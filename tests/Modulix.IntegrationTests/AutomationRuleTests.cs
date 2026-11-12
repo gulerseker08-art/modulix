@@ -50,9 +50,9 @@ public class AutomationRuleTests(AutomationFixture fixture) : IClassFixture<Auto
 
     private static readonly string[] PublisherPermissions = [.. ManagerPermissions, CoreModule.Permissions.PublishAutomation];
 
-    private static AutomationDefinition Definition(string documentStatus = "missing", string text = "Belge eksik", string action = NoteAction) => new(
+    private static AutomationDefinition Definition(string status = "pending", string text = "Planlama bekliyor", string action = NoteAction) => new(
         new RecordCreatedTrigger(),
-        new ConditionLeaf("logistics.shipment.documentStatus", AutomationOperator.Eq, [documentStatus]),
+        new ConditionLeaf("logistics.shipment.status", AutomationOperator.Eq, [status]),
         [new AutomationActionStep("note", action, new JsonObject { ["text"] = text })]);
 
     private static JsonElement Json(AutomationDefinition definition) => JsonSerializer.SerializeToElement(definition, AutomationJson.Options);
@@ -75,7 +75,7 @@ public class AutomationRuleTests(AutomationFixture fixture) : IClassFixture<Auto
         Assert.Null(created.Published);
         Assert.Equal(1, created.Draft!.VersionNo);
         Assert.Empty(created.DraftIssues);
-        Assert.Contains("Belge durumu = Eksik", created.Draft.Summary);
+        Assert.Contains("Durum = Planlama bekliyor", created.Draft.Summary);
         Assert.Contains("Kayıt oluşturulunca", created.Draft.Summary);
 
         // Taslak düzenlenir; sürüm numarası aynı kalır, eşzamanlılık sürümü artar.
@@ -160,7 +160,7 @@ public class AutomationRuleTests(AutomationFixture fixture) : IClassFixture<Auto
         // Taslak eksik olabilir: bilinmeyen aksiyon ve geçersiz koşul değeriyle kaydedilir.
         var broken = new AutomationDefinition(
             new RecordCreatedTrigger(),
-            new ConditionLeaf("logistics.shipment.documentStatus", AutomationOperator.Eq, ["yok-boyle-secenek"]),
+            new ConditionLeaf("logistics.shipment.status", AutomationOperator.Eq, ["yok-boyle-secenek"]),
             [new AutomationActionStep("note", "autotest.note.yok", new JsonObject())]);
         var created = await CreateRuleAsync(client, Create("Bozuk", broken));
         Assert.Equal(2, created.DraftIssues.Count);
@@ -237,12 +237,12 @@ public class AutomationRuleTests(AutomationFixture fixture) : IClassFixture<Auto
         var catalog = (await client.GetFromJsonAsync<AutomationCatalogDto>("/api/automation/catalog"))!;
 
         var shipment = Assert.Single(catalog.Entities, e => e.EntityKey == Shipment);
-        var status = Assert.Single(shipment.Fields, f => f.Key == "logistics.shipment.documentStatus");
+        var status = Assert.Single(shipment.Fields, f => f.Key == "logistics.shipment.status");
         Assert.Equal("Choice", status.Type);
         Assert.Contains("Eq", status.Operators);
         Assert.Contains("ChangedTo", status.Operators);
         Assert.DoesNotContain("Gt", status.Operators);
-        Assert.Equal(["complete", "missing"], status.Options.Select(o => o.Key).Order());
+        Assert.Equal(["cancelled", "delivered", "failed", "inTransit", "loading", "partial", "pending", "planned"], status.Options.Select(o => o.Key).Order(StringComparer.Ordinal));
         Assert.Contains(shipment.Events, e => e.EventType == "RecordCreated");
         var action = Assert.Single(catalog.Actions, a => a.Key == NoteAction);
         Assert.True(action.Available);
@@ -262,7 +262,7 @@ public class AutomationRuleTests(AutomationFixture fixture) : IClassFixture<Auto
         Assert.Empty(ok.Issues);
         Assert.False(ok.Evaluated);
         Assert.Equal("Kayıt oluşturulunca", ok.TriggerText);
-        Assert.Equal("Belge durumu = Eksik", ok.ConditionText);
+        Assert.Equal("Durum = Planlama bekliyor", ok.ConditionText);
         Assert.Contains(ok.Warnings, w => w.Contains("Örnek kayıt seçilmedi"));
 
         var invalid = await ReadAsync<AutomationPreviewDto>(await client.PostAsJsonAsync(
@@ -475,7 +475,7 @@ public class AutomationRuleTests(AutomationFixture fixture) : IClassFixture<Auto
             Assert.All(entries, e => Assert.NotEqual(Guid.Empty, e.UserId));
             var json = entries[0].Changes;
             Assert.Contains("Denetimli kural", json);
-            Assert.Contains("Belge durumu = Eksik", json);
+            Assert.Contains("Durum = Planlama bekliyor", json);
             Assert.DoesNotContain("DefinitionJson", json);
 
             var statusChange = entries[2].Changes;

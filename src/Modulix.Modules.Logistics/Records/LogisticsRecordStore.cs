@@ -47,7 +47,9 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
 
     private Dictionary<string, RecordField<TEntity>> FieldsByName => fieldsByName ??= Fields.ToDictionary(f => f.Name, StringComparer.Ordinal);
 
-    public string? PermissionFor(RecordOperation operation) => operation == RecordOperation.Read ? ReadPermission : WritePermission;
+    /// <summary>İş akışı kapısı açıkken yazma izni eylemin iznidir (ör. talep onayı); okuma her zaman kayıt türünün okuma iznidir.</summary>
+    public string? PermissionFor(RecordOperation operation) =>
+        operation == RecordOperation.Read ? ReadPermission : context.Gate.Permission ?? WritePermission;
 
     /// <summary>Tüm lojistik kayıtlarına özel alan eklenebilir (Y9a).</summary>
     public bool SupportsCustomFields => true;

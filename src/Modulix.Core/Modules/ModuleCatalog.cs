@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Modulix.Core.Contracts.Credentials;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
@@ -25,6 +26,7 @@ public sealed partial class ModuleCatalog
     private readonly Dictionary<string, (string ModuleKey, ChoiceListDefinition List)> choiceLists = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, LookupDefinition Lookup)> lookups = new(StringComparer.Ordinal);
     private readonly List<SharedRecordAccess> sharedAccess = [];
+    private readonly Dictionary<string, (string ModuleKey, CredentialOwner Owner)> credentialOwners = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, EventSubscription Subscription)> subscriptions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, BusinessEventDefinition Definition)> businessEvents = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> eventSchemaVersions = new(DomainEventTypes.SchemaVersions, StringComparer.Ordinal);
@@ -139,6 +141,19 @@ public sealed partial class ModuleCatalog
                 {
                     throw new InvalidOperationException(
                         $"Geçersiz ortak kayıt referansı: '{reference.EntityKey}.{reference.Field}' ({module.Key}).");
+                }
+            }
+
+            foreach (var owner in module.CredentialOwners)
+            {
+                if (!owner.EntityKey.StartsWith(module.Key + ".", StringComparison.Ordinal)
+                    || !CredentialCategories.All.Contains(owner.Category)
+                    || string.IsNullOrWhiteSpace(owner.DisplayName)
+                    || !module.Permissions.Any(p => p.Key == owner.ReadPermission)
+                    || !credentialOwners.TryAdd(owner.EntityKey, (module.Key, owner)))
+                {
+                    throw new InvalidOperationException(
+                        $"Geçersiz süreli belge sahibi: '{owner.EntityKey}' ({module.Key}). Kayıt türü ve okuma izni modülün olmalı, kategori tanımlı olmalı, tür bir kez bildirilmeli.");
                 }
             }
 
@@ -312,6 +327,22 @@ public sealed partial class ModuleCatalog
     /// <summary>Ortak kayıt türüne başvuran alanlar (ADR-0006), modül sırasıyla.</summary>
     public IEnumerable<SharedRecordReference> SharedReferencesTo(string entityKey) =>
         Modules.SelectMany(m => m.SharedRecordReferences).Where(r => r.SharedEntityKey == entityKey);
+
+    /// <summary>Süreli belge taşıyabilen kayıt türü ve modülü (ADR-0038 K3); bildirilmemişse null.</summary>
+    public (string ModuleKey, CredentialOwner Owner)? FindCredentialOwner(string entityKey) =>
+        credentialOwners.TryGetValue(entityKey, out var owner) ? owner : null;
+
+    /// <summary>Süreli belge taşıyabilen kayıt türleri, modül ve tanım sırasıyla.</summary>
+    public IEnumerable<(string ModuleKey, CredentialOwner Owner)> CredentialOwners =>
+        Modules.SelectMany(m => m.CredentialOwners.Select(o => (m.Key, o)));
+
+    /// <summary>
+    /// Erişimi sahip kaydın erişimi olan Core türü (süreli belge) için sahip türlerinin (modül, okuma izni) listesi; diğer türlerde null (türün kendi
+    /// okuma izni geçerlidir). Bu türün kuralı bütün sahip türlerinin belgelerini kapsar: kural yazan, tenant'ta modülü açık <b>her</b> sahip türünü
+    /// okuyabilmelidir ve kural bu okuma izinleriyle çalışır (yetki yükseltmesi yok). Sahibi bildirilmemişse liste boştur: tür kimseye görünmez.
+    /// </summary>
+    public IReadOnlyList<(string ModuleKey, string Permission)>? AutomationOwnerReads(string entityKey) =>
+        entityKey == CredentialEntities.Credential ? [.. CredentialOwners.Select(o => (o.ModuleKey, o.Owner.ReadPermission))] : null;
 
     /// <summary>Olay aboneliği ve modülü (ADR-0007); tanımlı değilse null.</summary>
     public (string ModuleKey, EventSubscription Subscription)? FindSubscription(string key) =>

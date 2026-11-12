@@ -12,8 +12,17 @@ namespace Modulix.Modules.Logistics.Records;
 /// araç bu tenant'ta olmalı, motorlu (dorse/römork değil) ve pasif olmamalıdır; Filo kapalıysa araç seçilemez. Sürücü silinmez (K12).
 /// Liste kişinin adına göre sıralanır ve kişinin adı, soyadı, telefonu ve e-postasıyla aranır.
 /// </summary>
-internal sealed class DriverRecordStore(LogisticsStoreContext context) : LogisticsRecordStore<Driver>(context)
+internal sealed class DriverRecordStore(LogisticsStoreContext context) : LogisticsRecordStore<Driver>(context), IRecordLabelProvider
 {
+    /// <summary>Sürücüyü başka listelerde (süreli belge) kişinin adı soyadıyla tanıtır.</summary>
+    public async Task<IReadOnlyDictionary<Guid, string>> LabelsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
+    {
+        Guid[] wanted = [.. ids];
+        return await Context.Data.Set<Driver>().AsNoTracking().Where(d => wanted.Contains(d.Id))
+            .Join(Context.Data.Set<Person>().AsNoTracking(), d => d.PersonId, p => p.Id, (d, p) => new { d.Id, Name = p.FirstName + " " + p.LastName })
+            .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
+    }
+
     public override string EntityKey => LogisticsModule.Entities.Driver;
 
     protected override string ReadPermission => LogisticsModule.Permissions.DriversRead;

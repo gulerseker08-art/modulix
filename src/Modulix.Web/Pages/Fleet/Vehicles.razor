@@ -17,6 +17,12 @@
     @if (editing)
     {
         <VehicleEditor Vehicle="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
+        @if (selected is not null)
+        {
+            <CredentialsPanel OwnerEntityKey="@FleetAccess.VehicleEntityKey" OwnerId="selected.Id" Category="@CredentialAccess.Vehicle" Lookups="Lookups"
+                              CanWrite="@Session.Can(FleetAccess.VehiclesWrite)" Title="Araç belgeleri"
+                              EmptyText="Bu araca henüz belge eklenmedi (muayene, trafik sigortası, kasko…)." />
+        }
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@

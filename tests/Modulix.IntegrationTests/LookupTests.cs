@@ -33,7 +33,7 @@ public class LookupTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFa
         using var otherAdmin = await LoginAsync(b.Admin);
 
         var defaults = (await rep.GetFromJsonAsync<List<LookupDto>>("/api/lookups"))!;
-        Assert.Equal(25, defaults.Count);
+        Assert.Equal(26, defaults.Count); // CRM lookup'ları + Core'un "Bildirim gönder" alıcısı (core.notification.recipient)
         var contactCompany = defaults.Single(l => l.Key == ContactCompany);
         Assert.True(contactCompany.Searchable);
         Assert.False(contactCompany.Customized);

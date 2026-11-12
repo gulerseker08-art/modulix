@@ -179,6 +179,11 @@ public sealed class RecordPipeline(
         {
             return Invalid<RecordData>(invalid.Errors);
         }
+        catch (RecordAccessDeniedException denied)
+        {
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, denied.Message);
+        }
+
         catch (RecordConflictException conflict)
         {
             return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, conflict.Message);
@@ -267,6 +272,11 @@ public sealed class RecordPipeline(
         {
             return Invalid<RecordData>(invalid.Errors);
         }
+        catch (RecordAccessDeniedException denied)
+        {
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, denied.Message);
+        }
+
         catch (RecordConflictException conflict)
         {
             return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, conflict.Message);
@@ -299,6 +309,11 @@ public sealed class RecordPipeline(
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return RecordResult<bool>.Ok(true);
         }
+        catch (RecordAccessDeniedException denied)
+        {
+            return RecordResult<bool>.Fail(RecordErrorCode.PermissionDenied, denied.Message);
+        }
+
         catch (RecordConflictException conflict)
         {
             return RecordResult<bool>.Fail(RecordErrorCode.Conflict, conflict.Message);

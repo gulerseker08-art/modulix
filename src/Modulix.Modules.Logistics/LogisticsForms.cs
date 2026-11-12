@@ -30,5 +30,62 @@ public static class LogisticsForms
             new("defaultVehicleId", "Varsayılan araç", "arac", 6),
             new("notes", "Notlar", "notlar", 12),
         ]),
+
+        new(LogisticsModule.Entities.CarrierTerms, "Taşıyıcı anlaşması",
+        [new(General, "Genel bilgiler"), new("kosullar", "Ücret ve performans")],
+        [
+            new("anlasma", "Anlaşma", "file-text"),
+            new("gecerlilik", "Geçerlilik ve ödeme", "calendar"),
+            new("ucret", "Ücret anlaşması", "wallet", Tab: "kosullar"),
+            new("performans", "Performans", "trending-up", Tab: "kosullar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "kosullar"),
+        ],
+        [
+            new("carrierPartyId", "Taşıyıcı firma", "anlasma", 6, Required: true, Fixed: true),
+            new("title", "Anlaşma adı", "anlasma", 6, Required: true, Fixed: true),
+            new("agreementNo", "Anlaşma no", "anlasma", 6),
+            new("isActive", "Etkin", "anlasma", 6, Fixed: true),
+            new("validFrom", "Başlangıç", "gecerlilik", 4, Required: true, Fixed: true),
+            new("validTo", "Bitiş", "gecerlilik", 4),
+            new("currency", "Para birimi", "gecerlilik", 4, Required: true, Fixed: true),
+            new("paymentTermDays", "Ödeme vadesi (gün)", "gecerlilik", 4),
+            new("rateNote", "Ücret anlaşması", "ucret", 12),
+            new("performanceNote", "Performans notu", "performans", 12),
+        ]),
+
+        Cargo(LogisticsModule.Entities.TransportRequest, "Taşıma talebi", [new("externalRef", "Dış referans", "taraflar", 6)]),
+        Cargo(LogisticsModule.Entities.Shipment, "Sevkiyat", []),
     ];
+
+    /// <summary>Talep ve sevkiyatın ortak düzeni: taraflar ve güzergâh, yük, notlar (üç sekme).</summary>
+    private static FormDefinition Cargo(string entity, string name, IReadOnlyList<FormFieldDefinition> extra) =>
+        new(entity, name,
+        [new(General, "Taraflar ve güzergâh"), new("yuk", "Yük"), new("notlar", "Notlar ve ek bilgiler")],
+        [
+            new("taraflar", "Taraflar", "building"),
+            new("guzergah", "Güzergâh ve tarih", "map-pin"),
+            new("yuk", "Yük", "package", Tab: "yuk"),
+            new("notlar", "Notlar", "message-square", Tab: "notlar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
+        ],
+        [
+            new("customerPartyId", "Müşteri", "taraflar", 6, Required: true, Fixed: true),
+            new("transportModeKey", "Taşıma türü", "taraflar", 6, Required: true, Fixed: true),
+            new("senderPartyId", "Gönderen", "taraflar", 6),
+            new("receiverPartyId", "Alıcı", "taraflar", 6),
+            .. extra,
+            new("pickupCity", "Yükleme şehri", "guzergah", 6, Required: true, Fixed: true),
+            new("deliveryCity", "Teslim şehri", "guzergah", 6, Required: true, Fixed: true),
+            new("pickupAddress", "Yükleme adresi", "guzergah", 6),
+            new("deliveryAddress", "Teslim adresi", "guzergah", 6),
+            new("pickupDate", "Yükleme günü", "guzergah", 6, Required: true, Fixed: true),
+            new("deliveryBy", "En geç teslim", "guzergah", 6),
+            new("cargoDescription", "Yük tanımı", "yuk", 12, Required: true, Fixed: true),
+            new("weightKg", "Ağırlık (kg)", "yuk", 3),
+            new("volumeM3", "Hacim (m³)", "yuk", 3),
+            new("palletCount", "Palet", "yuk", 3),
+            new("loadingMeters", "Yükleme metresi (LDM)", "yuk", 3),
+            new("hazardous", "Tehlikeli madde (ADR)", "yuk", 6),
+            new("notes", "Notlar", "notlar", 12),
+        ]);
 }

@@ -17,6 +17,12 @@
     @if (editing)
     {
         <DriverEditor Driver="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
+        @if (selected is not null)
+        {
+            <CredentialsPanel OwnerEntityKey="@LogisticsAccess.DriverEntityKey" OwnerId="selected.Id" Category="@CredentialAccess.Driver" Lookups="Lookups"
+                              CanWrite="@Session.Can(LogisticsAccess.DriversWrite)" Title="Sürücü belgeleri"
+                              EmptyText="Bu sürücüye henüz belge eklenmedi (ehliyet, SRC, psikoteknik…)." />
+        }
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@

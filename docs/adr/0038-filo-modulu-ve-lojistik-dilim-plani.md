@@ -191,3 +191,149 @@ Sıra kararı: dilim 2 (Core süreli belge) dosya ekleri ADR'sini (Ç4, PR #285,
 | `dotnet test tests/Modulix.Modules.Logistics.Tests` | 8: sekmeli form, kişi uzantısı ve Filo aracına yalnızca anahtarla bağ (Filo derleme başvurusu yok), rol şablonu ve katalog, Shared sabitleri |
 | `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsDriverTests\|FleetVehicleTests\|ModulesAndRolesTests"` (SQL Server; CI koşar) | 18: mutlu yol (kişi + kart, taşeron, Filo aracı, ada ve telefona göre arama, sıralama, süzgeçler, denetim kaydı, kişi kullanımdayken silinemez), doğrulama (tek kart, taşıyıcı zorunluluğu ve rolü, dorse, pasif ve bilinmeyen araç, Filo kapalıyken araç seçilemez ama kart güncellenir, silme 409), tenant izolasyonu (başka tenant'ın kişisi ve aracı kullanılamaz, kart görünmez), yetki (okuyan yazamaz ve kişi açamaz, sürücü yazma izni kişi açmaya yeter, modül kapalıyken 403) |
 | `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Web.Tests` | 69 / 121: Lojistik menüsü yalnızca modül ve izinle; pasif kartlarda yalnızca İK kaldı |
+
+## 13. Dilim 3b: Taşıyıcı anlaşması (11 Kasım 2026)
+
+K4 uygulandı: taşıyıcı firma kimliği `core.Party`'dir ("Taşıyıcı" ilişki rolü); lojistik yalnızca ilişkinin **koşulunu** tutar. Modülün mevcut `logistics.carriers.read/write` izinleri bu kaydı korur (izin açıklamaları "taşıyıcı anlaşması" olarak güncellendi).
+
+- **Anlaşma (`logistics.CarrierTerms`, `ICompanyShared`):** taşıyıcı (yalnızca oluştururken; rol oluşturmada denetlenir), anlaşma adı, numara (büyük harf; `UNIQUE(TenantId, CarrierPartyId, AgreementNo)` süzgeçli), başlangıç, bitiş (boş = süresiz), para birimi (ISO 4217), ödeme vadesi (0-365 gün), ücret anlaşması ve performans notu (serbest metin), etkin bayrağı, özel alanlar. Migration `LogisticsCarrierTerms` (RLS).
+- **Çakışma kuralı:** aynı taşıyıcının **etkin** anlaşmalarının `[başlangıç, bitiş]` aralıkları kesişemez; bir günde tek geçerli anlaşma olur. Pasif anlaşma (taslak teklif, eski koşul) denetime girmez. İleti çakışan anlaşmanın adını verir.
+- **Süzgeçler:** `validOn` o gün geçerli etkin anlaşmaları, `expiredBefore` o günden önce biteni verir; liste taşıyıcı adına göre, aynı taşıyıcıda en yeni dönem üstte sıralanır. Düzeltme için silinebilir (K12 anlaşmayı kapsamaz; hakediş gelince kullanılan anlaşmanın silinmesi o dilimde engellenir).
+- **Arayüz:** "Taşıyıcı anlaşmaları" ekranı (`/lojistik/tasiyici-anlasmalari`: Tüm anlaşmalar, Bugün geçerli, Süresi dolan, Pasif; durum rozeti geçerli / bitiyor (30 gün, görsel eşik) / süresi doldu / başlamadı / pasif) ve sekmeli anlaşma kartı (Genel bilgiler; Ücret ve performans). Yeni CSS sınıfı ya da token yok.
+
+**Bilerek yapılmadı:** tarife ve ücret hesabı (Ç18a.2), hakediş (dilim 7), anlaşma belgesi dosyası (Ç4, PR #285), anlaşma bitişine kala uyarı kuralı (Lojistik'in otomasyon kayıt kaynağı yok; sevkiyat diliminde eklenir), taşıyıcı performans puanı.
+
+### Test sonuçları (Dilim 3b)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 11 (3 yeni): sekmeli anlaşma formu, taşıyıcı izinleri ve firma bağı, Shared sabitleri; taşıyıcı seçen her lookup rol süzgeçli |
+| `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsCarrierTermsTests\|LogisticsDriverTests"` (SQL Server; CI koşar) | 8: mutlu yol (birbirini izleyen dönemler, bugün geçerli / süresi dolan süzgeçleri, taşıyıcıya göre sıralama ve arama, denetim kaydı, silme), doğrulama (zorunlu alanlar, taşıyıcı rolü, tarih sırası, para birimi, numara benzersizliği, süresiz anlaşmayla çakışma; pasif anlaşma çakışmaz), tenant izolasyonu (başka tenant'ın taşıyıcısı ve anlaşması görünmez), yetki (okuyan yazamaz ve silemez, sürücü izni anlaşmaları açmaz) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Web.Tests` | 69 / 121: anlaşma ekranı yalnızca taşıyıcı okuma izniyle |
+
+## 14. Dilim 2a: Core süreli belge (12 Kasım 2026)
+
+K3 uygulandı. Dosya ekleri (ADR-0040, PR #285) main'e girdiği için belge dosyası da bu dilimde bağlandı. Yaklaşan bitiş uyarısı (`DateRelative` kuralı) dilim 2b'ye ayrıldı: Core kayıt türünün otomasyon kayıt kaynağı ayrı bir incelenebilir adımdır.
+
+- **Kayıt (`core.Credentials`, `ICompanyShared`):** sahip kayıt türü ve kimliği (yalnızca oluştururken), belge türü, belge no (`UNIQUE(TenantId, OwnerEntityKey, OwnerId, TypeKey, DocumentNo)` süzgeçli), veren kurum, başlangıç ve bitiş (boş = süresiz), durum (`active` / `revoked`), notlar. "Süresi doldu" saklanmaz, tarihten hesaplanır. Migration `CoreCredentials` (RLS). Sahip kayda veritabanı yabancı anahtarı yoktur; bağ kayıt deposunda denetlenir.
+- **Sahip türünü modül bildirir:** `IModule.CredentialOwners` (ör. Filo `fleet.vehicle` → `vehicle`, Lojistik `logistics.driver` → `driver`). Katalog anahtarın modüle ait olduğunu ve kategorinin tanımlı olduğunu denetler. Core'da sektör koşulu yoktur.
+- **Belge türü** `core.credential-type` (Y9b) listesidir. Kategorileri: `vehicle`, `driver`, `party`, `facility`. Hazır değerler örnektir (muayene, trafik sigortası, kasko, egzoz, takograf kalibrasyonu; ehliyet, SRC, psikoteknik, ADR, takograf kartı; yetki belgesi, vekâletname; faaliyet izni). Türün kategorisi sahip türün kategorisiyle aynı olmalıdır.
+- **Erişim sahip kaydın erişimidir** (ADR-0040 K2 ile aynı ilke; ayrı `core.credentials.*` izni açılmadı, bölüm 5'teki taslaktan sapma):
+  - Sahip türü okuyabilen o türün belgelerini görür. Okuyamadığı türün belgeleri sorgudan elenir ve tekil okumada 404 döner.
+  - Ekleme, değiştirme ve silme için sahip kayıtta güncelleme izni ve sahip modülün yazılabilir lisansı gerekir. Yoksa 403 döner; bunun için yeni `RecordAccessDeniedException` eklendi.
+  - Sahip modülü kapanınca belgeler de görünmez.
+  - Dosya ekleme ve silme aynı kurala uyar: yeni `IRecordWriteGuard` sözleşmesini dosya deposu da sorar. Böylece araç yazan biri sürücü belgesine dosya ekleyemez.
+  - Sahip türü veri kapsamlı (sorumlu ya da şirket alanı) olamaz. Depo bu durumda satır düzeyi sahip kapsamı uygulamaz, ilk kullanımda hata verir; bugünkü sahipler (araç, sürücü) kapsamsızdır.
+- **Silme:** yanlış girilen belge silinebilir. Dosyası olan belge silinmez (409): önce dosya silinir ya da belge "İptal edildi" yapılır, böylece dosya erişilemez kalmaz.
+- **Süzgeçler:** sahip (tür, kimlik), tür, durum, `validOn` (o gün geçerli), `expiresBy` (o güne kadar bitecek ya da bitmiş geçerli belgeler), `expiredBefore`. Varsayılan sıra bitişi en yakın olandan başlar; süresiz belgeler sondadır.
+- **Arayüz:**
+  - Araç ve sürücü kartının altında "Araç belgeleri" / "Sürücü belgeleri" paneli var. Durum rozetleri: geçerli, "N gün kaldı" (30 gün, yalnızca görsel eşik), süresi doldu, başlamadı, iptal. Özet satırı yaklaşan ve süresi dolan belgeleri sayar.
+  - Sekmeli belge formu (Belge; Notlar) ve ortak `AttachmentPanel` (ADR-0040 dilim 1b'nin ilk bileşeni: liste, yükleme, indirme, silme).
+  - Yeni CSS sınıfı ya da token yok.
+
+**Bilerek yapılmadı:** yaklaşan bitiş uyarı kuralı (dilim 2b), belge zorunluluğu (sefer atamasında uyarı/engel, dilim 5, bölüm 9 madde 3), firma ve tesis sahipleri (Party belgesi ve antrepo izni; kategori hazır, sahip bildirimi sonra), tüm belgelerin tek listesi (sahip adını göstermek için sahip etiketi sözleşmesi gerekir; 2b ile), vekâletin taşınması (K3: zorunlu değil).
+
+### Test sonuçları (Dilim 2a)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Fleet.Tests` | sahip bildirimi ve katalog doğrulaması, belge türü listesi ve formu, Shared sabitleri |
+| `dotnet test tests/Modulix.IntegrationTests --filter "CredentialTests\|FileTests"` (SQL Server; CI koşar) | mutlu yol (araç ve sürücü belgeleri, bitişe göre sıra, geçerli / bitecek / bitmiş süzgeçleri, arama, iptal, denetim kaydı, dosya eki, dosyalı belge silinmez), doğrulama (zorunlu alanlar, sahip olmayan tür, bilinmeyen kayıt, kategori, liste dışı tür, tarih sırası, numara tekilliği, sahip değişmez, eski sürüm), tenant izolasyonu (başka tenant'ın aracına belge eklenemez, belgesi görünmez, değiştirilemez, silinemez, dosya eklenemez), yetki (araç okuyan görür ama yazamaz ve dosya ekleyemez; sürücü yazan araç belgesini görmez; araç yazan sürücü belgesini değiştiremez ve dosya ekleyemez; modül kapanınca belgeler gizlenir; izinsiz 403) |
+
+## 15. Dilim 2b: Bitişe kala uyarı ve belge takibi (12 Kasım 2026)
+
+K3'ün uyarı kısmı uygulandı: eşik koda değil firmanın kuralına yazılır.
+
+- **Kural türü `core.credential`** (ADR-0027):
+  - Tarama kaynağı `CredentialAutomationRecordSource`, yalnızca geçerli (iptal edilmemiş) belgeleri tarar.
+  - Tarihe bağlı tetikleyici `validTo` / `validFrom` alanlarında çalışır, ör. "bitişine 30 gün kala".
+  - Kayıt olayları: eklendi, güncellendi.
+  - Alanlar: belge no (etiket), tür anahtarı, sahip türü, veren kurum, tarihler, durum.
+- **Erişim kuralı:** belge kuralı bütün sahip türlerinin belgelerini kapsar.
+  - Kural düzenleyicide "Süreli belge" türünü yalnızca tenant'ta modülü açık **her** sahip türünü okuyabilen görür; bunun için en az bir sahip modülü açık olmalıdır.
+  - Kural bu okuma izinleriyle çalışır (`ModuleCatalog.AutomationOwnerReads`, `AutomationRuleIdentity`). Yayınlayanın sahip olmadığı bir okuma izni kurala geçmez.
+  - Sahip modülü olmayan tenant'ta tür görünmez.
+- **Core aksiyonu "Bildirim gönder"** (`core.notify`): sektörden bağımsızdır, her kayıt türünün kuralında kullanılır.
+  - Parametreler: alıcı (Core üye lookup'ı `core.notification.recipient`; kaydın sorumlu alanına da bağlanabilir) ve ileti (en çok 200 karakter, `{{alan}}` değişkenli).
+  - Alıcı kaydı **kendi yetkisiyle** göremiyorsa bildirim gönderilmez, adım atlanır. Böylece başlıktaki kayıt değişkenleri görmediği bilgiyi sızdırmaz.
+  - Aynı adım aynı kayıt için aynı alıcıya bir kez yazar. Tekilleştirme anahtarı adımın idempotency anahtarının SHA-256 özetidir.
+  - Kural motorunun çağrı kimliğinde kullanıcı yoktur (`UserId` boş); bu yüzden alıcı zorunludur.
+- **Sahip etiketi sözleşmesi:** `IRecordLabelProvider`. Araç kaydı plakayı, sürücü kaydı kişinin adını soyadını verir. Belge listesi her satıra salt okunur `ownerLabel` ekler; bu alan yalnızca listede bulunur, tekil okuma ve denetim kaydında yoktur.
+- **Arayüz:** "Belge takibi" ekranı iki menüde: Filo › Araç belgeleri (`/filo/belgeler`) ve Lojistik › Sürücü belgeleri (`/lojistik/surucu-belgeleri`).
+  - Aynı bileşen, sahip türü rotadan gelir.
+  - Görünümler: Bitişi yaklaşan (varsayılan: bugün geçerli ve 30 gün içinde bitecek), Süresi dolan, Bugün geçerli, Tüm belgeler, İptal edilen.
+  - Grid şablonu (`ViewTabs`, sıralanan başlıklar, sütun seçici, ⋯ menüsü, sayfalama). Belge kartın panelinden eklenir, buradan düzenlenir.
+  - Yeni CSS sınıfı ya da token yok.
+
+**Bilerek yapılmadı:**
+- Hazır kural şablonu ("bitişine 30 gün kala bildir"): alıcı tenant'a özgüdür, şablon alıcısız yayınlanamaz.
+- E-posta ile bildirim: aksiyon yalnızca uygulama içi; e-posta tercihi ayrı iştir.
+- Bildirim bağlantısı: belgenin kendi sayfası yok; sahip kartına bağlantı, sahip türüne göre rota sözleşmesi ister.
+- Sahip modülü sonradan açılırsa kural o türün okuma iznini de kazanır; yayın anındaki küme saklanmaz. Kabul edilen risk: bildirim yine alıcının kendi yetkisiyle süzülür.
+
+### Test sonuçları (Dilim 2b)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Fleet.Tests` | 14: belge kural türü, tarih alanı, tarama kaynağı, "Bildirim gönder" ve alıcı lookup'ı katalogda; sahip okuma izni modülün olmalı |
+| `dotnet test tests/Modulix.Core.Tests` | Core aksiyon listesi ve abonelik kayıt türleri süreli belgeyle güncellendi |
+| `dotnet test tests/Modulix.IntegrationTests --filter "CredentialExpiryTests\|CredentialTests"` (SQL Server; CI koşar) | mutlu yol ("bitişine 30 gün kala" kuralı yalnızca o güne düşen geçerli belgeyi bulur, iptal edilen ve 31 gün kalan taranmaz, bildirim kayıt değişkeniyle bir kez yazılır; listede plaka ve ad soyad), doğrulama (metin alanına tarih tetikleyicisi, boş ileti, alıcısız adım yayınlanmaz), tenant izolasyonu (tarama başka tenant'ın belgesini bulmaz, onun üyesine bildirim gitmez), yetki (aracı göremeyen alıcıya araç belgesinin bildirimi gitmez; sürücü izni araç belgelerini göstermez) |
+
+## 16. Dilim 4: Taşıma talebi ve sevkiyat (12 Kasım 2026)
+
+K6 ve K7'nin ilk yarısı uygulandı: talep → onay → sevkiyat → planlama → yükleme → yol. Teslim (K8) dilim 6'da, sefer ve durak (K5) dilim 5'tedir.
+
+- **Ortak yük ve güzergâh** (`CargoEntity`):
+  - Taraflar: müşteri (zorunlu), gönderen, alıcı (`core.Party`).
+  - Taşıma türü: `logistics.transport-mode` listesi (Y9b). Kategoriler `full` (komple) ve `partial` (parsiyel); hazır değerler FTL, Ekspres, LTL, Grupaj.
+  - Güzergâh: yükleme ve teslim şehri (zorunlu) ve adresi.
+  - Tarih: yükleme günü (zorunlu) ve en geç teslim; teslim günü yükleme gününden önce olamaz.
+  - Yük: tanım (zorunlu), kg, m³, palet, LDM, tehlikeli madde (ADR) bayrağı.
+  - Notlar, durum ve gerekçe; özel alanlar.
+  - Adres bugün metindir; durak adresi lookup'ı sefer diliminde gelir.
+- **Taşıma talebi** (`logistics.TransportRequests`):
+  - Kaynak `manual` / `api`.
+  - Dış referans kaynak içinde tekildir: `UNIQUE(TenantId, Source, ExternalRef)` süzgeçli. Böylece API'nin yeniden denediği istek çift talep açmaz.
+  - Yalnızca "Yeni" talep düzenlenir.
+- **Sevkiyat** (`logistics.Shipments`):
+  - Genel uçtan açılmaz; yalnızca talep onayıyla doğar.
+  - Her talepten en çok bir sevkiyat: `UNIQUE(TenantId, RequestId)`. Talebe aynı modül içinde bileşik yabancı anahtarla bağlıdır.
+  - Yükleme başlayana kadar (Planlama bekliyor, Planlandı) yük ve tarih düzeltilebilir.
+  - Migration `LogisticsRequestsShipments` (RLS).
+- **Durum yalnızca komutla** (K7):
+  - Geçiş tablosu `LogisticsTransitions`; iş akışı `LogisticsWorkflow`.
+  - Uçlar: `GET/POST /api/logistics/{requests|shipments}/{id}/actions`.
+  - Durum ve gerekçe alanları genel güncellemede yok sayılır. Komut, depoya "iş akışı kapısı"nı açarak kayıt boru hattından yazar (izin, sürüm denetimi 409, denetim kaydı, outbox). Bu, Siparişlerin `OrderWorkflowGate` kalıbıdır.
+- **Talep eylemleri** (onay mekanizması):
+  - **Onayla**: ayrı izin `logistics.requests.approve`. Aynı işlemde (`RunAtomicAsync`) sevkiyatı talebin yük ve güzergâhıyla açar, talebi "Onaylandı" yapar ve sevkiyata bağlar (`shipmentId`).
+  - **Reddet**: aynı izin, gerekçe zorunlu.
+  - **İptal**: yazma izni, gerekçe zorunlu, yalnızca yeni talep.
+  - Onaylayan, sevkiyat yazma izni olmadan da onaylayabilir; sevkiyat onayın parçasıdır.
+- **Sevkiyat eylemleri:**
+  - Planlandı → Yükleme başladı → Yola çıktı.
+  - İptal: teslimden önce ve yola çıkmadan, gerekçeli.
+  - Teslim durumlarına bu komutlarla geçilmez (birim testle denetlenir).
+  - "Planlandı" bugün elle verilir; sefer ataması gelince otomatik olur.
+- **Rol şablonları:**
+  - "Operasyon": talep açar, sevkiyat yürütür, onaylamaz.
+  - Yeni "Operasyon müdürü": onaylar ve reddeder.
+- **Kural yeteneği:** iki kural türü `logistics.transport-request` ve `logistics.shipment`.
+  - Tarama kaynağı yalnızca açık kayıtları tarar.
+  - Tarihe bağlı tetikleyici `pickupDate` / `deliveryBy`, ör. "yükleme gününe 1 gün kala planlanmamış sevkiyatı bildir". Durum geçişleri güncelleme olayıdır.
+  - Eski iskelet beyanındaki `documentStatus` ve `capacityUsagePercent` alanları kayıtta olmadığı için kaldırıldı; uygunluk sefer atamasındadır.
+- **Arayüz:** Lojistik › Taşıma talepleri (`/lojistik/talepler`) ve Sevkiyatlar (`/lojistik/sevkiyatlar`).
+  - Grid şablonu. Görünümler: Onay bekleyen / Onaylanan / Reddedilen / Tümü; Açık / Planlama bekleyen / Yolda / Kapanan / Tümü.
+  - Sekmeli kart: Taraflar ve güzergâh, Yük, Notlar. Kartın üstünde eylem çubuğu var; gerekçe isteyen eylem önce gerekçe sorar, yapılamayan eylem nedeniyle pasif görünür.
+  - Kapanan kayıt salt okunur.
+  - Yeni CSS sınıfı ya da token yok.
+
+**Karar (sapma):** talep ve sevkiyat bölüm 3'teki öneriye göre `ICompanyScoped` olacaktı. Kod tabanında henüz şirket kapsamlı tablo yok ve boru hattının şirket süzgeci uçtan uca denenmedi. Bu yüzden bu dilimde `ICompanyShared` kaldı. İşletici şirket alanı ilk şirket kapsamlı tabloyla birlikte ayrı bir dilimde eklenir (boş sütun + geri doldurma).
+
+**Bilerek yapılmadı:** navlun ve para birimi (dilim 7, alan yetkisiyle), sefer ve durak bağı (dilim 5), teslim ve kanıt (dilim 6), web formu ve sipariş köprüsü (K6, dilim 11), talep numarası serisi (Ç8.1), kendi talebini onaylama yasağı ayarı (Siparişlerdeki gibi; ilk ihtiyaçta ayar olarak).
+
+### Test sonuçları (Dilim 4)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 14: geçiş tablosu durum listesiyle tutarlı, teslim durumlarına komutla geçilmez, iptal gerekçeli ve yoldan önce, onay ayrı izin ve yalnızca müdür şablonunda; sekmeli formlar; kategorili taşıma türü; Shared sabitleri; kural alanları ve tarama kaynağı |
+| `dotnet test tests/Modulix.IntegrationTests --filter "LogisticsShipmentTests\|SharedRecordTests\|LookupTests"` (SQL Server; CI koşar) | mutlu yol (talep → onay → sevkiyat aynı işlemde ve bağlı → planlandı → yükleniyor → yolda, durum süzgeci, denetim kaydı), doğrulama (zorunlu alanlar, tarih sırası, referans tekilliği, genel güncelleme durumu yazamaz, gerekçesiz ret, bilinmeyen eylem, eski sürüm, sevkiyat doğrudan açılmaz, silme yok, kapanan talep düzenlenmez, sırasız geçiş, yoldaki sevkiyat iptal edilmez ve düzenlenmez), tenant izolasyonu (başka tenant'ın müşterisi kullanılamaz, talebi görünmez, eylemleri 404, aynı referans başka tenant'ta serbest), yetki (operasyon onaylayamaz ve eylem listesinde onay görmez, okuyan yazamaz ve eylem yapamaz, izinsiz 403, yalnızca onay izniyle onaylanır, modül kapalıyken 403) |

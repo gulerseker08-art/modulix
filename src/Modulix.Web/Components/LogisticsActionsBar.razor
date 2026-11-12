@@ -1,0 +1,92 @@
+@* Taşıma talebi ve sevkiyat iş akışı eylemleri (ADR-0038 K7): onayla, reddet, planlandı, yükleme başladı, yola çıktı, iptal. Eylemler ve ön koşul
+   sonucu sunucudan gelir (/api/logistics/{tür}/{id}/actions); kullanıcının izni olmayan eylem hiç gelmez, yapılamayan eylem nedeniyle pasif
+   görünür. Gerekçe isteyen eylem (ret, iptal) önce gerekçe sorar. Kararı sunucu verir; sürüm değiştiyse 409 iletisi gösterilir. *@
+@inject ApiClient Api
+
+@if (actions is { Count: > 0 })
+{
+    <section class="list-toolbar" aria-label="İş akışı eylemleri">
+        @if (pending is { } asking)
+        {
+            <label class="visually-hidden" for="action-reason">Gerekçe</label>
+            <input id="action-reason" class="form-control" maxlength="500" placeholder="@($"{asking.Label} gerekçesi")" @bind="reason" @bind:event="oninput" />
+            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => pending = null">Vazgeç</button>
+            <button type="button" class="btn btn-outline-danger" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" @onclick="() => RunAsync(asking)">@asking.Label</button>
+        }
+        else
+        {
+            @foreach (var action in actions)
+            {
+                <button type="button" class="@(action.Destructive ? "btn btn-outline-danger" : "btn btn-tonal")" disabled="@(busy || !action.Allowed)"
+                        title="@action.Message" @onclick="() => StartAsync(action)">
+                    @action.Label
+                </button>
+            }
+        }
+    </section>
+}
+
+@if (message is not null)
+{
+    <div class="alert alert-danger" role="alert">@message</div>
+}
+
+@code {
+    private List<LogisticsActionDto>? actions;
+    private LogisticsActionDto? pending;
+    private string? reason;
+    private string? message;
+    private bool busy;
+    private (Guid, long) loadedFor;
+
+    /// <summary><c>requests</c> ya da <c>shipments</c>.</summary>
+    [Parameter, EditorRequired] public string Kind { get; set; } = LogisticsLabels.Requests;
+
+    [Parameter, EditorRequired] public RecordResponse Record { get; set; } = default!;
+
+    /// <summary>Eylem başarılı olunca kaydın yeni hali.</summary>
+    [Parameter] public EventCallback<RecordResponse> Changed { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (Record.Id, Record.Version))
+        {
+            return;
+        }
+
+        loadedFor = (Record.Id, Record.Version);
+        pending = null;
+        var result = await Api.GetAsync<List<LogisticsActionDto>>($"/api/logistics/{Kind}/{Record.Id}/actions");
+        actions = result.Value ?? [];
+        message = result.Error;
+    }
+
+    private async Task StartAsync(LogisticsActionDto action)
+    {
+        if (action.RequiresReason)
+        {
+            pending = action;
+            reason = null;
+            return;
+        }
+
+        await RunAsync(action);
+    }
+
+    private async Task RunAsync(LogisticsActionDto action)
+    {
+        busy = true;
+        message = null;
+        var result = await Api.PostAsync<RecordResponse>($"/api/logistics/{Kind}/{Record.Id}/actions", new RunLogisticsActionRequest(action.Action, Record.Version, reason));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            message = result.FieldErrors?.Values.SelectMany(v => v).FirstOrDefault() ?? result.Error;
+            return;
+        }
+
+        pending = null;
+        reason = null;
+        await Changed.InvokeAsync(result.Value!);
+    }
+}

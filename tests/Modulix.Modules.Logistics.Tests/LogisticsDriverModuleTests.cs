@@ -17,7 +17,7 @@ public class LogisticsDriverModuleTests
     [Fact]
     public void The_driver_form_is_tabbed_and_keeps_the_person_on_the_first_tab()
     {
-        var form = Assert.Single(LogisticsForms.All);
+        var form = Assert.Single(LogisticsForms.All, f => f.EntityKey == LogisticsModule.Entities.Driver);
 
         Assert.Equal(LogisticsModule.Entities.Driver, form.EntityKey);
         Assert.True(form.Tabs.Count >= 2);
@@ -38,9 +38,10 @@ public class LogisticsDriverModuleTests
 
         var vehicle = Assert.Single(Module.Lookups, l => l.Key == LogisticsLookupDefinitions.DriverVehicle);
         Assert.Equal("fleet.vehicle", vehicle.TargetEntityKey);
-        var carrier = Assert.Single(Module.Lookups, l => l.FixedFilterName is not null);
-        Assert.Equal(LogisticsLookupDefinitions.DriverCarrier, carrier.Key);
-        Assert.Equal(LogisticsModule.RelationshipRoles.Carrier, carrier.FixedFilterValue);
+        // Taşıyıcı seçen her lookup "Taşıyıcı" rolüyle süzülür (sürücü ve taşıyıcı anlaşması).
+        var carriers = Module.Lookups.Where(l => l.FixedFilterName is not null).ToList();
+        Assert.Equal([LogisticsLookupDefinitions.DriverCarrier, LogisticsLookupDefinitions.TermsCarrier], carriers.Select(l => l.Key));
+        Assert.All(carriers, l => Assert.Equal(LogisticsModule.RelationshipRoles.Carrier, l.FixedFilterValue));
 
         // Modül yalnızca Core.Contracts'a başvurur: Filo'ya derleme zamanı bağı yoktur.
         Assert.DoesNotContain(typeof(LogisticsModule).Assembly.GetReferencedAssemblies(), a => a.Name == "Modulix.Modules.Fleet");
@@ -52,7 +53,7 @@ public class LogisticsDriverModuleTests
         var catalog = ModuleCatalog.Create(new LogisticsModule());
 
         Assert.Equal(["core", "logistics"], catalog.Modules.Select(m => m.Key));
-        var operations = Assert.Single(Module.RoleTemplates);
+        var operations = Module.RoleTemplates.Single(t => t.Key == "logistics.operations");
         Assert.Contains(LogisticsModule.Permissions.DriversRead, operations.Permissions);
         Assert.Contains(LogisticsModule.Permissions.DriversWrite, operations.Permissions);
     }

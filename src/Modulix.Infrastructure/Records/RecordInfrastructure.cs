@@ -299,6 +299,7 @@ public static class RecordsSetup
         services.AddScoped<IRecordStore, PartyRecordStore>();
         services.AddScoped<IRecordStore, PersonRecordStore>();
         services.AddScoped<IRecordStore, PartyRelationshipRecordStore>();
+        services.AddScoped<IRecordStore, CredentialRecordStore>();
         return services;
     }
 }

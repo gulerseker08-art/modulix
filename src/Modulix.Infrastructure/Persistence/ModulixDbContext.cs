@@ -178,6 +178,9 @@ public class ModulixDbContext(
     /// <summary>Kayıtlara bağlı dosyaların üst verisi (ADR-0040); içerik depolama adaptöründedir.</summary>
     public DbSet<Modulix.Core.Files.StoredFile> StoredFiles => Set<Modulix.Core.Files.StoredFile>();
 
+    /// <summary>Süreli belgeler (ADR-0038 K3): sahibi bir modül kaydıdır; dosyası Core dosya deposundadır.</summary>
+    public DbSet<Modulix.Core.Credentials.Credential> Credentials => Set<Modulix.Core.Credentials.Credential>();
+
     public DbSet<ActivityNode> ActivityNodes => Set<ActivityNode>();
 
     public DbSet<Capability> Capabilities => Set<Capability>();

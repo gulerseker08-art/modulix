@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Automation;
+using Modulix.Core.Contracts.Credentials;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
@@ -26,6 +27,22 @@ public sealed class LogisticsModule : IModule
         public const string CostsWrite = "logistics.costs.write";
         public const string DriversRead = "logistics.drivers.read";
         public const string DriversWrite = "logistics.drivers.write";
+        public const string RequestsRead = "logistics.requests.read";
+        public const string RequestsWrite = "logistics.requests.write";
+        public const string RequestsApprove = "logistics.requests.approve";
+    }
+
+    /// <summary>Seçim listeleri (Y9b).</summary>
+    public static class Lists
+    {
+        public const string TransportMode = "logistics.transport-mode";
+    }
+
+    /// <summary>Taşıma türü kategorileri: kod türün adına değil kategorisine bakar (komple: araç tek müşteriye; parsiyel: araç paylaşılır).</summary>
+    public static class TransportModeCategories
+    {
+        public const string Full = "full";
+        public const string Partial = "partial";
     }
 
     public string Key => ModuleKey;
@@ -36,61 +53,109 @@ public sealed class LogisticsModule : IModule
     [
         new(Permissions.ShipmentsRead, "Sevkiyatları görüntüler", "Sevkiyatlar"),
         new(Permissions.ShipmentsWrite, "Sevkiyat ekler ve düzenler", "Sevkiyatlar"),
-        new(Permissions.CarriersRead, "Taşıyıcıları görüntüler", "Taşıyıcılar"),
-        new(Permissions.CarriersWrite, "Taşıyıcı ekler ve düzenler", "Taşıyıcılar"),
+        new(Permissions.CarriersRead, "Taşıyıcı anlaşmalarını görüntüler", "Taşıyıcılar"),
+        new(Permissions.CarriersWrite, "Taşıyıcı anlaşması ekler, düzenler ve siler", "Taşıyıcılar"),
         new(Permissions.CostsRead, "Maliyetleri görüntüler", "Maliyetler"),
         new(Permissions.CostsWrite, "Maliyet ekler ve düzenler", "Maliyetler"),
         new(Permissions.DriversRead, "Sürücü kartlarını görüntüler", "Sürücüler"),
         new(Permissions.DriversWrite, "Sürücü kartı ekler ve düzenler; sürücü için kişi kaydı açar", "Sürücüler"),
+        new(Permissions.RequestsRead, "Taşıma taleplerini görüntüler", "Taşıma talepleri"),
+        new(Permissions.RequestsWrite, "Taşıma talebi açar, düzenler ve iptal eder", "Taşıma talepleri"),
+        new(Permissions.RequestsApprove, "Taşıma talebini onaylar (sevkiyat açılır) ya da reddeder", "Taşıma talepleri"),
     ];
 
     /// <summary>Kural altyapısında kullanılan kayıt türleri (ADR-0027).</summary>
     public static class AutomationEntityKeys
     {
-        public const string Shipment = "logistics.shipment";
+        public const string Shipment = Entities.Shipment;
+        public const string TransportRequest = Entities.TransportRequest;
     }
 
     /// <summary>
-    /// Kural altyapısı yetenekleri (ADR-0027): belge eksikliği ve kapasite eşiği kuralları CRM olmadan, aynı sözleşmeyle
-    /// yazılabilir. Lojistik henüz iskelet modüldür (sevkiyat kayıt deposu yok); bu beyan yeteneğin Core'a modül koduna
-    /// dokunmadan eklenebildiğini gösterir ve kayıt depoları gelince kural çalıştırmak ek Core değişikliği gerektirmez. Aksiyon
-    /// beyan edilmez: lojistik aksiyonları kayıt servisleriyle birlikte gelir. Araç beyanı Filo modülüne taşındı (`fleet.vehicle`, ADR-0038 K1).
+    /// Kural altyapısı yetenekleri (ADR-0027, ADR-0038 dilim 4): taşıma talebi ve sevkiyat kayıt olayları (durum geçişleri güncelleme olayıdır),
+    /// zamanlanmış ve tarihe bağlı tarama (ör. "yükleme gününe 1 gün kala hâlâ planlanmamış sevkiyat"). Eski iskelet beyanındaki belge durumu ve
+    /// kapasite alanları kayıtta olmadığı için kaldırıldı; belge ve kapasite uygunluğu sefer atamasında gelir (dilim 5). Araç beyanı Filo'dadır.
     /// </summary>
     AutomationCapabilities IModule.Automation { get; } = new()
     {
         Entities =
         [
-            new(AutomationEntityKeys.Shipment, "Sevkiyat", Permissions.ShipmentsRead),
+            new(AutomationEntityKeys.TransportRequest, "Taşıma talebi", Permissions.RequestsRead)
+            {
+                RecordSource = typeof(LogisticsAutomationRecordSource), LabelField = "cargoDescription",
+            },
+            new(AutomationEntityKeys.Shipment, "Sevkiyat", Permissions.ShipmentsRead)
+            {
+                RecordSource = typeof(LogisticsAutomationRecordSource), LabelField = "cargoDescription",
+            },
         ],
         Events =
         [
+            new("logistics.transport-request.created", AutomationEntityKeys.TransportRequest, DomainEventTypes.RecordCreated, "Taşıma talebi açıldı"),
+            new("logistics.transport-request.updated", AutomationEntityKeys.TransportRequest, DomainEventTypes.RecordUpdated, "Taşıma talebi güncellendi"),
             new("logistics.shipment.created", AutomationEntityKeys.Shipment, DomainEventTypes.RecordCreated, "Sevkiyat oluşturuldu"),
             new("logistics.shipment.updated", AutomationEntityKeys.Shipment, DomainEventTypes.RecordUpdated, "Sevkiyat güncellendi"),
         ],
-        Fields =
-        [
-            new(AutomationEntityKeys.Shipment, "documentStatus", "Belge durumu", AutomationFieldType.Choice)
-            {
-                Options = [new("complete", "Tam"), new("missing", "Eksik")],
-                Hint = "Eksik belgesi olan sevkiyatı yakalamak için.",
-            },
-            new(AutomationEntityKeys.Shipment, "capacityUsagePercent", "Kapasite kullanımı (%)", AutomationFieldType.Number)
-            {
-                Hint = "Kapasite eşiği kuralları için.",
-            },
-        ],
+        Fields = [.. CargoAutomationFields(AutomationEntityKeys.TransportRequest, Domain.TransportRequest.Statuses.All, RequestStatusLabels),
+            .. CargoAutomationFields(AutomationEntityKeys.Shipment, Domain.Shipment.Statuses.All, ShipmentStatusLabels)],
     };
+
+    /// <summary>Durum anahtarı → görünen ad (kural editörü, denetim kaydı, arayüz).</summary>
+    public static IReadOnlyDictionary<string, string> RequestStatusLabels { get; } = new Dictionary<string, string>
+    {
+        [Domain.TransportRequest.Statuses.New] = "Yeni",
+        [Domain.TransportRequest.Statuses.Approved] = "Onaylandı",
+        [Domain.TransportRequest.Statuses.Rejected] = "Reddedildi",
+        [Domain.TransportRequest.Statuses.Cancelled] = "İptal edildi",
+    };
+
+    public static IReadOnlyDictionary<string, string> ShipmentStatusLabels { get; } = new Dictionary<string, string>
+    {
+        [Domain.Shipment.Statuses.Pending] = "Planlama bekliyor",
+        [Domain.Shipment.Statuses.Planned] = "Planlandı",
+        [Domain.Shipment.Statuses.Loading] = "Yükleniyor",
+        [Domain.Shipment.Statuses.InTransit] = "Yolda",
+        [Domain.Shipment.Statuses.Delivered] = "Teslim edildi",
+        [Domain.Shipment.Statuses.Partial] = "Kısmi teslim",
+        [Domain.Shipment.Statuses.Failed] = "Teslim edilemedi",
+        [Domain.Shipment.Statuses.Cancelled] = "İptal edildi",
+    };
+
+    private static IEnumerable<AutomationFieldDefinition> CargoAutomationFields(string entity, IReadOnlyList<string> statuses, IReadOnlyDictionary<string, string> labels) =>
+    [
+        new(entity, "status", "Durum", AutomationFieldType.Choice) { Options = [.. statuses.Select(s => new AutomationOption(s, labels[s]))] },
+        new(entity, "cargoDescription", "Yük tanımı", AutomationFieldType.Text),
+        new(entity, "transportModeKey", "Taşıma türü (anahtar)", AutomationFieldType.Text),
+        new(entity, "pickupCity", "Yükleme şehri", AutomationFieldType.Text),
+        new(entity, "deliveryCity", "Teslim şehri", AutomationFieldType.Text),
+        new(entity, "pickupDate", "Yükleme günü", AutomationFieldType.Date) { Hint = "\"Yükleme gününe 1 gün kala\" gibi uyarılar için tarihe bağlı tetikleyicide kullanın." },
+        new(entity, "deliveryBy", "En geç teslim", AutomationFieldType.Date),
+        new(entity, "weightKg", "Ağırlık (kg)", AutomationFieldType.Number),
+        new(entity, "hazardous", "Tehlikeli madde (ADR)", AutomationFieldType.Boolean),
+    ];
 
     IReadOnlyList<RoleTemplate> IModule.RoleTemplates { get; } =
     [
         new(
             "logistics.operations",
             "Operasyon",
-            "Sevkiyatları, taşıyıcıları ve sürücü kartlarını görüntüler ve düzenler; maliyetleri görüntüler.",
+            "Taşıma taleplerini açar, sevkiyatları, taşıyıcıları ve sürücü kartlarını görüntüler ve düzenler; maliyetleri görüntüler. Talep onaylamaz.",
             [
+                Permissions.RequestsRead, Permissions.RequestsWrite,
                 Permissions.ShipmentsRead, Permissions.ShipmentsWrite,
                 Permissions.CarriersRead, Permissions.CarriersWrite,
                 Permissions.CostsRead,
+                Permissions.DriversRead, Permissions.DriversWrite,
+            ]),
+        new(
+            "logistics.manager",
+            "Operasyon müdürü",
+            "Operasyonun bütün işleri ve taşıma talebinin onayı ya da reddi.",
+            [
+                Permissions.RequestsRead, Permissions.RequestsWrite, Permissions.RequestsApprove,
+                Permissions.ShipmentsRead, Permissions.ShipmentsWrite,
+                Permissions.CarriersRead, Permissions.CarriersWrite,
+                Permissions.CostsRead, Permissions.CostsWrite,
                 Permissions.DriversRead, Permissions.DriversWrite,
             ]),
     ];
@@ -98,7 +163,34 @@ public sealed class LogisticsModule : IModule
     public static class Entities
     {
         public const string Driver = "logistics.driver";
+        public const string CarrierTerms = "logistics.carrier-terms";
+        public const string TransportRequest = "logistics.transport-request";
+        public const string Shipment = "logistics.shipment";
     }
+
+    /// <summary>
+    /// Taşıma türü (Y9b): hazır değerler örnektir; tenant kendi türlerini ekler, yeni türde kategori seçilir (komple / parsiyel). Kod türün adına
+    /// değil kategorisine bakar (ör. sefer planlamasında parsiyel yükler birleştirilir, dilim 5).
+    /// </summary>
+    IReadOnlyList<ChoiceListDefinition> IModule.ChoiceLists { get; } =
+    [
+        new(
+            Lists.TransportMode,
+            "Taşıma türü",
+            Entities.TransportRequest,
+            "transportModeKey",
+            Required: true,
+            [new(TransportModeCategories.Full, "Komple (araç tek müşteriye)"), new(TransportModeCategories.Partial, "Parsiyel (araç paylaşılır)")],
+            [
+                new("Ftl", "Komple (FTL)", TransportModeCategories.Full),
+                new("Express", "Ekspres (özel araç)", TransportModeCategories.Full),
+                new("Ltl", "Parsiyel (LTL)", TransportModeCategories.Partial),
+                new("Groupage", "Grupaj", TransportModeCategories.Partial),
+            ])
+        {
+            Default = "Ftl",
+        },
+    ];
 
     /// <summary>Platform ilişki rolleri (ADR-0029 K9): taşeron sürücünün çalıştığı firma bu roldedir.</summary>
     public static class RelationshipRoles
@@ -120,11 +212,45 @@ public sealed class LogisticsModule : IModule
         {
             References = new Dictionary<string, string> { ["personId"] = SharedEntities.Person, ["carrierPartyId"] = SharedEntities.Party },
         },
+        new(Entities.CarrierTerms, "Taşıyıcı anlaşması", Permissions.CarriersRead, new Dictionary<string, string>
+        {
+            ["carrierPartyId"] = "Taşıyıcı firma", ["title"] = "Anlaşma adı", ["agreementNo"] = "Anlaşma no", ["validFrom"] = "Başlangıç",
+            ["validTo"] = "Bitiş", ["currency"] = "Para birimi", ["paymentTermDays"] = "Ödeme vadesi (gün)", ["rateNote"] = "Ücret anlaşması",
+            ["performanceNote"] = "Performans notu", ["isActive"] = "Etkin",
+        }, "title")
+        {
+            References = new Dictionary<string, string> { ["carrierPartyId"] = SharedEntities.Party },
+        },
+        CargoAudit(Entities.TransportRequest, "Taşıma talebi", Permissions.RequestsRead, RequestStatusLabels,
+            new Dictionary<string, string> { ["source"] = "Kaynak", ["externalRef"] = "Dış referans", ["shipmentId"] = "Sevkiyat" }),
+        CargoAudit(Entities.Shipment, "Sevkiyat", Permissions.ShipmentsRead, ShipmentStatusLabels,
+            new Dictionary<string, string> { ["requestId"] = "Taşıma talebi" }),
     ];
+
+    private static AuditedEntity CargoAudit(
+        string entity, string name, string permission, IReadOnlyDictionary<string, string> statuses, IReadOnlyDictionary<string, string> extra) =>
+        new(entity, name, permission, new Dictionary<string, string>(extra)
+        {
+            ["customerPartyId"] = "Müşteri", ["senderPartyId"] = "Gönderen", ["receiverPartyId"] = "Alıcı", ["transportModeKey"] = "Taşıma türü",
+            ["pickupCity"] = "Yükleme şehri", ["pickupAddress"] = "Yükleme adresi", ["deliveryCity"] = "Teslim şehri", ["deliveryAddress"] = "Teslim adresi",
+            ["pickupDate"] = "Yükleme günü", ["deliveryBy"] = "En geç teslim", ["cargoDescription"] = "Yük tanımı", ["weightKg"] = "Ağırlık (kg)",
+            ["volumeM3"] = "Hacim (m³)", ["palletCount"] = "Palet", ["loadingMeters"] = "Yükleme metresi (LDM)", ["hazardous"] = "Tehlikeli madde",
+            ["notes"] = "Notlar", ["status"] = "Durum", ["statusReason"] = "Gerekçe",
+        }, "cargoDescription")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["status"] = statuses },
+            References = new Dictionary<string, string>
+            {
+                ["customerPartyId"] = SharedEntities.Party, ["senderPartyId"] = SharedEntities.Party, ["receiverPartyId"] = SharedEntities.Party,
+            },
+        };
 
     IReadOnlyList<CustomizableEntity> IModule.CustomizableEntities { get; } =
     [
         new(Entities.Driver, "Sürücü"),
+        new(Entities.CarrierTerms, "Taşıyıcı anlaşması"),
+        new(Entities.TransportRequest, "Taşıma talebi"),
+        new(Entities.Shipment, "Sevkiyat"),
     ];
 
     IReadOnlyList<LookupDefinition> IModule.Lookups => LogisticsLookupDefinitions.All;
@@ -137,6 +263,9 @@ public sealed class LogisticsModule : IModule
     [
         new(SharedEntities.Person, Permissions.DriversRead, Permissions.DriversWrite),
         new(SharedEntities.Party, Permissions.DriversRead),
+        new(SharedEntities.Party, Permissions.CarriersRead),
+        new(SharedEntities.Party, Permissions.RequestsRead),
+        new(SharedEntities.Party, Permissions.ShipmentsRead),
     ];
 
     /// <summary>Kişinin ve firmanın nerede kullanıldığı (silme ve birleştirme koruması).</summary>
@@ -144,6 +273,19 @@ public sealed class LogisticsModule : IModule
     [
         new(SharedEntities.Person, Entities.Driver, "personId", "sürücü kartı"),
         new(SharedEntities.Party, Entities.Driver, "carrierPartyId", "sürücü (taşıyıcı)"),
+        new(SharedEntities.Party, Entities.CarrierTerms, "carrierPartyId", "taşıyıcı anlaşması"),
+        new(SharedEntities.Party, Entities.TransportRequest, "customerPartyId", "taşıma talebi (müşteri)"),
+        new(SharedEntities.Party, Entities.TransportRequest, "senderPartyId", "taşıma talebi (gönderen)"),
+        new(SharedEntities.Party, Entities.TransportRequest, "receiverPartyId", "taşıma talebi (alıcı)"),
+        new(SharedEntities.Party, Entities.Shipment, "customerPartyId", "sevkiyat (müşteri)"),
+        new(SharedEntities.Party, Entities.Shipment, "senderPartyId", "sevkiyat (gönderen)"),
+        new(SharedEntities.Party, Entities.Shipment, "receiverPartyId", "sevkiyat (alıcı)"),
+    ];
+
+    /// <summary>Sürücü yetkinlikleri (ehliyet, SRC, psikoteknik...) Core süreli belgesidir (ADR-0038 K2, K3); sürücü kartının "Belgeler" bölümünde yönetilir.</summary>
+    IReadOnlyList<CredentialOwner> IModule.CredentialOwners { get; } =
+    [
+        new(Entities.Driver, CredentialCategories.Driver, "Sürücü", Permissions.DriversRead),
     ];
 
     /// <summary>Sürücü formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>
@@ -151,7 +293,13 @@ public sealed class LogisticsModule : IModule
 
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<LogisticsWorkflowGate>();
         services.AddScoped<LogisticsStoreContext>();
         services.AddScoped<IRecordStore, DriverRecordStore>();
+        services.AddScoped<IRecordStore, CarrierTermsRecordStore>();
+        services.AddScoped<IRecordStore, TransportRequestRecordStore>();
+        services.AddScoped<IRecordStore, ShipmentRecordStore>();
+        services.AddScoped<Lifecycle.ILogisticsWorkflow, Lifecycle.LogisticsWorkflow>();
+        services.AddScoped<LogisticsAutomationRecordSource>();
     }
 }

@@ -1,0 +1,277 @@
+@* Taşıyıcı anlaşması ekleme/düzenleme formu; Taşıyıcı anlaşmaları ekranı kullanır. Düzen firmanın form düzenine (ADR-0021) göre
+   çizilir. Kayıt genel kayıt uçlarından (/api/records/logistics.carrier-terms) yapılır. Taşıyıcı rolü, tarih tutarlılığı, numara
+   benzersizliği ve aynı taşıyıcının etkin anlaşmalarının çakışmaması sunucuda denetlenir; ileti alanın altında gösterilir. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Terms is null ? "Yeni taşıyıcı anlaşması" : "Taşıyıcı anlaşması")</h2>
+            @if (Terms is not null)
+            {
+                <p>@form.Title</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Anlaşma özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true"><AppIcon Name="file-text" Size="24" /></span>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Title) ? "Anlaşma adı" : form.Title)</strong>
+                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.AgreementNo) ? "Numarasız" : form.AgreementNo.ToUpperInvariant())</span>
+                </div>
+                <h3 class="summary-heading">Anlaşma özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Geçerlilik</dt><dd>@ValidityText</dd></div>
+                    <div><dt>Para birimi</dt><dd>@(string.IsNullOrWhiteSpace(form.Currency) ? "—" : form.Currency.ToUpperInvariant())</dd></div>
+                    <div><dt>Ödeme vadesi</dt><dd>@(form.PaymentTermDays is { } days ? $"{days} gün" : "—")</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Anlaşma formu bölümleri">
+                <Field Context="f">
+                    @switch (f.Key)
+                    {
+                        case "carrierPartyId":
+                            <label class="@f.LabelClass()" for="terms-carrier">@f.Label</label>
+                            <LookupPicker Id="terms-carrier" LookupKey="@LogisticsAccess.TermsCarrierLookup" @bind-Value="form.CarrierPartyId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="Taşıyıcı firma seçin…" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
+                            <FieldError Field="carrierPartyId" Errors="errors" />
+                            <small class="text-muted">@(form.Id is null ? "Yalnızca \"Taşıyıcı\" rolündeki firmalar listelenir." : "Anlaşmanın taşıyıcısı değiştirilemez; başka taşıyıcı için yeni anlaşma açın.")</small>
+                            break;
+                        case "title":
+                            <label class="@f.LabelClass()" for="terms-title">@f.Label</label>
+                            <input id="terms-title" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Title" />
+                            <FieldError Field="title" Errors="errors" />
+                            break;
+                        case "agreementNo":
+                            <label class="@f.LabelClass()" for="terms-no">@f.Label</label>
+                            <input id="terms-no" class="form-control" maxlength="50" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.AgreementNo" />
+                            <FieldError Field="agreementNo" Errors="errors" />
+                            break;
+                        case "isActive":
+                            <SegmentedChoice Id="terms-active" Label="@f.Label" LabelClass="@f.LabelClass()" Options="SegmentOptions.Active" @bind-Value="form.IsActive" />
+                            <FieldError Field="isActive" Errors="errors" />
+                            break;
+                        case "validFrom":
+                            <label class="@f.LabelClass()" for="terms-from">@f.Label</label>
+                            <input id="terms-from" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ValidFrom" />
+                            <FieldError Field="validFrom" Errors="errors" />
+                            break;
+                        case "validTo":
+                            <label class="@f.LabelClass()" for="terms-to">@f.Label</label>
+                            <input id="terms-to" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ValidTo" />
+                            <FieldError Field="validTo" Errors="errors" />
+                            <small class="text-muted">Boşsa süresizdir.</small>
+                            break;
+                        case "currency":
+                            <label class="@f.LabelClass()" for="terms-currency">@f.Label</label>
+                            <input id="terms-currency" class="form-control" maxlength="3" placeholder="TRY" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Currency" />
+                            <FieldError Field="currency" Errors="errors" />
+                            break;
+                        case "paymentTermDays":
+                            <label class="@f.LabelClass()" for="terms-payment">@f.Label</label>
+                            <input id="terms-payment" class="form-control" type="number" min="0" max="365" step="1" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PaymentTermDays" />
+                            <FieldError Field="paymentTermDays" Errors="errors" />
+                            break;
+                        case "rateNote":
+                            <label class="@f.LabelClass()" for="terms-rate">@f.Label</label>
+                            <textarea id="terms-rate" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" placeholder="ör. İstanbul–Ankara komple TIR 18.000 TRY + KDV; bekleme günü 2.500 TRY" @bind="form.RateNote"></textarea>
+                            <FieldError Field="rateNote" Errors="errors" />
+                            <small class="text-muted">Tarife altyapısı gelene kadar ücret burada açıklama olarak tutulur.</small>
+                            break;
+                        case "performanceNote":
+                            <label class="@f.LabelClass()" for="terms-performance">@f.Label</label>
+                            <textarea id="terms-performance" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PerformanceNote"></textarea>
+                            <FieldError Field="performanceNote" Errors="errors" />
+                            break;
+                    }
+                </Field>
+            </LayoutForm>
+
+            <div class="form-actions">
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+@code {
+    private bool dirty;
+    private const string EntityKey = LogisticsAccess.CarrierTermsEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private TermsForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek anlaşma; null ise yeni anlaşma.</summary>
+    [Parameter] public RecordResponse? Terms { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    private string ValidityText => (form.ValidFrom, form.ValidTo) switch
+    {
+        ({ } f, { } t) => $"{FleetLabels.Date(f)} – {FleetLabels.Date(t)}",
+        ({ } f, null) => $"{FleetLabels.Date(f)} tarihinden itibaren",
+        _ => "—",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir anlaşma verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Terms))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Terms;
+        form = Terms is { } r
+            ? new TermsForm
+            {
+                Id = r.Id, Version = r.Version, CarrierPartyId = WarehouseLabels.Id(r, "carrierPartyId"), Title = WarehouseLabels.Text(r, "title"),
+                AgreementNo = WarehouseLabels.Text(r, "agreementNo"), ValidFrom = FleetLabels.Day(WarehouseLabels.Text(r, "validFrom")),
+                ValidTo = FleetLabels.Day(WarehouseLabels.Text(r, "validTo")), Currency = WarehouseLabels.Text(r, "currency"),
+                PaymentTermDays = r.Values["paymentTermDays"]?.GetValue<int>(), RateNote = WarehouseLabels.Text(r, "rateNote"),
+                PerformanceNote = WarehouseLabels.Text(r, "performanceNote"), IsActive = WarehouseLabels.Flag(r, "isActive", true),
+                Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new TermsForm { ValidFrom = DateOnly.FromDateTime(DateTime.Now), Currency = "TRY" };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new JsonObject
+        {
+            ["title"] = form.Title.Trim(),
+            ["agreementNo"] = string.IsNullOrWhiteSpace(form.AgreementNo) ? null : form.AgreementNo.Trim(),
+            ["validFrom"] = form.ValidFrom?.ToString("yyyy-MM-dd"),
+            ["validTo"] = form.ValidTo?.ToString("yyyy-MM-dd"),
+            ["currency"] = form.Currency?.Trim(),
+            ["paymentTermDays"] = form.PaymentTermDays,
+            ["rateNote"] = string.IsNullOrWhiteSpace(form.RateNote) ? null : form.RateNote.Trim(),
+            ["performanceNote"] = string.IsNullOrWhiteSpace(form.PerformanceNote) ? null : form.PerformanceNote.Trim(),
+            ["isActive"] = form.IsActive,
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            // Taşıyıcı yalnızca oluştururken verilir; sonra değiştirilemez.
+            values["carrierPartyId"] = form.CarrierPartyId?.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class TermsForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? CarrierPartyId { get; set; }
+
+        public string Title { get; set; } = string.Empty;
+
+        public string? AgreementNo { get; set; }
+
+        public DateOnly? ValidFrom { get; set; }
+
+        public DateOnly? ValidTo { get; set; }
+
+        public string? Currency { get; set; }
+
+        public int? PaymentTermDays { get; set; }
+
+        public string? RateNote { get; set; }
+
+        public string? PerformanceNote { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}

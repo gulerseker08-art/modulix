@@ -12,8 +12,15 @@ namespace Modulix.Modules.Fleet.Records;
 /// 17 karakterdir ve benzersizdir. Taşeron araçta taşıyıcı firma zorunludur ve firmanın "Taşıyıcı" ilişki rolü olmalıdır; diğer mülkiyet
 /// türlerinde taşıyıcı seçilmez. Araç silinmez (K12): kullanım dışı araç "Pasif" yapılır.
 /// </summary>
-internal sealed partial class VehicleRecordStore(FleetStoreContext context) : FleetRecordStore<Vehicle>(context)
+internal sealed partial class VehicleRecordStore(FleetStoreContext context) : FleetRecordStore<Vehicle>(context), IRecordLabelProvider
 {
+    /// <summary>Aracı başka listelerde (süreli belge) plakasıyla tanıtır.</summary>
+    public async Task<IReadOnlyDictionary<Guid, string>> LabelsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
+    {
+        Guid[] wanted = [.. ids];
+        return await Context.Data.Set<Vehicle>().AsNoTracking().Where(v => wanted.Contains(v.Id)).ToDictionaryAsync(v => v.Id, v => v.Plate, cancellationToken);
+    }
+
     public override string EntityKey => FleetModule.Entities.Vehicle;
 
     protected override string ReadPermission => FleetModule.Permissions.VehiclesRead;

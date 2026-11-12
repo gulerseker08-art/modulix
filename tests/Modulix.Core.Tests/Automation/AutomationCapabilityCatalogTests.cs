@@ -9,7 +9,7 @@ namespace Modulix.Core.Tests.Automation;
 
 public class AutomationCapabilityCatalogTests
 {
-    private static readonly string[] CoreActions = [ApprovalAutomation.RequestAction, FlowAutomation.WaitAction, FlowAutomation.AwaitApprovalAction, FlowAutomation.StopAction];
+    private static readonly string[] CoreActions = [ApprovalAutomation.RequestAction, FlowAutomation.WaitAction, FlowAutomation.AwaitApprovalAction, FlowAutomation.StopAction, NotifyAutomation.NotifyAction];
 
     private static Action Build(AutomationCapabilities capabilities) => () => Catalog(capabilities);
 
@@ -37,7 +37,8 @@ public class AutomationCapabilityCatalogTests
     {
         var catalog = Catalog(AutomationCapabilities.None);
 
-        Assert.Empty(catalog.AutomationEntities);
+        // Core yalnızca süreli belge türünü beyan eder (ADR-0038 dilim 2b); modül hiçbir tür eklemez.
+        Assert.Equal(["core.credential"], catalog.AutomationEntities.Select(e => e.Entity.EntityKey));
 
         // Yetenek beyan etmeyen modül hiçbir aksiyon eklemez; kalanlar yalnızca Core'un aksiyonlarıdır.
         Assert.Equal(CoreActions, catalog.AutomationActions.Select(a => a.Action.Definition.Key));
