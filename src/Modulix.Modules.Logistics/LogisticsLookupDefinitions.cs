@@ -13,6 +13,9 @@ public static class LogisticsLookupDefinitions
     public const string DriverCarrier = "logistics.driver.carrier";
     public const string DriverVehicle = "logistics.driver.vehicle";
     public const string TermsCarrier = "logistics.carrier-terms.carrier";
+    public const string TripVehicle = "logistics.trip.vehicle";
+    public const string TripTrailer = "logistics.trip.trailer";
+    public const string TripCarrier = "logistics.trip.carrier";
 
     /// <summary>Filo'nun araç kayıt türü (sözleşme metni; Filo projesine başvurulmaz).</summary>
     public const string VehicleEntityKey = "fleet.vehicle";
@@ -66,6 +69,26 @@ public static class LogisticsLookupDefinitions
             FixedFilterValue = LogisticsModule.RelationshipRoles.Carrier,
         },
         new(TermsCarrier, LogisticsModule.Entities.CarrierTerms, "carrierPartyId", "Taşıyıcı firma", LookupTargetKind.Record, SharedEntities.Party)
+        {
+            LabelFields = PartyLabel,
+            SecondaryFields = PartySecondary,
+            SearchDescription = "Ünvan, vergi numarası, e-posta, telefon ve şehir (yalnızca \"Taşıyıcı\" rolündeki firmalar)",
+            FixedFilterName = "relationshipRole",
+            FixedFilterValue = LogisticsModule.RelationshipRoles.Carrier,
+        },
+        new(TripVehicle, LogisticsModule.Entities.Trip, "vehicleId", "Araç", LookupTargetKind.Record, VehicleEntityKey)
+        {
+            LabelFields = VehicleLabel,
+            SecondaryFields = VehicleSecondary,
+            SearchDescription = "Plaka, marka, model ve şasi numarası (Filo modülü; çekici ya da kamyon)",
+        },
+        new(TripTrailer, LogisticsModule.Entities.Trip, "trailerId", "Dorse", LookupTargetKind.Record, VehicleEntityKey)
+        {
+            LabelFields = VehicleLabel,
+            SecondaryFields = VehicleSecondary,
+            SearchDescription = "Plaka, marka, model ve şasi numarası (Filo modülü; dorse ya da römork)",
+        },
+        new(TripCarrier, LogisticsModule.Entities.Trip, "carrierPartyId", "Taşıyıcı firma", LookupTargetKind.Record, SharedEntities.Party)
         {
             LabelFields = PartyLabel,
             SecondaryFields = PartySecondary,

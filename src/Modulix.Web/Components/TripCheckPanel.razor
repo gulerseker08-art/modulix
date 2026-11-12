@@ -1,0 +1,105 @@
+@* Seferin uygunluk denetimi (ADR-0038 dilim 5): yük / kapasite kartları (ağırlık, palet, LDM, hacim; aşan ölçü tehlike tonunda) ve bulgular.
+   Engel varsa plan onaylanmaz; uyarılar onayla birlikte seferin notuna yazılır. Denetim sunucudadır (/api/logistics/trips/{id}/check); bu panel
+   yalnızca gösterir. Belge kuralı (uyar / engelle) firma ayarıdır. *@
+@using System.Globalization
+@inject ApiClient Api
+
+<section class="settings-group" aria-label="Uygunluk denetimi">
+    <h2>Uygunluk denetimi</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    else if (check is null)
+    {
+        <p class="text-muted" role="status">Denetleniyor…</p>
+    }
+    else
+    {
+        <div class="kpi-grid">
+            <SalesKpiCard Label="Sevkiyat / durak" Value="@($"{check.Load.ShipmentCount} / {check.Load.StopCount}")" Icon="package" Tone="@(check.Load.ShipmentCount == 0 ? "danger" : "brand")" />
+            @Measure("Ağırlık", "hash", check.Load.WeightKg, check.Load.PayloadKg, "kg")
+            @Measure("Palet", "layers", check.Load.Pallets, check.Load.PalletCapacity, "palet")
+            @Measure("Yükleme metresi", "columns", check.Load.LoadingMeters, check.Load.LoadingMetersCapacity, "LDM")
+            @Measure("Hacim", "package", check.Load.VolumeM3, check.Load.VolumeCapacity, "m³")
+        </div>
+
+        @if (check.Issues.Count == 0)
+        {
+            <div class="alert alert-success" role="status"><AppIcon Name="check-circle" Size="16" /> Sefer hazır: araç, sürücü, kapasite ve belgeler uygun.</div>
+        }
+        else
+        {
+            @if (check.Issues.Where(i => i.Blocking).ToList() is { Count: > 0 } blocking)
+            {
+                <div class="alert alert-danger" role="status">
+                    <strong>Plan onaylanmadan önce düzeltin:</strong>
+                    <ul class="mb-0">
+                        @foreach (var issue in blocking)
+                        {
+                            <li>@issue.Message</li>
+                        }
+                    </ul>
+                </div>
+            }
+            @if (check.Issues.Where(i => !i.Blocking).ToList() is { Count: > 0 } warnings)
+            {
+                <div class="alert alert-warning" role="status">
+                    <strong>Uyarılar</strong> (onayı engellemez, seferde saklanır):
+                    <ul class="mb-0">
+                        @foreach (var issue in warnings)
+                        {
+                            <li>@issue.Message</li>
+                        }
+                    </ul>
+                </div>
+            }
+        }
+    }
+</section>
+
+@code {
+    private static readonly CultureInfo Tr = CultureInfo.GetCultureInfo("tr-TR");
+
+    private TripCheckDto? check;
+    private string? message;
+    private (Guid, int) loadedFor;
+
+    [Parameter, EditorRequired] public Guid TripId { get; set; }
+
+    /// <summary>Değişince denetim yeniden yapılır (sefer, durak ya da sevkiyat değişti).</summary>
+    [Parameter] public int Refresh { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (TripId, Refresh))
+        {
+            return;
+        }
+
+        loadedFor = (TripId, Refresh);
+        var result = await Api.GetAsync<TripCheckDto>($"/api/logistics/trips/{TripId}/check");
+        check = result.Value;
+        message = result.Error;
+    }
+
+    /// <summary>"12.000 / 24.000 kg"; kapasite yoksa "12.000 kg" ve "kapasite girilmemiş"; aşan ölçü tehlike tonunda.</summary>
+    private RenderFragment Measure(string label, string icon, decimal used, decimal? capacity, string unit)
+    {
+        var value = capacity is { } max ? $"{used.ToString("#,0.##", Tr)} / {max.ToString("#,0.##", Tr)} {unit}" : $"{used.ToString("#,0.##", Tr)} {unit}";
+        var tone = capacity switch
+        {
+            null => "info",
+            { } cap when used > cap => "danger",
+            _ => "success",
+        };
+        var detail = capacity switch
+        {
+            null => "Araç kapasitesi girilmemiş",
+            { } cap when cap > 0 => $"%{Math.Round(used * 100 / cap).ToString(Tr)} dolu",
+            _ => null,
+        };
+        return @<SalesKpiCard Label="@label" Value="@value" Icon="@icon" Tone="@tone" Detail="@detail" />;
+    }
+}

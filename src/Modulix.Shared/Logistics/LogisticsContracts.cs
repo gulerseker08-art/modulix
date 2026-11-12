@@ -1,3 +1,5 @@
+using Modulix.Shared.Records;
+
 namespace Modulix.Shared.Logistics;
 
 /// <summary>
@@ -62,6 +64,45 @@ public static class LogisticsAccess
         ("cancelled", "İptal edildi"),
     ];
 
+    public const string TripsRead = "logistics.trips.read";
+    public const string TripsWrite = "logistics.trips.write";
+
+    public const string TripEntityKey = "logistics.trip";
+    public const string TripStopEntityKey = "logistics.trip-stop";
+    public const string DeliveryProofEntityKey = "logistics.delivery-proof";
+
+    /// <summary>Teslim sonuçları (sabit; sunucudaki <c>DeliveryProof.Outcomes</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> DeliveryOutcomes { get; } =
+    [
+        ("delivered", "Teslim edildi"),
+        ("partial", "Kısmi teslim"),
+        ("failed", "Teslim edilemedi"),
+    ];
+
+    public const string TripVehicleLookup = "logistics.trip.vehicle";
+    public const string TripTrailerLookup = "logistics.trip.trailer";
+    public const string TripCarrierLookup = "logistics.trip.carrier";
+
+    /// <summary>Sefer durumları (sabit; sunucudaki <c>Trip.Statuses</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> TripStatuses { get; } =
+    [
+        ("planning", "Planlanıyor"),
+        ("ready", "Hazır"),
+        ("inProgress", "Yolda"),
+        ("completed", "Tamamlandı"),
+        ("cancelled", "İptal edildi"),
+    ];
+
+    /// <summary>Durak türleri (sabit; sunucudaki <c>TripStop.Types</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> StopTypes { get; } =
+    [
+        ("loading", "Yükleme"),
+        ("unloading", "Boşaltma"),
+        ("border", "Sınır / gümrük"),
+        ("rest", "Mola"),
+        ("emptyReturn", "Boş dönüş"),
+    ];
+
     public const string Subcontracted = "subcontracted";
 
     /// <summary>Sürücü tipleri (sabit; sunucudaki <c>Driver.Types</c>).</summary>
@@ -85,3 +126,25 @@ public sealed record LogisticsActionDto(string Action, string Label, bool Allowe
 
 /// <summary>İş akışı eylemi isteği; sürüm eşzamanlı değişikliği yakalar (409).</summary>
 public sealed record RunLogisticsActionRequest(string Action, long Version, string? Reason);
+
+/// <summary>Seferin uygunluk denetimi (ADR-0038 dilim 5): engel varsa plan onaylanmaz; uyarılar onayla birlikte seferde saklanır.</summary>
+public sealed record TripCheckDto(bool CanConfirm, IReadOnlyList<TripCheckIssueDto> Issues, TripLoadDto Load);
+
+public sealed record TripCheckIssueDto(string Code, string Message, bool Blocking);
+
+/// <summary>Seferin yükü ve araç + dorse kapasitesi; kapasitesi girilmemiş ölçü boş.</summary>
+public sealed record TripLoadDto(
+    int ShipmentCount, int StopCount, decimal WeightKg, decimal? PayloadKg, int Pallets, int? PalletCapacity, decimal LoadingMeters, decimal? LoadingMetersCapacity,
+    decimal VolumeM3, decimal? VolumeCapacity);
+
+/// <summary>Planlama bekleyen sevkiyatı sefere ekleme isteği.</summary>
+public sealed record AssignShipmentRequest(Guid ShipmentId);
+
+/// <summary>
+/// Teslim komutu isteği (ADR-0038 K8, dilim 6). <c>Outcome</c>: <c>delivered</c>, <c>partial</c> ya da <c>failed</c>. Teslim ve kısmi teslimde teslim alan,
+/// kısmi teslimde açıklama (<c>Notes</c>), başarısız teslimde neden zorunludur. Zaman sunucuda verilir; fotoğraf ve imza kanıt kaydına dosya olarak eklenir.
+/// </summary>
+public sealed record RecordDeliveryRequest(long Version, string Outcome, string? ReceivedBy, bool Damaged, bool Shortage, string? FailureReason, string? Notes);
+
+/// <summary>Teslim komutunun sonucu: güncel sevkiyat ve yazılan (değişmez) teslim kanıtı.</summary>
+public sealed record DeliveryResponse(RecordResponse Shipment, RecordResponse Proof);

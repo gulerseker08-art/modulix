@@ -1,0 +1,178 @@
+@* Sevkiyatın teslimi ve teslim kanıtları (ADR-0038 K8, dilim 6). Yoldaki sevkiyatta "Teslimi kaydet" formu görünür: sonuç (teslim edildi, kısmi teslim,
+   teslim edilemedi), teslim alan, hasar / eksik işareti, neden ve not. Zaman sunucuda verilir. Kayıt değişmezdir; düzeltme için sevkiyat kapanmadan
+   yeni kanıt girilemez (düzeltme sonraki dilim). Fotoğraf ve imza dosyaları kanıta eklenir (Core dosya deposu). Kurallar sunucudadır
+   (/api/logistics/shipments/{id}/delivery); sayfa içi küçük eylem formu olduğu için sekmesizdir. *@
+@inject ApiClient Api
+
+<section class="settings-group" aria-label="Teslim">
+    <h2>Teslim</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (InTransit && CanWrite)
+    {
+        <form class="record-form" novalidate aria-label="Teslimi kaydet" @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="delivery-outcome">Sonuç</label>
+                    <select id="delivery-outcome" class="form-select" @bind="outcome">
+                        @foreach (var (key, label) in LogisticsAccess.DeliveryOutcomes)
+                        {
+                            <option value="@key">@label</option>
+                        }
+                    </select>
+                    <FieldError Field="outcome" Errors="errors" />
+                </div>
+                @if (outcome != "failed")
+                {
+                    <div class="col-md-8">
+                        <label class="form-label required" for="delivery-receiver">Teslim alan</label>
+                        <input id="delivery-receiver" class="form-control" maxlength="200" required aria-required="true" placeholder="Ad soyad ya da unvan" @bind="receivedBy" />
+                        <FieldError Field="receivedBy" Errors="errors" />
+                    </div>
+                    <div class="col-md-6">
+                        <SegmentedChoice Id="delivery-damaged" Label="Hasar var mı?" Options="YesNo" @bind-Value="damaged" />
+                    </div>
+                    <div class="col-md-6">
+                        <SegmentedChoice Id="delivery-shortage" Label="Eksik var mı?" Options="YesNo" @bind-Value="shortage" />
+                    </div>
+                }
+                else
+                {
+                    <div class="col-md-8">
+                        <label class="form-label required" for="delivery-failure">Teslim edilememe nedeni</label>
+                        <textarea id="delivery-failure" class="form-control" rows="2" maxlength="2000" required aria-required="true" placeholder="ör. alıcı yerinde yoktu, adres bulunamadı" @bind="failureReason"></textarea>
+                        <FieldError Field="failureReason" Errors="errors" />
+                    </div>
+                }
+                <div class="col-12">
+                    <label class="form-label @(outcome == "partial" ? "required" : null)" for="delivery-notes">Not</label>
+                    <textarea id="delivery-notes" class="form-control" rows="2" maxlength="2000" placeholder="@(outcome == "partial" ? "Neyin teslim edilmediğini açıklayın" : "İsteğe bağlı")" @bind="notes"></textarea>
+                    <FieldError Field="notes" Errors="errors" />
+                </div>
+            </div>
+            <div class="list-toolbar">
+                <button type="submit" class="btn btn-tonal" disabled="@busy" aria-busy="@(busy ? "true" : null)">
+                    <AppIcon Name="check" Size="16" /> Teslimi kaydet
+                </button>
+            </div>
+            <small class="text-muted">Teslim zamanı sunucuda verilir ve kayıt değiştirilemez. Fotoğraf ve imzayı teslimden sonra kanıta ekleyebilirsiniz.</small>
+        </form>
+    }
+
+    @if (proofs is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (proofs.Count == 0)
+    {
+        <p class="text-muted" role="status">@(InTransit ? "Teslim henüz kaydedilmedi." : "Bu sevkiyat için teslim kanıtı yok.")</p>
+    }
+    else
+    {
+        @foreach (var proof in proofs)
+        {
+            var result = WarehouseLabels.Text(proof, "outcome");
+            <article class="settings-group" aria-label="Teslim kanıtı">
+                <h3>
+                    <span class="badge @LogisticsLabels.CargoStatusBadge(result)">@LogisticsLabels.DeliveryOutcome(result)</span>
+                    <span class="text-muted">@Moment(WarehouseLabels.Text(proof, "receivedAt"))</span>
+                </h3>
+                <dl class="summary-facts">
+                    @if (WarehouseLabels.Text(proof, "receivedBy") is { Length: > 0 } receiver)
+                    {
+                        <div><dt>Teslim alan</dt><dd>@receiver</dd></div>
+                    }
+                    @if (WarehouseLabels.Flag(proof, "damaged"))
+                    {
+                        <div><dt>Hasar</dt><dd><span class="badge stage-lost">Hasarlı teslim</span></dd></div>
+                    }
+                    @if (WarehouseLabels.Flag(proof, "shortage"))
+                    {
+                        <div><dt>Eksik</dt><dd><span class="badge stage-proposal">Eksik teslim</span></dd></div>
+                    }
+                    @if (WarehouseLabels.Text(proof, "failureReason") is { Length: > 0 } reason)
+                    {
+                        <div><dt>Neden</dt><dd>@reason</dd></div>
+                    }
+                    @if (WarehouseLabels.Text(proof, "notes") is { Length: > 0 } note)
+                    {
+                        <div><dt>Not</dt><dd>@note</dd></div>
+                    }
+                </dl>
+                <AttachmentPanel EntityKey="@LogisticsAccess.DeliveryProofEntityKey" RecordId="proof.Id" CanWrite="CanWrite" Title="Fotoğraf ve imza" EmptyText="Teslim fotoğrafı ya da imzası henüz eklenmedi." />
+            </article>
+        }
+    }
+</section>
+
+@code {
+    private static readonly IReadOnlyList<SegmentOption<bool>> YesNo = [new(false, "Hayır"), new(true, "Evet")];
+
+    private List<RecordResponse>? proofs;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private (Guid, long) loadedFor;
+    private string outcome = "delivered";
+    private string? receivedBy;
+    private bool damaged;
+    private bool shortage;
+    private string? failureReason;
+    private string? notes;
+
+    [Parameter, EditorRequired] public RecordResponse Shipment { get; set; } = default!;
+
+    [Parameter] public bool CanWrite { get; set; }
+
+    /// <summary>Teslim kaydedildi: sevkiyatın yeni hali sayfaya iletilir (durum, sürüm).</summary>
+    [Parameter] public EventCallback<RecordResponse> Changed { get; set; }
+
+    private bool InTransit => WarehouseLabels.Text(Shipment, "status") == "inTransit";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (Shipment.Id, Shipment.Version))
+        {
+            return;
+        }
+
+        loadedFor = (Shipment.Id, Shipment.Version);
+        var page = await Api.GetAsync<RecordPageResponse>($"/api/records/{LogisticsAccess.DeliveryProofEntityKey}?shipmentId={Shipment.Id}&pageSize=50");
+        proofs = page.Value?.Items.ToList() ?? [];
+        message = page.Error;
+    }
+
+    private async Task SubmitAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var failed = outcome == "failed";
+        var request = new RecordDeliveryRequest(
+            Shipment.Version, outcome, failed ? null : Blank(receivedBy), !failed && damaged, !failed && shortage, failed ? Blank(failureReason) : null, Blank(notes));
+        var result = await Api.PostAsync<DeliveryResponse>($"/api/logistics/shipments/{Shipment.Id}/delivery", request);
+        busy = false;
+
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            message = result.FieldErrors?.Values.SelectMany(v => v).FirstOrDefault() ?? result.Error;
+            return;
+        }
+
+        (outcome, receivedBy, damaged, shortage, failureReason, notes) = ("delivered", null, false, false, null, null);
+        await Changed.InvokeAsync(result.Value!.Shipment);
+    }
+
+    /// <summary>Yerel saatle "12.11.2026 08:30".</summary>
+    private static string Moment(string? value) =>
+        DateTimeOffset.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var at)
+            ? at.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture)
+            : string.Empty;
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

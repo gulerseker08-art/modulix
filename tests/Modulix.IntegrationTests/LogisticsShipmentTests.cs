@@ -57,7 +57,8 @@ public class LogisticsShipmentTests(ModulixApiFactory factory) : IClassFixture<M
         Assert.Equal(("pending", request.Id.ToString(), "Ankara", "24 palet gıda"),
             (Status(shipment), shipment.Values["requestId"]!.GetValue<string>(), shipment.Values["pickupCity"]!.GetValue<string>(), shipment.Values["cargoDescription"]!.GetValue<string>()));
 
-        shipment = await ActAsync(operations, "shipments", shipment, "plan");
+        shipment = await PlanAsync(operations, shipment); // planlama sefer atamasıdır (dilim 5)
+        Assert.Equal("planned", Status(shipment));
         shipment = await ActAsync(operations, "shipments", shipment, "startLoading");
         shipment = await ActAsync(operations, "shipments", shipment, "depart");
         Assert.Equal("inTransit", Status(shipment));
@@ -117,7 +118,7 @@ public class LogisticsShipmentTests(ModulixApiFactory factory) : IClassFixture<M
         var shipment = await GetAsync(manager, $"{Shipments}/{other.Values["shipmentId"]!.GetValue<string>()}");
         Assert.Equal(HttpStatusCode.Conflict, (await manager.PostAsJsonAsync($"/api/logistics/shipments/{shipment.Id}/actions",
             new RunLogisticsActionRequest("depart", shipment.Version, null))).StatusCode);
-        shipment = await ActAsync(manager, "shipments", await ActAsync(manager, "shipments", await ActAsync(manager, "shipments", shipment, "plan"), "startLoading"), "depart");
+        shipment = await ActAsync(manager, "shipments", await ActAsync(manager, "shipments", await PlanAsync(manager, shipment), "startLoading"), "depart");
         Assert.Equal(HttpStatusCode.Conflict, (await manager.PostAsJsonAsync($"/api/logistics/shipments/{shipment.Id}/actions",
             new RunLogisticsActionRequest("cancel", shipment.Version, "vazgeçildi"))).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await manager.PutAsJsonAsync($"{Shipments}/{shipment.Id}",
@@ -169,7 +170,7 @@ public class LogisticsShipmentTests(ModulixApiFactory factory) : IClassFixture<M
         var approved = await ActAsync(approver, "requests", request, "approve");
         var shipment = await GetAsync(operations, $"{Shipments}/{approved.Values["shipmentId"]!.GetValue<string>()}");
         Assert.Equal(HttpStatusCode.Forbidden, (await reader.PostAsJsonAsync($"/api/logistics/shipments/{shipment.Id}/actions",
-            new RunLogisticsActionRequest("plan", shipment.Version, null))).StatusCode);
+            new RunLogisticsActionRequest("startLoading", shipment.Version, null))).StatusCode);
 
         // Modül kapalıyken uçlar kapalıdır.
         await factory.SetModuleAsync(s.TenantId, "logistics", enabled: false);
@@ -198,8 +199,8 @@ public class LogisticsShipmentTests(ModulixApiFactory factory) : IClassFixture<M
             Assert.True(await roles.SetMembershipRolesAsync(await factory.GetMembershipIdAsync(admin.Id, tenant.Id), [system.Id], CancellationToken.None));
         }
 
-        await factory.CreateRoleAsync(tenant.Id, [RequestsRead, RequestsWrite, RequestsApprove, ShipmentsRead, ShipmentsWrite], Scope.All, manager);
-        await factory.CreateRoleAsync(tenant.Id, [RequestsRead, RequestsWrite, ShipmentsRead, ShipmentsWrite], Scope.All, operations);
+        await factory.CreateRoleAsync(tenant.Id, [RequestsRead, RequestsWrite, RequestsApprove, ShipmentsRead, ShipmentsWrite, TripsRead, TripsWrite], Scope.All, manager);
+        await factory.CreateRoleAsync(tenant.Id, [RequestsRead, RequestsWrite, ShipmentsRead, ShipmentsWrite, TripsRead, TripsWrite], Scope.All, operations);
         await factory.CreateRoleAsync(tenant.Id, [RequestsRead, ShipmentsRead], Scope.All, reader);
         await factory.CreateRoleAsync(tenant.Id, [RequestsRead, RequestsApprove], Scope.All, approver);
 
@@ -226,6 +227,15 @@ public class LogisticsShipmentTests(ModulixApiFactory factory) : IClassFixture<M
     {
         var response = await client.PostAsJsonAsync($"/api/logistics/{kind}/{record.Id}/actions", new RunLogisticsActionRequest(action, record.Version, reason));
         Assert.True(response.StatusCode == HttpStatusCode.OK, $"{action}: {(int)response.StatusCode} {await response.Content.ReadAsStringAsync()}");
+        return (await response.Content.ReadFromJsonAsync<RecordResponse>())!;
+    }
+
+    /// <summary>Sevkiyatı yeni bir sefere ekler (sevkiyat "Planlandı" olur) ve sevkiyatın yeni halini döner.</summary>
+    private static async Task<RecordResponse> PlanAsync(HttpClient client, RecordResponse shipment)
+    {
+        var trip = await PostAsync(client, "/api/records/logistics.trip", new JsonObject { ["plannedStart"] = Iso(Today.AddDays(1)) });
+        var response = await client.PostAsJsonAsync($"/api/logistics/trips/{trip.Id}/shipments", new AssignShipmentRequest(shipment.Id));
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<RecordResponse>())!;
     }
 

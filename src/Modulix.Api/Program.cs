@@ -81,6 +81,7 @@ builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modu
 builder.Services.AddScoped<Modulix.Modules.Crm.Reporting.ISalesReportingPolicyProvider, Modulix.Api.Crm.SalesReportingPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Contracts.Lifecycle.IContractPolicyProvider, Modulix.Api.Contracts.ContractPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Orders.Lifecycle.IOrderPolicyProvider, Modulix.Api.Orders.OrderPolicyProvider>();
+builder.Services.AddScoped<Modulix.Modules.Logistics.Lifecycle.ILogisticsPolicyProvider, Modulix.Api.Logistics.LogisticsPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Support.Lifecycle.ISupportPolicyProvider, Modulix.Api.Support.SupportPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Marketing.Runs.IMarketingPolicyProvider, Modulix.Api.Marketing.MarketingPolicyProvider>();
 builder.Services.Configure<Modulix.Api.Communication.CommunicationCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Communication.CommunicationCleanupOptions.SectionName));

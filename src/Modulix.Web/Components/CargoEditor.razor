@@ -5,6 +5,7 @@
 @using System.Text.Json.Nodes
 @inject ApiClient Api
 @inject FormLayouts Layouts
+@inject SessionState Session
 
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
@@ -158,6 +159,11 @@
         <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null || ReadOnly)">Kaydet</button>
     </div>
 </form>
+
+@if (!IsRequest && Record is not null && Status is "inTransit" or "delivered" or "partial" or "failed")
+{
+    <DeliveryProofPanel Shipment="Record" CanWrite="@Session.Can(LogisticsAccess.ShipmentsWrite)" Changed="ActionDoneAsync" />
+}
 
 @code {
     private static readonly IReadOnlyList<SegmentOption<bool>> HazardousOptions = [new(false, "Hayır"), new(true, "Evet")];

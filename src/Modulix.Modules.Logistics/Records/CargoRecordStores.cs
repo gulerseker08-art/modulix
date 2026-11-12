@@ -175,7 +175,8 @@ internal sealed class TransportRequestRecordStore(LogisticsStoreContext context)
 
 /// <summary>
 /// Sevkiyat deposu (ADR-0038 K5, K7, dilim 4). Genel uçtan oluşturulamaz: sevkiyat yalnızca talep onayıyla, iş akışı kapısı açıkken doğar.
-/// Yükleme başlayana kadar (Planlama bekliyor, Planlandı) yük ve tarih alanları düzeltilebilir; durum iş akışı komutudur.
+/// Yükleme başlayana kadar (Planlama bekliyor, Planlandı) yük ve tarih alanları düzeltilebilir; durum iş akışı komutudur. Planlama sefer atamasıdır
+/// (dilim 5): atanan sevkiyat "Planlandı" olur ve sefere bağlanır, seferden çıkarılan "Planlama bekliyor"a döner.
 /// </summary>
 internal sealed class ShipmentRecordStore(LogisticsStoreContext context) : CargoRecordStore<Shipment>(context)
 {
@@ -197,16 +198,28 @@ internal sealed class ShipmentRecordStore(LogisticsStoreContext context) : Cargo
     [
         .. CargoFields(),
         Field.Reference<Shipment, TransportRequest>("requestId", "Taşıma talebi bulunamadı.", s => s.RequestId, (s, v) => s.RequestId = v!.Value, required: true, createOnly: true),
+        Field.Computed<Shipment>("tripId", s => s.TripId?.ToString()),
     ];
 
     protected override IReadOnlyDictionary<string, RecordFilter<Shipment>> Filters { get; } = new Dictionary<string, RecordFilter<Shipment>>(
         CargoFilters(Shipment.Statuses.All))
     {
         ["requestId"] = (q, v) => FilterValue.Id(v) is { } id ? q.Where(s => s.RequestId == id) : null,
+        ["tripId"] = (q, v) => v == "none" ? q.Where(s => s.TripId == null) : FilterValue.Id(v) is { } id ? q.Where(s => s.TripId == id) : null,
     };
 
     protected override async Task CargoAppliedAsync(Shipment entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
+        // Sefer ataması (dilim 5): "Planlandı"ya geçiş sefere bağlar, "Planlama bekliyor"a dönüş bağı kaldırır.
+        if (Context.Gate.IsOpen && Context.Gate.Status == Shipment.Statuses.Planned)
+        {
+            entity.TripId = Context.Gate.LinkedId;
+        }
+        else if (Context.Gate.IsOpen && Context.Gate.Status == Shipment.Statuses.Pending)
+        {
+            entity.TripId = null;
+        }
+
         if (isNew && (entity.RequestId == Guid.Empty
             || await Context.Data.Set<Shipment>().AsNoTracking().AnyAsync(s => s.RequestId == entity.RequestId, cancellationToken)))
         {

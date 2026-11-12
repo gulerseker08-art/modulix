@@ -239,6 +239,7 @@ public static class AppCatalog
         new(Logistics, null, "Lojistik", "truck", null, 42, ModuleKey: LogisticsAccess.ModuleKey, Group: OperationsGroup),
         new("logistics.requests", Logistics, "Taşıma talepleri", "inbox", "lojistik/talepler", 4, LogisticsAccess.ModuleKey, LogisticsAccess.RequestsRead),
         new("logistics.shipments", Logistics, "Sevkiyatlar", "truck", "lojistik/sevkiyatlar", 6, LogisticsAccess.ModuleKey, LogisticsAccess.ShipmentsRead),
+        new("logistics.trips", Logistics, "Seferler", "map-pin", "lojistik/seferler", 8, LogisticsAccess.ModuleKey, LogisticsAccess.TripsRead, Tone: AppTone.Teal),
         new("logistics.drivers", Logistics, "Sürücüler", "user", "lojistik/suruculer", 10, LogisticsAccess.ModuleKey, LogisticsAccess.DriversRead),
         new("logistics.carrier-terms", Logistics, "Taşıyıcı anlaşmaları", "file-text", "lojistik/tasiyici-anlasmalari", 20, LogisticsAccess.ModuleKey, LogisticsAccess.CarriersRead, Tone: AppTone.Teal),
         new("logistics.credentials", Logistics, "Sürücü belgeleri", "calendar", "lojistik/surucu-belgeleri", 30, LogisticsAccess.ModuleKey, LogisticsAccess.DriversRead, Tone: AppTone.Indigo),

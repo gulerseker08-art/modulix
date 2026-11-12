@@ -220,7 +220,7 @@ public sealed class TransportRequest : CargoEntity
 /// <summary>
 /// Sevkiyat (ADR-0038 K5, K7): onaylanan talepten doğan müşteri yükü. Durumlar iş akışı komutuyla ilerler: Planlama bekliyor → Planlandı →
 /// Yükleniyor → Yolda; teslim (Teslim edildi / Kısmi / Başarısız) yalnızca teslim komutuyla gelir (dilim 6). İptal teslimden önce ve gerekçeyle.
-/// Sefer ve durak bağı dilim 5'tedir. Silinmez (K12).
+/// Planlama sefer atamasıyla verilir (dilim 5). Silinmez (K12).
 /// </summary>
 public sealed class Shipment : CargoEntity
 {
@@ -242,4 +242,147 @@ public sealed class Shipment : CargoEntity
 
     /// <summary>Kaynak taşıma talebi; her talepten en çok bir sevkiyat.</summary>
     public Guid RequestId { get; internal set; }
+
+    /// <summary>Sevkiyatın atandığı sefer (atamayla "Planlandı" olur; çıkarılınca boşalır ve "Planlama bekliyor"a döner).</summary>
+    public Guid? TripId { get; internal set; }
+}
+
+/// <summary>
+/// Sefer (ADR-0038 K5, dilim 5): bir aracın (çekici/kamyon, isteğe bağlı dorse) bir ya da iki sürücüyle yaptığı yolculuk; sıralı durak zinciridir
+/// (<see cref="TripStop"/>). Komple taşıma iki duraklı, parsiyel çok duraklı seferdir; ayrı model yoktur. Taşeron seferde taşıyıcı firma seçilir,
+/// araç ve sürücü isteğe bağlıdır. Numara sunucuda verilir (SF-yıl-sıra; belge serisi Ç8.1 gelince ona taşınır). Durum yalnızca iş akışı
+/// komutuyla değişir: Planlanıyor → Hazır (uygunluk denetimi geçince) → Yolda → Tamamlandı; İptal yoldan önce ve gerekçeli. Silinmez (K12).
+/// </summary>
+public sealed class Trip : LogisticsEntity
+{
+    public const int NumberMaxLength = 30;
+    public const int TextMaxLength = 2000;
+    public const int ReasonMaxLength = 2000;
+
+    public static class Statuses
+    {
+        public const string Planning = "planning";
+        public const string Ready = "ready";
+        public const string InProgress = "inProgress";
+        public const string Completed = "completed";
+        public const string Cancelled = "cancelled";
+
+        public static IReadOnlyList<string> All { get; } = [Planning, Ready, InProgress, Completed, Cancelled];
+    }
+
+    public Trip() => Status = Statuses.Planning;
+
+    /// <summary>Tenant içinde tekil sefer numarası (SF-2026-00001).</summary>
+    public string Number { get; internal set; } = string.Empty;
+
+    public DateOnly PlannedStart { get; internal set; }
+
+    /// <summary>Planlanan dönüş/bitiş günü; boşsa tek günlük sefer sayılır.</summary>
+    public DateOnly? PlannedEnd { get; internal set; }
+
+    /// <summary>Motorlu araç (Filo; çekici, kamyon, panelvan).</summary>
+    public Guid? VehicleId { get; internal set; }
+
+    /// <summary>Dorse/römork (Filo; çekilen araç).</summary>
+    public Guid? TrailerId { get; internal set; }
+
+    public Guid? DriverId { get; internal set; }
+
+    /// <summary>İkinci sürücü (çift sürücülü uzun yol; ADR-0038 bölüm 9 madde 2).</summary>
+    public Guid? CoDriverId { get; internal set; }
+
+    /// <summary>Taşeron seferde taşıyıcı firma ("Taşıyıcı" ilişki rolü).</summary>
+    public Guid? CarrierPartyId { get; internal set; }
+
+    public string? Notes { get; internal set; }
+
+    /// <summary>Durum yalnızca iş akışı komutuyla değişir (K7).</summary>
+    public string Status { get; internal set; }
+
+    /// <summary>Son geçişin notu: iptal gerekçesi ya da onaylanan uygunluk uyarıları.</summary>
+    public string? StatusReason { get; internal set; }
+}
+
+/// <summary>
+/// Sefer durağı (ADR-0038 K5): sıra, tür (yükleme, boşaltma, sınır/gümrük, mola, boş dönüş), şehir ve adres, planlanan ve gerçekleşen varış.
+/// Sıra sefer içinde tekildir; araya durak eklemek için onar onar artar (10, 20, 30). Sevkiyat atanınca yükleme ve boşaltma durakları sevkiyatın
+/// güzergâhından açılır ve sevkiyata bağlanır; bu duraklar sevkiyat çıkarılınca kalkar. Plan yalnızca sefer planlanırken değişir; varış saati
+/// sefer yoldayken girilir.
+/// </summary>
+public sealed class TripStop : LogisticsEntity
+{
+    public const int MaxSequence = 9999;
+    public const int SequenceStep = 10;
+
+    public static class Types
+    {
+        public const string Loading = "loading";
+        public const string Unloading = "unloading";
+        public const string Border = "border";
+        public const string Rest = "rest";
+        public const string EmptyReturn = "emptyReturn";
+
+        public static IReadOnlyList<string> All { get; } = [Loading, Unloading, Border, Rest, EmptyReturn];
+    }
+
+    public Guid TripId { get; internal set; }
+
+    public int Sequence { get; internal set; }
+
+    public string StopType { get; internal set; } = Types.Loading;
+
+    public string City { get; internal set; } = string.Empty;
+
+    public string? Address { get; internal set; }
+
+    public DateTimeOffset? PlannedAt { get; internal set; }
+
+    /// <summary>Gerçekleşen varış (sefer yoldayken girilir); bütün duraklarda dolmadan sefer tamamlanmaz.</summary>
+    public DateTimeOffset? ArrivedAt { get; internal set; }
+
+    /// <summary>Durağın yükü (sevkiyat atamasıyla açılan yükleme/boşaltma durağı); elle eklenen durakta boş.</summary>
+    public Guid? ShipmentId { get; internal set; }
+
+    public string? Notes { get; internal set; }
+}
+
+/// <summary>
+/// Teslim kanıtı (ADR-0038 K8, dilim 6): bir sevkiyatın teslim komutuyla yazılan <b>değişmez</b> kaydı. Sonuç (teslim, kısmi, başarısız), teslim alan,
+/// sunucu zamanı, hasar ve eksik işareti, başarısız teslimin nedeni ve notu taşır. Fotoğraf ve imza dosyaları kayda Core dosya deposuyla
+/// eklenir (<c>IFileStore</c>). Kayıt güncellenmez ve silinmez; düzeltme yeni kanıtla yapılır. Genel uçtan oluşturulamaz.
+/// </summary>
+public sealed class DeliveryProof : LogisticsEntity
+{
+    public const int ReceivedByMaxLength = 200;
+    public const int TextMaxLength = 2000;
+
+    public static class Outcomes
+    {
+        public const string Delivered = "delivered";
+        public const string Partial = "partial";
+        public const string Failed = "failed";
+
+        public static IReadOnlyList<string> All { get; } = [Delivered, Partial, Failed];
+    }
+
+    public Guid ShipmentId { get; internal set; }
+
+    public string Outcome { get; internal set; } = Outcomes.Delivered;
+
+    /// <summary>Teslim alanın adı (teslim ve kısmi teslimde zorunlu).</summary>
+    public string? ReceivedBy { get; internal set; }
+
+    /// <summary>Teslimin kaydedildiği an; sunucu zamanıdır, istemciden gelmez.</summary>
+    public DateTimeOffset ReceivedAt { get; internal set; }
+
+    /// <summary>Teslimde hasar görüldü.</summary>
+    public bool Damaged { get; internal set; }
+
+    /// <summary>Teslimde eksik çıktı.</summary>
+    public bool Shortage { get; internal set; }
+
+    /// <summary>Başarısız teslimin nedeni (başarısızda zorunlu).</summary>
+    public string? FailureReason { get; internal set; }
+
+    public string? Notes { get; internal set; }
 }

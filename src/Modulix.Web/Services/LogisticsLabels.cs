@@ -10,6 +10,31 @@ public static class LogisticsLabels
     /// <summary>İş akışı uçlarındaki tür adları (<c>/api/logistics/{tür}/...</c>).</summary>
     public const string Requests = "requests";
     public const string Shipments = "shipments";
+    public const string Trips = "trips";
+
+    public static string TripStatus(string? key) => LogisticsAccess.TripStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    /// <summary>Planlanan marka tonu, hazır bilgi tonu, yolda dikkat tonu, tamamlanan başarı tonu, iptal nötr ton.</summary>
+    public static string TripStatusBadge(string? key) => key switch
+    {
+        "planning" => "stage-qualified",
+        "ready" => "stage-proposal",
+        "inProgress" => "stage-negotiation",
+        "completed" => "status-customer",
+        _ => "status-inactive",
+    };
+
+    public static string StopType(string? key) => LogisticsAccess.StopTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    /// <summary>Durak türü ikonu: yükleme, boşaltma, sınır, mola, boş dönüş.</summary>
+    public static string StopIcon(string? key) => key switch
+    {
+        "loading" => "package",
+        "unloading" => "check-circle",
+        "border" => "shield",
+        "rest" => "clock",
+        _ => "truck",
+    };
 
     public static string CargoStatus(string kind, string? key) =>
         (kind == Requests ? LogisticsAccess.RequestStatuses : LogisticsAccess.ShipmentStatuses).FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
@@ -28,6 +53,8 @@ public static class LogisticsLabels
     /// <summary>Güzergâh: "İstanbul → Ankara".</summary>
     public static string Route(RecordResponse record) => $"{WarehouseLabels.Text(record, "pickupCity")} → {WarehouseLabels.Text(record, "deliveryCity")}";
     public static string DriverType(string? key) => LogisticsAccess.DriverTypes.FirstOrDefault(t => t.Key == key).Label ?? key ?? string.Empty;
+
+    public static string DeliveryOutcome(string? key) => LogisticsAccess.DeliveryOutcomes.FirstOrDefault(o => o.Key == key).Label ?? key ?? string.Empty;
 
     public static string Status(string? key) => LogisticsAccess.Statuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 

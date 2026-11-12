@@ -108,5 +108,68 @@ internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
         builder.HasIndex(s => new { s.TenantId, s.RequestId }).IsUnique().HasDatabaseName("UX_Shipments_Request");
         builder.HasOne<TransportRequest>().WithMany().HasForeignKey(s => new { s.TenantId, s.RequestId })
             .HasPrincipalKey(r => new { r.TenantId, r.Id }).OnDelete(DeleteBehavior.Restrict);
+
+        // Atandığı sefer (aynı modül, bileşik yabancı anahtar).
+        builder.HasIndex(s => new { s.TenantId, s.TripId }).HasDatabaseName("IX_Shipments_Trip");
+        builder.HasOne<Trip>().WithMany().HasForeignKey(s => new { s.TenantId, s.TripId })
+            .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class TripConfiguration : IEntityTypeConfiguration<Trip>
+{
+    public void Configure(EntityTypeBuilder<Trip> builder)
+    {
+        LogisticsTables.ConfigureCommon(builder, "Trips");
+        builder.Property(t => t.Number).HasMaxLength(Trip.NumberMaxLength).IsUnicode(false).IsRequired();
+        builder.Property(t => t.Notes).HasMaxLength(Trip.TextMaxLength);
+        builder.Property(t => t.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(t => t.StatusReason).HasMaxLength(Trip.ReasonMaxLength);
+
+        builder.HasIndex(t => new { t.TenantId, t.Number }).IsUnique().HasDatabaseName("UX_Trips_Number");
+        builder.HasIndex(t => new { t.TenantId, t.Status, t.PlannedStart }).HasDatabaseName("IX_Trips_Status");
+        builder.HasIndex(t => new { t.TenantId, t.VehicleId }).HasDatabaseName("IX_Trips_Vehicle");
+        builder.HasIndex(t => new { t.TenantId, t.DriverId }).HasDatabaseName("IX_Trips_Driver");
+        builder.HasOne<Driver>().WithMany().HasForeignKey(t => new { t.TenantId, t.DriverId })
+            .HasPrincipalKey(d => new { d.TenantId, d.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Driver>().WithMany().HasForeignKey(t => new { t.TenantId, t.CoDriverId })
+            .HasPrincipalKey(d => new { d.TenantId, d.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class TripStopConfiguration : IEntityTypeConfiguration<TripStop>
+{
+    public void Configure(EntityTypeBuilder<TripStop> builder)
+    {
+        LogisticsTables.ConfigureCommon(builder, "TripStops");
+        builder.Property(s => s.StopType).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(s => s.City).HasMaxLength(CargoEntity.CityMaxLength).IsRequired();
+        builder.Property(s => s.Address).HasMaxLength(CargoEntity.AddressMaxLength);
+        builder.Property(s => s.Notes).HasMaxLength(CargoEntity.TextMaxLength);
+
+        // Sıra sefer içinde tekildir (ADR-0038 bölüm 3).
+        builder.HasIndex(s => new { s.TenantId, s.TripId, s.Sequence }).IsUnique().HasDatabaseName("UX_TripStops_Sequence");
+        builder.HasIndex(s => new { s.TenantId, s.ShipmentId }).HasDatabaseName("IX_TripStops_Shipment");
+        builder.HasOne<Trip>().WithMany().HasForeignKey(s => new { s.TenantId, s.TripId })
+            .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Shipment>().WithMany().HasForeignKey(s => new { s.TenantId, s.ShipmentId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class DeliveryProofConfiguration : IEntityTypeConfiguration<DeliveryProof>
+{
+    public void Configure(EntityTypeBuilder<DeliveryProof> builder)
+    {
+        LogisticsTables.ConfigureCommon(builder, "DeliveryProofs");
+        builder.Property(p => p.Outcome).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(p => p.ReceivedBy).HasMaxLength(DeliveryProof.ReceivedByMaxLength);
+        builder.Property(p => p.FailureReason).HasMaxLength(DeliveryProof.TextMaxLength);
+        builder.Property(p => p.Notes).HasMaxLength(DeliveryProof.TextMaxLength);
+
+        // Bir sevkiyatın birden çok kanıtı olabilir (düzeltme yeni kanıtla yapılır); sevkiyata aynı modül içinde bileşik yabancı anahtar.
+        builder.HasIndex(p => new { p.TenantId, p.ShipmentId, p.ReceivedAt }).HasDatabaseName("IX_DeliveryProofs_Shipment");
+        builder.HasOne<Shipment>().WithMany().HasForeignKey(p => new { p.TenantId, p.ShipmentId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }
