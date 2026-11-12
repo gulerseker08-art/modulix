@@ -112,12 +112,17 @@
     --mx-radius-modal: 16px;
     --mx-radius-badge: 999px;
 
-    /* Gölgeler: kartlarda yumuşak, düğmede marka renginde parlama (yalnızca birincil düğme ve etkin öğeler) */
+    /* Gölgeler: kartlarda yumuşak, düğmelerde küçük denetim gölgesi (parlama yok) */
     --mx-shadow-card: 0 1px 2px rgba(16, 29, 53, 0.04), 0 8px 28px rgba(16, 29, 53, 0.06);
     --mx-shadow-raised: 0 10px 32px rgba(16, 29, 53, 0.10);
     --mx-shadow-popover: 0 14px 36px rgba(16, 29, 53, 0.16);
-    --mx-shadow-glow: 0 8px 20px rgba(31, 95, 203, 0.30);
     --mx-shadow-control: 0 1px 2px rgba(16, 29, 53, 0.08);
+
+    /* Düğme dolguları (6.11 seçenek C, 12.11 güncellemesi): birincil lacivert düz, yıkıcı kırmızı düz; metin --mx-text-on-brand (AA) */
+    --mx-fill-primary: var(--mx-brand-navy);
+    --mx-fill-primary-hover: var(--mx-brand-navy-light);
+    --mx-fill-danger: #DC2626;
+    --mx-fill-danger-hover: #B91C1C;
 
     /* Marka degradesi: birincil düğme, etkin sekme çizgisi, sayaç rozeti, bölüm ikonu (beyaz metinle AA: 4.5:1 ve üzeri) */
     --mx-gradient-brand: linear-gradient(135deg, #087DB8 0%, #1F5FCB 100%);
@@ -235,8 +240,13 @@
     --mx-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
     --mx-shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.35);
     --mx-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.5);
-    --mx-shadow-glow: 0 8px 20px rgba(59, 174, 230, 0.22);
     --mx-shadow-control: 0 1px 2px rgba(0, 0, 0, 0.35);
+
+    /* Koyu temada birincil açık dolgu + koyu metin; yıkıcı açık kırmızı + koyu metin */
+    --mx-fill-primary: #E6EDF7;
+    --mx-fill-primary-hover: #FFFFFF;
+    --mx-fill-danger: #F87171;
+    --mx-fill-danger-hover: #FCA5A5;
 
     /* Koyu zeminde açık degrade + koyu metin (--mx-text-on-brand) */
     --mx-gradient-brand: linear-gradient(135deg, #3BAEE6 0%, #6FA8FA 100%);
@@ -307,7 +317,7 @@ a, .btn-link {
 .btn {
     --bs-btn-padding-y: 0.25rem;
     --bs-btn-padding-x: 0.8rem;
-    font-weight: 700;
+    font-weight: 600; /* ikincil, tonal ve ghost; birincil ve yıkıcı 700 (aşağıda) */
     font-size: var(--mx-fs-label);
     border-radius: var(--mx-radius-button);
     display: inline-flex;
@@ -334,50 +344,105 @@ a, .btn-link {
     width: var(--mx-control-height);
 }
 
+/* Birincil: çizgili lacivert (koyu temada açık çizgi). Tek eleman, ek işaretleme gerekmez:
+   iki yan kenar yarım daire, üst ve alt kenar degrade çizgi parçalarıyla çizilir. Beklemede üstte uzun parça solda,
+   altta sağda; hover'da parçalar yer değiştirir ve zemin açık tona dolar. Yazı rengi çizgiyle aynıdır. */
 .btn-primary {
-    --bs-btn-color: var(--mx-text-on-brand);
-    --bs-btn-bg: var(--mx-brand-primary);
-    --bs-btn-border-color: var(--mx-brand-primary);
-    --bs-btn-hover-color: var(--mx-text-on-brand);
-    --bs-btn-hover-bg: var(--mx-brand-primary-hover);
-    --bs-btn-hover-border-color: var(--mx-brand-primary-hover);
-    --bs-btn-active-color: var(--mx-text-on-brand);
-    --bs-btn-active-bg: var(--mx-brand-primary-hover);
-    --bs-btn-active-border-color: var(--mx-brand-primary-hover);
-    --bs-btn-disabled-color: var(--mx-text-on-brand);
-    --bs-btn-disabled-bg: var(--mx-brand-primary);
-    --bs-btn-disabled-border-color: var(--mx-brand-primary);
-
-    /* Marka degradesi + parlama; Bootstrap'ın düz zemini degradenin altında kalır (degrade desteklemeyen ortam için yedek). */
-    background-image: var(--mx-gradient-brand);
-    border-color: transparent;
-    box-shadow: var(--mx-shadow-glow);
+    --mx-line: var(--mx-fill-primary);
+    --mx-line-long: calc(100% - 48px);
+    --mx-line-short: 8px;
+    --bs-btn-color: var(--mx-fill-primary);
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: var(--mx-fill-primary);
+    --bs-btn-hover-color: var(--mx-fill-primary);
+    --bs-btn-hover-bg: var(--mx-surface-control);
+    --bs-btn-hover-border-color: var(--mx-fill-primary);
+    --bs-btn-active-color: var(--mx-fill-primary);
+    --bs-btn-active-bg: var(--mx-surface-control);
+    --bs-btn-active-border-color: var(--mx-fill-primary);
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
+    --bs-btn-disabled-opacity: 1;
+    font-weight: 700;
+    border-width: 0 2px;
+    border-radius: 999px;
+    background-image: linear-gradient(var(--mx-line), var(--mx-line)), linear-gradient(var(--mx-line), var(--mx-line)), linear-gradient(var(--mx-line), var(--mx-line)), linear-gradient(var(--mx-line), var(--mx-line));
+    background-repeat: no-repeat;
+    background-origin: border-box;
+    background-position: left 16px top 0, right 16px top 0, right 16px bottom 0, left 16px bottom 0;
+    background-size: var(--mx-line-long) 2px, var(--mx-line-short) 2px, var(--mx-line-long) 2px, var(--mx-line-short) 2px;
+    transition: background-size 0.45s ease, background-color 0.3s ease, color 0.15s ease, transform 0.15s ease;
 }
 
-    .btn-primary:hover:not(:disabled):not(.disabled),
-    .btn-primary:focus-visible {
-        background-image: var(--mx-gradient-brand-hover);
-        border-color: transparent;
-        box-shadow: var(--mx-shadow-glow);
-    }
-
     .btn-primary:hover:not(:disabled):not(.disabled) {
-        transform: translateY(-1px);
+        background-size: var(--mx-line-short) 2px, var(--mx-line-long) 2px, var(--mx-line-short) 2px, var(--mx-line-long) 2px;
     }
 
     .btn-primary:active:not(:disabled):not(.disabled) {
-        background-image: var(--mx-gradient-brand-hover);
         transform: translateY(1px);
-        box-shadow: none;
     }
 
     .btn-primary:disabled,
     .btn-primary.disabled {
+        background-image: none;
+    }
+
+@media (prefers-reduced-motion: reduce) {
+    .btn-primary {
+        transition: none;
+    }
+}
+
+/* Yıkıcı onay düğmesi: düz kırmızı dolgu; koyu temada açık kırmızı + koyu metin. Hover'da bir ton açılır ve 1 px yükselir. */
+.btn-danger {
+    --bs-btn-color: var(--mx-text-on-brand);
+    --bs-btn-bg: var(--mx-fill-danger);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-text-on-brand);
+    --bs-btn-hover-bg: var(--mx-fill-danger-hover);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-text-on-brand);
+    --bs-btn-active-bg: var(--mx-fill-danger-hover);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
+    --bs-btn-disabled-opacity: 1;
+    font-weight: 700;
+    box-shadow: var(--mx-shadow-control);
+}
+
+    .btn-danger:hover:not(:disabled):not(.disabled) {
+        transform: translateY(-1px);
+        box-shadow: var(--mx-shadow-raised);
+    }
+
+    .btn-danger:active:not(:disabled):not(.disabled) {
+        transform: translateY(1px);
         box-shadow: none;
     }
 
+    .btn-danger:disabled,
+    .btn-danger.disabled {
+        box-shadow: none;
+    }
+
+/* Kaydetme sırasında: tıklanmaz, genişlik ve yükseklik sabit, metin hafif solar (aria-busy="true"). */
+.btn[aria-busy="true"] {
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+/* Büyük düğme: yalnızca boş durum ve sihirbaz gibi tek eylemli ekranlarda. */
+.btn-lg {
+    --bs-btn-padding-x: 1.1rem;
+    font-size: var(--mx-fs-body);
+}
+
 /* Tonal düğme: üçüncül eylem (ör. "Satır ekle"); hayalet düğme: araç çubuğu eylemleri (Filtrele, Sütunlar). */
-.btn-tonal {
+.btn-tonal,
+.btn-outline-primary {
     --bs-btn-color: var(--mx-tone-brand-fg);
     --bs-btn-bg: var(--mx-tone-brand-bg);
     --bs-btn-border-color: transparent;
@@ -407,21 +472,7 @@ a, .btn-link {
     --bs-btn-disabled-border-color: transparent;
 }
 
-/* Çerçeveli birincil düğme: yumuşak (tonal) görünüm; çerçeve yok, hover'da bir ton koyulaşır. Bütün sayfalarda ortak. */
-.btn-outline-primary {
-    --bs-btn-color: var(--mx-tone-brand-fg);
-    --bs-btn-bg: var(--mx-tone-brand-bg);
-    --bs-btn-border-color: transparent;
-    --bs-btn-hover-color: var(--mx-tone-brand-fg);
-    --bs-btn-hover-bg: var(--mx-tone-info-bg);
-    --bs-btn-hover-border-color: transparent;
-    --bs-btn-active-color: var(--mx-tone-brand-fg);
-    --bs-btn-active-bg: var(--mx-tone-info-bg);
-    --bs-btn-active-border-color: transparent;
-    --bs-btn-disabled-color: var(--mx-text-secondary);
-    --bs-btn-disabled-bg: var(--mx-surface-muted);
-    --bs-btn-disabled-border-color: transparent;
-}
+/* Not: btn-outline-primary yukarıda btn-tonal ile aynı yumuşak görünümü paylaşır (çerçeve yok, hover'da bir ton koyulaşır). */
 
 /* İkincil düğmeler (İptal, Ara, sayfalama): dolgulu, çerçevesiz; hover'da bir ton koyulaşır. */
 .btn-outline-secondary {
@@ -444,20 +495,15 @@ a, .btn-link {
     --bs-btn-color: var(--mx-tone-danger-fg);
     --bs-btn-bg: var(--mx-tone-danger-bg);
     --bs-btn-border-color: transparent;
-    --bs-btn-hover-color: var(--mx-surface);
-    --bs-btn-hover-bg: var(--mx-danger-text);
+    --bs-btn-hover-color: var(--mx-text-on-brand);
+    --bs-btn-hover-bg: var(--mx-fill-danger);
     --bs-btn-hover-border-color: transparent;
-    --bs-btn-active-color: var(--mx-surface);
-    --bs-btn-active-bg: var(--mx-danger-text);
+    --bs-btn-active-color: var(--mx-text-on-brand);
+    --bs-btn-active-bg: var(--mx-fill-danger);
     --bs-btn-active-border-color: transparent;
     --bs-btn-disabled-color: var(--mx-text-secondary);
     --bs-btn-disabled-bg: var(--mx-surface-muted);
     --bs-btn-disabled-border-color: transparent;
-}
-
-.btn-danger {
-    --bs-btn-bg: var(--mx-danger);
-    --bs-btn-border-color: var(--mx-danger);
 }
 
 /* Kaydetme sırasında düğmenin genişliği değişmez; spinner metnin yanında görünür. */
@@ -565,6 +611,20 @@ a, .btn-link {
 
 .btn:focus:not(:focus-visible) {
     box-shadow: none;
+}
+
+/* Birincil ve yıkıcı düğmede odak halkası iki katmanlı: iç halka sayfa zemini, dış halka marka rengi. */
+.btn-primary:focus-visible,
+.btn-danger:focus-visible {
+    box-shadow: 0 0 0 2px var(--mx-surface), 0 0 0 4px var(--mx-brand-primary);
+}
+
+.btn-primary:focus-visible {
+    border-color: var(--mx-fill-primary);
+}
+
+.btn-danger:focus-visible {
+    border-color: transparent;
 }
 
 .form-check-input {
@@ -816,6 +876,10 @@ code {
     --bs-btn-padding-y: 0.125rem;
     --bs-btn-padding-x: 0.6rem;
     min-height: 30px;
+}
+
+.btn-lg {
+    min-height: 44px; /* büyük düğme: dokunmatik hedef boyutu her cihazda */
 }
 
 @media (pointer: coarse) {
@@ -4577,6 +4641,16 @@ button.pipeline-label {
         outline: 2px solid var(--mx-brand-primary);
         outline-offset: -2px;
     }
+
+/* overflow-x: auto, dikeyi de kaydırılabilir yapar; etkin sekmenin alt çizgisi (bottom: -1px) taşıp
+   dikey kaydırma çubuğu çıkarıyordu. Dikeyi kapat, çizgiyi kutunun içinde tut. */
+.record-tabs {
+    overflow-y: hidden;
+}
+
+.view-tabs .record-tab.active::after {
+    bottom: 0;
+}
 
 .record-tab-count {
     padding: 0.05rem 0.45rem;

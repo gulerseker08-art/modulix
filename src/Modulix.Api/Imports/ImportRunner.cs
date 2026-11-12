@@ -43,6 +43,7 @@ public sealed class ImportRunner(
     ITenantScopeFactory tenantScopes,
     ModulixDatabaseOptions database,
     ImportErrorReports reports,
+    IImportWorkbookReader workbooks,
     TimeProvider time,
     IHostApplicationLifetime lifetime,
     ILogger<ImportRunner> logger) : IHostedService
@@ -97,9 +98,23 @@ public sealed class ImportRunner(
             db.ImportRuns.Add(run);
 
             var fields = await services.GetRequiredService<ImportSchema>().FieldsAsync(tenant, definition, stopping);
-            var file = ImportCsvFile.Read(content);
-            var columns = ImportColumns.Bind(file.Headers, fields);
             var issues = new IssueList(tenant.TenantId, run.Id, time);
+            ImportFileContent file;
+            try
+            {
+                file = ImportFiles.IsWorkbook(fileName) ? workbooks.Read(content) : ImportCsvFile.Read(content);
+            }
+            catch (ImportFileException ex)
+            {
+                // Bozuk ya da sınırı aşan çalışma kitabı: koşu açılır, dosya sorunu günlüğe yazılır ve Failed biter (CSV'deki dosya sorunlarıyla aynı yol).
+                run.Start(0, time.GetUtcNow());
+                issues.Add(0, new ImportRowProblem(null, ImportIssueCodes.FileInvalid, ImportIssueSeverity.Error, ex.Message));
+                run.Fail(ex.Message, time.GetUtcNow());
+                await issues.SaveAsync(db);
+                return run.Id;
+            }
+
+            var columns = ImportColumns.Bind(file.Headers, fields);
             foreach (var header in columns.Unknown)
             {
                 issues.Add(0, new ImportRowProblem(null, ImportIssueCodes.FileInvalid, ImportIssueSeverity.Warning, $"Tanınmayan sütun yok sayıldı: {header}."));

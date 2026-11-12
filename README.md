@@ -226,12 +226,12 @@ Platformu işleten ekip için ayrı bir alan: menüde **Platform** (`/platform`)
 
 ### İşlem günlüğü ve içe aktarma (ADR-0033, Dilim 1-3)
 
-**Yönetim → İşlem günlüğü** (`/yonetim/gunluk`), **Yeni içe aktarma** (`/yonetim/gunluk/yeni`), **İçe aktarma tasarımı** (`/yonetim/ice-aktarma-tasarimi`). CSV dosyasından firma, kişi ve müşteri adayı oluşturulur; önce firmalar yüklenir. Tablolar `core.ImportRuns` (iş: kullanıcı, kayıt türü, dosya adı/boyutu/SHA-256 özeti, mod, politika, durum, satır sayıları, iz kimliği) ve `core.ImportRowIssues` (satır no, sütun, hata kodu, önem, ileti); ikisi de RLS'lidir. **Ham hücre değeri saklanmaz.**
+**Yönetim → İşlem günlüğü** (`/yonetim/gunluk`), **Yeni içe aktarma** (`/yonetim/gunluk/yeni`), **İçe aktarma tasarımı** (`/yonetim/ice-aktarma-tasarimi`). Excel (.xlsx) ya da CSV dosyasından firma, kişi ve müşteri adayı oluşturulur; önce firmalar yüklenir. Tablolar `core.ImportRuns` (iş: kullanıcı, kayıt türü, dosya adı/boyutu/SHA-256 özeti, mod, politika, durum, satır sayıları, iz kimliği) ve `core.ImportRowIssues` (satır no, sütun, hata kodu, önem, ileti); ikisi de RLS'lidir. **Ham hücre değeri saklanmaz.**
 
 - **Görünürlük (rol izniyle):** `core.imports.read` firmanın bütün içe aktarmalarını, yalnızca `core.imports.run` kullanıcının kendi içe aktarmalarını görür; başkasının koşusu 404 döner. Kullanıcı süzgeci de bu sınırı aşamaz. `core.imports.rollback` ayrılmıştır (geri alma Dilim 4). Üçü de Yönetici rolündedir.
 - **API:** `GET /api/imports?status=&mode=&userId=&entityKey=&from=&to=&page=&pageSize=` (en yeni üstte; tarihler firma saat dilimiyle gün olarak yorumlanır, bitiş dahil) ve `GET /api/imports/{id}?severity=&code=&page=&pageSize=` (koşu özeti, hata kodu dağılımı ve sayfalı satır hataları). Geçersiz durum, mod, önem ya da hata kodu 400 döner.
 - **Hata kodları** kapalı listedir: `required-missing`, `format-invalid`, `lookup-unresolved`, `duplicate-exact`, `duplicate-possible`, `custom-field-invalid`, `permission-denied`, `business-rule`, `file-invalid`, `system-error`. Koşu başına en çok 5.000 satır sorunu saklanır; hatalı satır sayısı yine doğrudur.
-- **İçe aktarma:** `POST /api/imports/preview?entityKey=&fileName=` kuru çalışmadır (aynı doğrulama, işlem geri alınır, yalnızca günlüğe koşu yazılır); `POST /api/imports?entityKey=&fileName=` hatasız satırları kayıt boru hattından oluşturur (denetim kaynağı `Import`). Dosya gövdede ham bayttır: yalnızca `.csv`/`.txt`, en çok 10 MB ve 2.000 satır; `;`, `,` ve sekme ayraçları ile UTF-8 ve Windows-1254 tanınır. İkisi de 202 ve koşu özetiyle döner; satırlar arka planda işlenir, sonuç `GET /api/imports/{id}` ile izlenir (sayfa kapansa da koşu biter). Tenant başına aynı anda bir koşu olur (409). Dosya düzeyi sorunda koşu hemen `Failed` biter, satır yazılmaz.
+- **İçe aktarma:** `POST /api/imports/preview?entityKey=&fileName=` kuru çalışmadır (aynı doğrulama, işlem geri alınır, yalnızca günlüğe koşu yazılır); `POST /api/imports?entityKey=&fileName=` hatasız satırları kayıt boru hattından oluşturur (denetim kaynağı `Import`). Dosya gövdede ham bayttır: `.xlsx` (yalnızca ilk sayfa; sayı ve tarih hücreleri Türkçe biçime çevrilir, formül hücresinde kayıtlı sonuç okunur, açılmış boyut 200 MB ile sınırlıdır; eski `.xls` reddedilir), `.csv` ya da `.txt`; en çok 10 MB ve 2.000 satır; bozuk ya da zip imzası olmayan `.xlsx` koşuyu `file-invalid` ile `Failed` bitirir; hata raporu her zaman CSV'dir; `;`, `,` ve sekme ayraçları ile UTF-8 ve Windows-1254 tanınır. İkisi de 202 ve koşu özetiyle döner; satırlar arka planda işlenir, sonuç `GET /api/imports/{id}` ile izlenir (sayfa kapansa da koşu biter). Tenant başına aynı anda bir koşu olur (409). Dosya düzeyi sorunda koşu hemen `Failed` biter, satır yazılmaz.
 - **Yetki:** başlatmak için `core.imports.run` ve türün oluşturma izni gerekir; modül kapalı ya da salt okunursa tür listelenmez ve 404 döner. `GET /api/imports/definitions` kullanıcının içe aktarabildiği türleri ve sütunları (firmanın özel alanları dahil), `GET /api/imports/definitions/{entityKey}/template` boş şablonu verir.
 - **Hücreler:** başlık, sütunun görünen adı ya da teknik anahtarıdır; tanınmayan sütun uyarıyla yok sayılır. Sayılar `1.234,56`, tarihler `gg.aa.yyyy` ya da `yyyy-aa-gg`, seçimler görünen ad ya da anahtar, çoklu seçimler `|` ile yazılır. Firma sütunu vergi numarası ya da tam adla, Sorumlu sütunu firmanın etkin üyesinin e-postasıyla çözülür; bulunamayan ya da birden çok eşleşen değer `lookup-unresolved` olur. Firmada aynı vergi numarası `duplicate-exact` satır hatasıdır; ad, e-posta ve telefon yalnızca `duplicate-possible` uyarısıdır, satırı engellemez.
 - **Tasarım:** `GET /api/customization/import-designs` ve `PUT .../{entityKey}` (`core.customization.manage`, denetim kaydına yazılır): firma türü açıp kapatır, sütun çıkarır, zorunlu kılar; kodun zorunlu tuttuğu sütun kapatılamaz. İçe aktarılan kayıtlar varsayılan olarak kural çalıştırmaz ve atama e-postası göndermez; "Kurallar ve atama e-postaları çalışsın" seçeneği bunu tür başına açar.
@@ -804,13 +804,15 @@ Modüller birbirinin değişikliğine ve bildirimlere olaylarla tepki verir ([AD
 
 `main` dalına her push'ta ve her pull request'te GitHub Actions (`.github/workflows/ci.yml`):
 
-1. SQL Server'ı yereldekiyle aynı `compose.yaml` ve `init.sql` ile açar; şifreler her çalışmada yeniden üretilir.
-2. Release modunda derler. Yüksek veya kritik güvenlik açığı olan bir paket varsa derleme durur.
-3. Migration'ları uygular; mimari, birim ve entegrasyon testlerini çalıştırır.
+Üç katman paralel çalışır:
 
-CI tüm dallarda çalışır. Yeni migration'ı GitHub üzerinde üretmek için **Actions → EF migration olustur → Run workflow**.
+1. **`unit-tests`**: bütün çözümü Release modunda derler (yüksek/kritik güvenlik açıklı paket derlemeyi durdurur), mimari ve birim testlerini çalıştırır. Veritabanı gerekmez.
+2. **`integration-tests`**: entegrasyon testleri (tek job'da ~52 dk sürüyordu) test sınıfı düzeyinde **4 parçaya** bölünür (`scripts/ci-test-shard.sh`; sınıf başına test sayısına göre dengeli). Her parça kendi SQL Server + Mailpit'ini yereldekiyle aynı `compose.yaml` ve `init.sql` ile açar (şifreler her çalışmada yeniden üretilir), migration'ları uygular ve yalnızca kendi sınıflarını koşar. Her parçanın iş özetinde en yavaş test sınıfları listelenir (`scripts/ci-slow-classes.sh`); dengeyi bu veriyle ayarla. Parça sayısı `matrix.shard` listesinden gelir.
+3. **`build-and-test`**: ikisini toplayan kapı. Dal kuralı (ruleset) bu adı zorunlu kontrol olarak ister; adı değiştirme.
 
-Sonuç GitHub'da reponun **Actions** sekmesinde ve README'deki rozette görünür. Bir çalışma yaklaşık 5–8 dakika sürer; özel repolarda bu süre aylık ücretsiz dakika kotasından düşer.
+CI `main` push'unda ve `main` tabanlı pull request'te çalışır. Yeni migration'ı GitHub üzerinde üretmek için **Actions → EF migration olustur → Run workflow**.
+
+Sonuç GitHub'da reponun **Actions** sekmesinde ve README'deki rozette görünür. Bir çalışma yaklaşık 15–20 dakika sürer (parçalamadan önce ~57 dk). Yeni entegrasyon test sınıfı eklemek ayrı bir ayar gerektirmez; sınıf otomatik olarak bir parçaya düşer.
 
 ## Günlük komutlar
 

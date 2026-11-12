@@ -170,6 +170,7 @@ public static class PersistenceSetup
         services.AddScoped<IRegimeProfileAdmin>(sp => sp.GetRequiredService<RegimeProfileService>());
         services.AddScoped<IRegimeProfileCatalog>(sp => sp.GetRequiredService<RegimeProfileService>());
         services.AddSingleton<IGtipFileReader, GtipFileReader>();
+        services.AddSingleton<IImportWorkbookReader, ImportWorkbookReader>();
         services.AddScoped<IActivityCodeCatalog, ActivityCodeCatalog>();
         services.AddScoped<ITenantActivitySelection, TenantActivitySelectionService>();
         services.AddScoped<IRulePackageService, RulePackageService>();

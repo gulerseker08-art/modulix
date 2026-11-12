@@ -161,3 +161,12 @@ Mutlu yol (yükle, uygula, sonuç); hata/doğrulama (her hata kodu, biçim, dosy
 - Ad benzerliği içe aktarmada tam eşleşmedir ("Acme A.Ş." ile "ACME Anonim Şirketi" uyarı vermez); ünvan anahtarı mükerrer önerisi ucundadır. Kişide ad-soyad eşleşmesi yoktur: e-postası ve telefonu olmayan kişi dosyası yeniden yüklenirse uyarısız çoğalır.
 - Kuru çalışmada dosyadaki yeni firmalar yazılmadığı için aynı dosyanın kişileri sınanamaz; firmalar uygulanmadan kişi kuru çalışması `lookup-unresolved` verir.
 - Kişide firma bağı yalnızca birincil firmadır; rol, departman ve ana irtibat elle girilir (ADR-0011).
+
+**Dilim 4a:** uygulandı (XLSX desteği, 12 Kasım 2026).
+
+- `.xlsx` çalışma kitabı CSV ile aynı yoldan geçer (kuru çalışma, boru hattı, günlük, yetki). Biçim dosya adının uzantısından seçilir (`ImportFiles`); satır kurma ve hücre temizliği CSV ve XLSX için ortaktır (`ImportFiles.Build`), yani boş satır numaralaması, kırpma ve 2.000 satır sınırı aynıdır. Okuyucu `IImportWorkbookReader` ile Core'a soyutlanır, gerçeklemesi `Infrastructure/Imports/ImportWorkbookReader`'dadır.
+- **Sapma (paket):** bölüm 4 ve 116 `DocumentFormat.OpenXml` diyordu; depoda GTİP içe aktarması için zaten **MiniExcel** vardı ve güvenlik taramasından geçiyor. İkinci bir Excel paketi eklenmedi, aynı okuyucu deseni (`GtipFileReader`) kullanıldı. "OpenXml sürümünün taranması" açık noktası böylece kapandı.
+- **Hücre türleri:** Excel hücresi gerçek tiptedir. Sayı Türkçe ondalık metne (`1250,5`), tarih `gg.aa.yyyy`'ye, mantıksal değer `Evet/Hayır`'a çevrilir ve mevcut hücre yorumundan geçer; böylece CSV'deki "12.5 reddedilir" kuralı bozulmaz. Saatli tarih `gg.aa.yyyy SS:dd` olur (tarih sütunu bunu reddeder). **Bilinen sınır:** telefon gibi sayı olarak saklanmış değerin baştaki sıfırı Excel'de zaten yoktur; metin biçimli hücre kullanılmalıdır.
+- **Güvenlik:** yalnızca ilk sayfa okunur; zip imzası ("PK") ve açılmış boyut (200 MB, zip bombası) denetlenir; fiziksel satır okuması 100.000'de, sütun okuması 201'de, dolu satır okuması 2.001'de durur (büyük ama boş biçimli sayfa belleği doldurmaz). Formül hücresinde yalnızca kayıtlı sonuç okunur; makro ve dış bağlantı çalışmaz. Bozuk dosya 400 değil, `file-invalid` hatalı `Failed` koşu olarak günlüğe yazılır; `.xls` uzantısı ise uçta 400 ile reddedilir.
+- Hata raporu ve şablon CSV kalır (ADR'deki "CSV/XLSX" ikinci biçim sonraya bırakıldı): Türkçe Excel UTF-8 BOM'lu CSV'yi doğrudan açar ve rapor düzeltilip yeniden yüklenebilir.
+- **Kalan (Dilim 4):** geri alma, aynı dosya uyarısı, kayıtlı sütun eşlemesi, "hepsi ya da hiç" modu.
