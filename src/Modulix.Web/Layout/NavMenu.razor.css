@@ -84,6 +84,8 @@
     padding: var(--mx-space-3) var(--mx-space-3);
     border-radius: var(--mx-radius-button);
     background: linear-gradient(135deg, var(--mx-brand-navy-light), var(--mx-brand-navy));
+    border: 1.5px solid var(--mx-brand-teal);
+    box-shadow: 0 0 0 3px rgba(0, 194, 199, 0.14);
     color: #fff;
     font-size: var(--mx-fs-body);
     font-weight: 700;
