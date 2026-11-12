@@ -29,10 +29,11 @@ public class ChoiceListTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         using var repClient = await LoginAsync(rep);
 
         var lists = (await adminClient.GetFromJsonAsync<List<ChoiceListDto>>("/api/customization/lists"))!;
+        // Core'un belge türü listesi (ADR-0038 K3) her firmada vardır ve önce gelir; ardından CRM listeleri.
         Assert.Equal(
-            [CrmLists.OpportunityStage, CrmLists.OpportunityType, CrmLists.OpportunityLossReason, CrmLists.CompanyStatus, CrmLists.CompanySource, CrmLists.ActivityType, CrmLeadLists.Source, CrmLeadLists.DisqualificationReason],
+            ["core.credential-type", CrmLists.OpportunityStage, CrmLists.OpportunityType, CrmLists.OpportunityLossReason, CrmLists.CompanyStatus, CrmLists.CompanySource, CrmLists.ActivityType, CrmLeadLists.Source, CrmLeadLists.DisqualificationReason],
             lists.Select(l => l.Key));
-        var stages = lists[0];
+        var stages = lists.Single(l => l.Key == CrmLists.OpportunityStage);
         Assert.False(stages.Customized);
         Assert.Equal(["Lead", "Qualified", "Proposal", "Negotiation", "Won", "Lost"], stages.Values.Select(v => v.Key));
         Assert.Equal(HttpStatusCode.Forbidden, (await repClient.PutAsJsonAsync(
