@@ -76,6 +76,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Dinamik (özel) alanlar | Var | `CustomFieldInputs.razor` — aynı form sınıflarıyla çizilir; `Only` ile tek alan (form düzeni içinde) |
 | Metadata'dan form (LayoutForm) | Var | `Components/LayoutForm.razor` — `Layout` (`FormLayoutDto`), `Field` şablonu, `Shows`, özel alanlar; sekme / bölüm / alan düzeni firmanın form düzeninden (ADR-0021). Yönetim: `Pages/Admin/FormDesigner.razor` |
 | FieldError | Var | Alanın altında doğrulama iletisi |
+| Alan açıklaması baloncuğu | Var | Giriş alanıyla aynı kapsayıcıdaki `form-text`, alanın üzerine gelince/odaklanınca alanın üstünde baloncuk olarak açılır (yalnızca CSS, `app.css`; ikon yok, formda yer kaplamaz). Hata metni (`form-text text-danger`) ve girişle aynı kapsayıcıda olmayan `form-text` satır içi kalır |
 | FileUpload, RichTextEditor, MultiLookup | Yok | |
 
 ## Veri
