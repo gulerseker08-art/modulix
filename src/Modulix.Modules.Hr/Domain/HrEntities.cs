@@ -778,3 +778,50 @@ public sealed class SurveyAnswer : HrEntity
 
     public string? TextValue { get; internal set; }
 }
+
+/// <summary>
+/// Kurum içi blog yazısı (ADR-0042 dilim 8). İletişim/İK ekibi yazar ve yayınlar; okurlar yalnızca yayındaki yazıları görür. Metin düz metindir
+/// (HTML yorumlanmaz); ekler ADR-0040 dosya deposundadır (kayda bağlı).
+/// </summary>
+public sealed class BlogPost : HrEntity
+{
+    public const int TitleMaxLength = 200;
+    public const int SummaryMaxLength = 500;
+    public const int BodyMaxLength = 20_000;
+
+    public string Title { get; internal set; } = string.Empty;
+
+    public string? Summary { get; internal set; }
+
+    public string Body { get; internal set; } = string.Empty;
+
+    public bool IsPublished { get; internal set; }
+
+    /// <summary>İlk yayınlandığı an (yeniden taslağa alınıp yayınlansa da değişmez); okur listesi buna göre sıralanır.</summary>
+    public DateTimeOffset? PublishedAt { get; internal set; }
+
+    public Guid? AuthorUserId { get; internal set; }
+}
+
+/// <summary>
+/// Fotoğraf albümü (ADR-0042 dilim 8). Fotoğraflar albüm kaydına bağlı ADR-0040 dosyalarıdır (kayıt başına en çok 20 dosya); okurlar yalnızca
+/// yayındaki albümleri ve onların fotoğraflarını görür (dosya erişimi bağlı kaydın erişimidir).
+/// </summary>
+public sealed class PhotoAlbum : HrEntity
+{
+    public const int TitleMaxLength = 200;
+    public const int DescriptionMaxLength = 2000;
+
+    public string Title { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    /// <summary>Etkinliğin günü (ör. yılbaşı kutlaması); okur listesi buna göre sıralanır.</summary>
+    public DateOnly? EventDate { get; internal set; }
+
+    public bool IsPublished { get; internal set; }
+
+    public DateTimeOffset? PublishedAt { get; internal set; }
+
+    public Guid? AuthorUserId { get; internal set; }
+}

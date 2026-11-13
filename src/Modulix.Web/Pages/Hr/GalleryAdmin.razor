@@ -1,0 +1,185 @@
+@page "/ik/galeri-yonetimi"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Galeri yönetimi · Modulix</PageTitle>
+
+@* Galeri yönetimi (ADR-0042 dilim 8): albüm açma, fotoğraf ekleme ve silme (ADR-0040 dosyaları; albüm başına en çok 20), yayınlama. Okurlar
+   yayındaki albümleri "Galeri" ekranında görür. Albüm silinmeden önce fotoğrafları silinmelidir (kaydı silinen albümün dosyaları erişilemez kalır). *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.GalleryManage">
+    <PageHeader Title="Galeri yönetimi" Icon="image" Subtitle="@(page is null ? "Albüm açın, fotoğraf ekleyin ve yayınlayın." : $"{page.TotalCount} albüm")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <PhotoAlbumEditor @key="selected?.Id" Album="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
+        @if (selected is not null)
+        {
+            <AttachmentPanel EntityKey="@HrAccess.PhotoAlbumEntityKey" RecordId="selected.Id" CanWrite="true" Title="Fotoğraflar"
+                             EmptyText="Henüz fotoğraf eklenmedi." CountChanged="PhotosChanged" />
+            <AlbumPhotos AlbumId="selected.Id" Revision="revision" Title="@(WarehouseLabels.Text(selected, "title") ?? "Albüm")" />
+        }
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Albüm görünümleri" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Albüm ara" placeholder="Başlık ya da açıklamada ara" @bind="search" />
+        </form>
+        @if (!editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni albüm</button>
+        }
+    </div>
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan albüm yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Albümler</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><SortHeader Label="Başlık" ColumnIcon="image" Asc="title" Desc="-title" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="Etkinlik günü" ColumnIcon="calendar" Asc="eventDate" Desc="-eventDate" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> Durum</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var album in page.Items)
+                {
+                    var published = WarehouseLabels.Flag(album, "isPublished");
+                    <tr>
+                        <td data-label="Başlık" class="primary">@WarehouseLabels.Text(album, "title")</td>
+                        <td data-label="Etkinlik günü">@(WarehouseLabels.Text(album, "eventDate") is { Length: > 0 } day ? HrLabels.Date(day) : "—")</td>
+                        <td data-label="Durum"><span class="badge @(published ? "status-customer" : "status-inactive")">@(published ? "Yayında" : "Taslak")</span></td>
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(album, "title")} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(album)"><AppIcon Name="pencil" Size="16" /> <span>Aç</span></button>
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteAsync(album)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private const string DefaultSort = "-eventDate";
+    private static readonly string Url = "/api/records/" + HrAccess.PhotoAlbumEntityKey;
+
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private int revision;
+    private string? message;
+    private string? search;
+    private string sort = DefaultSort;
+    private string view = "all";
+
+    private static IReadOnlyList<ViewOption> ViewOptions { get; } =
+    [
+        new("all", "Tüm albümler", Icon: "list"),
+        new("isPublished=true", "Yayında", Icon: "image"),
+        new("isPublished=false", "Taslak", Icon: "pencil"),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.GalleryManage))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        sort = key;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&sort={Uri.EscapeDataString(sort)}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (view != "all")
+        {
+            url += "&" + view;
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private void Open(RecordResponse? album)
+    {
+        selected = album;
+        editing = true;
+    }
+
+    private void Close()
+    {
+        editing = false;
+        selected = null;
+    }
+
+    private void PhotosChanged(int count) => revision++;
+
+    private async Task SavedAsync(RecordResponse saved)
+    {
+        // Yeni albüm kaydedilince açık kalır: fotoğraf eklenebilsin.
+        if (selected is null)
+        {
+            selected = saved;
+        }
+        else
+        {
+            Close();
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private async Task DeleteAsync(RecordResponse album)
+    {
+        var photos = await Api.GetAsync<List<StoredFileDto>>($"/api/files?entityKey={Uri.EscapeDataString(HrAccess.PhotoAlbumEntityKey)}&recordId={album.Id}");
+        if (photos.Value is { Count: > 0 })
+        {
+            message = "Albümü silmeden önce fotoğraflarını silin (albümü açıp Fotoğraflar bölümünden).";
+            return;
+        }
+
+        var result = await Api.DeleteAsync($"{Url}/{album.Id}?version={album.Version}");
+        message = result.IsSuccess ? null : result.Error;
+        if (result.IsSuccess && selected?.Id == album.Id)
+        {
+            Close();
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

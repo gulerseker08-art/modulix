@@ -29,6 +29,10 @@ public static class HrAccess
     public const string AnnouncementsManage = "hr.announcements.manage";
     public const string SurveysRespond = "hr.surveys.respond";
     public const string SurveysManage = "hr.surveys.manage";
+    public const string BlogRead = "hr.blog.read";
+    public const string BlogManage = "hr.blog.manage";
+    public const string GalleryRead = "hr.gallery.read";
+    public const string GalleryManage = "hr.gallery.manage";
 
     public const string EmployeeEntityKey = "hr.employee";
     public const string LeaveRequestEntityKey = "hr.leave-request";
@@ -56,6 +60,8 @@ public static class HrAccess
     public const string SurveyEntityKey = "hr.survey";
     public const string SurveyQuestionEntityKey = "hr.survey-question";
     public const string SurveyResponseEntityKey = "hr.survey-response";
+    public const string BlogPostEntityKey = "hr.blog-post";
+    public const string PhotoAlbumEntityKey = "hr.photo-album";
     public const string AnnouncementReadEntityKey = "hr.announcement-read";
 
     /// <summary>Yalnızca bu kategorideki izin türü yıllık haktan düşer.</summary>

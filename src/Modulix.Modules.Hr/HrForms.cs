@@ -215,5 +215,31 @@ public static class HrForms
             new("questionType", "Tür", "soru", 6, Required: true, Fixed: true),
             new("options", "Seçenekler (satır başına bir tane)", "bicim", 12),
         ]),
+        new(HrModule.Entities.BlogPost, "Blog yazısı",
+        [new(General, "Yazı"), new("yayin", "Yayın"), new("ek", "Ek bilgiler")],
+        [
+            new("yazi", "Yazı", "file-text"),
+            new("yayin", "Yayın", "calendar", Tab: "yayin"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ek"),
+        ],
+        [
+            new("title", "Başlık", "yazi", 12, Required: true, Fixed: true),
+            new("summary", "Özet", "yazi", 12),
+            new("body", "Metin", "yazi", 12, Required: true, Fixed: true),
+            new("isPublished", "Yayında", "yayin", 6),
+        ]),
+        new(HrModule.Entities.PhotoAlbum, "Fotoğraf albümü",
+        [new(General, "Albüm"), new("yayin", "Yayın"), new("ek", "Ek bilgiler")],
+        [
+            new("album", "Albüm", "image"),
+            new("yayin", "Yayın", "calendar", Tab: "yayin"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ek"),
+        ],
+        [
+            new("title", "Başlık", "album", 12, Required: true, Fixed: true),
+            new("description", "Açıklama", "album", 12),
+            new("eventDate", "Etkinlik günü", "yayin", 6),
+            new("isPublished", "Yayında", "yayin", 6),
+        ]),
     ];
 }

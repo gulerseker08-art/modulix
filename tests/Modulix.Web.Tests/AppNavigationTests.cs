@@ -425,6 +425,11 @@ public class AppNavigationTests
         Assert.Equal(["Anketler", "Anket yönetimi"],
             Nav([HrAccess.ModuleKey], [HrAccess.SurveysRespond, HrAccess.SurveysManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
 
+        // Blog ve galeri: okuma ekranları iletişim ekranlarının ardından; yönetim ekranları en sonda.
+        Assert.Equal(["Blog", "Galeri"], Nav([HrAccess.ModuleKey], [HrAccess.BlogRead, HrAccess.GalleryRead]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["Blog", "Galeri", "Blog yönetimi", "Galeri yönetimi"],
+            Nav([HrAccess.ModuleKey], [HrAccess.BlogRead, HrAccess.GalleryRead, HrAccess.BlogManage, HrAccess.GalleryManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
         Assert.Empty(Nav([], [HrAccess.EmployeesRead]).Roots());
         Assert.Empty(Nav([HrAccess.ModuleKey], []).Roots());
     }

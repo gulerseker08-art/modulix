@@ -1,0 +1,175 @@
+@page "/ik/blog-yonetimi"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Blog yönetimi · Modulix</PageTitle>
+
+@* Blog yönetimi (ADR-0042 dilim 8): taslak ve yayındaki bütün yazılar; yazma, yayınlama, ek ekleme ve silme. Okurlar yazıları "Blog" ekranında
+   görür. *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.BlogManage">
+    <PageHeader Title="Blog yönetimi" Icon="file-text" Subtitle="@(page is null ? "Kurum içi yazıları hazırlayın ve yayınlayın." : $"{page.TotalCount} yazı")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <BlogPostEditor @key="selected?.Id" Post="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
+        @if (selected is not null)
+        {
+            <AttachmentPanel EntityKey="@HrAccess.BlogPostEntityKey" RecordId="selected.Id" CanWrite="true" Title="Ekler" EmptyText="Bu yazının eki yok." />
+        }
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Blog görünümleri" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Yazı ara" placeholder="Başlık ya da metinde ara" @bind="search" />
+        </form>
+        @if (!editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni yazı</button>
+        }
+    </div>
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan yazı yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Blog yazıları</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><SortHeader Label="Başlık" ColumnIcon="file-text" Asc="title" Desc="-title" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="user" Size="14" /> Yazan</span></th>
+                    <th scope="col"><SortHeader Label="Yayın" ColumnIcon="calendar" Asc="publishedAt" Desc="-publishedAt" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> Durum</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var post in page.Items)
+                {
+                    var published = WarehouseLabels.Flag(post, "isPublished");
+                    <tr>
+                        <td data-label="Başlık" class="primary">@WarehouseLabels.Text(post, "title")</td>
+                        <td data-label="Yazan">@(WarehouseLabels.Id(post, "authorUserId") is { } author ? Lookups.MemberName(author) : "—")</td>
+                        <td data-label="Yayın">@(DateTimeOffset.TryParse(WarehouseLabels.Text(post, "publishedAt"), out var at) ? at.LocalDateTime.ToString("dd.MM.yyyy") : "—")</td>
+                        <td data-label="Durum"><span class="badge @(published ? "status-customer" : "status-inactive")">@(published ? "Yayında" : "Taslak")</span></td>
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(post, "title")} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(post)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteAsync(post)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private const string DefaultSort = "-publishedAt";
+    private static readonly string Url = "/api/records/" + HrAccess.BlogPostEntityKey;
+
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private string? message;
+    private string? search;
+    private string sort = DefaultSort;
+    private string view = "all";
+
+    private static IReadOnlyList<ViewOption> ViewOptions { get; } =
+    [
+        new("all", "Tüm yazılar", Icon: "list"),
+        new("isPublished=true", "Yayında", Icon: "file-text"),
+        new("isPublished=false", "Taslak", Icon: "pencil"),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.BlogManage))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        sort = key;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&sort={Uri.EscapeDataString(sort)}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (view != "all")
+        {
+            url += "&" + view;
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private void Open(RecordResponse? post)
+    {
+        selected = post;
+        editing = true;
+    }
+
+    private void Close()
+    {
+        editing = false;
+        selected = null;
+    }
+
+    private async Task SavedAsync(RecordResponse saved)
+    {
+        // Yeni yazı kaydedilince açık kalır: ek eklenebilsin.
+        if (selected is null)
+        {
+            selected = saved;
+        }
+        else
+        {
+            Close();
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private async Task DeleteAsync(RecordResponse post)
+    {
+        var result = await Api.DeleteAsync($"{Url}/{post.Id}?version={post.Version}");
+        message = result.IsSuccess ? null : result.Error;
+        if (result.IsSuccess && selected?.Id == post.Id)
+        {
+            Close();
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+}
