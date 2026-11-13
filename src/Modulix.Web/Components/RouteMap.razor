@@ -43,7 +43,7 @@
                 @foreach (var p in points)
                 {
                     <circle class="map-pulse" cx="@F(p.X)" cy="@F(p.Y)" r="@F(PointSize * 1.6)" />
-                    <circle class="map-dot" cx="@F(p.X)" cy="@F(p.Y)" r="@F(PointSize)" />
+                    <circle class="map-dot @(p.Approximate ? "is-approx" : null)" cx="@F(p.X)" cy="@F(p.Y)" r="@F(PointSize)"><title>@(p.Approximate ? $"{p.Name}: şehir katalogda yok, ülkenin yaklaşık merkezi" : p.Name)</title></circle>
                     @* Razor'da <text> etiketi özel anlamlıdır; SVG metni işaretlemeyle yazılır (ad katalogdan gelir, yine de kodlanır). *@
                     @((MarkupString)$"<text class=\"map-label\" x=\"{F(p.X + PointSize * 2)}\" y=\"{F(p.Y - PointSize * 1.4)}\" font-size=\"{F(LabelSize)}\">{System.Net.WebUtility.HtmlEncode(p.Name)}</text>")
                 }
@@ -84,13 +84,23 @@
 
     private sealed record Drawn(string From, string To, int Count, string Path);
 
-    private sealed record Point(string Name, double X, double Y);
+    private sealed record Point(string Name, double X, double Y, bool Approximate);
 
     private static readonly Dictionary<string, MapData> Cache = [];
+
+    /// <summary>"Avrupa" görünümüne sığan ülkeler (Türkiye, Avrupa ve Kafkasya). Güzergâhın bütün uçları bu kümedeyse Avrupa haritası, değilse Dünya seçilir (ADR-0043 K5).</summary>
+    private static readonly HashSet<string> EuropeCodes = new(StringComparer.Ordinal)
+    {
+        "TR", "DE", "FR", "IT", "ES", "PT", "GB", "IE", "NL", "BE", "LU", "CH", "AT", "CZ", "SK", "PL", "HU", "RO", "BG", "GR", "RS", "HR", "SI", "BA", "ME",
+        "MK", "AL", "XK", "MD", "UA", "BY", "LT", "LV", "EE", "FI", "SE", "NO", "DK", "IS", "CY", "GE", "AM", "AZ", "MT", "LI", "MC", "AD", "SM", "VA",
+    };
 
     private static readonly (string Key, string Label)[] Views = [("auto", "Otomatik"), ("tr", "Türkiye"), ("europe", "Avrupa"), ("world", "Dünya")];
 
     [Parameter, EditorRequired] public IReadOnlyList<DashboardRouteDto> Routes { get; set; } = [];
+
+    /// <summary>Ülkeleri farklı açık sevkiyat sayısı (başlıkta yazılır; 0 ise yazılmaz).</summary>
+    [Parameter] public int International { get; set; }
 
     private string chosen = "auto";
     private MapData? map;
@@ -104,7 +114,9 @@
 
     private string ActiveView => chosen;
 
-    private string Subtitle => drawn.Count == 0 ? "Etkin sevkiyatların yükleme ve teslim şehirleri" : $"{drawn.Sum(d => d.Count)} etkin sevkiyat · {drawn.Count} güzergâh";
+    private string Subtitle => drawn.Count == 0
+        ? "Etkin sevkiyatların yükleme ve teslim şehirleri"
+        : $"{drawn.Sum(d => d.Count)} etkin sevkiyat · {drawn.Count} güzergâh" + (International > 0 ? $" · uluslararası açık sevkiyat: {International}" : string.Empty);
 
     private string Description => drawn.Count == 0
         ? "Güzergâh haritası, çizilecek güzergâh yok"
@@ -122,7 +134,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        var signature = string.Join('|', Routes.Select(r => $"{r.From}>{r.To}:{r.Count}"));
+        var signature = string.Join('|', Routes.Select(r => $"{r.From}/{r.FromCountry}>{r.To}/{r.ToCountry}:{r.Count}"));
         if (signature == lastSignature && map is not null)
         {
             return;
@@ -158,7 +170,7 @@
         unmapped = 0;
         foreach (var r in Routes)
         {
-            if (LogisticsGazetteer.Find(r.From) is { } a && LogisticsGazetteer.Find(r.To) is { } b)
+            if (LogisticsGazetteer.Find(r.From, r.FromCountry) is { } a && LogisticsGazetteer.Find(r.To, r.ToCountry) is { } b)
             {
                 mapped.Add((r, a, b));
             }
@@ -169,7 +181,7 @@
         }
 
         var all = mapped.SelectMany(m => new[] { m.Item2, m.Item3 }).ToList();
-        var key = all.All(p => p.Country == "TR") ? "tr" : all.All(p => p.Lon is >= -12 and <= 48 && p.Lat is >= 34 and <= 71) ? "europe" : "world";
+        var key = all.All(p => p.Country == "TR") ? "tr" : all.All(p => EuropeCodes.Contains(p.Country)) ? "europe" : "world";
         return (key, mapped);
     }
 
@@ -184,13 +196,13 @@
             var mx = (a.X + b.X) / 2;
             var my = (a.Y + b.Y) / 2 - Math.Sqrt(Math.Pow(b.X - a.X, 2) + Math.Pow(b.Y - a.Y, 2)) * 0.25;
             drawn.Add(new Drawn(from.Name, to.Name, route.Count, $"M{F(a.X)},{F(a.Y)}Q{F(mx)},{F(my)} {F(b.X)},{F(b.Y)}"));
-            seen[from.Name] = new Point(from.Name, a.X, a.Y);
-            seen[to.Name] = new Point(to.Name, b.X, b.Y);
+            seen[from.Name] = new Point(from.Name, a.X, a.Y, from.Approximate);
+            seen[to.Name] = new Point(to.Name, b.X, b.Y, to.Approximate);
         }
 
         points = [.. seen.Values];
         hot = map!.Key == "tr"
-            ? [.. mapped.SelectMany(m => new[] { m.From, m.To }).Where(p => p.Country == "TR").Select(p => LogisticsGazetteer.Normalize(p.Name))]
+            ? [.. mapped.SelectMany(m => new[] { m.From, m.To }).Where(p => p.Country == "TR" && !p.Approximate).Select(p => LogisticsGazetteer.Normalize(p.Name))]
             : [];
         hover = null;
     }

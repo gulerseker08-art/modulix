@@ -32,10 +32,11 @@ public sealed record DashboardRequests(int Awaiting, int? OldestWaitingDays);
 /// </summary>
 public sealed record DashboardShipments(
     int Pending, int PickupSoonUnplanned, int Late, int InTransit, IReadOnlyList<DashboardStatusCount> ByStatus, IReadOnlyList<DashboardLateShipment> LateItems,
+    int International,
     IReadOnlyList<DashboardRoute> Routes);
 
-/// <summary>Güzergâh özeti (harita): etkin (planlı, yüklenen, yoldaki) sevkiyatların yükleme ve teslim şehri (kayıttaki metin) ve sayısı.</summary>
-public sealed record DashboardRoute(string From, string To, int Count);
+/// <summary>Güzergâh özeti (harita): etkin (planlı, yüklenen, yoldaki) sevkiyatların yükleme ve teslim şehri (kayıttaki metin), ülkesi (ISO 3166-1 alfa-2) ve sayısı.</summary>
+public sealed record DashboardRoute(string From, string FromCountry, string To, string ToCountry, int Count);
 
 public sealed record DashboardStatusCount(string Status, int Count);
 
@@ -105,14 +106,15 @@ internal sealed class LogisticsDashboardService(
         var pickupSoon = await open.CountAsync(s => s.Status == Shipment.Statuses.Pending && s.PickupDate <= soon, cancellationToken);
         var late = open.Where(s => s.DeliveryBy != null && s.DeliveryBy < today);
         var lateCount = await late.CountAsync(cancellationToken);
+        var international = await open.CountAsync(s => s.PickupCountry != s.DeliveryCountry, cancellationToken);
         var lateItems = await late.OrderBy(s => s.DeliveryBy).ThenBy(s => s.Id).Take(ListLimit)
             .Select(s => new { s.Id, s.PickupCity, s.DeliveryCity, DeliveryBy = s.DeliveryBy!.Value, s.Status })
             .ToListAsync(cancellationToken);
 
         // Harita: etkin sevkiyatların güzergâhları (şehir metni kayıttaki gibi); en yoğun ilk RouteLimit güzergâh.
         var routes = await open.Where(s => s.Status != Shipment.Statuses.Pending)
-            .GroupBy(s => new { s.PickupCity, s.DeliveryCity })
-            .Select(g => new { g.Key.PickupCity, g.Key.DeliveryCity, Count = g.Count() })
+            .GroupBy(s => new { s.PickupCity, s.PickupCountry, s.DeliveryCity, s.DeliveryCountry })
+            .Select(g => new { g.Key.PickupCity, g.Key.PickupCountry, g.Key.DeliveryCity, g.Key.DeliveryCountry, Count = g.Count() })
             .OrderByDescending(r => r.Count).ThenBy(r => r.PickupCity).ThenBy(r => r.DeliveryCity)
             .Take(RouteLimit).ToListAsync(cancellationToken);
 
@@ -121,7 +123,8 @@ internal sealed class LogisticsDashboardService(
             Of(Shipment.Statuses.Pending), pickupSoon, lateCount, Of(Shipment.Statuses.InTransit),
             [.. OpenShipments.Select(s => new DashboardStatusCount(s, Of(s)))],
             [.. lateItems.Select(s => new DashboardLateShipment(s.Id, s.PickupCity, s.DeliveryCity, s.DeliveryBy, s.Status, today.DayNumber - s.DeliveryBy.DayNumber))],
-            [.. routes.Select(r => new DashboardRoute(r.PickupCity, r.DeliveryCity, r.Count))]);
+            international,
+            [.. routes.Select(r => new DashboardRoute(r.PickupCity, r.PickupCountry, r.DeliveryCity, r.DeliveryCountry, r.Count))]);
     }
 
     private async Task<DashboardTrips> TripsAsync(DateOnly today, CancellationToken cancellationToken)

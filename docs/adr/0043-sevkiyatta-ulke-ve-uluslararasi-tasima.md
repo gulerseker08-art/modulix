@@ -26,7 +26,7 @@ Taşıma talebi ve sevkiyatta yükleme ve teslim yeri bugün yalnızca **serbest
 
 **K4 — "Uluslararası" türetilir, saklanmaz.** `PickupCountry != DeliveryCountry` ise sevkiyat uluslararasıdır; ihracat/ithalat/transit için sabit liste ya da alan yoktur (ADR-0038 taşıma türü listesi gibi tenant'ın kendi kategorileri varsa, kod yalnızca kategoriye bakar). Otomasyon ve alan kuralı için türetilmiş alan `international` (Boolean) sunulur; böylece "yurt dışı sevkiyatta gümrük belgesi iste" firmanın kuralı olur, kodda `if` olmaz.
 
-**K5 — Yer kataloğu ülkeyle çalışır.** `LogisticsGazetteer.Find(city)` yerine `Find(city, country)`: ülke verilmişse aday yalnızca o ülkeden seçilir (aynı şehir adı iki ülkede olabilir). Şehir katalogda yoksa ülkenin merkez noktasına düşülür ve haritada "yaklaşık" işaretlenir; panoda "gösterilemeyen" sayısı azalır. Harita görünümü (Türkiye / Avrupa / Dünya) artık tahminle değil ülke kodlarıyla seçilir.
+**K5 — Yer kataloğu ülkeyle çalışır.** `LogisticsGazetteer.Find(city)` yerine `Find(city, country)`: ülke verilmişse önce o ülkeden aday seçilir. **Uygulama notu (dilim 2):** katalogdaki adlar tekil olduğundan, ad katalogda varsa ülke farklı olsa da o yer kullanılır; çünkü ülkeden önce açılmış kayıtlar `TR` varsayılanıyla gelir ve "Hamburg" gibi yurt dışı şehirleri yanlış ülkeyle taşır. Aynı ad iki ülkede katalogdaysa (bugün yok) ülke eşleşmesi önceliklidir ve bu kural o zaman eklenir. Şehir katalogda yoksa ülkenin merkez noktasına düşülür ve haritada "yaklaşık" işaretlenir; panoda "gösterilemeyen" sayısı azalır. Harita görünümü (Türkiye / Avrupa / Dünya) artık tahminle değil ülke kodlarıyla seçilir.
 
 **K6 — Tenant'ın kendi yer defteri bu ADR'nin dışındadır.** Katalogda olmayan depo, tesis ve fabrika için tenant'a ait yer tablosu (`Place`: ad, ülke, şehir, enlem/boylam; ADR-0016 lookup ile `pickupPlaceId`) ayrı bir ADR'nin konusudur (bölüm 5, dilim 3). Bu ADR yalnızca ülke alanını getirir.
 
@@ -48,7 +48,7 @@ Taşıma talebi ve sevkiyatta yükleme ve teslim yeri bugün yalnızca **serbest
 ## 4. Dilimler
 
 1. **Alan ve geçiş:** `PickupCountry` / `DeliveryCountry`, `CountryCatalog`, `logistics.default-country`, migration, form, liste, süzgeç, denetim kaydı, otomasyon alanları, README.
-2. **Harita ve katalog:** `LogisticsGazetteer.Find(city, country)`, ülke merkezine düşme ("yaklaşık"), harita görünümünü ülkeye göre seçme, panodaki "uluslararası sevkiyat" sayacı.
+2. **Harita ve katalog (uygulandı, 14 Kasım 2026):** `LogisticsGazetteer.Find(city, country)`, ülke merkezine düşme ("yaklaşık"), harita görünümünü ülkeye göre seçme, panodaki "uluslararası sevkiyat" sayacı.
 3. **Durak ülkesi ve yer defteri:** `TripStop` ülkesi, `Place` tablosu ve `pickupPlaceId` lookup'ı (ayrı ADR).
 4. **Belgeler ve gümrük köprüsü:** CMR, TIR karnesi, A.TR gibi sevkiyat belgeleri (Y9b belge türleri; kategori `shipment`), Antrepo rejim profiliyle köprü (ADR-0032).
 

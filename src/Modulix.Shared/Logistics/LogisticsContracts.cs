@@ -189,10 +189,11 @@ public sealed record DashboardRequestsDto(int Awaiting, int? OldestWaitingDays);
 
 public sealed record DashboardShipmentsDto(
     int Pending, int PickupSoonUnplanned, int Late, int InTransit, IReadOnlyList<DashboardStatusCountDto> ByStatus, IReadOnlyList<DashboardLateShipmentDto> LateItems,
+    int International,
     IReadOnlyList<DashboardRouteDto> Routes);
 
-/// <summary>Güzergâh özeti (harita): etkin sevkiyatların yükleme ve teslim şehri (kayıttaki metin) ve sayısı.</summary>
-public sealed record DashboardRouteDto(string From, string To, int Count);
+/// <summary>Güzergâh özeti (harita): etkin sevkiyatların yükleme ve teslim şehri (kayıttaki metin), ülkesi (ISO 3166-1 alfa-2) ve sayısı.</summary>
+public sealed record DashboardRouteDto(string From, string FromCountry, string To, string ToCountry, int Count);
 
 public sealed record DashboardStatusCountDto(string Status, int Count);
 
