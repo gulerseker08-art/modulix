@@ -92,6 +92,22 @@ public class LogisticsDashboardTests(ModulixApiFactory factory) : IClassFixture<
     }
 
     [Fact]
+    public async Task Active_shipments_are_grouped_into_routes_for_the_map_and_pending_ones_are_left_out()
+    {
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        await ShipmentAsync(manager, s.CustomerId, "İstanbul", "Ankara", Today.AddDays(2), null); // planlama bekliyor: haritada yok
+        var first = await ShipmentAsync(manager, s.CustomerId, "Kocaeli", "Mersin", Today.AddDays(2), null);
+        var second = await ShipmentAsync(manager, s.CustomerId, "Kocaeli", "Mersin", Today.AddDays(2), null);
+        var trip = await PostAsync(manager, Trips, new JsonObject { ["plannedStart"] = Iso(Today.AddDays(2)) });
+        await AssignAsync(manager, trip, first);
+        await AssignAsync(manager, trip, second);
+
+        var route = Assert.Single((await manager.GetFromJsonAsync<LogisticsDashboardDto>(Url))!.Shipments!.Routes);
+        Assert.Equal(("Kocaeli", "Mersin", 2), (route.From, route.To, route.Count));
+    }
+
+    [Fact]
     public async Task An_empty_company_gets_zeros_and_no_rates()
     {
         var s = await SetUpAsync();
