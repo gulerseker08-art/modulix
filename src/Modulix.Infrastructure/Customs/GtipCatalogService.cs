@@ -155,7 +155,7 @@ internal sealed class GtipCatalogService(ModulixDbContext db, TimeProvider time)
         }
 
         var size = Math.Clamp(pageSize, 1, MaxPageSize);
-        var number = Math.Max(page, 1);
+        var number = Math.Clamp(page, 1, 100_000);
         var query = db.GtipCatalogEntries.AsNoTracking().Where(e => e.VersionId == versionId);
         if (!string.IsNullOrWhiteSpace(search))
         {

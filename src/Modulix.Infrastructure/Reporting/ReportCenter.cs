@@ -29,7 +29,7 @@ internal sealed class ReportCenter(
     public async Task<ReportPage> ListAsync(ReportListQuery query, CancellationToken cancellationToken)
     {
         var me = RequireTenant().UserId;
-        var page = Math.Max(1, query.Page);
+        var page = Math.Clamp(query.Page, 1, 100_000);
         var pageSize = Math.Clamp(query.PageSize, 1, ReportListQuery.MaxPageSize);
 
         var reports = Visible(me);

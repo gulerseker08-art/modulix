@@ -59,7 +59,7 @@ internal sealed class PlatformAdministration(
     public async Task<PlatformTenantPage> ListTenantsAsync(PlatformTenantQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var page = Math.Max(1, query.Page);
+        var page = Math.Clamp(query.Page, 1, 100_000);
         var pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
 
         var tenants = db.Tenants.AsNoTracking();
@@ -308,7 +308,7 @@ internal sealed class PlatformAdministration(
     public async Task<PlatformAuditPage> ListAuditAsync(PlatformAuditQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var page = Math.Max(1, query.Page);
+        var page = Math.Clamp(query.Page, 1, 100_000);
         var pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
 
         var entries = db.PlatformAuditLog.AsNoTracking();

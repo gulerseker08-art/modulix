@@ -36,7 +36,7 @@ internal sealed class AuditLog(
     public async Task<AuditLogPage> QueryAsync(AuditQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var page = Math.Max(1, query.Page);
+        var page = Math.Clamp(query.Page, 1, 100_000);
         var pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
 
         var filtered = Filter(query);
@@ -90,7 +90,7 @@ internal sealed class AuditLog(
     public async Task<AuditLogPage> GetRecordHistoryAsync(RecordRef record, int page, int pageSize, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(record);
-        page = Math.Max(1, page);
+        page = Math.Clamp(page, 1, 100_000);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
         var entries = Filter(new AuditQuery(EntityKey: record.EntityKey, RecordId: record.Id));

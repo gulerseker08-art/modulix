@@ -304,6 +304,13 @@ internal sealed class RoleService(
             return true;
         }
 
+        // Yetki yükseltmeye karşı: verilen ya da alınan her rol, işlemi yapanın elindeki izin ve kapsamla sınırlıdır
+        // (departman rolü atamasıyla aynı kural; yönetici hariç).
+        if (actingMembershipId is { } acting)
+        {
+            await EnsureActorMayAssignRolesAsync(acting, [.. wanted.Except(currentIds), .. currentIds.Except(wanted)], cancellationToken);
+        }
+
         db.MembershipRoles.RemoveRange(current.Where(mr => !wanted.Contains(mr.RoleId)));
         foreach (var roleId in wanted.Except(currentIds))
         {
@@ -324,6 +331,26 @@ internal sealed class RoleService(
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;
+    }
+
+    public async Task EnsureActorMayAssignRolesAsync(Guid actingMembershipId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(roleIds);
+        if (roleIds.Count == 0)
+        {
+            return;
+        }
+
+        var ids = roleIds.Distinct().ToList();
+        var changedRoles = await db.Roles.AsNoTracking().Where(r => ids.Contains(r.Id)).ToListAsync(cancellationToken);
+        var changedOverrides = await OverridesByRoleAsync(changedRoles.Select(r => r.Id).ToList(), cancellationToken);
+        foreach (var role in changedRoles)
+        {
+            await EnsureActorMayChangeAsync(actingMembershipId, role.Permissions, cancellationToken);
+            await EnsureActorMayGrantScopeAsync(actingMembershipId, role.Scope, cancellationToken);
+            await EnsureActorMayGrantOverridesAsync(
+                actingMembershipId, changedOverrides.GetValueOrDefault(role.Id) ?? new Dictionary<string, RecordScope>(), previous: null, cancellationToken);
+        }
     }
 
     public async Task<IReadOnlyList<RoleSummary>?> GetMembershipRolesAsync(Guid membershipId, CancellationToken cancellationToken)
@@ -560,6 +587,9 @@ internal sealed class RoleService(
             {
                 await administrators.EnsureIsAdministratorAsync(target.Id, actor, cancellationToken);
             }
+
+            // Üyelere verilen hedef rol de işlemi yapanın izin ve kapsamıyla sınırlıdır (yetki yükseltmeye karşı).
+            await EnsureActorMayAssignRolesAsync(actor, [target.Id], cancellationToken);
         }
 
         return target;
