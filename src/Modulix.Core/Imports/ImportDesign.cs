@@ -57,12 +57,17 @@ public sealed class TenantImportDesign : ITenantEntity, ICompanyShared
 /// </param>
 /// <param name="Excluded">Şablondan çıkarılan sütunlar; dosyada varsa tanınmayan sütun gibi yok sayılır.</param>
 /// <param name="Required">Firmanın zorunlu kıldığı sütunlar.</param>
+/// <param name="AllOrNothing">
+/// "Hepsi ya da hiç" (ADR-0033 bölüm 5, Dilim 4e): uygulama aynı dosyanın son 24 saatteki hatasız kuru çalışmasını şart koşar ve bütün satırları tek
+/// işlemde yazar; tek hatalı satır hiçbir kaydın kalmamasına yol açar. Varsayılan kapalıdır ("hatasız satırları al").
+/// </param>
 /// <param name="Aliases">
 /// Kayıtlı sütun eşlemesi (Dilim 4c): alan anahtarı → firmanın dosyalarında o sütun için kullandığı başka başlık adları ("Müşteri Adı" → Konu).
 /// Eski tasarım satırlarında yoktur (null); JSON'da saklandığı için migration gerekmez.
 /// </param>
 public sealed record ImportDesignInput(
-    bool Enabled, bool RunAutomation, IReadOnlyList<string> Excluded, IReadOnlyList<string> Required, IReadOnlyDictionary<string, IReadOnlyList<string>>? Aliases = null)
+    bool Enabled, bool RunAutomation, IReadOnlyList<string> Excluded, IReadOnlyList<string> Required, IReadOnlyDictionary<string, IReadOnlyList<string>>? Aliases = null,
+    bool AllOrNothing = false)
 {
     public static ImportDesignInput Default { get; } = new(true, false, [], []);
 
@@ -76,7 +81,11 @@ public sealed record ImportDesignField(string Key, string Label, bool Included, 
 }
 
 public sealed record ImportDesignInfo(
-    string EntityKey, string DisplayName, bool Enabled, bool RunAutomation, IReadOnlyList<ImportDesignField> Fields, long Version);
+    string EntityKey, string DisplayName, bool Enabled, bool RunAutomation, IReadOnlyList<ImportDesignField> Fields, long Version)
+{
+    /// <summary>"Hepsi ya da hiç" (Dilim 4e): uygulama tek işlemde, hatasız kuru çalışmadan sonra.</summary>
+    public bool AllOrNothing { get; init; }
+}
 
 /// <summary>Tasarım kuralları (saf mantık).</summary>
 public static class ImportDesignRules

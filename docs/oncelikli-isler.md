@@ -33,7 +33,7 @@ firma alt profili, sektör bilgisi tablosu, AI erişimi menüsü) bu sıraya al�
 |------|----|-----------------|
 | 1 | Depo/antrepo 6b ekranları (A-8) | Yapıldı (13 Kasım): arka ucu hazırdı, karar istemiyordu, pilotun depo tarafını açar |
 | 2 | Eskimiş ADR metinleri (A-9) | Yapıldı (13 Kasım, PR #305): 0010, 0014–0017, 0019 sonuna tarihli güncel durum notu |
-| 3 | İçe aktarma dilim 4 kalanları (A-6) | 4b aynı dosya uyarısı (#306), 4c kayıtlı sütun eşlemesi (#307), 4d geri alma (#312) yapıldı; kalan: "hepsi ya da hiç" (4e) |
+| 3 | İçe aktarma dilim 4 kalanları (A-6) | 4b aynı dosya uyarısı (#306), 4c kayıtlı sütun eşlemesi (#307), 4d geri alma (#312) yapıldı ve 4e "hepsi ya da hiç" yapıldı; dilim 4 tamam |
 | 4 | Arayüz dili aşama 4 kalan dilimleri (A-10): 8b teklif ayrıntısı → 18 | Mekanik; `az` doğrulaması hâlâ açık (taslak sayılır) |
 | 5 | Raporlama kalanları (A-11) ve CRM bağları (A-12) | Ürün önceliği sorulmalı (B listesi); önerilen varsayılan: önce xlsx dışa aktarma, sonra `CampaignId` bağı |
 | — | Ç4 dosya dilim 1b (A-4) | `AttachmentPanel` ADR-0038 dilim 2a ile geldi; kalan 2 tarama, 3 yaşam döngüsü, 4 portal bağlantısı dış sağlayıcı/ürün kararı bekliyor |
