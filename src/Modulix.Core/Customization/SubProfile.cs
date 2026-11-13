@@ -278,4 +278,13 @@ public interface ISubProfileService
 
     /// <summary>Yalnızca uygulanmamış seçenek kaldırılır. Alt profil ya da seçenek yoksa null.</summary>
     Task<SubProfileView?> RemoveOptionAsync(Guid id, Guid optionId, CancellationToken cancellationToken);
+
+    /// <summary>Hazır alt profiller ve bu firma için durumları (eklenmiş mi, hangi modül kapalı).</summary>
+    Task<IReadOnlyList<SubProfileStarterView>> ListStartersAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Hazır alt profili firmanın taslak alt profili olarak ekler (tek işlem; seçenekler uygulanmaz, firma etkinleştirince uygulanır). Tanımsız anahtar
+    /// için null; zaten eklenmişse <see cref="SubProfileConflictException"/>; gereken modül kapalıysa <see cref="ArgumentException"/>.
+    /// </summary>
+    Task<SubProfileView?> CreateFromStarterAsync(string key, CancellationToken cancellationToken);
 }

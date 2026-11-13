@@ -20,6 +20,34 @@
     }
     else
     {
+        @if (starters.Count > 0)
+        {
+            <h3>Hazır alt profiller</h3>
+            <p class="text-muted">
+                Hazır öneriler tek tıkla taslak alt profil olarak eklenir; seçeneklerini gözden geçirip siz etkinleştirirsiniz. İçerikleri öneridir,
+                eklendikten sonra istediğiniz gibi değiştirebilirsiniz.
+            </p>
+            <div class="profile-cards">
+                @foreach (var starter in starters)
+                {
+                    <button type="button" class="profile-card" disabled="@(busy || starter.Added || starter.MissingModules.Count > 0)"
+                            aria-label="@(starter.Added ? $"{starter.Name} zaten eklenmiş" : $"{starter.Name} alt profilini ekle")" @onclick="() => AddStarterAsync(starter.Key)">
+                        <strong>@starter.Name</strong>
+                        <span>@starter.Description</span>
+                        <span class="text-muted">@starter.Options.Count seçenek: @string.Join(", ", starter.Options)</span>
+                        @if (starter.Added)
+                        {
+                            <span class="badge category">Eklendi</span>
+                        }
+                        else if (starter.MissingModules.Count > 0)
+                        {
+                            <span class="badge">@string.Join(", ", starter.MissingModules) modülü kapalı</span>
+                        }
+                    </button>
+                }
+            </div>
+        }
+
         <div class="list-toolbar">
             <button type="button" class="btn btn-primary" disabled="@busy" @onclick="NewProfile">Yeni alt profil</button>
         </div>
@@ -120,7 +148,7 @@
                 @if (plan is not null)
                 {
                     <section class="settings-group">
-                        <h4>Etkinleştirince firmaya eklenecekler</h4>
+                        <h3>Etkinleştirince firmaya eklenecekler</h3>
                         <ProfilePreview Plan="plan" Applied="false" />
                         <div class="form-actions">
                             <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => plan = null">Vazgeç</button>
@@ -129,7 +157,7 @@
                     </section>
                 }
 
-                <h4>Seçenekler</h4>
+                <h3>Seçenekler</h3>
                 @if (current.Options.Count == 0)
                 {
                     <p class="text-muted">Bu alt profilde henüz seçenek yok.</p>
@@ -180,7 +208,7 @@
                 else
                 {
                     <form novalidate @onsubmit="SaveOptionAsync" @onsubmit:preventDefault>
-                        <h4>@(optionForm.Id is null ? "Yeni seçenek" : "Seçeneği düzenle")</h4>
+                        <h3>@(optionForm.Id is null ? "Yeni seçenek" : "Seçeneği düzenle")</h3>
                         <div class="form-grid">
                             <div>
                                 <label class="form-label" for="optionKind">Tür</label>
@@ -274,6 +302,7 @@
 
 @code {
     private List<SubProfileDto>? profiles;
+    private List<SubProfileStarterDto> starters = [];
     private SubProfileDto? current;
     private ProfilePlanDto? plan;
     private List<ActivityOptionDto> activities = [];
@@ -293,7 +322,8 @@
         var all = await Api.GetAsync<List<SubProfileDto>>("/api/customization/sub-profiles");
         profiles = all.Value;
         message = all.Error;
-        activities = (await Api.GetAsync<List<ActivityOptionDto>>("/api/activity-options")).Value?
+        starters = (await Api.GetAsync<List<SubProfileStarterDto>>("/api/customization/sub-profiles/starters")).Value ?? [];
+        activities =(await Api.GetAsync<List<ActivityOptionDto>>("/api/activity-options")).Value?
             .Where(a => a.Kind == "Activity").OrderBy(a => a.Name).ToList() ?? [];
         entities = (await Api.GetAsync<List<CustomizableEntityDto>>("/api/customization/entities")).Value ?? [];
         lists = (await Api.GetAsync<List<ChoiceListDto>>("/api/customization/lists")).Value ?? [];
@@ -304,6 +334,23 @@
         var all = await Api.GetAsync<List<SubProfileDto>>("/api/customization/sub-profiles");
         profiles = all.Value ?? profiles;
         message = all.Error;
+        starters = (await Api.GetAsync<List<SubProfileStarterDto>>("/api/customization/sub-profiles/starters")).Value ?? starters;
+    }
+
+    private async Task AddStarterAsync(string key)
+    {
+        busy = true;
+        var result = await Api.PostAsync<SubProfileDto>($"/api/customization/sub-profiles/starters/{Uri.EscapeDataString(key)}", new { });
+        busy = false;
+        message = result.Error;
+        if (result.IsSuccess)
+        {
+            plan = null;
+            optionForm = null;
+            profileForm = null;
+            current = result.Value;
+            await ReloadAsync();
+        }
     }
 
     private async Task OpenAsync(Guid id)

@@ -80,6 +80,7 @@ builder.Services.AddScoped<Modulix.Core.Contracts.Activities.IFollowUpActivities
 
 // Sektör profilleri (Y9c): tanımlar açılışta modül kataloğuna göre doğrulanır.
 builder.Services.AddSingleton(sp => new SectorProfileCatalog(SectorProfiles.Create(), sp.GetRequiredService<ModuleCatalog>()));
+builder.Services.AddSingleton(sp => new SubProfileStarterCatalog(SubProfileStarters.Create(), sp.GetRequiredService<ModuleCatalog>()));
 
 builder.Services.AddModulixRecords();
 builder.Services.AddScoped<Modulix.Modules.Crm.Opportunities.IOpportunityPolicyProvider, Modulix.Api.Crm.OpportunityPolicyProvider>();

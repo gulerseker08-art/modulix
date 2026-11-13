@@ -207,6 +207,112 @@ public class SubProfileTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         Assert.Empty((await GetAsync(adminClient, created.Id)).Options);
     }
 
+    [Fact]
+    public async Task Admin_adds_a_starter_as_a_draft_and_its_options_reach_the_tenant_only_when_activated()
+    {
+        var (_, admin, _) = await SetUpAsync();
+        using var client = await LoginAsync(admin);
+
+        var starters = (await client.GetFromJsonAsync<List<SubProfileStarterDto>>($"{Url}/starters"))!;
+        Assert.Equal(["kara-tasimaciligi", "gumruklu-antrepo", "deniz-tasimaciligi"], starters.Select(s => s.Key));
+        Assert.All(starters, s =>
+        {
+            Assert.False(s.Added);
+            Assert.Empty(s.MissingModules);
+            Assert.NotEmpty(s.Options);
+        });
+        Assert.Equal(["Güzergâh", "Araç tipi", "Yük tipi"], starters[0].Options);
+
+        var response = await client.PostAsync($"{Url}/starters/kara-tasimaciligi", null);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = (await response.Content.ReadFromJsonAsync<SubProfileDto>())!;
+        Assert.Equal(("kara-tasimaciligi", "Kara taşımacılığı", SubProfileStatuses.Draft), (created.Code, created.Name, created.Status));
+        Assert.Equal(["Güzergâh", "Araç tipi", "Yük tipi"], created.Options.Select(o => o.Label));
+        Assert.All(created.Options, o => Assert.Null(o.AppliedAt));
+        Assert.Equal(["Tır", "Kamyon", "Kamyonet", "Frigorifik"], created.Options.Single(o => o.Label == "Araç tipi").Choices);
+
+        // Eklemek hiçbir şeyi uygulamaz; kart "Eklendi" olur, diğer hazır alt profiller etkilenmez.
+        Assert.Empty((await client.GetFromJsonAsync<List<CustomFieldDto>>("/api/custom-fields"))!);
+        var after = (await client.GetFromJsonAsync<List<SubProfileStarterDto>>($"{Url}/starters"))!;
+        Assert.Equal([true, false, false], after.Select(s => s.Added));
+
+        var active = await SetStatusAsync(client, created.Id, SubProfileStatuses.Active, created.Revision);
+        Assert.All(active.Options, o => Assert.NotNull(o.AppliedAt));
+        Assert.Equal(["Güzergâh", "Araç tipi", "Yük tipi"], (await client.GetFromJsonAsync<List<CustomFieldDto>>("/api/custom-fields"))!.Select(f => f.Label));
+    }
+
+    [Fact]
+    public async Task Starter_is_rejected_when_unknown_already_added_named_like_another_or_its_module_is_closed()
+    {
+        var (_, admin, _) = await SetUpAsync();
+        using var client = await LoginAsync(admin);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync($"{Url}/starters/yok", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsync($"{Url}/starters/gumruklu-antrepo", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsync($"{Url}/starters/gumruklu-antrepo", null)).StatusCode);
+        Assert.Single((await client.GetFromJsonAsync<List<SubProfileDto>>(Url))!);
+
+        // Başka koddan aynı adlı alt profil varsa hazır alt profil eklenmez ve yarım kayıt kalmaz.
+        _ = await CreateAsync(client, "Deniz taşımacılığı");
+        Assert.Contains("name", await ProblemAsync(await client.PostAsync($"{Url}/starters/deniz-tasimaciligi", null)));
+        var names = (await client.GetFromJsonAsync<List<SubProfileDto>>(Url))!.Select(p => p.Name).Order().ToList();
+        Assert.Equal(["Deniz taşımacılığı", "Gümrüklü antrepo"], names);
+        var deniz = (await client.GetFromJsonAsync<List<SubProfileDto>>(Url))!.Single(p => p.Name == "Deniz taşımacılığı");
+        Assert.Equal(0, deniz.OptionCount);
+
+        // CRM kapalı bir firmada hazır alt profiller listelenir ama eklenemez; eksik modül adı söylenir.
+        var tenant = await factory.CreateTenantAsync();
+        var closedAdmin = await factory.CreateUserAsync(tenant);
+        using (var scope = factory.OpenScope(tenant.Id))
+        {
+            var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
+            var system = await roles.EnsureSystemRoleAsync(CancellationToken.None);
+            Assert.True(await roles.SetMembershipRolesAsync(await factory.GetMembershipIdAsync(closedAdmin.Id, tenant.Id), [system.Id], CancellationToken.None));
+        }
+
+        using var closedClient = await LoginAsync(closedAdmin);
+        var listed = (await closedClient.GetFromJsonAsync<List<SubProfileStarterDto>>($"{Url}/starters"))!;
+        Assert.All(listed, s => Assert.Equal(["CRM"], s.MissingModules));
+        Assert.Contains("key", await ProblemAsync(await closedClient.PostAsync($"{Url}/starters/kara-tasimaciligi", null)));
+        Assert.Empty((await closedClient.GetFromJsonAsync<List<SubProfileDto>>(Url))!);
+    }
+
+    [Fact]
+    public async Task A_starter_added_by_one_tenant_is_invisible_to_another_which_can_add_its_own()
+    {
+        var (_, adminA, _) = await SetUpAsync();
+        var (_, adminB, _) = await SetUpAsync();
+        using var clientA = await LoginAsync(adminA);
+        using var clientB = await LoginAsync(adminB);
+
+        var a = await clientA.PostAsync($"{Url}/starters/deniz-tasimaciligi", null);
+        Assert.Equal(HttpStatusCode.Created, a.StatusCode);
+        var createdA = (await a.Content.ReadFromJsonAsync<SubProfileDto>())!;
+
+        Assert.Empty((await clientB.GetFromJsonAsync<List<SubProfileDto>>(Url))!);
+        Assert.All((await clientB.GetFromJsonAsync<List<SubProfileStarterDto>>($"{Url}/starters"))!, s => Assert.False(s.Added));
+        Assert.Equal(HttpStatusCode.NotFound, (await clientB.GetAsync($"{Url}/{createdA.Id}")).StatusCode);
+
+        // B kendi kopyasını ekleyince A'nınkine dokunmaz.
+        var b = await clientB.PostAsync($"{Url}/starters/deniz-tasimaciligi", null);
+        Assert.Equal(HttpStatusCode.Created, b.StatusCode);
+        Assert.NotEqual(createdA.Id, (await b.Content.ReadFromJsonAsync<SubProfileDto>())!.Id);
+        Assert.Single((await clientA.GetFromJsonAsync<List<SubProfileDto>>(Url))!);
+    }
+
+    [Fact]
+    public async Task Users_without_the_customization_permission_cannot_list_or_add_starters()
+    {
+        var (_, admin, rep) = await SetUpAsync();
+        using var adminClient = await LoginAsync(admin);
+        using var repClient = await LoginAsync(rep);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await repClient.GetAsync($"{Url}/starters")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await repClient.PostAsync($"{Url}/starters/kara-tasimaciligi", null)).StatusCode);
+
+        Assert.Empty((await adminClient.GetFromJsonAsync<List<SubProfileDto>>(Url))!);
+    }
+
     private static async Task<SubProfileDto> CreateAsync(HttpClient client, string name)
     {
         var response = await client.PostAsJsonAsync(Url, new SaveSubProfileRequest(name, null, null));
