@@ -1,0 +1,316 @@
+@page "/lojistik/masraflar"
+@* Lojistik › Masraflar (ADR-0038 K10, dilim 8). Bütün seferlerin masrafları tek listede; asıl iş "Bekleyenler" görünümüdür: onay bekleyen masraf burada
+   toplanır, yetkili kişi satırı açıp onaylar ya da gerekçeyle reddeder. Masraf girişi seferin kartındaki Masraflar panelindedir (TripExpensesPanel).
+   Grid şablonu: görünüm sekmeleri (sunucuda durum süzgeci), arama (açıklama), sıralanan başlıklar, sütun seçici, satır menüsü, sayfalama. Onaysız
+   masraf kârlılığa girmez; toplamlar onaylı ve bekleyen olarak para birimine göre ayrı yazılır. *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Masraflar · Modulix</PageTitle>
+
+<AuthGate Module="@LogisticsAccess.ModuleKey" Permission="@LogisticsAccess.ExpensesRead">
+    <PageHeader Title="Masraflar" Icon="wallet" Subtitle="@(page is null ? "Onay bekleyen sefer masraflarını karara bağlayın." : $"{page.TotalCount} masraf")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (selected is not null)
+    {
+        <section class="settings-group" aria-label="Masraf">
+            <h2>
+                @WarehouseLabels.Text(selected, "description")
+                <span class="badge @StatusBadge(WarehouseLabels.Text(selected, "status"))">@StatusLabel(WarehouseLabels.Text(selected, "status"))</span>
+            </h2>
+            <dl class="summary-facts">
+                <div><dt>Sefer</dt><dd>@WarehouseLabels.NameOf(trips, WarehouseLabels.Id(selected, "tripId"))</dd></div>
+                <div><dt>Tür</dt><dd>@Lookups.Label(LogisticsAccess.ExpenseKindList, WarehouseLabels.Text(selected, "kindKey"))</dd></div>
+                <div><dt>Tarih</dt><dd>@DayText(selected)</dd></div>
+                <div><dt>Tutar</dt><dd>@FleetLabels.Money(Amount(selected), WarehouseLabels.Text(selected, "currency"))</dd></div>
+                @if (selected.Values["vatAmount"]?.GetValue<decimal>() is { } vat)
+                {
+                    <div><dt>KDV</dt><dd>@FleetLabels.Money(vat, WarehouseLabels.Text(selected, "currency"))</dd></div>
+                }
+                @if (WarehouseLabels.Id(selected, "supplierPartyId") is { } supplier)
+                {
+                    <div><dt>Tedarikçi</dt><dd>@WarehouseLabels.NameOf(suppliers, supplier)</dd></div>
+                }
+                @if (selected.Values["liters"]?.GetValue<decimal>() is { } liters)
+                {
+                    <div><dt>Litre</dt><dd>@FleetLabels.Capacity(liters, "L")</dd></div>
+                }
+                @if (selected.Values["unitPrice"]?.GetValue<decimal>() is { } unitPrice)
+                {
+                    <div><dt>Litre fiyatı</dt><dd>@FleetLabels.Money(unitPrice, WarehouseLabels.Text(selected, "currency"))</dd></div>
+                }
+                @if (selected.Values["odometerKm"]?.GetValue<int>() is { } km)
+                {
+                    <div><dt>Kilometre sayacı</dt><dd>@km.ToString("N0", Regional.Numbers) km</dd></div>
+                }
+                @if (WarehouseLabels.Flag(selected, "chargeToDriver"))
+                {
+                    <div><dt>Sürücüye rücu</dt><dd><span class="badge stage-proposal">Rücu edilecek (bilgi)</span></dd></div>
+                }
+                @if (WarehouseLabels.Text(selected, "statusReason") is { Length: > 0 } reason)
+                {
+                    <div><dt>Ret gerekçesi</dt><dd>@reason</dd></div>
+                }
+            </dl>
+            <LogisticsActionsBar Kind="expenses" Record="selected" Changed="DecidedAsync" />
+            <AttachmentPanel EntityKey="@LogisticsAccess.TripExpenseEntityKey" RecordId="selected.Id" CanWrite="Session.Can(LogisticsAccess.ExpensesWrite)" Title="Makbuz ve fiş" EmptyText="Makbuz ya da fiş eklenmedi." />
+            <div class="list-toolbar">
+                <button type="button" class="btn btn-outline-secondary" @onclick="Close">Kapat</button>
+            </div>
+        </section>
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Masraf görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Masraflarda ara" placeholder="Açıklama ara" @bind="search" />
+        </form>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+    </div>
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan masraf yok.</p>
+    }
+    else
+    {
+        <p class="text-muted" role="status" aria-live="polite">@Summary</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Sefer masrafları</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var record in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, record)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(record, "description")} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenAsync(record)"><AppIcon Name="pencil" Size="16" /> <span>Aç</span></button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/records/" + LogisticsAccess.TripExpenseEntityKey;
+
+    /// <summary>Görünüm → durum süzgeci.</summary>
+    private static readonly IReadOnlyList<(string Key, string Label, string Icon, string? Status)> Views =
+    [
+        ("pending", "Bekleyenler", "hourglass", "pending"),
+        ("approved", "Onaylananlar", "check-circle", "approved"),
+        ("rejected", "Reddedilenler", "x", "rejected"),
+        ("all", "Tüm masraflar", "list", null),
+    ];
+
+    private readonly Dictionary<Guid, string> trips = [];
+    private readonly Dictionary<Guid, string> suppliers = [];
+    private GridViewState grid = new(LogisticsAccess.TripExpenseEntityKey, "-expenseDate");
+    private PersonalGridViews views = default!;
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private string? message;
+    private string? search;
+    private string view = Views[0].Key;
+    private string? status;
+
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions => [.. Views.Select(v => new ViewOption(v.Key, v.Label, Icon: v.Icon)), .. views.Options];
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, LogisticsAccess.TripExpenseEntityKey);
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(LogisticsAccess.ExpensesRead))
+        {
+            return;
+        }
+
+        await Lookups.LoadAsync();
+        grid.Define(
+        [
+            new("expenseDate", "Tarih", "calendar", "expenseDate", "-expenseDate", Locked: true),
+            new("trip", "Sefer", "map-pin"),
+            new("kind", "Tür", "tag"),
+            new("description", "Açıklama", "type"),
+            new("amount", "Tutar", "hash", "amount", "-amount"),
+            new("status", "Durum", "tag", "status", "-status"),
+        ]);
+        await views.LoadAsync();
+        await ChooseViewAsync(Views[0].Key);
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            status = GridFilters.Parse(saved.Filters).GetValueOrDefault("status");
+        }
+        else
+        {
+            grid.Reset();
+            status = Views.FirstOrDefault(v => v.Key == key).Status;
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(status is { } s ? ("status", s) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(Views[0].Key);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (status is not null)
+        {
+            url += $"&status={Uri.EscapeDataString(status)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+        if (page is not null)
+        {
+            await WarehouseLabels.ResolveNamesAsync(Api, LogisticsAccess.ExpenseTripLookup, page.Items.Select(e => WarehouseLabels.Id(e, "tripId")).OfType<Guid>(), trips);
+        }
+    }
+
+    /// <summary>Satırı açar; tedarikçi adı çözülür.</summary>
+    private async Task OpenAsync(RecordResponse record)
+    {
+        selected = record;
+        message = null;
+        if (WarehouseLabels.Id(record, "supplierPartyId") is { } supplier)
+        {
+            await WarehouseLabels.ResolveNamesAsync(Api, LogisticsAccess.ExpenseSupplierLookup, [supplier], suppliers);
+        }
+    }
+
+    private void Close() => selected = null;
+
+    /// <summary>Karar verildi: liste yenilenir, karar verilmiş masraf (güncel haliyle) açık kalır.</summary>
+    private async Task DecidedAsync(RecordResponse decided)
+    {
+        await LoadAsync(page?.Page ?? 1);
+        selected = decided;
+    }
+
+    /// <summary>Sayfadaki masrafların toplamı; onaylı ve bekleyen para birimine göre ayrı (onaysız masraf kârlılığa girmez).</summary>
+    private string Summary
+    {
+        get
+        {
+            string Total(string state) => string.Join(" + ", page!.Items
+                .Where(e => WarehouseLabels.Text(e, "status") == state)
+                .GroupBy(e => WarehouseLabels.Text(e, "currency"))
+                .Select(g => FleetLabels.Money(g.Sum(e => Amount(e) ?? 0), g.Key)));
+
+            var approved = Total("approved");
+            var pending = Total("pending");
+            return $"Bu sayfada — onaylı: {(approved.Length == 0 ? "—" : approved)} · beklemede: {(pending.Length == 0 ? "—" : pending)}";
+        }
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse record) =>
+        @<td data-label="@column.Label" class="@(column.Key == "expenseDate" ? "primary" : null)">@CellContent(column.Key, record)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse record) => key switch
+    {
+        "expenseDate" => @<text>@DayText(record)</text>,
+        "trip" => @<text>@WarehouseLabels.NameOf(trips, WarehouseLabels.Id(record, "tripId"))</text>,
+        "kind" => @<text>@Lookups.Label(LogisticsAccess.ExpenseKindList, WarehouseLabels.Text(record, "kindKey"))</text>,
+        "description" => @<text>@WarehouseLabels.Text(record, "description")</text>,
+        "amount" => @<text>@FleetLabels.Money(Amount(record), WarehouseLabels.Text(record, "currency"))</text>,
+        "status" => @<span class="badge @StatusBadge(WarehouseLabels.Text(record, "status"))">@StatusLabel(WarehouseLabels.Text(record, "status"))</span>,
+        _ => @<text></text>,
+    };
+
+    private static decimal? Amount(RecordResponse record) => record.Values["amount"]?.GetValue<decimal>();
+
+    private static string DayText(RecordResponse record) =>
+        FleetLabels.Day(WarehouseLabels.Text(record, "expenseDate")) is { } day ? FleetLabels.Date(day) : "—";
+
+    private static string StatusLabel(string key) => LogisticsAccess.ExpenseStatuses.FirstOrDefault(s => s.Key == key).Label ?? key;
+
+    /// <summary>Beklemede dikkat tonu, onaylı başarı tonu, reddedilen kayıp tonu.</summary>
+    private static string StatusBadge(string key) => key switch
+    {
+        "approved" => "status-customer",
+        "rejected" => "stage-lost",
+        _ => "stage-negotiation",
+    };
+}

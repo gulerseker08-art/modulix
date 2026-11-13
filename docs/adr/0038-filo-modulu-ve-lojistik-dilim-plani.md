@@ -538,3 +538,22 @@ Dilim 9 ikiye bölündü. Bu dilim yalnızca operasyon panosunu getirir. Kârlı
 | `dotnet test tests/Modulix.ArchitectureTests` | 69/69 |
 | `dotnet test tests/Modulix.Web.Tests` | 122/122 (menüde pano ilk sırada, sürücü ya da sefer izniyle görünür) |
 | `... --filter "LogisticsDashboardTests"` | 4 test yazıldı. **Mutlu yol:** talep, sevkiyat, geciken, sefer ilerlemesi, teslim oranı ve günlük dağılım, belge. **Boş firma:** sıfırlar, oran yok. **Tenant izolasyonu:** başka firmanın kayıtları sayılmaz. **Yetki:** yalnızca sefer izni olan yalnızca sefer bölümünü alır, izinsiz 403, modül kapalıyken 403. **Yerelde çalıştırılamadı** (SQL Server 14333 bağlantısı zaman aşımında); CI doğrular. |
+
+## 22. Dilim 8b: Masraflar ekranı ve masraf paneli düzeltmesi (13 Kasım 2026)
+
+Dilim 8'in "bilerek yapılmadı" listesindeki bekleyen masraf kuyruğu eklendi; görsel doğrulamada bulunan bir arayüz hatası düzeltildi.
+
+- **Masraflar ekranı** (`/lojistik/masraflar`, menüde "Masraflar", izin `logistics.expenses.read`): grid şablonu; görünümler Bekleyenler (varsayılan), Onaylananlar, Reddedilenler, Tüm masraflar; kişisel görünüm kaydı; arama (açıklama); sıralanan başlıklar (`expenseDate`, `amount`, `status`); sütun seçici; satır menüsü "Aç". Sefer numarası `logistics.trip-expense.trip` çözümleme lookup'ıyla gelir (seçici değil; okuma sefer okuma iznine bağlı, izni olmayan "—" görür). Satır açılınca ayrıntı kartı: bütün alanlar, onay/ret eylem çubuğu (`LogisticsActionsBar`, ret gerekçe ister), makbuz paneli. Karar sonrası liste yenilenir, karar verilmiş masraf kartta güncel haliyle kalır. Sayfa toplamı onaylı ve bekleyen olarak para birimine göre ayrı yazılır.
+- **Onay merkezi bağlantısı** (`ApprovalTargets.LinkTemplate`) artık `lojistik/masraflar`: masraf başına sayfa olmadığı için eskiden seferler listesine gidiyordu.
+- **Menü çevirisi** (ADR-0034): `nav.app.logistics.expenses` TR/EN/AZ.
+- **Hata düzeltmesi (dilim 8 paneli):** `TripExpensesPanel` `CrmLookups`'ı kendisi enjekte ediyordu; `CrmLookups` geçici (transient) kayıtlı olduğundan panel yüklenmemiş boş bir örnek alıyor, "Tür" seçimi boş kalıyor (masraf eklenemiyor) ve tür sütunu etiket yerine ham anahtar ("Fuel") gösteriyordu. Panel artık sayfanın yüklediği örneği parametre olarak alır (CargoEditor ve TripEditor ile aynı kalıp). Bu hata birim ve entegrasyon testleriyle yakalanamaz (yalnızca arayüz); tarayıcıda görüldü.
+- **Görsel doğrulama:** Masraflar ekranı ve ayrıntı kartı açık ve koyu temada, sefer kartındaki Masraflar paneli koyu temada tarayıcıda incelendi; yeni CSS sınıfı ya da token yok. **Düzeltmeden sonraki panelin tarayıcıda yeniden doğrulaması ve dilim 6 (Teslim paneli), 7a (Navlun/Hakediş) bölümlerinin tema kontrolü yapılamadı** (Docker Desktop açılmadı); derleme, birim, Web ve mimari testleri geçti.
+
+### Test sonuçları (Dilim 8b)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 30 (1 yeni): çözümleme lookup'ları ve onay bağlantısı |
+| `dotnet test tests/Modulix.Web.Tests` | 138 (1 yeni): Masraflar menüsü kendi okuma iznine ve modüle bağlı |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 |
+| `... --filter "LogisticsExpenseTests"` (SQL Server; CI koşar) | 5 (1 yeni): sefer numarası çözümlemesi yalnızca sefer okuma izni olan ve aynı tenant'taki kullanıcıya açık. **Yerelde çalıştırılamadı** (Docker Desktop kapalı) |

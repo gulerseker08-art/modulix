@@ -102,7 +102,7 @@ public sealed class LogisticsModule : IModule
     /// </summary>
     IReadOnlyList<Core.Contracts.Approvals.ApprovalTargetDefinition> IModule.ApprovalTargets { get; } =
     [
-        new(Entities.TripExpense, "Sefer masrafı", "description", "lojistik/seferler")
+        new(Entities.TripExpense, "Sefer masrafı", "description", "lojistik/masraflar")
         {
             AmountField = "amount",
             CurrencyField = "currency",

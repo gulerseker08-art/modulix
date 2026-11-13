@@ -335,6 +335,18 @@ public class AppNavigationTests
     }
 
     [Fact]
+    public void Logistics_expenses_screen_needs_its_own_read_permission_and_the_module()
+    {
+        // Masraflar kendi okuma iznine bağlıdır: sefer ya da sürücü izni yetmez; modül kapalıysa hiç görünmez.
+        Assert.Equal(["Masraflar"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.ExpensesRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
+        var nav = Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.ExpensesRead]);
+        Assert.Equal("lojistik/masraflar", nav.Find("logistics.expenses")!.Route);
+        Assert.Equal(AppCatalog.Logistics, nav.Context("lojistik/masraflar")!.Root.Id);
+        Assert.DoesNotContain("Masraflar", Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.TripsRead, LogisticsAccess.DriversRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
+        Assert.Empty(Nav([], [LogisticsAccess.ExpensesRead]).Roots());
+    }
+
+    [Fact]
     public void Fleet_app_shows_the_vehicles_screen_only_with_the_module_and_the_permission()
     {
         var nav = Nav([FleetAccess.ModuleKey], [FleetAccess.VehiclesRead]);

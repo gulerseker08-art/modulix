@@ -195,6 +195,7 @@
   "nav.app.logistics.requests": "Transport requests",
   "nav.app.logistics.shipments": "Shipments",
   "nav.app.logistics.trips": "Trips",
+  "nav.app.logistics.expenses": "Expenses",
   "nav.app.logistics.drivers": "Drivers",
   "nav.app.logistics.carrier-terms": "Carrier agreements",
   "nav.app.logistics.credentials": "Driver documents",

@@ -3,7 +3,6 @@
    kişinin eylem çubuğundadır (LogisticsActionsBar, ret gerekçe ister). Karar verilmiş masraf değişmez ve silinmez; makbuz ve fiş masrafa dosya olarak
    eklenir. Onaysız masraf toplamlara girmez: "Beklemede" ayrı gösterilir. Kurallar sunucudadır; sayfa içi küçük eylem formu olduğu için sekmesizdir. *@
 @inject ApiClient Api
-@inject CrmLookups Lookups
 
 <section class="settings-group" aria-label="Masraflar">
     <h2>Masraflar</h2>
@@ -183,6 +182,9 @@
     private ExpenseForm form = new();
 
     [Parameter, EditorRequired] public RecordResponse Trip { get; set; } = default!;
+
+    /// <summary>Sayfanın yüklediği seçim listeleri (CrmLookups geçici kayıtlıdır: panel kendi örneğini değil sayfanınkini kullanır).</summary>
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
 
     [Parameter] public bool CanWrite { get; set; }
 
