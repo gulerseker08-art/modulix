@@ -221,4 +221,26 @@ public partial class PlatformAdministrationTests
         using var check = factory.Services.CreateScope();
         Assert.False(await check.ServiceProvider.GetRequiredService<ModulixDbContext>().Plans.AnyAsync(p => p.Name == "Ad"));
     }
+
+    [Fact]
+    public async Task Only_another_owner_can_reset_two_factor_of_a_platform_account()
+    {
+        var ownerAccount = await CreatePlatformAdministratorAsync();
+        var supportAccount = await CreatePlatformMemberAsync(PlatformRole.Support);
+        var tenantUser = await factory.CreateUserAsync(await factory.CreateTenantAsync());
+        using var support = await LoginAsync(supportAccount);
+        using var owner = await LoginAsync(ownerAccount);
+
+        // Destek, firma kullanıcısının doğrulamasını sıfırlayabilir; platform hesabınınkini (Owner'ınki dahil) sıfırlayamaz.
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await support.PostAsJsonAsync("/api/platform/users/reset-two-factor", new ResetTwoFactorRequest(tenantUser.Email!))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await support.PostAsJsonAsync("/api/platform/users/reset-two-factor", new ResetTwoFactorRequest(ownerAccount.Email!))).StatusCode);
+
+        // Owner başka bir platform hesabınınkini sıfırlar; kendi doğrulamasını bu yolla kapatamaz.
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await owner.PostAsJsonAsync("/api/platform/users/reset-two-factor", new ResetTwoFactorRequest(supportAccount.Email!))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await owner.PostAsJsonAsync("/api/platform/users/reset-two-factor", new ResetTwoFactorRequest(ownerAccount.Email!))).StatusCode);
+    }
 }
