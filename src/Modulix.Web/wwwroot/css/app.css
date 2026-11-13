@@ -6530,3 +6530,125 @@ button.hero-stat {
         color: var(--mx-text-secondary);
         font-weight: 400;
     }
+
+/* Depo ve antrepo panosu (Warehouse/WarehouseDashboard.razor): iki serili sütun grafik, yığılmış durum çubuğu, doluluk ölçeri.
+   Renkler yalnızca --chart-c* ve --mx-* tokenlarından gelir; renk tek başına anlam taşımaz (değer ve ad metinde de yazılır). */
+.chart-fill-0 { background: var(--chart-c0); }
+.chart-fill-1 { background: var(--chart-c1); }
+.chart-fill-2 { background: var(--chart-c2); }
+.chart-fill-3 { background: var(--chart-c3); }
+.chart-fill-4 { background: var(--chart-c4); }
+.chart-fill-5 { background: var(--chart-c5); }
+
+.chart-legend.pair-chart-legend {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    gap: var(--mx-space-3);
+    margin-bottom: var(--mx-space-3);
+    color: var(--mx-text-secondary);
+    font-size: var(--mx-fs-helper);
+}
+
+    .chart-legend.pair-chart-legend li {
+        gap: var(--mx-space-1);
+        padding: 0;
+        border: 0;
+    }
+
+    .chart-legend.pair-chart-legend i {
+        display: inline-block;
+        width: 0.625rem;
+        height: 0.625rem;
+        border-radius: 2px;
+    }
+
+.pair-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--mx-space-1);
+    height: 11rem;
+    border-bottom: 1px solid var(--mx-border-strong);
+}
+
+.pair-chart-col {
+    display: flex;
+    flex: 1;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    height: 100%;
+}
+
+    .pair-chart-col i {
+        display: block;
+        flex: 1;
+        max-width: 0.875rem;
+        border-radius: 3px 3px 0 0;
+    }
+
+.pair-chart-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: var(--mx-space-1);
+    color: var(--mx-text-secondary);
+    font-size: var(--mx-fs-helper);
+}
+
+.dash-totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mx-space-4);
+    margin: var(--mx-space-3) 0 0;
+    color: var(--mx-text-secondary);
+    font-size: var(--mx-fs-helper);
+}
+
+    .dash-totals strong {
+        color: var(--mx-text-primary);
+        font-size: var(--mx-fs-card-title);
+        font-variant-numeric: tabular-nums;
+    }
+
+.stack-bar {
+    display: flex;
+    height: 0.625rem;
+    margin: var(--mx-space-1) 0 var(--mx-space-3);
+    overflow: hidden;
+    border-radius: var(--mx-radius-badge);
+    background: var(--mx-surface-control);
+}
+
+    .stack-bar i {
+        display: block;
+        height: 100%;
+    }
+
+.dash-swatch {
+    display: inline-block;
+    flex: none;
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 2px;
+}
+
+.dash-meter {
+    flex: 0 0 34%;
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: var(--mx-radius-badge);
+    background: var(--mx-surface-control);
+}
+
+    .dash-meter i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+    }
+
+@media (max-width: 640px) {
+    .dash-meter {
+        flex-basis: 28%;
+    }
+}
