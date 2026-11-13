@@ -105,5 +105,42 @@ public static class HrForms
             new("vatAmount", "KDV tutarı", "masraf", 3),
             new("description", "Açıklama", "aciklama", 12),
         ]),
+
+        new(HrModule.Entities.Asset, "Demirbaş",
+        [new(General, "Genel bilgiler"), new("satinalma", "Satın alma"), new("notlar", "Notlar ve ek bilgiler")],
+        [
+            new("kimlik", "Demirbaş", "package"),
+            new("teknik", "Marka ve seri", "wrench"),
+            new("satinalma", "Satın alma", "wallet", Tab: "satinalma"),
+            new("notlar", "Notlar", "message-square", Tab: "notlar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
+        ],
+        [
+            new("assetTag", "Envanter numarası", "kimlik", 4, Required: true, Fixed: true),
+            new("name", "Ad", "kimlik", 8, Required: true, Fixed: true),
+            new("categoryKey", "Kategori", "kimlik", 6, Required: true, Fixed: true),
+            new("status", "Durum", "kimlik", 6, Fixed: true),
+            new("brand", "Marka", "teknik", 4),
+            new("model", "Model", "teknik", 4),
+            new("serialNumber", "Seri numarası", "teknik", 4),
+            new("purchaseDate", "Alış tarihi", "satinalma", 4),
+            new("purchaseCost", "Alış tutarı", "satinalma", 4),
+            new("currency", "Para birimi", "satinalma", 4),
+            new("notes", "Notlar", "notlar", 12),
+        ]),
+
+        new(HrModule.Entities.AssetAssignment, "Zimmet",
+        [new(General, "Teslim"), new("ek", "Ek bilgiler")],
+        [
+            new("teslim", "Zimmet", "clipboard-list"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ek"),
+        ],
+        [
+            new("assetId", "Demirbaş", "teslim", 6, Required: true, Fixed: true),
+            new("employeeId", "Çalışan", "teslim", 6, Required: true, Fixed: true),
+            new("assignedOn", "Teslim tarihi", "teslim", 6, Required: true, Fixed: true),
+            new("expectedReturnOn", "Beklenen iade", "teslim", 6),
+            new("conditionOut", "Teslimdeki durum ve aksesuarlar", "teslim", 12),
+        ]),
     ];
 }

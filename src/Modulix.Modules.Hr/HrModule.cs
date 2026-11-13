@@ -33,6 +33,8 @@ public sealed class HrModule : IModule
         public const string ExpensesApprove = "hr.expenses.approve";
         public const string ExpensesManage = "hr.expenses.manage";
         public const string ExpensesPay = "hr.expenses.pay";
+        public const string AssetsRead = "hr.assets.read";
+        public const string AssetsManage = "hr.assets.manage";
     }
 
     public static class Entities
@@ -43,6 +45,8 @@ public sealed class HrModule : IModule
         public const string Holiday = "hr.holiday";
         public const string ExpenseClaim = "hr.expense-claim";
         public const string ExpenseLine = "hr.expense-line";
+        public const string Asset = "hr.asset";
+        public const string AssetAssignment = "hr.asset-assignment";
     }
 
     public static class Lists
@@ -50,6 +54,16 @@ public sealed class HrModule : IModule
         public const string Department = "hr.department";
         public const string LeaveType = "hr.leave-type";
         public const string ExpenseType = "hr.expense-type";
+        public const string AssetCategory = "hr.asset-category";
+    }
+
+    /// <summary>Demirbaş kategorileri (dilim 4): raporlar ve işe giriş/çıkış listeleri kategoriye bakar.</summary>
+    public static class AssetCategories
+    {
+        public const string It = "it";
+        public const string Access = "access";
+        public const string Furniture = "furniture";
+        public const string Equipment = "equipment";
     }
 
     /// <summary>Masraf türü kategorileri (dilim 3): raporlar kategoriye bakar; vergi ve harcırah sınırları koda yazılmaz (ADR-0042 bölüm 8).</summary>
@@ -95,6 +109,8 @@ public sealed class HrModule : IModule
         new(Permissions.ExpensesApprove, "Onaylayanı olduğu masraf beyanlarını onaylar, iade eder ve reddeder", "Masraf onayı"),
         new(Permissions.ExpensesManage, "Herkes adına beyan açar ve düzenler, her beyana karar verir ve iptal eder", "Masraf yönetimi"),
         new(Permissions.ExpensesPay, "Onaylanmış masraf beyanlarını ödendi olarak işaretler", "Masraf ödemesi"),
+        new(Permissions.AssetsRead, "Demirbaşları ve zimmetleri görüntüler (kayıt kapsamına göre: çalışan kendi zimmetlerini)", "Zimmet"),
+        new(Permissions.AssetsManage, "Demirbaş ekler ve düzenler, zimmetler, iade alır", "Zimmet"),
     ];
 
     /// <summary>Denetim kaydında görünen kayıt türleri (Y5); hassas alanların değeri denetim kaydında gizlenir.</summary>
@@ -164,6 +180,25 @@ public sealed class HrModule : IModule
         {
             References = new Dictionary<string, string> { ["claimId"] = Entities.ExpenseClaim },
         },
+        new(Entities.Asset, "Demirbaş", Permissions.AssetsRead, new Dictionary<string, string>
+        {
+            ["assetTag"] = "Envanter numarası", ["name"] = "Ad", ["categoryKey"] = "Kategori", ["serialNumber"] = "Seri numarası",
+            ["brand"] = "Marka", ["model"] = "Model", ["purchaseDate"] = "Alış tarihi", ["purchaseCost"] = "Alış tutarı", ["currency"] = "Para birimi",
+            ["status"] = "Durum", ["notes"] = "Notlar", ["currentEmployeeId"] = "Zimmetli çalışan",
+        }, "assetTag")
+        {
+            References = new Dictionary<string, string> { ["currentEmployeeId"] = Entities.Employee },
+        },
+        new(Entities.AssetAssignment, "Zimmet", Permissions.AssetsRead, new Dictionary<string, string>
+        {
+            ["assetId"] = "Demirbaş", ["employeeId"] = "Çalışan", ["assignedOn"] = "Teslim tarihi", ["expectedReturnOn"] = "Beklenen iade",
+            ["conditionOut"] = "Teslimdeki durum", ["status"] = "Durum", ["acknowledgedAt"] = "Teslim onayı", ["returnedOn"] = "İade tarihi",
+            ["conditionIn"] = "İadedeki durum", ["closedByUserId"] = "Kapatan",
+        }, "assetTag")
+        {
+            References = new Dictionary<string, string> { ["assetId"] = Entities.Asset, ["employeeId"] = Entities.Employee },
+            UserFields = ["assignedByUserId", "closedByUserId", "employeeUserId"],
+        },
         new(Entities.Holiday, "Resmî tatil", Permissions.LeavesRead, new Dictionary<string, string>
         {
             ["date"] = "Tarih", ["name"] = "Ad", ["halfDay"] = "Yarım gün",
@@ -182,6 +217,8 @@ public sealed class HrModule : IModule
         new(Entities.LeaveBalance, "İzin hakkı"),
         new(Entities.ExpenseClaim, "Masraf beyanı"),
         new(Entities.ExpenseLine, "Masraf satırı"),
+        new(Entities.Asset, "Demirbaş"),
+        new(Entities.AssetAssignment, "Zimmet"),
     ];
 
     /// <summary>Departman (Y9b): hazır değerler örnektir; firma kendi departmanlarını ekler. Kod departmanın adına bakmaz.</summary>
@@ -259,6 +296,35 @@ public sealed class HrModule : IModule
         {
             Default = "Taxi",
         },
+
+        // Demirbaş kategorisi (Y9b): hazır değerler örnektir; firma ekler. Araçlar Filo modülündedir.
+        new(
+            Lists.AssetCategory,
+            "Demirbaş kategorisi",
+            Entities.Asset,
+            "categoryKey",
+            Required: true,
+            [
+                new(AssetCategories.It, "Bilişim"),
+                new(AssetCategories.Access, "Giriş ve kimlik"),
+                new(AssetCategories.Furniture, "Mobilya"),
+                new(AssetCategories.Equipment, "Ekipman ve alet"),
+            ],
+            [
+                new("Laptop", "Dizüstü bilgisayar", AssetCategories.It),
+                new("Desktop", "Masaüstü bilgisayar", AssetCategories.It),
+                new("Monitor", "Monitör", AssetCategories.It),
+                new("Phone", "Cep telefonu", AssetCategories.It),
+                new("SimCard", "Hat (SIM kart)", AssetCategories.It),
+                new("AccessCard", "Giriş kartı", AssetCategories.Access),
+                new("Key", "Anahtar", AssetCategories.Access),
+                new("Furniture", "Masa ve sandalye", AssetCategories.Furniture),
+                new("Tool", "El aleti", AssetCategories.Equipment),
+                new("Ppe", "İş güvenliği ekipmanı", AssetCategories.Equipment),
+            ])
+        {
+            Default = "Laptop",
+        },
     ];
 
     IReadOnlyList<LookupDefinition> IModule.Lookups => HrLookupDefinitions.All;
@@ -292,6 +358,7 @@ public sealed class HrModule : IModule
             new(Entities.Employee, "Çalışan", Permissions.EmployeesRead) { LabelField = "fullName" },
             new(Entities.LeaveRequest, "İzin talebi", Permissions.LeavesRead) { LabelField = "employeeName" },
             new(Entities.ExpenseClaim, "Masraf beyanı", Permissions.ExpensesRead) { LabelField = "title" },
+            new(Entities.AssetAssignment, "Zimmet", Permissions.AssetsRead) { LabelField = "assetTag" },
         ],
         Events =
         [
@@ -301,6 +368,8 @@ public sealed class HrModule : IModule
             new("hr.leave-request.updated", Entities.LeaveRequest, DomainEventTypes.RecordUpdated, "İzin talebinin durumu değişti"),
             new("hr.expense-claim.created", Entities.ExpenseClaim, DomainEventTypes.RecordCreated, "Masraf beyanı açıldı"),
             new("hr.expense-claim.updated", Entities.ExpenseClaim, DomainEventTypes.RecordUpdated, "Masraf beyanı güncellendi"),
+            new("hr.asset-assignment.created", Entities.AssetAssignment, DomainEventTypes.RecordCreated, "Demirbaş zimmetlendi"),
+            new("hr.asset-assignment.updated", Entities.AssetAssignment, DomainEventTypes.RecordUpdated, "Zimmet onaylandı ya da kapandı"),
         ],
         Fields =
         [
@@ -342,6 +411,16 @@ public sealed class HrModule : IModule
                 ],
             },
             new(Entities.ExpenseClaim, "totalAmount", "Toplam", AutomationFieldType.Number),
+            new(Entities.AssetAssignment, "assetTag", "Envanter numarası", AutomationFieldType.Text),
+            new(Entities.AssetAssignment, "status", "Durum", AutomationFieldType.Choice)
+            {
+                Options =
+                [
+                    new(Domain.AssetAssignment.Statuses.Active, "Zimmette"), new(Domain.AssetAssignment.Statuses.Returned, "İade alındı"),
+                    new(Domain.AssetAssignment.Statuses.Lost, "Kayıp"),
+                ],
+            },
+            new(Entities.AssetAssignment, "expectedReturnOn", "Beklenen iade", AutomationFieldType.Date),
         ],
     };
 
@@ -355,7 +434,13 @@ public sealed class HrModule : IModule
                 Permissions.EmployeesRead, Permissions.EmployeesWrite, Permissions.EmployeesPersonal,
                 Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove, Permissions.LeavesManage,
                 Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.ExpensesManage,
+                Permissions.AssetsRead, Permissions.AssetsManage,
             ]),
+        new(
+            "hr.asset-keeper",
+            "Demirbaş sorumlusu",
+            "Demirbaşları ve bütün zimmetleri yönetir: demirbaş ekler, zimmetler, iade alır; izin, masraf ve özlük verisine erişmez.",
+            [Permissions.EmployeesRead, Permissions.AssetsRead, Permissions.AssetsManage]),
         new(
             "hr.finance",
             "Finans (masraf ödemesi)",
@@ -365,7 +450,7 @@ public sealed class HrModule : IModule
             "hr.staff",
             "Çalışan (rehber)",
             "Rehberi ve organizasyon şemasını görüntüler, kendi izin hakkını görür ve kendi adına izin talebi açar; özlük bilgilerini göremez.",
-            [Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.ExpensesRead, Permissions.ExpensesRequest])
+            [Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.AssetsRead])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
         },
@@ -375,7 +460,7 @@ public sealed class HrModule : IModule
             "Çalışan izinlerine ek olarak onaylayanı olduğu (astlarının) izin taleplerini görür, onaylar ve reddeder.",
             [
                 Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove,
-                Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove,
+                Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.AssetsRead,
             ])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
@@ -394,5 +479,8 @@ public sealed class HrModule : IModule
         services.AddScoped<IRecordStore, ExpenseClaimRecordStore>();
         services.AddScoped<IRecordStore, ExpenseLineRecordStore>();
         services.AddScoped<IExpenseWorkflow, ExpenseWorkflow>();
+        services.AddScoped<IRecordStore, AssetRecordStore>();
+        services.AddScoped<IRecordStore, AssetAssignmentRecordStore>();
+        services.AddScoped<IAssetWorkflow, AssetWorkflow>();
     }
 }

@@ -25,6 +25,7 @@ public static class LogisticsEndpoints
         ["requests"] = LogisticsModule.Entities.TransportRequest,
         ["shipments"] = LogisticsModule.Entities.Shipment,
         ["trips"] = LogisticsModule.Entities.Trip,
+        ["expenses"] = LogisticsModule.Entities.TripExpense,
     };
 
     public static IEndpointRouteBuilder MapLogisticsEndpoints(this IEndpointRouteBuilder app)

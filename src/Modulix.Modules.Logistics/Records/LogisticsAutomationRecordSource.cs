@@ -21,8 +21,29 @@ internal sealed class LogisticsAutomationRecordSource(LogisticsStoreContext cont
         LogisticsModule.Entities.Shipment =>
             ScanAsync(context.Data.Set<Shipment>().AsNoTracking().Where(s => OpenShipments.Contains(s.Status)), query, cancellationToken),
         LogisticsModule.Entities.Trip => ScanTripsAsync(query, cancellationToken),
+        LogisticsModule.Entities.TripExpense => ScanExpensesAsync(query, cancellationToken),
         _ => throw new InvalidOperationException("Bilinmeyen kayıt türü."),
     };
+
+    /// <summary>Karar bekleyen masraflar ("3 gündür onay bekleyen masraf" hatırlatması); tarih alanı masraf tarihidir.</summary>
+    private async Task<AutomationScanPage> ScanExpensesAsync(AutomationScanQuery query, CancellationToken cancellationToken)
+    {
+        var expenses = context.Data.Set<TripExpense>().AsNoTracking().Where(e => e.Status == TripExpense.Statuses.Pending);
+        if (query.AfterRecordId is { } cursor)
+        {
+            expenses = expenses.Where(e => e.Id.CompareTo(cursor) > 0);
+        }
+
+        expenses = query.Kind switch
+        {
+            AutomationScanKind.Scheduled => expenses,
+            AutomationScanKind.DateRelative when query.Field == "expenseDate" && query.TargetDate is { } target => expenses.Where(e => e.ExpenseDate == target),
+            AutomationScanKind.DateRelative => throw new InvalidOperationException("Desteklenmeyen tarih alanı."),
+            _ => throw new InvalidOperationException("Desteklenmeyen tarama türü."),
+        };
+
+        return new AutomationScanPage(await expenses.OrderBy(e => e.Id).Select(e => e.Id).Take(query.PageSize).ToListAsync(cancellationToken));
+    }
 
     private static readonly string[] OpenTrips = [Trip.Statuses.Planning, Trip.Statuses.Ready, Trip.Statuses.InProgress];
 

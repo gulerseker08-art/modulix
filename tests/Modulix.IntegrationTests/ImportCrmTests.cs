@@ -200,6 +200,51 @@ public class ImportCrmTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
         Assert.Equal(HttpStatusCode.Forbidden, (await PutAsync(client, Company, new SaveImportDesignRequest(true, false, [], [], 1))).StatusCode);
     }
 
+    // ADR-0033 Dilim 4e: "hepsi ya da hiç". Uygulama aynı dosyanın hatasız kuru çalışmasını ister; kuru çalışma başka firmadan sayılmaz; ayarı
+    // yalnızca özelleştirme izni olan değiştirir.
+    [Fact]
+    public async Task All_or_nothing_needs_a_clean_rehearsal_of_the_same_file_in_the_same_firm()
+    {
+        var (client, tenant, _) = await ImporterAsync();
+        using var _c = client;
+        using var admin = await AdminAsync(tenant);
+        var design = await DesignAsync(admin, LeadKey);
+        var saved = await SaveAsync(admin, design, new SaveImportDesignRequest(true, false, [], [], design.Version, AllOrNothing: true));
+        Assert.True(saved.AllOrNothing);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await PutAsync(client, LeadKey, new SaveImportDesignRequest(true, false, [], [], saved.Version, AllOrNothing: false))).StatusCode);
+
+        var good = "Konu;Soyad\r\nTek işlem 1;Kaya\r\nTek işlem 2;Demir\r\n";
+        var bad = "Konu;Soyad\r\nTek işlem 3;Kaya\r\n;Demir\r\n";
+
+        // Kuru çalışmasız uygulama ve hatalı kuru çalışmadan sonra uygulama hiçbir satır almadan düşer.
+        var blind = await RunAsync(client, LeadKey, good);
+        Assert.Equal(("Failed", 0), (blind.Run.Status, blind.Run.CreatedCount));
+        Assert.Contains(blind.Issues.Items, i => i.Code == "file-invalid" && i.Message.Contains("kuru çalışma", StringComparison.Ordinal));
+        Assert.Equal("PartiallySucceeded", (await RunAsync(client, LeadKey, bad, preview: true)).Run.Status);
+        Assert.Equal("Failed", (await RunAsync(client, LeadKey, bad)).Run.Status);
+
+        // Hatasız kuru çalışmadan sonra bütün satırlar tek işlemde yazılır.
+        Assert.Equal("Succeeded", (await RunAsync(client, LeadKey, good, preview: true)).Run.Status);
+        var applied = await RunAsync(client, LeadKey, good);
+        Assert.Equal(("Succeeded", "AllOrNothing", 2), (applied.Run.Status, applied.Run.Policy, applied.Run.CreatedCount));
+        using (var scope = factory.OpenScope(tenant.Id))
+        {
+            var subjects = await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Set<Lead>().AsNoTracking().Select(l => l.Subject).ToListAsync();
+            Assert.Equal(["Tek işlem 1", "Tek işlem 2"], subjects.Order());
+        }
+
+        // Başka firmanın kuru çalışması bu firmanın ön koşulunu karşılamaz.
+        var (otherClient, other, _) = await ImporterAsync();
+        using var _o = otherClient;
+        using var otherAdmin = await AdminAsync(other);
+        var otherDesign = await DesignAsync(otherAdmin, LeadKey);
+        await SaveAsync(otherAdmin, otherDesign, new SaveImportDesignRequest(true, false, [], [], otherDesign.Version, AllOrNothing: true));
+        var stranger = "Konu;Soyad\r\nYabancı;Kaya\r\n";
+        Assert.Equal("Succeeded", (await RunAsync(client, LeadKey, stranger, preview: true)).Run.Status);
+        Assert.Equal("Failed", (await RunAsync(otherClient, LeadKey, stranger)).Run.Status);
+    }
+
     // ADR-0033 Dilim 4c: kayıtlı sütun eşlemesi firmanın tasarımındadır; aynı başlıklı dosya başka firmada tanınmaz.
     [Fact]
     public async Task Saved_column_mapping_binds_the_firms_own_headers_only_in_that_firm()
