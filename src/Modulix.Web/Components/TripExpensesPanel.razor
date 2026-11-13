@@ -1,0 +1,352 @@
+@* Seferin masrafları (ADR-0038 K10, dilim 8). Masraf girilir (tür, açıklama, tarih, KDV dahil tutar, para birimi, KDV, tedarikçi); yakıt türünde litre ve
+   kilometre, trafik cezasında sürücüye rücu bilgisi istenir (kural türün kategorisine bakar). Beklemedeki masraf düzenlenir; onay ve ret yetkili
+   kişinin eylem çubuğundadır (LogisticsActionsBar, ret gerekçe ister). Karar verilmiş masraf değişmez ve silinmez; makbuz ve fiş masrafa dosya olarak
+   eklenir. Onaysız masraf toplamlara girmez: "Beklemede" ayrı gösterilir. Kurallar sunucudadır; sayfa içi küçük eylem formu olduğu için sekmesizdir. *@
+@inject ApiClient Api
+@inject CrmLookups Lookups
+
+<section class="settings-group" aria-label="Masraflar">
+    <h2>Masraflar</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (CanEnter)
+    {
+        <form class="record-form" novalidate aria-label="@(editing is null ? "Masraf ekle" : "Masrafı düzenle")" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label required" for="expense-kind">Tür</label>
+                    <select id="expense-kind" class="form-select" required aria-required="true" @bind="form.KindKey">
+                        @foreach (var kind in Lookups.Choices(LogisticsAccess.ExpenseKindList, form.KindKey))
+                        {
+                            <option value="@kind.Key">@kind.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="kindKey" Errors="errors" />
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label required" for="expense-description">Açıklama</label>
+                    <input id="expense-description" class="form-control" maxlength="200" required aria-required="true" placeholder="ör. Osmangazi Köprüsü geçişi" @bind="form.Description" />
+                    <FieldError Field="description" Errors="errors" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label required" for="expense-date">Tarih</label>
+                    <input id="expense-date" class="form-control" type="date" required aria-required="true" @bind="form.ExpenseDate" />
+                    <FieldError Field="expenseDate" Errors="errors" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label required" for="expense-amount">Tutar (KDV dahil)</label>
+                    <input id="expense-amount" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" required aria-required="true" @bind="form.Amount" />
+                    <FieldError Field="amount" Errors="errors" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label required" for="expense-currency">Para birimi</label>
+                    <input id="expense-currency" class="form-control" maxlength="3" list="expense-currencies" autocomplete="off" required aria-required="true" @bind="form.Currency" />
+                    <datalist id="expense-currencies"><option value="TRY"></option><option value="EUR"></option><option value="USD"></option><option value="GBP"></option></datalist>
+                    <FieldError Field="currency" Errors="errors" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="expense-vat">KDV tutarı</label>
+                    <input id="expense-vat" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" @bind="form.VatAmount" />
+                    <FieldError Field="vatAmount" Errors="errors" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="expense-supplier">Tedarikçi</label>
+                    <LookupPicker Id="expense-supplier" LookupKey="@LogisticsAccess.ExpenseSupplierLookup" @bind-Value="form.SupplierPartyId" Placeholder="İstasyon, işletme…" Invalid="@(errors?.ContainsKey("supplierPartyId") == true)" />
+                    <FieldError Field="supplierPartyId" Errors="errors" />
+                </div>
+                @if (IsFuel)
+                {
+                    <div class="col-md-4">
+                        <label class="form-label required" for="expense-liters">Litre</label>
+                        <input id="expense-liters" class="form-control" type="number" min="0" step="0.001" inputmode="decimal" required aria-required="true" @bind="form.Liters" />
+                        <FieldError Field="liters" Errors="errors" />
+                        <small class="text-muted">@UnitPriceHint</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="expense-odometer">Kilometre sayacı</label>
+                        <input id="expense-odometer" class="form-control" type="number" min="0" step="1" inputmode="numeric" @bind="form.OdometerKm" />
+                        <FieldError Field="odometerKm" Errors="errors" />
+                    </div>
+                }
+                else if (IsFine)
+                {
+                    <div class="col-md-4">
+                        <SegmentedChoice Id="expense-charge" Label="Sürücüye rücu edilecek mi?" Options="YesNo" @bind-Value="form.ChargeToDriver" />
+                        <small class="text-muted">Yalnızca bilgidir; borç kaydı üretmez.</small>
+                        <FieldError Field="chargeToDriver" Errors="errors" />
+                    </div>
+                }
+            </div>
+            <div class="list-toolbar">
+                @if (editing is not null)
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelEdit">Vazgeç</button>
+                }
+                <button type="submit" class="btn btn-tonal" disabled="@busy" aria-busy="@(busy ? "true" : null)">
+                    <AppIcon Name="@(editing is null ? "plus" : "check")" Size="16" /> @(editing is null ? "Masraf ekle" : "Değişikliği kaydet")
+                </button>
+            </div>
+        </form>
+    }
+
+    @if (expenses is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (expenses.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu sefer için masraf girilmedi.</p>
+    }
+    else
+    {
+        <p class="text-muted" role="status" aria-live="polite">@Summary</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Sefer masrafları</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><AppIcon Name="calendar" Size="14" /> Tarih</th>
+                    <th scope="col"><AppIcon Name="tag" Size="14" /> Tür</th>
+                    <th scope="col"><AppIcon Name="hash" Size="14" /> Açıklama</th>
+                    <th scope="col"><AppIcon Name="hash" Size="14" /> Tutar</th>
+                    <th scope="col"><AppIcon Name="check-circle" Size="14" /> Durum</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var expense in expenses)
+                {
+                    var status = WarehouseLabels.Text(expense, "status");
+                    <tr>
+                        <td data-label="Tarih">@(FleetLabels.Day(WarehouseLabels.Text(expense, "expenseDate")) is { } day ? FleetLabels.Date(day) : "—")</td>
+                        <td data-label="Tür" class="primary">@Lookups.Label(LogisticsAccess.ExpenseKindList, WarehouseLabels.Text(expense, "kindKey"))</td>
+                        <td data-label="Açıklama">
+                            @WarehouseLabels.Text(expense, "description")
+                            @if (expense.Values["liters"]?.GetValue<decimal>() is { } liters)
+                            {
+                                <small class="text-muted"> · @FleetLabels.Capacity(liters, "L")</small>
+                            }
+                            @if (WarehouseLabels.Flag(expense, "chargeToDriver"))
+                            {
+                                <span class="badge stage-proposal">Sürücüye rücu</span>
+                            }
+                            @if (WarehouseLabels.Text(expense, "statusReason") is { Length: > 0 } reason)
+                            {
+                                <small class="text-muted"> · @reason</small>
+                            }
+                        </td>
+                        <td data-label="Tutar">@FleetLabels.Money(expense.Values["amount"]?.GetValue<decimal>(), WarehouseLabels.Text(expense, "currency"))</td>
+                        <td data-label="Durum"><span class="badge @StatusBadge(status)">@StatusLabel(status)</span></td>
+                        <td class="row-menu-cell actions">
+                            @if (status == "pending" && CanWrite)
+                            {
+                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => Edit(expense)">Düzenle</button>
+                            }
+                            <button type="button" class="btn btn-ghost btn-sm" aria-expanded="@(receipts == expense.Id ? "true" : "false")" @onclick="() => ToggleReceipts(expense.Id)">Makbuz</button>
+                        </td>
+                    </tr>
+                    @if (status == "pending")
+                    {
+                        <tr>
+                            <td colspan="6">
+                                <LogisticsActionsBar Kind="expenses" Record="expense" Changed="DecidedAsync" />
+                            </td>
+                        </tr>
+                    }
+                    @if (receipts == expense.Id)
+                    {
+                        <tr>
+                            <td colspan="6">
+                                <AttachmentPanel EntityKey="@LogisticsAccess.TripExpenseEntityKey" RecordId="expense.Id" CanWrite="CanWrite" Title="Makbuz ve fiş" EmptyText="Makbuz ya da fiş eklenmedi." />
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+@code {
+    private static readonly IReadOnlyList<SegmentOption<bool>> YesNo = [new(false, "Hayır"), new(true, "Evet")];
+
+    private List<RecordResponse>? expenses;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private (Guid, long) loadedFor;
+    private Guid? receipts;
+    private RecordResponse? editing;
+    private ExpenseForm form = new();
+
+    [Parameter, EditorRequired] public RecordResponse Trip { get; set; } = default!;
+
+    [Parameter] public bool CanWrite { get; set; }
+
+    /// <summary>Karar verildi (onay ya da ret): sayfa seferi yenileyebilir.</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private bool CanEnter => CanWrite && WarehouseLabels.Text(Trip, "status") != "cancelled";
+
+    private string? Category => Lookups.CategoryOf(LogisticsAccess.ExpenseKindList, form.KindKey);
+
+    private bool IsFuel => Category == LogisticsAccess.FuelCategory;
+
+    private bool IsFine => Category == LogisticsAccess.FineCategory;
+
+    private string UnitPriceHint =>
+        form.Amount is > 0 && form.Liters is > 0 ? $"Litre fiyatı ≈ {FleetLabels.Money(decimal.Round(form.Amount.Value / form.Liters.Value, 2), form.Currency)}" : "Tutar ve litre girilince litre fiyatı hesaplanır.";
+
+    /// <summary>Onaylı toplam para birimine göre; bekleyenler ayrı yazılır (onaysız masraf kârlılığa girmez).</summary>
+    private string Summary
+    {
+        get
+        {
+            string Total(string status) => string.Join(" + ", expenses!
+                .Where(e => WarehouseLabels.Text(e, "status") == status)
+                .GroupBy(e => WarehouseLabels.Text(e, "currency"))
+                .Select(g => FleetLabels.Money(g.Sum(e => e.Values["amount"]?.GetValue<decimal>() ?? 0), g.Key)));
+
+            var approved = Total("approved");
+            var pending = Total("pending");
+            return $"Onaylı: {(approved.Length == 0 ? "—" : approved)} · Beklemede: {(pending.Length == 0 ? "—" : pending)}";
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (form.KindKey.Length == 0)
+        {
+            form.KindKey = Lookups.DefaultOf(LogisticsAccess.ExpenseKindList) ?? string.Empty;
+        }
+
+        if (loadedFor == (Trip.Id, Trip.Version))
+        {
+            return;
+        }
+
+        loadedFor = (Trip.Id, Trip.Version);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var page = await Api.GetAsync<RecordPageResponse>($"/api/records/{LogisticsAccess.TripExpenseEntityKey}?tripId={Trip.Id}&pageSize=200&sort=expenseDate");
+        expenses = page.Value?.Items.ToList() ?? [];
+        message = page.Error;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var values = new System.Text.Json.Nodes.JsonObject
+        {
+            ["kindKey"] = form.KindKey,
+            ["description"] = form.Description?.Trim(),
+            ["expenseDate"] = form.ExpenseDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            ["amount"] = form.Amount,
+            ["currency"] = string.IsNullOrWhiteSpace(form.Currency) ? null : form.Currency.Trim(),
+            ["vatAmount"] = form.VatAmount,
+            ["supplierPartyId"] = form.SupplierPartyId?.ToString(),
+            ["liters"] = IsFuel ? form.Liters : null,
+            ["odometerKm"] = IsFuel ? form.OdometerKm : null,
+            ["chargeToDriver"] = IsFine && form.ChargeToDriver,
+        };
+
+        ApiResult<RecordResponse> result;
+        if (editing is null)
+        {
+            values["tripId"] = Trip.Id.ToString();
+            result = await Api.PostAsync<RecordResponse>($"/api/records/{LogisticsAccess.TripExpenseEntityKey}", new RecordWriteRequest(values, null));
+        }
+        else
+        {
+            result = await Api.PutAsync<RecordResponse>($"/api/records/{LogisticsAccess.TripExpenseEntityKey}/{editing.Id}", new RecordWriteRequest(values, editing.Version));
+        }
+
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            message = result.FieldErrors?.Values.SelectMany(v => v).FirstOrDefault() ?? result.Error;
+            return;
+        }
+
+        editing = null;
+        form = new ExpenseForm { KindKey = form.KindKey, Currency = form.Currency };
+        await LoadAsync();
+    }
+
+    private void Edit(RecordResponse expense)
+    {
+        editing = expense;
+        errors = null;
+        message = null;
+        form = new ExpenseForm
+        {
+            KindKey = WarehouseLabels.Text(expense, "kindKey"),
+            Description = WarehouseLabels.Text(expense, "description"),
+            ExpenseDate = FleetLabels.Day(WarehouseLabels.Text(expense, "expenseDate")),
+            Amount = expense.Values["amount"]?.GetValue<decimal>(),
+            Currency = WarehouseLabels.Text(expense, "currency"),
+            VatAmount = expense.Values["vatAmount"]?.GetValue<decimal>(),
+            SupplierPartyId = WarehouseLabels.Id(expense, "supplierPartyId"),
+            Liters = expense.Values["liters"]?.GetValue<decimal>(),
+            OdometerKm = expense.Values["odometerKm"]?.GetValue<int>(),
+            ChargeToDriver = WarehouseLabels.Flag(expense, "chargeToDriver"),
+        };
+    }
+
+    private void CancelEdit()
+    {
+        editing = null;
+        errors = null;
+        form = new ExpenseForm { KindKey = Lookups.DefaultOf(LogisticsAccess.ExpenseKindList) ?? string.Empty };
+    }
+
+    private void ToggleReceipts(Guid id) => receipts = receipts == id ? null : id;
+
+    private async Task DecidedAsync(RecordResponse decided)
+    {
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private static string StatusLabel(string key) => LogisticsAccess.ExpenseStatuses.FirstOrDefault(s => s.Key == key).Label ?? key;
+
+    /// <summary>Beklemede dikkat tonu, onaylı başarı tonu, reddedilen kayıp tonu.</summary>
+    private static string StatusBadge(string key) => key switch
+    {
+        "approved" => "status-customer",
+        "rejected" => "stage-lost",
+        _ => "stage-negotiation",
+    };
+
+    private sealed class ExpenseForm
+    {
+        public string KindKey { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public DateOnly? ExpenseDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+
+        public decimal? Amount { get; set; }
+
+        public string? Currency { get; set; } = "TRY";
+
+        public decimal? VatAmount { get; set; }
+
+        public Guid? SupplierPartyId { get; set; }
+
+        public decimal? Liters { get; set; }
+
+        public int? OdometerKm { get; set; }
+
+        public bool ChargeToDriver { get; set; }
+    }
+}

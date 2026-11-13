@@ -406,6 +406,10 @@ public class AppNavigationTests
         Assert.Equal(["Masraf beyanları"], Nav([HrAccess.ModuleKey], [HrAccess.ExpensesRead, HrAccess.ExpensesPay]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
         Assert.Equal("ik/masraf-beyanlari", Nav([HrAccess.ModuleKey], [HrAccess.ExpensesManage]).Find("hr.expense-claims")!.Route);
 
+        // Zimmet: okuma izni "Zimmetlerim"i, yönetim izni "Demirbaşlar"ı açar.
+        Assert.Equal(["Zimmetlerim"], Nav([HrAccess.ModuleKey], [HrAccess.AssetsRead]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["Zimmetlerim", "Demirbaşlar"], Nav([HrAccess.ModuleKey], [HrAccess.AssetsRead, HrAccess.AssetsManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
         Assert.Empty(Nav([], [HrAccess.EmployeesRead]).Roots());
         Assert.Empty(Nav([HrAccess.ModuleKey], []).Roots());
     }

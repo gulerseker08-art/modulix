@@ -23,6 +23,7 @@ public class LogisticsShipmentModuleTests
             {
                 LogisticsModule.Entities.TransportRequest => TransportRequest.Statuses.All,
                 LogisticsModule.Entities.Shipment => Shipment.Statuses.All,
+                LogisticsModule.Entities.TripExpense => TripExpense.Statuses.All,
                 _ => Trip.Statuses.All,
             };
             Assert.All(t.From, from => Assert.Contains(from, statuses));
