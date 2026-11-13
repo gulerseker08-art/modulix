@@ -92,7 +92,7 @@ public sealed class LogisticsModule : IModule
         new(Permissions.TripsWrite, "Sefer planlar, araç ve sürücü atar, sevkiyat ekler, seferi yürütür ve iptal eder", "Seferler"),
         new(Permissions.FreightRead, "Navlun ve taşıyıcı hakedişi tutarlarını görür ve girer (sevkiyat ve sefer yazma izniyle birlikte)", "Navlun ve hakediş"),
         new(Permissions.ExpensesRead, "Sefer masraflarını görüntüler", "Sefer masrafları"),
-        new(Permissions.ExpensesWrite, "Sefer masrafı girer ve beklemedeki masrafı düzenler; makbuz ekler", "Sefer masrafları"),
+        new(Permissions.ExpensesWrite, "Sefer masrafı girer, beklemedeki ya da reddedilen masrafı düzenler ve yeniden onaya gönderir; makbuz ekler", "Sefer masrafları"),
         new(Permissions.ExpensesApprove, "Sefer masrafını onaylar ya da reddeder", "Sefer masrafları"),
     ];
 
