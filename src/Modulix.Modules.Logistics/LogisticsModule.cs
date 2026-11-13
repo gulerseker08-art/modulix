@@ -455,6 +455,7 @@ public sealed class LogisticsModule : IModule
         services.AddScoped<Lifecycle.IShipmentDelivery, Lifecycle.ShipmentDelivery>();
         services.AddScoped<Lifecycle.ITripPlanner, Lifecycle.TripPlanner>();
         services.AddScoped<Lifecycle.ILogisticsWorkflow, Lifecycle.LogisticsWorkflow>();
+        services.AddScoped<Dashboard.ILogisticsDashboard, Dashboard.LogisticsDashboardService>();
         services.AddScoped<LogisticsAutomationRecordSource>();
     }
 }

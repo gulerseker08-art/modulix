@@ -190,6 +190,7 @@
   "nav.app.fleet.maintenance": "Bakım kayıtları",
   "nav.app.fleet.credentials": "Araç belgeleri",
   "nav.app.logistics": "Lojistik",
+  "nav.app.logistics.dashboard": "Pano",
   "nav.app.logistics.requests": "Taşıma talepleri",
   "nav.app.logistics.shipments": "Sevkiyatlar",
   "nav.app.logistics.trips": "Seferler",

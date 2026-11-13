@@ -240,6 +240,7 @@ public static class AppCatalog
         new("warehouse.customs-declarations", Warehouse, "Beyannameler", "clipboard-list", "depo/beyannameler", 70, WarehouseAccess.ModuleKey, WarehouseAccess.DeclarationsRead),
         new("warehouse.regime-bindings", Warehouse, "Rejim profilleri", "shield", "depo/rejim-profilleri", 80, WarehouseAccess.ModuleKey, WarehouseAccess.RegimesRead, Tone: AppTone.Teal),
         new(Logistics, null, "Lojistik", "truck", null, 42, ModuleKey: LogisticsAccess.ModuleKey, Group: OperationsGroup),
+        new("logistics.dashboard", Logistics, "Pano", "dashboard", "lojistik/pano", 2, LogisticsAccess.ModuleKey, AnyPermission: LogisticsAccess.DashboardAny, ExactMatch: true),
         new("logistics.requests", Logistics, "Taşıma talepleri", "inbox", "lojistik/talepler", 4, LogisticsAccess.ModuleKey, LogisticsAccess.RequestsRead),
         new("logistics.shipments", Logistics, "Sevkiyatlar", "truck", "lojistik/sevkiyatlar", 6, LogisticsAccess.ModuleKey, LogisticsAccess.ShipmentsRead),
         new("logistics.trips", Logistics, "Seferler", "map-pin", "lojistik/seferler", 8, LogisticsAccess.ModuleKey, LogisticsAccess.TripsRead, Tone: AppTone.Teal),
