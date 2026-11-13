@@ -351,6 +351,65 @@ public class ImportRunTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
         Assert.DoesNotContain((await ApplyAsync(other, file)).Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
     }
 
+    // ADR-0033 Dilim 4d: geri alma. Dokunulmamış kayıtlar silinir, sonradan değişen korunur; gerekçe zorunlu; tek sefer; firma sınırı; izin.
+    [Fact]
+    public async Task Rollback_removes_untouched_imported_records_keeps_changed_ones_and_needs_its_permission()
+    {
+        var (client, tenant, _) = await ImporterAsync();
+        using var _c = client;
+        var applied = await ApplyAsync(client, "Konu;Soyad\r\nBir;Kaya\r\nİki;Demir\r\nÜç;Ak\r\n");
+        Assert.Equal(3, applied.Run.CreatedCount);
+        var rollbackUrl = $"/api/imports/{applied.Run.Id}/rollback";
+
+        // İçe aktarma izni geri alma izni değildir.
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync(rollbackUrl, new ImportRollbackRequest("Yanlış dosya"))).StatusCode);
+
+        var manager = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [RunImports, ReadImports, RollbackImports, LeadsRead, LeadsUpdate, LeadsDelete], manager);
+        using var managerClient = await LoginAsync(manager);
+
+        // Bir kayıt içe aktarmadan sonra değiştirilir: geri almada korunmalı.
+        Guid changedId;
+        using (var scope = factory.OpenScope(tenant.Id))
+        {
+            changedId = await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Set<Lead>().Where(l => l.Subject == "İki").Select(l => l.Id).SingleAsync();
+        }
+
+        var current = (await managerClient.GetFromJsonAsync<Modulix.Shared.Records.RecordResponse>($"/api/records/{Lead}/{changedId}"))!;
+        var update = await managerClient.PutAsJsonAsync($"/api/records/{Lead}/{changedId}",
+            new Modulix.Shared.Records.RecordWriteRequest(new System.Text.Json.Nodes.JsonObject { ["subject"] = "İki (düzeltildi)" }, current.Version));
+        Assert.True(update.IsSuccessStatusCode, await update.Content.ReadAsStringAsync());
+
+        // Gerekçe zorunlu; başka firmanın yöneticisi bu koşuyu bulamaz.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await managerClient.PostAsJsonAsync(rollbackUrl, new ImportRollbackRequest(" "))).StatusCode);
+        var (otherClient, otherTenant, _) = await ImporterAsync();
+        otherClient.Dispose();
+        var otherManager = await factory.CreateUserAsync(otherTenant);
+        await factory.CreateRoleAsync(otherTenant.Id, [ReadImports, RollbackImports, LeadsRead, LeadsDelete], otherManager);
+        using (var otherManagerClient = await LoginAsync(otherManager))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, (await otherManagerClient.PostAsJsonAsync(rollbackUrl, new ImportRollbackRequest("Deneme"))).StatusCode);
+        }
+
+        var response = await managerClient.PostAsJsonAsync(rollbackUrl, new ImportRollbackRequest("Yanlış dosya yüklendi"));
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var outcome = (await response.Content.ReadFromJsonAsync<ImportRollbackDto>())!;
+        Assert.Equal((2, 0, "RolledBack"), (outcome.Removed, outcome.AlreadyRemoved, outcome.Run.Status));
+        Assert.Equal(changedId, Assert.Single(outcome.Kept).RecordId);
+
+        using (var scope = factory.OpenScope(tenant.Id))
+        {
+            var subjects = await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Set<Lead>().AsNoTracking().Select(l => l.Subject).ToListAsync();
+            Assert.Equal(["İki (düzeltildi)"], subjects);
+        }
+
+        // İkinci geri alma ve kuru çalışmanın geri alınması reddedilir.
+        Assert.Equal(HttpStatusCode.Conflict, (await managerClient.PostAsJsonAsync(rollbackUrl, new ImportRollbackRequest("Tekrar"))).StatusCode);
+        var preview = await PreviewAsync(client, "Konu;Soyad\r\nKuru;Kaya\r\n");
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await managerClient.PostAsJsonAsync($"/api/imports/{preview.Run.Id}/rollback", new ImportRollbackRequest("Kuru"))).StatusCode);
+    }
+
     private async Task AddCustomFieldAsync(Tenant tenant, string label)
     {
         var admin = await factory.CreateUserAsync(tenant);
