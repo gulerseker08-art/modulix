@@ -44,6 +44,10 @@ public sealed class HrModule : IModule
 
         /// <summary>Tek tek cevap kayıtları ve denetim kaydındaki cevap değerleri; hiçbir rol şablonunda yoktur (sonuçlar özetten görülür).</summary>
         public const string SurveysAnswers = "hr.surveys.answers";
+        public const string BlogRead = "hr.blog.read";
+        public const string BlogManage = "hr.blog.manage";
+        public const string GalleryRead = "hr.gallery.read";
+        public const string GalleryManage = "hr.gallery.manage";
     }
 
     public static class Entities
@@ -66,6 +70,8 @@ public sealed class HrModule : IModule
         public const string SurveyQuestion = "hr.survey-question";
         public const string SurveyResponse = "hr.survey-response";
         public const string SurveyAnswer = "hr.survey-answer";
+        public const string BlogPost = "hr.blog-post";
+        public const string PhotoAlbum = "hr.photo-album";
     }
 
     public static class Lists
@@ -137,6 +143,10 @@ public sealed class HrModule : IModule
         new(Permissions.SurveysRespond, "Kendisine yönelik açık anketleri yanıtlar", "Anketler"),
         new(Permissions.SurveysManage, "Anket hazırlar, yanıta açar, kapatır ve özet sonuçları görür", "Anketler"),
         new(Permissions.SurveysAnswers, "Tek tek cevap kayıtlarını görür (kimliği gizli anketler hariç); varsayılan rollerde yoktur", "Anketler"),
+        new(Permissions.BlogRead, "Yayındaki blog yazılarını ve eklerini okur", "Blog"),
+        new(Permissions.BlogManage, "Blog yazısı yazar, yayınlar, ek ekler ve kaldırır", "Blog"),
+        new(Permissions.GalleryRead, "Yayındaki fotoğraf albümlerini görür", "Galeri"),
+        new(Permissions.GalleryManage, "Albüm açar, fotoğraf ekler ve kaldırır, albümü yayınlar", "Galeri"),
     ];
 
     /// <summary>Denetim kaydında görünen kayıt türleri (Y5); hassas alanların değeri denetim kaydında gizlenir.</summary>
@@ -283,6 +293,20 @@ public sealed class HrModule : IModule
         {
             ["questionId"] = "Soru", ["rating"] = "Puan", ["choice"] = "Seçim", ["text"] = "Metin",
         }, "questionId"),
+        new(Entities.BlogPost, "Blog yazısı", Permissions.BlogRead, new Dictionary<string, string>
+        {
+            ["title"] = "Başlık", ["summary"] = "Özet", ["body"] = "Metin", ["isPublished"] = "Yayında",
+        }, "title")
+        {
+            UserFields = ["authorUserId"],
+        },
+        new(Entities.PhotoAlbum, "Fotoğraf albümü", Permissions.GalleryRead, new Dictionary<string, string>
+        {
+            ["title"] = "Başlık", ["description"] = "Açıklama", ["eventDate"] = "Etkinlik günü", ["isPublished"] = "Yayında",
+        }, "title")
+        {
+            UserFields = ["authorUserId"],
+        },
         new(Entities.Holiday, "Resmî tatil", Permissions.LeavesRead, new Dictionary<string, string>
         {
             ["date"] = "Tarih", ["name"] = "Ad", ["halfDay"] = "Yarım gün",
@@ -308,6 +332,8 @@ public sealed class HrModule : IModule
         new(Entities.Announcement, "Duyuru"),
         new(Entities.Survey, "Anket"),
         new(Entities.SurveyQuestion, "Anket sorusu"),
+        new(Entities.BlogPost, "Blog yazısı"),
+        new(Entities.PhotoAlbum, "Fotoğraf albümü"),
     ];
 
     /// <summary>Departman (Y9b): hazır değerler örnektir; firma kendi departmanlarını ekler. Kod departmanın adına bakmaz.</summary>
@@ -451,6 +477,8 @@ public sealed class HrModule : IModule
             new(Entities.ChecklistTask, "Süreç görevi", Permissions.ChecklistsRead) { LabelField = "title" },
             new(Entities.Announcement, "Duyuru", Permissions.AnnouncementsManage) { LabelField = "title" },
             new(Entities.Survey, "Anket", Permissions.SurveysManage) { LabelField = "title" },
+            new(Entities.BlogPost, "Blog yazısı", Permissions.BlogManage) { LabelField = "title" },
+            new(Entities.PhotoAlbum, "Fotoğraf albümü", Permissions.GalleryManage) { LabelField = "title" },
         ],
         Events =
         [
@@ -468,6 +496,10 @@ public sealed class HrModule : IModule
             new("hr.announcement.updated", Entities.Announcement, DomainEventTypes.RecordUpdated, "Duyuru güncellendi ya da yayınlandı"),
             new("hr.survey.created", Entities.Survey, DomainEventTypes.RecordCreated, "Anket hazırlandı"),
             new("hr.survey.updated", Entities.Survey, DomainEventTypes.RecordUpdated, "Anket güncellendi, yanıta açıldı ya da kapandı"),
+            new("hr.blog-post.created", Entities.BlogPost, DomainEventTypes.RecordCreated, "Blog yazısı yazıldı"),
+            new("hr.blog-post.updated", Entities.BlogPost, DomainEventTypes.RecordUpdated, "Blog yazısı güncellendi ya da yayınlandı"),
+            new("hr.photo-album.created", Entities.PhotoAlbum, DomainEventTypes.RecordCreated, "Fotoğraf albümü açıldı"),
+            new("hr.photo-album.updated", Entities.PhotoAlbum, DomainEventTypes.RecordUpdated, "Fotoğraf albümü güncellendi ya da yayınlandı"),
         ],
         Fields =
         [
@@ -532,6 +564,10 @@ public sealed class HrModule : IModule
             {
                 Options = [new(Domain.Survey.Statuses.Draft, "Taslak"), new(Domain.Survey.Statuses.Open, "Yanıta açık"), new(Domain.Survey.Statuses.Closed, "Kapalı")],
             },
+            new(Entities.BlogPost, "title", "Başlık", AutomationFieldType.Text),
+            new(Entities.BlogPost, "isPublished", "Yayında", AutomationFieldType.Boolean),
+            new(Entities.PhotoAlbum, "title", "Başlık", AutomationFieldType.Text),
+            new(Entities.PhotoAlbum, "isPublished", "Yayında", AutomationFieldType.Boolean),
         ],
     };
 
@@ -547,6 +583,7 @@ public sealed class HrModule : IModule
                 Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.ExpensesManage,
                 Permissions.AssetsRead, Permissions.AssetsManage, Permissions.ChecklistsRead, Permissions.ChecklistsManage,
                 Permissions.AnnouncementsRead, Permissions.AnnouncementsManage, Permissions.SurveysRespond, Permissions.SurveysManage,
+                Permissions.BlogRead, Permissions.BlogManage, Permissions.GalleryRead, Permissions.GalleryManage,
             ]),
         new(
             "hr.asset-keeper",
@@ -563,7 +600,7 @@ public sealed class HrModule : IModule
             "Çalışan (rehber)",
             "Rehberi ve organizasyon şemasını görüntüler, kendi izin hakkını görür ve kendi adına izin talebi açar; özlük bilgilerini göremez.",
             [Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.AssetsRead,
-                Permissions.ChecklistsRead, Permissions.AnnouncementsRead, Permissions.SurveysRespond])
+                Permissions.ChecklistsRead, Permissions.AnnouncementsRead, Permissions.SurveysRespond, Permissions.BlogRead, Permissions.GalleryRead])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
         },
@@ -574,7 +611,7 @@ public sealed class HrModule : IModule
             [
                 Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove,
                 Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.AssetsRead,
-                Permissions.ChecklistsRead, Permissions.AnnouncementsRead, Permissions.SurveysRespond,
+                Permissions.ChecklistsRead, Permissions.AnnouncementsRead, Permissions.SurveysRespond, Permissions.BlogRead, Permissions.GalleryRead,
             ])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
@@ -609,5 +646,7 @@ public sealed class HrModule : IModule
         services.AddScoped<IRecordStore, SurveyResponseRecordStore>();
         services.AddScoped<IRecordStore, SurveyAnswerRecordStore>();
         services.AddScoped<ISurveyService, SurveyService>();
+        services.AddScoped<IRecordStore, BlogPostRecordStore>();
+        services.AddScoped<IRecordStore, PhotoAlbumRecordStore>();
     }
 }

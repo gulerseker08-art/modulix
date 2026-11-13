@@ -328,3 +328,26 @@ internal sealed class SurveyAnswerConfiguration : IEntityTypeConfiguration<Surve
         builder.HasIndex(a => new { a.TenantId, a.SurveyId, a.QuestionId }).HasDatabaseName("IX_SurveyAnswers_Question");
     }
 }
+
+internal sealed class BlogPostConfiguration : IEntityTypeConfiguration<BlogPost>
+{
+    public void Configure(EntityTypeBuilder<BlogPost> builder)
+    {
+        HrTables.ConfigureCommon(builder, "BlogPosts");
+        builder.Property(p => p.Title).HasMaxLength(BlogPost.TitleMaxLength).IsRequired();
+        builder.Property(p => p.Summary).HasMaxLength(BlogPost.SummaryMaxLength);
+        builder.Property(p => p.Body).HasMaxLength(BlogPost.BodyMaxLength).IsRequired();
+        builder.HasIndex(p => new { p.TenantId, p.IsPublished, p.PublishedAt }).HasDatabaseName("IX_BlogPosts_Published");
+    }
+}
+
+internal sealed class PhotoAlbumConfiguration : IEntityTypeConfiguration<PhotoAlbum>
+{
+    public void Configure(EntityTypeBuilder<PhotoAlbum> builder)
+    {
+        HrTables.ConfigureCommon(builder, "PhotoAlbums");
+        builder.Property(a => a.Title).HasMaxLength(PhotoAlbum.TitleMaxLength).IsRequired();
+        builder.Property(a => a.Description).HasMaxLength(PhotoAlbum.DescriptionMaxLength);
+        builder.HasIndex(a => new { a.TenantId, a.IsPublished, a.EventDate }).HasDatabaseName("IX_PhotoAlbums_Published");
+    }
+}
