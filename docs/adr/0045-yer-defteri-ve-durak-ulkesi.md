@@ -1,6 +1,6 @@
 # ADR-0045 — Yer defteri (Place) ve durak ülkesi
 
-Durum: **taslak** (14 Kasım 2026, tartışma için; kabul edilmedi). Bu belge tek başına hiçbir şeyi uygulamaz. Numara geçicidir: açık bir PR aynı numarayı almış olabilir, birleştirmeden önce kontrol et. (Not: `main`'de iki ADR "0043" numarasını taşıyor, firma-sektor-katalogu ve sevkiyatta-ulke-ve-uluslararasi-tasima; numaralar ayrıca düzeltilmeli.)
+Durum: **taslak** (14 Kasım 2026, tartışma için; kabul edilmedi). **K1 kararı verildi (14 Kasım 2026, ürün sahibi): yer defteri Core ortak kaydıdır, Lojistik'e özel tablo değildir.** Diğer kararlar öneridir. Bu belge tek başına hiçbir şeyi uygulamaz. Numara geçicidir: açık bir PR aynı numarayı almış olabilir, birleştirmeden önce kontrol et. (Not: `main`'de iki ADR "0043" numarasını taşıyor, firma-sektor-katalogu ve sevkiyatta-ulke-ve-uluslararasi-tasima; numaralar ayrıca düzeltilmeli.)
 
 İlgili: ADR-0043 sevkiyatta ülke (K6 yer defteri, K7 durak ülkesi, dilim 3'ü bu belge açar), ADR-0006 (ortak firma, kişi), ADR-0016 (lookup), ADR-0012 (CRM adresi), ADR-0038 (Lojistik, `TripStop`), ADR-0032 (Antrepo, `Facility`), ADR-0033 (içe aktarma), ADR-0034 (arayüz dili).
 
@@ -64,7 +64,7 @@ CLAUDE.md "ortak ana veri (Firma, Kişi, Adres) Core'a aittir; bir kez girilir, 
 
 Yanıt gelmezse varsayılan uygulanır.
 
-1. **Yer Core ortak kaydı mı, Lojistik'e özel mi?** Varsayılan: Core ortak kayıt (CLAUDE.md "ortak ana veri Core'a aittir"; Antrepo ve diğer modüller de kullanır). Alternatif Lojistik'e özel tablodur; sonradan Core'a taşımak veri taşıma ve referans değiştirme gerektirir.
+1. **Yer Core ortak kaydı mı, Lojistik'e özel mi?** **Karar (14 Kasım 2026, ürün sahibi): Core ortak kayıt.** Gerekçe: Core ortak kayıt (CLAUDE.md "ortak ana veri Core'a aittir"; Antrepo ve diğer modüller de kullanır). Alternatif Lojistik'e özel tablodur; sonradan Core'a taşımak veri taşıma ve referans değiştirme gerektirir.
 2. **Koordinat zorunlu mu?** Varsayılan: hayır (K2).
 3. **Yer türü listesi tenant tarafından genişletilebilir mi?** Varsayılan: evet, Y9b listesi ve kategoriler (K1).
 4. **Yer seçilince metin kopyalanır mı, canlı mı?** Varsayılan: kopyalanır (snapshot, K3).
