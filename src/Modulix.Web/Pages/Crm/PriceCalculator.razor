@@ -2,19 +2,19 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Fiyat hesapla · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.priceCalculator.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.PricesRead">
     <div class="page-header">
-        <h1>Fiyat hesapla</h1>
+        <h1>@Texts.Get("crm.priceCalculator.title")</h1>
     </div>
 
-    <p class="text-muted">Sunucu, fiyat listesini seçer; birimi dönüştürür; indirim, vergi ve yuvarlamayı uygular. Sonuç hiçbir kayıt oluşturmaz; teklif satırı bu hesabı anlık görüntü olarak saklayacaktır.</p>
+    <p class="text-muted">@Texts.Get("crm.priceCalculator.help")</p>
 
     <form class="record-form" novalidate @onsubmit="CalculateAsync" @onsubmit:preventDefault>
         <div class="form-grid">
             <div>
-                <label class="form-label" for="product">Ürün *</label>
+                <label class="form-label" for="product">@Texts.Get("crm.priceLists.item.product")</label>
                 <select id="product" class="form-select" @bind="form.ProductId">
                     <option value="@Guid.Empty">—</option>
                     @foreach (var product in products)
@@ -24,13 +24,13 @@
                 </select>
             </div>
             <div>
-                <label class="form-label" for="quantity">Miktar *</label>
+                <label class="form-label" for="quantity">@Texts.Get("crm.products.components.quantity")</label>
                 <input id="quantity" class="form-control" type="number" step="any" min="0" @bind="form.Quantity" />
             </div>
             <div>
-                <label class="form-label" for="unit">Satış birimi</label>
+                <label class="form-label" for="unit">@Texts.Get("crm.priceCalculator.field.unit")</label>
                 <select id="unit" class="form-select" @bind="form.UnitId">
-                    <option value="">Ürünün temel birimi</option>
+                    <option value="">@Texts.Get("crm.priceCalculator.field.baseUnit")</option>
                     @foreach (var unit in units)
                     {
                         <option value="@unit.Id">@unit.Code — @unit.Name</option>
@@ -38,17 +38,17 @@
                 </select>
             </div>
             <div>
-                <label class="form-label" for="currency">Para birimi *</label>
+                <label class="form-label" for="currency">@Texts.Get("common.field.currencyRequired")</label>
                 <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />
             </div>
             <div>
-                <label class="form-label" for="at">Tarih (boşsa şimdi)</label>
+                <label class="form-label" for="at">@Texts.Get("crm.priceCalculator.field.at")</label>
                 <input id="at" class="form-control" type="datetime-local" @bind="form.At" />
             </div>
             <div>
-                <label class="form-label" for="list">Fiyat listesi (açık seçim)</label>
+                <label class="form-label" for="list">@Texts.Get("crm.priceCalculator.field.priceList")</label>
                 <select id="list" class="form-select" @bind="form.PriceListId">
-                    <option value="">Otomatik seç</option>
+                    <option value="">@Texts.Get("crm.priceCalculator.field.autoPriceList")</option>
                     @foreach (var list in lists)
                     {
                         <option value="@list.Id">@list.Name (@list.Currency)</option>
@@ -56,7 +56,7 @@
                 </select>
             </div>
             <div>
-                <label class="form-label" for="company">Firma</label>
+                <label class="form-label" for="company">@Texts.Get("crm.priceCalculator.field.company")</label>
                 <select id="company" class="form-select" @bind="form.CompanyId">
                     <option value="">—</option>
                     @foreach (var company in companies)
@@ -66,21 +66,21 @@
                 </select>
             </div>
             <div>
-                <label class="form-label" for="segment">Segment / kanal</label>
+                <label class="form-label" for="segment">@Texts.Get("crm.priceCalculator.field.segment")</label>
                 <input id="segment" class="form-control" @bind="form.Segment" />
             </div>
             <div>
-                <label class="form-label" for="manual">Elle indirim (%)</label>
+                <label class="form-label" for="manual">@Texts.Get("crm.priceCalculator.field.manual")</label>
                 <input id="manual" class="form-control" type="number" step="any" min="0" max="100" @bind="form.Manual" />
             </div>
             <div>
-                <label class="form-label" for="display">Gösterim para birimi</label>
+                <label class="form-label" for="display">@Texts.Get("crm.priceCalculator.field.display")</label>
                 <input id="display" class="form-control" maxlength="3" @bind="form.Display" />
             </div>
             @if (policies.Count > 0)
             {
                 <div class="span-all">
-                    <span class="form-label">İndirim politikaları</span>
+                    <span class="form-label">@Texts.Get("crm.discountPolicies.title")</span>
                     @foreach (var policy in policies)
                     {
                         <label class="form-check-label me-3">
@@ -92,7 +92,7 @@
             }
         </div>
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary" disabled="@busy">Hesapla</button>
+            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.priceCalculator.calculate")</button>
         </div>
     </form>
 
@@ -113,32 +113,32 @@
             <h2>@result.ProductCode — @result.ProductName</h2>
             <table class="table record-table">
                 <tbody>
-                    <tr><th>Fiyat listesi</th><td>@result.PriceListName (sürüm @result.PriceListVersion)</td></tr>
-                    <tr><th>Miktar</th><td>@result.Quantity (temel birimde @result.BaseQuantity)</td></tr>
-                    <tr><th>Liste bedeli</th><td>@Fmt(result.ListTotal) @result.Currency@(result.IsFree ? " · ücretsiz satış" : null)</td></tr>
-                    <tr><th>İndirimli bedel</th><td>@Fmt(result.DiscountedTotal) @result.Currency (etkin %@result.EffectiveDiscountPercent)</td></tr>
-                    <tr><th>Vergi (%@result.TaxRatePercent, @(result.PriceIncludesTax ? "dahil" : "hariç"))</th><td>@Fmt(result.Tax) @result.Currency</td></tr>
-                    <tr><th>Vergisiz</th><td>@Fmt(result.Net) @result.Currency</td></tr>
-                    <tr><th>Toplam</th><td><strong>@Fmt(result.Gross) @result.Currency</strong></td></tr>
+                    <tr><th>@Texts.Get("crm.quoteDetail.field.priceList")</th><td>@Texts.Get("crm.priceCalculator.priceListVersion", result.PriceListName, result.PriceListVersion)</td></tr>
+                    <tr><th>@Texts.Get("crm.quoteDetail.col.quantity")</th><td>@Texts.Get("crm.priceCalculator.quantityValue", result.Quantity.ToString(), result.BaseQuantity.ToString())</td></tr>
+                    <tr><th>@Texts.Get("crm.priceCalculator.row.listTotal")</th><td>@Fmt(result.ListTotal) @result.Currency@(result.IsFree ? " · " + Texts.Get("crm.priceCalculator.freeSale") : null)</td></tr>
+                    <tr><th>@Texts.Get("crm.priceCalculator.row.discounted")</th><td>@Fmt(result.DiscountedTotal) @result.Currency @Texts.Get("crm.priceCalculator.effective", result.EffectiveDiscountPercent.ToString())</td></tr>
+                    <tr><th>@Texts.Get(result.PriceIncludesTax ? "crm.priceCalculator.row.taxIncluded" : "crm.priceCalculator.row.taxExcluded", result.TaxRatePercent.ToString())</th><td>@Fmt(result.Tax) @result.Currency</td></tr>
+                    <tr><th>@Texts.Get("crm.priceCalculator.row.net")</th><td>@Fmt(result.Net) @result.Currency</td></tr>
+                    <tr><th>@Texts.Get("crm.quotes.col.total")</th><td><strong>@Fmt(result.Gross) @result.Currency</strong></td></tr>
                     @if (result.Display is { } display)
                     {
-                        <tr><th>@display.Currency (kur @display.Rate, @display.RateDate.ToString("yyyy-MM-dd"))</th><td>@Fmt(display.Gross) @display.Currency</td></tr>
+                        <tr><th>@Texts.Get("crm.priceCalculator.row.display", display.Currency, display.Rate.ToString(), display.RateDate.ToString("yyyy-MM-dd"))</th><td>@Fmt(display.Gross) @display.Currency</td></tr>
                     }
                 </tbody>
             </table>
             @if (result.RequiresApproval)
             {
-                <div class="alert alert-warning" role="status">Bu indirim onay eşiğini aşıyor; onay gerekir.</div>
+                <div class="alert alert-warning" role="status">@Texts.Get("crm.priceCalculator.requiresApproval")</div>
             }
 
             @if (result.DiscountCapApplied)
             {
-                <div class="alert alert-info" role="status">Azami toplam indirim sınırı uygulandı.</div>
+                <div class="alert alert-info" role="status">@Texts.Get("crm.priceCalculator.capApplied")</div>
             }
 
             @if (result.Components.Count > 0)
             {
-                <h3>Paket bileşenleri</h3>
+                <h3>@Texts.Get("crm.products.components.title")</h3>
                 <ul>
                     @foreach (var component in result.Components)
                     {
@@ -148,7 +148,7 @@
             }
 
             <details>
-                <summary>Hesap açıklaması</summary>
+                <summary>@Texts.Get("crm.priceCalculator.explanation")</summary>
                 <ul>
                     @foreach (var line in result.Explanation)
                     {

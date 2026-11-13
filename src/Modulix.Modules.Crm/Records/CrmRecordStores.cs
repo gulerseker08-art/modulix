@@ -17,7 +17,7 @@ namespace Modulix.Modules.Crm.Records;
 internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmRecordStore<Company>(context), IMergeableRecordStore
 {
     /// <summary>Taraftaki alanlar. Mevcut tarafa bağlanırken boş gönderilenler taraftaki değeri silmez.</summary>
-    private static readonly string[] PartyFields = ["name", "kind", "taxOffice", "taxNumber", "phone", "email", "website", "city", "address"];
+    private static readonly string[] PartyFields = ["name", "kind", "taxOffice", "taxNumber", "phone", "email", "website", "city", "address", "industry"];
 
     public override string EntityKey => CrmModule.Entities.Company;
 
@@ -37,7 +37,12 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         Field.Text<Company>("website", Party.WebsiteMaxLength, c => c.Party.Website, (c, v) => c.Party.Website = v),
         Field.Text<Company>("city", Party.CityMaxLength, c => c.Party.City, (c, v) => c.Party.City = v),
         Field.Text<Company>("address", Party.AddressMaxLength, c => c.Party.Address, (c, v) => c.Party.Address = v),
-        Field.Text<Company>("industry", Company.IndustryMaxLength, c => c.Industry, (c, v) => c.Industry = v),
+        // Sektör (ADR-0043) ortak firma kaydındadır (Party.IndustryCode) ve sektör kataloğundan bir koddur. Yazarken kod ya da etkin sektör adı
+        // verilebilir (içe aktarma, Lead dönüşümü); kayda her zaman kod yazılır. "industryName" katalogdaki adı verir; "legacyIndustry" katalog
+        // öncesi serbest metindir (eşleşmeyen eski değer korunur, sektör seçilince temizlenir).
+        Field.Text<Company>("industry", Company.IndustryMaxLength, c => c.Party.IndustryCode, (c, v) => c.Party.IndustryCode = v),
+        Field.ReadOnly<Company>("industryName", c => c.Party.Industry?.Name),
+        Field.ReadOnly<Company>("legacyIndustry", c => c.Industry),
         Field.ListChoice<Company>("status", CrmModule.Lists.CompanyStatus, c => c.Status, (c, v) => c.Status = v!),
         Field.ListChoice<Company>("source", CrmModule.Lists.CompanySource, c => c.Source, (c, v) => c.Source = v, required: false),
         Field.Text<Company>("tags", Company.TagsMaxLength, c => c.Tags, (c, v) => c.Tags = v),
@@ -64,6 +69,8 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         // Kod listesi alanları (ADR-0029 Dilim E): "a,b" biçiminde saklanır; tam kod eşleşir (kısmi eşleşme olmaz).
         ["relationshipRole"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => ("," + c.Party.RelationshipRoles + ",").Contains("," + code + ",")) : null,
         ["customerSector"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => ("," + c.Party.CustomerSectors + ",").Contains("," + code + ",")) : null,
+        // Firma sektörü (ADR-0043): sektör kataloğu kodu, tam eşleşme.
+        ["industry"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => c.Party.IndustryCode == code) : null,
         ["serviceNeed"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => ("," + c.Party.ServiceNeeds + ",").Contains("," + code + ",")) : null,
     };
 
@@ -74,7 +81,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
                 await FilterValue.ChoiceAsync(v, CrmModule.Lists.CompanyStatus, ctx, ct) is { } status ? q.Where(c => c.Status == status) : null,
         };
 
-    protected override IQueryable<Company> Load(IQueryable<Company> source) => source.Include(c => c.Party);
+    protected override IQueryable<Company> Load(IQueryable<Company> source) => source.Include(c => c.Party).ThenInclude(p => p.Industry);
 
     protected override IOrderedQueryable<Company> Order(IQueryable<Company> source) => source.OrderBy(c => c.Party.Name);
 
@@ -91,8 +98,9 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         "-city" => source.OrderBy(c => c.Party.City == null).ThenByDescending(c => c.Party.City).ThenBy(c => c.Party.Name),
         "phone" => source.OrderBy(c => c.Party.Phone == null).ThenBy(c => c.Party.Phone).ThenBy(c => c.Party.Name),
         "-phone" => source.OrderBy(c => c.Party.Phone == null).ThenByDescending(c => c.Party.Phone).ThenBy(c => c.Party.Name),
-        "industry" => source.OrderBy(c => c.Industry == null).ThenBy(c => c.Industry).ThenBy(c => c.Party.Name),
-        "-industry" => source.OrderBy(c => c.Industry == null).ThenByDescending(c => c.Industry).ThenBy(c => c.Party.Name),
+        // Sektör adına göre (katalog); katalog öncesi serbest metin yalnızca kod yokken sıraya girer.
+        "industry" => source.OrderBy(c => (c.Party.Industry!.Name ?? c.Industry) == null).ThenBy(c => c.Party.Industry!.Name ?? c.Industry).ThenBy(c => c.Party.Name),
+        "-industry" => source.OrderBy(c => (c.Party.Industry!.Name ?? c.Industry) == null).ThenByDescending(c => c.Party.Industry!.Name ?? c.Industry).ThenBy(c => c.Party.Name),
         "taxNumber" => source.OrderBy(c => c.Party.TaxNumber == null).ThenBy(c => c.Party.TaxNumber).ThenBy(c => c.Party.Name),
         "-taxNumber" => source.OrderBy(c => c.Party.TaxNumber == null).ThenByDescending(c => c.Party.TaxNumber).ThenBy(c => c.Party.Name),
         "createdAt" => source.OrderBy(c => c.CreatedAt).ThenBy(c => c.Party.Name),
@@ -172,6 +180,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
     /// <summary>Vergi numarası taraflar arasında tekildir; başka bir tarafın numarası verilirse alan hatası (409 değil).</summary>
     protected override async Task AppliedAsync(Company entity, JsonObject values, CancellationToken cancellationToken)
     {
+        await ResolveIndustryAsync(entity, values, cancellationToken);
         await EnsureTaxNumberFormatAsync(entity, cancellationToken);
         if (entity.Party.TaxNumber is { } number
             && await Context.Data.Set<Party>().AnyAsync(p => p.TaxNumber == number && p.Id != entity.PartyId, cancellationToken))
@@ -182,6 +191,36 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
 
         // Eski telefon/e-posta/şehir/adres alanları yapılandırılmış ana kayıtlara yansır (ADR-0012).
         await LegacyContactSync.FromCompanyAsync(Context.Data, entity, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sektör alanı kataloğa göre çözülür (ADR-0043): gelen değer kod ya da etkin sektör adı olabilir; kayda kod yazılır ve ad
+    /// navigasyonu doldurulur (yanıt güncel adı taşır). Katalogda olmayan değer alan hatasıdır; pasife alınmış sektör yalnızca
+    /// kayıtta zaten varsa kalabilir. Sektör seçilince katalog öncesi serbest metin temizlenir.
+    /// </summary>
+    private async Task ResolveIndustryAsync(Company entity, JsonObject values, CancellationToken cancellationToken)
+    {
+        if (!values.TryGetPropertyValue("industry", out var node) || FieldNamed("industry").IsOmitted(node))
+        {
+            return;
+        }
+
+        if (entity.Party.IndustryCode is not { } written)
+        {
+            // Sektör temizlendi: yanıt eski adı taşımasın.
+            entity.Party.Industry = null;
+            return;
+        }
+
+        var stored = await Context.Data.Set<Party>().AsNoTracking().Where(p => p.Id == entity.PartyId).Select(p => p.IndustryCode).SingleOrDefaultAsync(cancellationToken);
+        if (await IndustryResolution.ResolveAsync(Context, written, stored, cancellationToken) is not { } industry)
+        {
+            return;
+        }
+
+        entity.Party.IndustryCode = industry.Code;
+        entity.Party.Industry = industry;
+        entity.Industry = null;
     }
 
     /// <summary>
@@ -233,6 +272,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
     {
         ["name"] = entity.Party.Name, ["kind"] = entity.Party.Kind.ToString(), ["taxOffice"] = entity.Party.TaxOffice, ["taxNumber"] = entity.Party.TaxNumber, ["phone"] = entity.Party.Phone,
         ["email"] = entity.Party.Email, ["website"] = entity.Party.Website, ["city"] = entity.Party.City, ["address"] = entity.Party.Address,
+        ["industry"] = entity.Party.IndustryCode,
     };
 }
 

@@ -126,7 +126,7 @@ internal static class CrmReportDatasets
     };
 
     private static DatasetDefinition LeadDataset() => new(
-        Leads, "Lead'ler", CrmModule.Entities.Lead, 1,
+        Leads, "Lead'ler", CrmModule.Entities.Lead, 2,
         [
             new("leadNumber", "Lead no", DatasetColumnKind.Text, FilterShow),
             new("subject", "Konu", DatasetColumnKind.Text, FilterShow),
@@ -136,7 +136,8 @@ internal static class CrmReportDatasets
             new("disqualificationReason", "Eleme nedeni", DatasetColumnKind.Choice, All) { ChoiceList = CrmModule.Lists.LeadDisqualificationReason },
             new("ownerId", "Sorumlu", DatasetColumnKind.Lookup, All) { LookupKey = CrmLookupDefinitions.LeadOwner, StoreFilter = "ownerId" },
             new("companyName", "Firma adı", DatasetColumnKind.Text, FilterShow),
-            new("industry", "Sektör", DatasetColumnKind.Text, All),
+            new("industryName", "Sektör", DatasetColumnKind.Text, All),
+            new("industry", "Sektör kodu", DatasetColumnKind.Text, All),
             new("country", "Ülke", DatasetColumnKind.Text, All),
             new("city", "Şehir", DatasetColumnKind.Text, All),
             new("utmCampaign", "Kampanya (UTM)", DatasetColumnKind.Text, All),
@@ -195,24 +196,25 @@ internal static class CrmReportDatasets
     };
 
     private static DatasetDefinition CompanyDataset() => new(
-        Companies, "Firmalar", CrmModule.Entities.Company, 1,
+        Companies, "Firmalar", CrmModule.Entities.Company, 2,
         [
             new("name", "Ad", DatasetColumnKind.Text, FilterShow),
             new("status", "Durum", DatasetColumnKind.Choice, All) { ChoiceList = CrmModule.Lists.CompanyStatus, StoreFilter = "status" },
             new("source", "Kaynak", DatasetColumnKind.Choice, All) { ChoiceList = CrmModule.Lists.CompanySource, StoreFilter = "source" },
-            new("industry", "Sektör", DatasetColumnKind.Text, All),
+            new("industryName", "Sektör", DatasetColumnKind.Text, All),
+            new("industry", "Sektör kodu", DatasetColumnKind.Text, All),
             new("city", "Şehir", DatasetColumnKind.Text, All),
             new("ownerId", "Sorumlu", DatasetColumnKind.Lookup, All) { LookupKey = CrmLookupDefinitions.CompanyOwner, StoreFilter = "ownerId" },
             new("tags", "Etiketler", DatasetColumnKind.Text, FilterShow),
         ])
     {
         AllowsCustomFields = true,
-        DefaultColumns = ["name", "status", "industry", "city", "ownerId"],
+        DefaultColumns = ["name", "status", "industryName", "city", "ownerId"],
         RecordPath = "crm/firmalar/{id}",
         ReadyReports =
         [
             new("crm.companies.by-industry", "Sektöre göre firmalar", "Firma sayısı sektör bazında.",
-                new(Companies, [], [], [new("industry")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Bar)),
+                new(Companies, [], [], [new("industryName")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Bar)),
             new("crm.companies.by-status", "Duruma göre firmalar", "Firma sayısı durum bazında.",
                 new(Companies, [], [], [new("status")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Pie)),
             new("crm.companies.by-owner", "Sorumluya göre firmalar", "Firma sayısı sorumlu bazında.",

@@ -188,3 +188,166 @@ internal sealed class AssetAssignmentConfiguration : IEntityTypeConfiguration<As
         builder.HasIndex(a => new { a.TenantId, a.OwnerId }).HasDatabaseName("IX_AssetAssignments_Owner");
     }
 }
+
+internal sealed class ChecklistTemplateConfiguration : IEntityTypeConfiguration<ChecklistTemplate>
+{
+    public void Configure(EntityTypeBuilder<ChecklistTemplate> builder)
+    {
+        HrTables.ConfigureCommon(builder, "ChecklistTemplates");
+        builder.Property(t => t.Name).HasMaxLength(ChecklistTemplate.NameMaxLength).IsRequired();
+        builder.Property(t => t.Kind).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(t => t.Description).HasMaxLength(ChecklistTemplate.TextMaxLength);
+        builder.HasIndex(t => new { t.TenantId, t.Kind, t.Name }).IsUnique().HasDatabaseName("UX_ChecklistTemplates_Name");
+    }
+}
+
+internal sealed class ChecklistTemplateItemConfiguration : IEntityTypeConfiguration<ChecklistTemplateItem>
+{
+    public void Configure(EntityTypeBuilder<ChecklistTemplateItem> builder)
+    {
+        HrTables.ConfigureCommon(builder, "ChecklistTemplateItems");
+        builder.Property(i => i.Title).HasMaxLength(ChecklistTemplateItem.TitleMaxLength).IsRequired();
+        builder.Property(i => i.Description).HasMaxLength(ChecklistTemplateItem.TextMaxLength);
+        builder.Property(i => i.ResponsibleRole).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(i => i.TaskType).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.HasOne<ChecklistTemplate>().WithMany().HasForeignKey(i => new { i.TenantId, i.TemplateId })
+            .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(i => new { i.TenantId, i.TemplateId, i.Sequence }).HasDatabaseName("IX_ChecklistTemplateItems_Template");
+    }
+}
+
+internal sealed class EmployeeChecklistConfiguration : IEntityTypeConfiguration<EmployeeChecklist>
+{
+    public void Configure(EntityTypeBuilder<EmployeeChecklist> builder)
+    {
+        HrTables.ConfigureCommon(builder, "EmployeeChecklists");
+        builder.Property(c => c.Kind).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(c => c.Name).HasMaxLength(ChecklistTemplate.NameMaxLength).IsRequired();
+        builder.Property(c => c.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(c => c.CancelReason).HasMaxLength(EmployeeChecklist.ReasonMaxLength);
+        builder.HasOne<Employee>().WithMany().HasForeignKey(c => new { c.TenantId, c.EmployeeId })
+            .HasPrincipalKey(e => new { e.TenantId, e.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ChecklistTemplate>().WithMany().HasForeignKey(c => new { c.TenantId, c.TemplateId })
+            .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(c => new { c.TenantId, c.EmployeeId, c.Kind }).HasDatabaseName("IX_EmployeeChecklists_Employee");
+        builder.HasIndex(c => new { c.TenantId, c.Status }).HasDatabaseName("IX_EmployeeChecklists_Status");
+        builder.HasIndex(c => new { c.TenantId, c.OwnerId }).HasDatabaseName("IX_EmployeeChecklists_Owner");
+    }
+}
+
+internal sealed class ChecklistTaskConfiguration : IEntityTypeConfiguration<ChecklistTask>
+{
+    public void Configure(EntityTypeBuilder<ChecklistTask> builder)
+    {
+        HrTables.ConfigureCommon(builder, "ChecklistTasks");
+        builder.Property(t => t.Title).HasMaxLength(ChecklistTemplateItem.TitleMaxLength).IsRequired();
+        builder.Property(t => t.Description).HasMaxLength(ChecklistTemplateItem.TextMaxLength);
+        builder.Property(t => t.ResponsibleRole).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(t => t.TaskType).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(t => t.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(t => t.Note).HasMaxLength(ChecklistTask.NoteMaxLength);
+        builder.HasOne<EmployeeChecklist>().WithMany().HasForeignKey(t => new { t.TenantId, t.ChecklistId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(t => new { t.TenantId, t.ChecklistId, t.Sequence }).HasDatabaseName("IX_ChecklistTasks_Checklist");
+        builder.HasIndex(t => new { t.TenantId, t.AssigneeUserId, t.Status }).HasDatabaseName("IX_ChecklistTasks_Assignee");
+        builder.HasIndex(t => new { t.TenantId, t.OwnerId }).HasDatabaseName("IX_ChecklistTasks_Owner");
+    }
+}
+
+internal sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Announcement>
+{
+    public void Configure(EntityTypeBuilder<Announcement> builder)
+    {
+        HrTables.ConfigureCommon(builder, "Announcements");
+        builder.Property(a => a.Title).HasMaxLength(Announcement.TitleMaxLength).IsRequired();
+        builder.Property(a => a.Body).HasMaxLength(Announcement.BodyMaxLength).IsRequired();
+        builder.Property(a => a.AudienceDepartmentKey).HasMaxLength(100);
+        builder.HasIndex(a => new { a.TenantId, a.IsPublished, a.PublishOn }).HasDatabaseName("IX_Announcements_Published");
+    }
+}
+
+internal sealed class AnnouncementReadConfiguration : IEntityTypeConfiguration<AnnouncementRead>
+{
+    public void Configure(EntityTypeBuilder<AnnouncementRead> builder)
+    {
+        HrTables.ConfigureCommon(builder, "AnnouncementReads");
+        builder.HasOne<Announcement>().WithMany().HasForeignKey(r => new { r.TenantId, r.AnnouncementId })
+            .HasPrincipalKey(a => new { a.TenantId, a.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(r => new { r.TenantId, r.AnnouncementId, r.UserId }).IsUnique().HasDatabaseName("UX_AnnouncementReads_User");
+    }
+}
+
+internal sealed class SurveyConfiguration : IEntityTypeConfiguration<Survey>
+{
+    public void Configure(EntityTypeBuilder<Survey> builder)
+    {
+        HrTables.ConfigureCommon(builder, "Surveys");
+        builder.Property(s => s.Title).HasMaxLength(Survey.TitleMaxLength).IsRequired();
+        builder.Property(s => s.Description).HasMaxLength(Survey.DescriptionMaxLength);
+        builder.Property(s => s.Status).HasMaxLength(20).IsRequired();
+        builder.Property(s => s.AudienceDepartmentKey).HasMaxLength(100);
+        builder.HasIndex(s => new { s.TenantId, s.Status }).HasDatabaseName("IX_Surveys_Status");
+    }
+}
+
+internal sealed class SurveyQuestionConfiguration : IEntityTypeConfiguration<SurveyQuestion>
+{
+    public void Configure(EntityTypeBuilder<SurveyQuestion> builder)
+    {
+        HrTables.ConfigureCommon(builder, "SurveyQuestions");
+        builder.Property(q => q.Text).HasMaxLength(SurveyQuestion.TextMaxLength).IsRequired();
+        builder.Property(q => q.QuestionType).HasMaxLength(20).IsRequired();
+        builder.Property(q => q.Options).HasMaxLength(SurveyQuestion.OptionsMaxLength);
+        builder.HasOne<Survey>().WithMany().HasForeignKey(q => new { q.TenantId, q.SurveyId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class SurveyResponseConfiguration : IEntityTypeConfiguration<SurveyResponse>
+{
+    public void Configure(EntityTypeBuilder<SurveyResponse> builder)
+    {
+        HrTables.ConfigureCommon(builder, "SurveyResponses");
+        builder.HasOne<Survey>().WithMany().HasForeignKey(r => new { r.TenantId, r.SurveyId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(r => new { r.TenantId, r.SurveyId, r.RespondentUserId }).IsUnique().HasDatabaseName("UX_SurveyResponses_Respondent");
+    }
+}
+
+internal sealed class SurveyAnswerConfiguration : IEntityTypeConfiguration<SurveyAnswer>
+{
+    public void Configure(EntityTypeBuilder<SurveyAnswer> builder)
+    {
+        HrTables.ConfigureCommon(builder, "SurveyAnswers");
+        builder.Property(a => a.Choice).HasMaxLength(SurveyQuestion.OptionMaxLength);
+        builder.Property(a => a.TextValue).HasMaxLength(SurveyAnswer.TextMaxLength);
+        builder.HasOne<SurveyResponse>().WithMany().HasForeignKey(a => new { a.TenantId, a.ResponseId })
+            .HasPrincipalKey(r => new { r.TenantId, r.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<SurveyQuestion>().WithMany().HasForeignKey(a => new { a.TenantId, a.QuestionId })
+            .HasPrincipalKey(q => new { q.TenantId, q.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(a => new { a.TenantId, a.SurveyId, a.QuestionId }).HasDatabaseName("IX_SurveyAnswers_Question");
+    }
+}
+
+internal sealed class BlogPostConfiguration : IEntityTypeConfiguration<BlogPost>
+{
+    public void Configure(EntityTypeBuilder<BlogPost> builder)
+    {
+        HrTables.ConfigureCommon(builder, "BlogPosts");
+        builder.Property(p => p.Title).HasMaxLength(BlogPost.TitleMaxLength).IsRequired();
+        builder.Property(p => p.Summary).HasMaxLength(BlogPost.SummaryMaxLength);
+        builder.Property(p => p.Body).HasMaxLength(BlogPost.BodyMaxLength).IsRequired();
+        builder.HasIndex(p => new { p.TenantId, p.IsPublished, p.PublishedAt }).HasDatabaseName("IX_BlogPosts_Published");
+    }
+}
+
+internal sealed class PhotoAlbumConfiguration : IEntityTypeConfiguration<PhotoAlbum>
+{
+    public void Configure(EntityTypeBuilder<PhotoAlbum> builder)
+    {
+        HrTables.ConfigureCommon(builder, "PhotoAlbums");
+        builder.Property(a => a.Title).HasMaxLength(PhotoAlbum.TitleMaxLength).IsRequired();
+        builder.Property(a => a.Description).HasMaxLength(PhotoAlbum.DescriptionMaxLength);
+        builder.HasIndex(a => new { a.TenantId, a.IsPublished, a.EventDate }).HasDatabaseName("IX_PhotoAlbums_Published");
+    }
+}

@@ -44,7 +44,7 @@ Kapsam dışı (bu ADR'de yok): bordro ve SGK/vergi bildirimleri (M4.6–M4.7, D
 
 **K7 — Kurum içi iletişim İK modülündedir.** Duyuru, blog ve galeri sektörsüzdür ve İK paketinin parçası olarak satılır; ayrı bir "intranet" modülü bugün açılmaz (ADR-0028 lisans tanımı yeterli). Hedef kitle departman/çalışma yeri/herkes olarak çalışan kartından seçilir. Ayrı modül ihtiyacı (İK almadan duyuru) doğarsa kayıt türleri taşınabilir; şema adı `hr` kalır.
 
-**K8 — Anket motoru tekrar yazılmaz.** Pazarlama modülünün anket portalı (`SurveyPortal`) müşteri anketidir; çalışan anketi kimlik doğrulamalı ve isteğe bağlı anonimdir. Dilim 7'de Pazarlama motorunun Core'a taşınabilir parçaları (soru tipi, yanıt toplama) incelenir; taşınamıyorsa İK'da küçük bir anket kaydı açılır. Karar dilim 7'ye ertelendi.
+**K8 — Anket motoru tekrar yazılmaz.** Pazarlama modülünün anket portalı (`SurveyPortal`) müşteri anketidir; çalışan anketi kimlik doğrulamalı ve isteğe bağlı anonimdir. Dilim 7'de Pazarlama motorunun Core'a taşınabilir parçaları (soru tipi, yanıt toplama) incelenir; taşınamıyorsa İK'da küçük bir anket kaydı açılır. Karar dilim 7'ye ertelendi. **Dilim 7 kararı:** repodaki tek "anket" Destek modülünün talep memnuniyeti puanıdır (tek 1–5 puan, belirteçli bağlantı); soru tipi ve yanıt toplama motoru yoktur, Core'a taşınacak parça çıkmadı. İK'da küçük bir anket kaydı açıldı (bölüm 15).
 
 **K9 — Silme yoktur.** Çalışan kartı, izin talebi, masraf beyanı, zimmet hareketi silinmez: iptal edilir ya da durumu değişir (yasal saklama). Tenant dışa aktarma ve silme (`tenant-export`/`tenant-delete`) bütün `hr` tablolarını kapsar.
 
@@ -105,10 +105,10 @@ Her dilim dört testle teslim edilir (mutlu yol, doğrulama, tenant izolasyonu, 
 | 2 | İzin türleri, hak/bakiye, talep, onay (**yapıldı**, bölüm 10); takvim, Ç6a bağlantısı, işveren şirket bağı (2b) | 1, Ç6a (var) |
 | 3 | Masraf beyanı, belge, onay, ödeme durumu (**yapıldı**, bölüm 11); Ç6a tutar onayı (3b) | 1, ADR-0040 (var), Ç6a |
 | 4 | Demirbaş ve zimmet, tutanak çıktısı (**yapıldı**, bölüm 12) | 1 |
-| 5 | İşe giriş/çıkış kontrol listeleri | 1, 4 |
-| 6 | Duyurular | 1 |
-| 7 | Anket (K8) | 1 |
-| 8 | Blog ve galeri | 1, ADR-0040 |
+| 5 | İşe giriş/çıkış kontrol listeleri (**yapıldı**, bölüm 13) | 1, 4 |
+| 6 | Duyurular (**yapıldı**, bölüm 14) | 1 |
+| 7 | Anket (K8; **yapıldı**, bölüm 15) | 1 |
+| 8 | Blog ve galeri (**yapıldı**, bölüm 16) | 1, ADR-0040 |
 
 ## 7. Riskler
 
@@ -217,4 +217,89 @@ Bölüm 5'teki masraf akışı izin dilimindeki kalıpla (iş akışı kapısı,
 | `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
 | `dotnet test tests/Modulix.Core.Tests` | 964/964 geçti |
 | `HrAssetTests` (entegrasyon, 4 test; PDF dahil) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |
+
+## 13. Dilim 5: işe giriş ve çıkış (13 Kasım 2026)
+
+- **Şablon** `hr.ChecklistTemplates` (ad tür içinde tekil; tür işe giriş/işten çıkış, yalnızca oluştururken; etkin) ve **adımları** `hr.ChecklistTemplateItems` (sıra, başlık, açıklama, sorumlu: çalışan / yönetici / İK, başlangıca göre gün farkı, görev türü: elle / zimmet iadesi). "Zimmet iadesi" yalnızca çıkış şablonunda olur. Şablon değişikliği başlatılmış süreçleri etkilemez; kullanılmış şablon silinmez, pasife alınır.
+- **Süreç** `hr.EmployeeChecklists` yalnızca başlatma komutuyla açılır; şablonun adımları aynı işlemde **görevlere** `hr.ChecklistTasks` dönüşür (kayıt boru hattından; her biri audit ve olay üretir). Son tarih = başlangıç günü + gün farkı; sorumlu kullanıcı o anda çözülür (çalışanın ve yöneticisinin kullanıcısı; İK görevi "süreç yönetimi" izni olan herkese açık). Ayrılmış çalışana işe giriş başlatılmaz; aynı türde açık süreç tekildir.
+- **İlerleme:** görev kapandıkça sürecin ilerlemesi aynı işlemde güncellenir; bütün görevler tamamlanınca ya da atlanınca süreç tamamlanır, biri yeniden açılınca açılır; iptal edilmiş süreç ve görevleri değişmez.
+- **Açık zimmet kuralı (dilim 4 bağı):** çıkış sürecindeki "zimmet iadesi" görevi çalışanın açık zimmeti varken tamamlanamaz (409, neden ekranda); bu yüzden açık zimmetle çıkış süreci kapanmaz. Modül içi okumadır (aynı modülün tablosu).
+- **Görünürlük:** veri kapsamı alanı `employeeUserId`; ek olarak kullanıcıya atanmış görevler ve onların süreçleri görünür (yönetici astının sürecini "kendi" kapsamıyla görür).
+- **Arayüz:** İşe giriş ve çıkış (süreç başlat, görünümler, süreç kartında görevler ve iptal), Süreç şablonları (şablon + adımlar, sekmeli formlar), Görevlerim (bana atanan açık görevler, İK'ya ayrıca İK görevleri; gecikenler işaretli). Yeni CSS sınıfı yok.
+- Migration `HrChecklists`: dört tablo + `TenantIsolationSql.AddTable`.
+
+**Bilerek yapılmadı:** işe giriş tarihi girilince/çalışan "Ayrıldı" yapılınca sürecin kendiliğinden başlaması (ADR-0027 kuralıyla bağlanabilir; "Süreç başlat" aksiyonu sonra), görev atandığında bildirim, kullanıcı hesabının çıkışta kapatılması (Core üyelik işlemi; görev olarak elle), görev başına dosya.
+
+### Test sonuçları (Dilim 5)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 29/29 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
+| `dotnet test tests/Modulix.Core.Tests` | 964/964 geçti |
+| `HrChecklistTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |
+
+## 14. Dilim 6: duyurular (13 Kasım 2026)
+
+- **Duyuru** `hr.Announcements` (başlık, düz metin gövde en çok 8000 karakter, hedef departman, sabitlenmiş, yayında, yayın ve bitiş günü, yazan) ve **okundu kaydı** `hr.AnnouncementReads` (duyuru + kullanıcı tekil; `UNIQUE(TenantId, AnnouncementId, UserId)`). İki yeni izin: `hr.announcements.read` (çalışan ve yönetici rol şablonlarında) ve `hr.announcements.manage` (İK uzmanında).
+- **Hedefleme sunucuda:** "duyuru yönetimi" izni olmayan okur yalnızca yayında, yayın günü gelmiş, süresi dolmamış ve hedef departmanı boş ya da çalışan kartındaki departmanı olan duyuruları görür; diğerleri liste ve tekil okumada "bulunamadı"dır (sorgu düzeyinde, `HrRecordStore.RestrictAsync`). Yönetici bütün duyuruları görür.
+- **Okundu:** `POST /api/hr/announcements/{id}/read` duyuruyu görebilen kullanıcı için okundu kaydını kayıt boru hattından yazar (tekrar okumada yeni kayıt yazmaz) ve duyurunun güncel halini döner. Okundu kaydı doğrudan yazılamaz ve değişmez (409); listesini (kim okudu) yalnızca yönetici görür. Duyuru silinince okundu kayıtları aynı işlemde silinir.
+- **Doğrulama:** başlık ve metin zorunlu; bitiş günü başlangıçtan önce olamaz; yayın günü verilmezse bugündür; hedef departman seçim listesinden.
+- **Arayüz:** Duyurular (akış: sabitlenmişler üstte, okunmamışlar "Yeni" rozetli, açınca okundu yazılır; metin `.preline` ile düz metin) ve Duyuru yönetimi (Yayında / Taslak / Süresi geçen / Tümü görünümleri, okuyan sayısı, sekmeli form, okuyanlar listesi). Yeni CSS sınıfı yok.
+- Migration `HrAnnouncements`: iki tablo + `TenantIsolationSql.AddTable`.
+
+**Bilerek yapılmadı:** zengin metin/HTML gövde ve görsel (dilim 8'deki dosya altyapısıyla), duyuru yayınlanınca e-posta/anlık bildirim (ADR-0027 kuralıyla bağlanabilir), yorum ve beğeni, birden çok departmana ya da kişiye hedefleme, ana sayfa kutucuğu.
+
+### Test sonuçları (Dilim 6)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 29/29 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
+| `HrAnnouncementTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |
+
+## 15. Dilim 7: anketler (13 Kasım 2026)
+
+- **Anket** `hr.Surveys` (başlık, açıklama, durum taslak / yanıta açık / kapalı, kimliği gizli, hedef departman, kapanış günü, hazırlayan), **soru** `hr.SurveyQuestions` (sıra, metin, tür: 1–5 puan / tek seçim / serbest metin, seçenekler satır başına, zorunlu), **katılım** `hr.SurveyResponses` (anket + kullanıcı tekil; `UNIQUE(TenantId, SurveyId, RespondentUserId)`) ve **cevap** `hr.SurveyAnswers`. İzinler: `hr.surveys.respond` (çalışan ve yönetici şablonları), `hr.surveys.manage` (İK uzmanı), `hr.surveys.answers` (tek tek cevaplar ve denetim kaydındaki cevap değerleri; **hiçbir rol şablonunda yok**).
+- **Durum komutla değişir:** `POST /api/hr/surveys/{id}/actions` (`open`: sorusu olmalı, kapanış günü geçmemiş olmalı; `close`: yalnızca açık anket; kapalı anket yeniden açılabilir). Soru yalnızca taslakta eklenir, değişir, silinir (yanıt toplanırken soru değişirse sonuç karşılaştırılamaz). Yanıtı olan anket silinmez, kapatılır; taslak anket sorularıyla silinir.
+- **Yanıt:** `POST /api/hr/surveys/{id}/responses` anket yanıta açıksa, kapanış günü geçmemişse ve kullanıcı hedef kitledeyse (departmanı boş ya da çalışan kartındaki departmanı) kabul edilir. Zorunlu soru, puan 1–5, seçeneğin listede olması ve metin uzunluğu denetlenir (alan adı `answers.{soruId}`, 422); tekrar yanıt 409. Katılım ve cevaplar kayıt boru hattından **tek işlemde** yazılır. Okur (yönetim izni yok) yalnızca yanıt verebileceği anketleri ve sorularını görür; diğerleri 404. Yönetici bütün anketleri görür ama yanıt için o da hedef kitlede olmalıdır.
+- **Sonuç:** `GET /api/hr/surveys/{id}/results` (yalnızca yönetim izni): soru başına cevap sayısı, puan ortalaması ve 1–5 dağılımı, seçenek dağılımı, metin cevapları (yanıtlayan bilgisi olmadan, alfabetik).
+- **Kimliği gizli anket (sınırıyla birlikte):** seçim yalnızca oluştururken yapılır. Sonuçlarda ve kayıt uçlarında yanıtlayan gösterilmez (katılım listesinde `respondentUserId` boş), cevaplar tek tek listelenmez (`hr.surveys.answers` izniyle de), sonuç en az **3 yanıt** gelince gösterilir. **Sınır:** platform kuralı gereği her yazma denetim kaydına yazan kullanıcıyla düşer (Y5: her önemli yazma denetim kaydına yazılır); bu yüzden cevap kaydı ile kullanıcı denetim kaydında ilişkilidir. Cevap değerleri denetim kaydında yalnızca `hr.surveys.answers` izniyle görünür, ama tenant'ın sistem yöneticisi rolü bütün izinlere sahiptir. Yani "kimliği gizli", İK yöneticisinden ve sonuç ekranından gizlidir; tenant yöneticisinden ve veritabanından tam anonimlik **değildir**. Arayüz metni de buna göre yazıldı ("sonuçlarda kimin ne yanıtladığı gösterilmez"; "anonim" denmez). Tam anonimlik (yazanı kaydetmeyen yazma) Core'da kayıt boru hattının sistem kimliğiyle yazabilmesini gerektirir; ayrı bir karar konusudur.
+- **Arayüz:** Anketler (`/ik/anketler`: açık anketler, "Yanıt bekliyor/Yanıtlandı", yanıt formu) ve Anket yönetimi (`/ik/anket-yonetimi`: Taslak / Yanıta açık / Kapalı / Tümü görünümleri, sıralanabilir başlıklar, sekmeli anket ve soru formları, yanıta aç/kapat eylemleri, sonuç özeti). Yeni CSS sınıfı yok.
+- Migration `HrSurveys`: dört tablo + `TenantIsolationSql.AddTable`. `Field.Flag` yardımcısına `createOnly` eklendi.
+
+**Bilerek yapılmadı:** tam anonim yazma (yukarıda), çoklu seçim ve matris soru, koşullu soru, anket şablonları ve tekrarlayan nabız anketi, hatırlatma e-postası, sonuçların dışa aktarımı ve departman kırılımı (kimliği gizli ankette küçük grupları açığa çıkarır; eşik kuralıyla birlikte tasarlanmalı).
+
+### Test sonuçları (Dilim 7)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 30/30 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
+| `dotnet test tests/Modulix.Core.Tests` | 971/971 geçti |
+| `HrSurveyTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |
+
+## 16. Dilim 8: blog ve galeri (13 Kasım 2026)
+
+- **Blog yazısı** `hr.BlogPosts` (başlık, özet, düz metin gövde en çok 20.000 karakter, yayında, ilk yayın anı, yazan) ve **fotoğraf albümü** `hr.PhotoAlbums` (başlık, açıklama, etkinlik günü, yayında, ilk yayın anı, yazan). İzinler: `hr.blog.read`, `hr.gallery.read` (çalışan ve yönetici şablonları), `hr.blog.manage`, `hr.gallery.manage` (İK uzmanı).
+- **Yazar modeli:** yazıyı ve albümü yönetim izni olan iletişim/İK ekibi yazar. Her çalışanın kendi yazısını yazması bilerek yapılmadı: ADR-0040'ta dosya yükleme kayıt *türünün* güncelleme iznine bağlıdır; yazar başına yazma izni verilseydi bir yazar başkasının yazısına dosya ekleyebilirdi. Bu, ADR-0040'ın kayıt düzeyinde dosya yetkisi dilimiyle birlikte açılır.
+- **Görünürlük sunucuda:** yönetim izni olmayan okur yalnızca yayındaki yazı ve albümleri görür; taslak 404'tür ve dosya erişimi bağlı kaydın erişimi olduğundan taslağın ekleri ve fotoğrafları da 404'tür. Yayın anı ilk yayında yazılır; taslağa alınıp yeniden yayınlansa değişmez.
+- **Fotoğraflar ve ekler ADR-0040 dosyalarıdır** (yeni tablo yok): albüm başına en çok 20 dosya, PNG/JPEG/GIF (ve diğer izinli türler), 10 MB. İndirme her zaman `attachment` olarak kalır; galeri görüntüyü oturumla alıp sayfada `data:` adresiyle gösterir (dosya adresi tarayıcıda açılmaz, CSP değişmedi). Görüntü olmayan dosya indirme bağlantısıyla listelenir.
+- **Arayüz:** Blog (`/ik/blog`: yayındaki yazılar, devamını oku, ekler), Galeri (`/ik/galeri`: albüm kartları, fotoğraf ızgarası), Blog yönetimi ve Galeri yönetimi (Tümü / Yayında / Taslak görünümleri, sıralanabilir başlıklar, sekmeli formlar, dosya paneli). Yeni CSS sınıfı yok (`profile-cards` + `img-fluid`); `AppIcon` setine Lucide `image` ikonu eklendi.
+- Migration `HrBlogAndGallery`: iki tablo + `TenantIsolationSql.AddTable`.
+
+**Bilerek yapılmadı:** yorum ve beğeni, kategori/etiket, zengin metin, albüm kapağı ve küçük resim (sunucuda küçültme yok; albüm açılınca fotoğraflar tam boyutuyla yüklenir), albüm başına 20'den fazla fotoğraf, kaydı silinen yazı/albümün dosyalarının temizliği (ADR-0040 dilim 3; galeri yönetimi albüm silinmeden önce fotoğrafların silinmesini ister, bu kural yalnızca arayüzdedir).
+
+### Test sonuçları (Dilim 8)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 31/31 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
+| `dotnet test tests/Modulix.Core.Tests` | 971/971 geçti |
+| `HrBlogGalleryTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |

@@ -402,7 +402,7 @@
         "email" => @<text>@lead.Email</text>,
         "phone" => @<text>@lead.Phone</text>,
         "city" => @<text>@lead.City</text>,
-        "industry" => @<text>@lead.Industry</text>,
+        "industry" => @<text>@(lead.IndustryName ?? lead.LegacyIndustry)</text>,
         "productInterest" => @<text>@lead.ProductInterest</text>,
         _ => @<text></text>,
     };

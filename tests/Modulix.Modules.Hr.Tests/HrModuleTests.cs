@@ -52,8 +52,7 @@ public class HrModuleTests
     [Fact]
     public void Personal_fields_are_sensitive_and_audited_with_their_own_permission()
     {
-        var sensitive = Assert.Single(Module.SensitiveFields);
-        Assert.Equal(HrModule.Entities.Employee, sensitive.EntityKey);
+        var sensitive = Assert.Single(Module.SensitiveFields, s => s.EntityKey == HrModule.Entities.Employee);
         Assert.Equal(HrModule.Permissions.EmployeesPersonal, sensitive.Permission);
         Assert.Equal(HrModule.PersonalFields, sensitive.Fields);
         Assert.Contains("nationalId", sensitive.Fields);
@@ -69,7 +68,9 @@ public class HrModuleTests
         Assert.Equal(
             [
                 HrModule.Entities.Employee, HrModule.Entities.LeaveRequest, HrModule.Entities.LeaveBalance, HrModule.Entities.ExpenseClaim,
-                HrModule.Entities.ExpenseLine, HrModule.Entities.Asset, HrModule.Entities.AssetAssignment,
+                HrModule.Entities.ExpenseLine, HrModule.Entities.Asset, HrModule.Entities.AssetAssignment, HrModule.Entities.ChecklistTemplate,
+                HrModule.Entities.ChecklistTemplateItem, HrModule.Entities.Announcement, HrModule.Entities.Survey, HrModule.Entities.SurveyQuestion,
+                HrModule.Entities.BlogPost, HrModule.Entities.PhotoAlbum,
             ],
             HrForms.All.Select(f => f.EntityKey));
         foreach (var definition in HrForms.All)
@@ -172,6 +173,66 @@ public class HrModuleTests
     }
 
     [Fact]
+    public void Blog_and_gallery_are_read_by_staff_and_managed_by_the_specialist()
+    {
+        foreach (var template in new[] { "hr.staff", "hr.manager" })
+        {
+            var permissions = Module.RoleTemplates.Single(t => t.Key == template).Permissions;
+            Assert.Contains(HrModule.Permissions.BlogRead, permissions);
+            Assert.Contains(HrModule.Permissions.GalleryRead, permissions);
+            Assert.DoesNotContain(HrModule.Permissions.BlogManage, permissions);
+            Assert.DoesNotContain(HrModule.Permissions.GalleryManage, permissions);
+        }
+
+        var specialist = Module.RoleTemplates.Single(t => t.Key == "hr.specialist").Permissions;
+        Assert.Contains(HrModule.Permissions.BlogManage, specialist);
+        Assert.Contains(HrModule.Permissions.GalleryManage, specialist);
+        Assert.Equal(HrModule.Permissions.GalleryRead, Assert.Single(Module.AuditedEntities, a => a.EntityKey == HrModule.Entities.PhotoAlbum).ReadPermission);
+    }
+
+    [Fact]
+    public void Survey_permissions_go_to_staff_as_respond_and_answer_values_are_audited_under_a_permission_in_no_template()
+    {
+        Assert.Contains(HrModule.Permissions.SurveysRespond, Module.RoleTemplates.Single(t => t.Key == "hr.staff").Permissions);
+        Assert.Contains(HrModule.Permissions.SurveysRespond, Module.RoleTemplates.Single(t => t.Key == "hr.manager").Permissions);
+        Assert.Contains(HrModule.Permissions.SurveysManage, Module.RoleTemplates.Single(t => t.Key == "hr.specialist").Permissions);
+        Assert.All(Module.RoleTemplates, t => Assert.DoesNotContain(HrModule.Permissions.SurveysAnswers, t.Permissions));
+
+        var answers = Assert.Single(Module.AuditedEntities, a => a.EntityKey == HrModule.Entities.SurveyAnswer);
+        Assert.Equal(HrModule.Permissions.SurveysAnswers, answers.ReadPermission);
+        Assert.DoesNotContain(Module.SensitiveFields, s => s.EntityKey == HrModule.Entities.SurveyAnswer); // yanıtlayan yazabilsin
+
+        var question = new SurveyQuestion { Options = " Evet \n\nHayır\n" };
+        Assert.Equal(["Evet", "Hayır"], question.OptionList());
+        Assert.Empty(new SurveyQuestion().OptionList());
+        Assert.True(new SurveyQuestion().IsRequired);
+        Assert.Equal(Survey.Statuses.Draft, new Survey().Status);
+    }
+
+    [Fact]
+    public void Checklist_permissions_go_to_staff_as_read_and_to_the_specialist_as_manage_and_progress_follows_tasks()
+    {
+        Assert.Contains(HrModule.Permissions.ChecklistsRead, Module.RoleTemplates.Single(t => t.Key == "hr.staff").Permissions);
+        Assert.DoesNotContain(HrModule.Permissions.ChecklistsManage, Module.RoleTemplates.Single(t => t.Key == "hr.manager").Permissions);
+        Assert.Contains(HrModule.Permissions.ChecklistsManage, Module.RoleTemplates.Single(t => t.Key == "hr.specialist").Permissions);
+        var template = Module.Lookups.Single(l => l.Key == HrLookupDefinitions.ChecklistTemplate);
+        Assert.Equal((HrModule.Entities.ChecklistTemplate, "isActive", "true"), (template.TargetEntityKey, template.FixedFilterName, template.FixedFilterValue));
+
+        // İlerleme: bütün görevler kapanınca tamamlanır, biri yeniden açılınca açılır; iptal edilmiş süreç durumunu korur.
+        var checklist = new EmployeeChecklist();
+        checklist.SetProgress(3, 2);
+        Assert.Equal((EmployeeChecklist.Statuses.Open, (DateTimeOffset?)null), (checklist.Status, checklist.CompletedAt));
+        checklist.SetProgress(3, 3);
+        Assert.Equal(EmployeeChecklist.Statuses.Completed, checklist.Status);
+        Assert.NotNull(checklist.CompletedAt);
+        checklist.SetProgress(3, 2);
+        Assert.Equal(EmployeeChecklist.Statuses.Open, checklist.Status);
+        checklist.Status = EmployeeChecklist.Statuses.Cancelled;
+        checklist.SetProgress(3, 3);
+        Assert.Equal(EmployeeChecklist.Statuses.Cancelled, checklist.Status);
+    }
+
+    [Fact]
     public void Staff_and_managers_see_their_own_records_and_only_the_specialist_manages_leave()
     {
         var staff = Module.RoleTemplates.Single(t => t.Key == "hr.staff");
@@ -268,5 +329,35 @@ public class HrModuleTests
         Assert.Equal(HrLookupDefinitions.AssignmentAsset, HrAccess.AssignmentAssetLookup);
         Assert.Equal(Asset.Statuses.All, HrAccess.AssetStatuses.Select(s => s.Key));
         Assert.Equal(AssetAssignment.Statuses.All, HrAccess.AssignmentStatuses.Select(s => s.Key));
+        Assert.Equal(HrModule.Permissions.ChecklistsRead, HrAccess.ChecklistsRead);
+        Assert.Equal(HrModule.Permissions.ChecklistsManage, HrAccess.ChecklistsManage);
+        Assert.Equal(HrModule.Entities.ChecklistTemplate, HrAccess.ChecklistTemplateEntityKey);
+        Assert.Equal(HrModule.Entities.ChecklistTemplateItem, HrAccess.ChecklistTemplateItemEntityKey);
+        Assert.Equal(HrModule.Entities.EmployeeChecklist, HrAccess.EmployeeChecklistEntityKey);
+        Assert.Equal(HrModule.Entities.ChecklistTask, HrAccess.ChecklistTaskEntityKey);
+        Assert.Equal(HrModule.Permissions.AnnouncementsRead, HrAccess.AnnouncementsRead);
+        Assert.Equal(HrModule.Permissions.AnnouncementsManage, HrAccess.AnnouncementsManage);
+        Assert.Equal(HrModule.Entities.Announcement, HrAccess.AnnouncementEntityKey);
+        Assert.Equal(HrModule.Entities.AnnouncementRead, HrAccess.AnnouncementReadEntityKey);
+        Assert.Equal(HrModule.Permissions.SurveysRespond, HrAccess.SurveysRespond);
+        Assert.Equal(HrModule.Permissions.SurveysManage, HrAccess.SurveysManage);
+        Assert.Equal(HrModule.Entities.Survey, HrAccess.SurveyEntityKey);
+        Assert.Equal(HrModule.Entities.SurveyQuestion, HrAccess.SurveyQuestionEntityKey);
+        Assert.Equal(HrModule.Entities.SurveyResponse, HrAccess.SurveyResponseEntityKey);
+        Assert.Equal([.. Survey.Statuses.All], HrAccess.SurveyStatuses.Select(s => s.Key));
+        Assert.Equal([.. SurveyQuestion.Types.All], HrAccess.QuestionTypes.Select(s => s.Key));
+        Assert.Equal(HrModule.Permissions.BlogRead, HrAccess.BlogRead);
+        Assert.Equal(HrModule.Permissions.BlogManage, HrAccess.BlogManage);
+        Assert.Equal(HrModule.Permissions.GalleryRead, HrAccess.GalleryRead);
+        Assert.Equal(HrModule.Permissions.GalleryManage, HrAccess.GalleryManage);
+        Assert.Equal(HrModule.Entities.BlogPost, HrAccess.BlogPostEntityKey);
+        Assert.Equal(HrModule.Entities.PhotoAlbum, HrAccess.PhotoAlbumEntityKey);
+        Assert.Equal(HrLookupDefinitions.ChecklistEmployee, HrAccess.ChecklistEmployeeLookup);
+        Assert.Equal(HrLookupDefinitions.ChecklistTemplate, HrAccess.ChecklistTemplateLookup);
+        Assert.Equal(Checklists.Kinds.All, HrAccess.ChecklistKinds.Select(s => s.Key));
+        Assert.Equal(Checklists.Responsibles.All, HrAccess.ChecklistResponsibles.Select(s => s.Key));
+        Assert.Equal(Checklists.TaskTypes.All, HrAccess.ChecklistTaskTypes.Select(s => s.Key));
+        Assert.Equal(EmployeeChecklist.Statuses.All, HrAccess.ChecklistStatuses.Select(s => s.Key));
+        Assert.Equal(ChecklistTask.Statuses.All, HrAccess.TaskStatuses.Select(s => s.Key));
     }
 }

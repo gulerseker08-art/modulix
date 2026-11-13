@@ -94,4 +94,39 @@ public static class HrLabels
         "lost" => "stage-lost",
         _ => "status-inactive",
     };
+
+    public static string ChecklistKind(string? key) => HrAccess.ChecklistKinds.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    public static string ChecklistStatus(string? key) => HrAccess.ChecklistStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    public static string ChecklistStatusBadge(string? key) => key switch
+    {
+        "open" => "stage-qualified",
+        "completed" => "status-customer",
+        _ => "status-inactive",
+    };
+
+    public static string TaskStatus(string? key) => HrAccess.TaskStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    public static string TaskStatusBadge(string? key) => key switch
+    {
+        "open" => "stage-negotiation",
+        "done" => "status-customer",
+        _ => "status-inactive",
+    };
+
+    public static string Responsible(string? key) => HrAccess.ChecklistResponsibles.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    public static string TaskType(string? key) => HrAccess.ChecklistTaskTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    public static string SurveyStatus(string? key) => HrAccess.SurveyStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    public static string SurveyStatusBadge(string? key) => key switch
+    {
+        "open" => "stage-qualified",
+        "draft" => "stage-negotiation",
+        _ => "status-inactive",
+    };
+
+    public static string QuestionType(string? key) => HrAccess.QuestionTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 }

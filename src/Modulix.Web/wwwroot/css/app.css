@@ -6880,3 +6880,11 @@ button.hero-stat {
         flex-basis: 28%;
     }
 }
+
+/* Güzergâh haritasında ülkenin yaklaşık merkezine düşen nokta (şehir katalogda yok): içi boş halka */
+.map-dot.is-approx {
+    fill: none;
+    stroke: var(--mx-map-dot);
+    stroke-width: 1.5;
+    stroke-dasharray: 2 2;
+}

@@ -1,0 +1,139 @@
+@* Anket yanıt formu (ADR-0042 dilim 7). Sorular sunucudan gelir (yalnızca yanıt verilebilecek anketlerin soruları görünür); puan 1–5, tek seçim ya da
+   serbest metin. Zorunlu sorular, seçeneklerin geçerliliği ve tekrar yanıt sunucuda denetlenir; hatalı soru kendi altında gösterilir. Kimliği gizli
+   ankette okura sonuçlarda kimliğinin gösterilmeyeceği söylenir. *@
+@inject ApiClient Api
+
+<form class="record-form sectioned" novalidate @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+    <div class="form-toolbar">
+        <div>
+            <h2>@WarehouseLabels.Text(Survey, "title")</h2>
+            @if (WarehouseLabels.Flag(Survey, "isAnonymous"))
+            {
+                <p>Kimliği gizli anket: sonuçlarda kimin ne yanıtladığı gösterilmez.</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || questions is not { Count: > 0 })" aria-busy="@(busy ? "true" : null)">Gönder</button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <FormTabs Title="Sorular" Label="Anket yanıt formu bölümleri">
+        @if (WarehouseLabels.Text(Survey, "description") is { Length: > 0 } description)
+        {
+            <p class="preline">@description</p>
+        }
+
+        @if (questions is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+        else
+        {
+            <ol class="list-unstyled">
+                @foreach (var question in questions)
+                {
+                    var id = question.Id;
+                    var type = WarehouseLabels.Text(question, "questionType");
+                    var required = WarehouseLabels.Flag(question, "isRequired");
+                    <li class="mb-4">
+                        <fieldset>
+                            <legend class="@(required ? "form-label required" : "form-label")">@WarehouseLabels.Text(question, "text")</legend>
+                            @switch (type)
+                            {
+                                case "rating":
+                                    @for (var r = 1; r <= 5; r++)
+                                    {
+                                        var value = r;
+                                        <div class="form-check form-check-inline">
+                                            <input id="@($"q-{id}-{value}")" class="form-check-input" type="radio" name="@($"q-{id}")" checked="@(answers[id].Rating == value)"
+                                                   @onchange="() => answers[id].Rating = value" />
+                                            <label class="form-check-label" for="@($"q-{id}-{value}")">@value</label>
+                                        </div>
+                                    }
+                                    <small class="text-muted d-block">1: hiç katılmıyorum / çok kötü · 5: tamamen katılıyorum / çok iyi</small>
+                                    break;
+                                case "choice":
+                                    var index = 0;
+                                    @foreach (var option in (WarehouseLabels.Text(question, "options") ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                                    {
+                                        var key = $"q-{id}-o{index++}";
+                                        <div class="form-check">
+                                            <input id="@key" class="form-check-input" type="radio" name="@($"q-{id}")" checked="@(answers[id].Choice == option)"
+                                                   @onchange="() => answers[id].Choice = option" />
+                                            <label class="form-check-label" for="@key">@option</label>
+                                        </div>
+                                    }
+                                    break;
+                                default:
+                                    <label class="visually-hidden" for="@($"q-{id}-text")">Cevabınız</label>
+                                    <textarea id="@($"q-{id}-text")" class="form-control" rows="3" maxlength="2000" @bind="answers[id].Text"></textarea>
+                                    break;
+                            }
+                            <FieldError Field="@($"answers.{id}")" Errors="errors" />
+                        </fieldset>
+                    </li>
+                }
+            </ol>
+        }
+    </FormTabs>
+</form>
+
+@code {
+    private List<RecordResponse>? questions;
+    private readonly Dictionary<Guid, Answer> answers = [];
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    [Parameter, EditorRequired] public RecordResponse Survey { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Submitted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<RecordPageResponse>($"/api/records/{HrAccess.SurveyQuestionEntityKey}?surveyId={Survey.Id}&pageSize=200");
+        questions = result.Value?.Items.ToList() ?? [];
+        message = result.Error;
+        foreach (var question in questions)
+        {
+            answers[question.Id] = new Answer();
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var request = new SubmitSurveyRequest([.. answers
+            .Where(a => a.Value.Rating is not null || !string.IsNullOrWhiteSpace(a.Value.Choice) || !string.IsNullOrWhiteSpace(a.Value.Text))
+            .Select(a => new SurveyAnswerItem(a.Key, a.Value.Rating, a.Value.Choice, string.IsNullOrWhiteSpace(a.Value.Text) ? null : a.Value.Text.Trim()))]);
+        var result = await Api.PostAsync<RecordResponse>($"/api/hr/surveys/{Survey.Id}/responses", request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            await Submitted.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class Answer
+    {
+        public int? Rating { get; set; }
+
+        public string? Choice { get; set; }
+
+        public string? Text { get; set; }
+    }
+}

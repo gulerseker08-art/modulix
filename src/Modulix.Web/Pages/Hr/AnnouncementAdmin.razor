@@ -1,0 +1,184 @@
+@page "/ik/duyuru-yonetimi"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Duyuru yönetimi · Modulix</PageTitle>
+
+@* Duyuru yönetimi (ADR-0042 dilim 6): taslak, yayında ve süresi geçmiş bütün duyurular; yazma, yayınlama, sabitleme, hedef departman ve kimin
+   okuduğu. Okurlar duyuruları "Duyurular" akışında görür. *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.AnnouncementsManage">
+    <PageHeader Title="Duyuru yönetimi" Icon="bell" Subtitle="@(page is null ? "Duyuru yazın, yayınlayın ve okunma durumunu izleyin." : $"{page.TotalCount} duyuru")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <AnnouncementEditor @key="selected?.Id" Announcement="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="() => editing = false" />
+        @if (selected is not null)
+        {
+            <section aria-label="Okuyanlar">
+                <div class="list-toolbar mt-3"><h3 class="h6 mb-0 me-auto">Okuyanlar</h3></div>
+                @if (reads is null || reads.Count == 0)
+                {
+                    <p class="text-muted" role="status">Henüz kimse okumadı.</p>
+                }
+                else
+                {
+                    <ul class="profile-cards list-unstyled">
+                        @foreach (var read in reads)
+                        {
+                            <li class="profile-card">
+                                <strong>@Lookups.MemberName(WarehouseLabels.Id(read, "userId"))</strong>
+                                <span>@(DateTimeOffset.TryParse(WarehouseLabels.Text(read, "readAt"), out var at) ? at.LocalDateTime.ToString("dd.MM.yyyy HH:mm") : "")</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+        }
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Duyuru görünümleri" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Duyuru ara" placeholder="Başlık ya da metinde ara" @bind="search" />
+        </form>
+        @if (!editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => OpenAsync(null)"><AppIcon Name="plus" Size="16" /> Yeni duyuru</button>
+        }
+    </div>
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan duyuru yok.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Duyurular</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><AppIcon Name="bell" Size="14" /> Başlık</th>
+                    <th scope="col"><AppIcon Name="users" Size="14" /> Hedef</th>
+                    <th scope="col"><AppIcon Name="calendar" Size="14" /> Yayın aralığı</th>
+                    <th scope="col"><AppIcon Name="eye" Size="14" /> Okuyan</th>
+                    <th scope="col"><AppIcon Name="tag" Size="14" /> Durum</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var announcement in page.Items)
+                {
+                    <tr>
+                        <td data-label="Başlık" class="primary">@WarehouseLabels.Text(announcement, "title")
+                            @if (WarehouseLabels.Flag(announcement, "isPinned"))
+                            {
+                                <span class="badge stage-qualified">Sabitlenmiş</span>
+                            }
+                        </td>
+                        <td data-label="Hedef">@(WarehouseLabels.Text(announcement, "audienceDepartmentKey") is { Length: > 0 } dep ? Lookups.Label(HrAccess.DepartmentList, dep) : "Herkes")</td>
+                        <td data-label="Yayın aralığı">@HrLabels.Date(WarehouseLabels.Text(announcement, "publishOn")) – @(WarehouseLabels.Text(announcement, "expiresOn") is { Length: > 0 } e ? HrLabels.Date(e) : "süresiz")</td>
+                        <td data-label="Okuyan">@WarehouseLabels.Number(announcement, "readCount")</td>
+                        <td data-label="Durum"><span class="badge @(WarehouseLabels.Flag(announcement, "isPublished") ? "status-customer" : "status-inactive")">@(WarehouseLabels.Flag(announcement, "isPublished") ? "Yayında" : "Taslak")</span></td>
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(announcement, "title")} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenAsync(announcement)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteAsync(announcement)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + HrAccess.AnnouncementEntityKey;
+
+    private RecordPageResponse? page;
+    private List<RecordResponse>? reads;
+    private RecordResponse? selected;
+    private bool editing;
+    private string? message;
+    private string? search;
+    private string view = "active=true";
+
+    private static IReadOnlyList<ViewOption> ViewOptions { get; } =
+    [
+        new("active=true", "Yayında", Icon: "bell"),
+        new("isPublished=false", "Taslak", Icon: "pencil"),
+        new("expired=true", "Süresi geçen", Icon: "history"),
+        new("all", "Tüm duyurular", Icon: "list"),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.AnnouncementsManage))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (view != "all")
+        {
+            url += "&" + view;
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private async Task OpenAsync(RecordResponse? announcement)
+    {
+        selected = announcement;
+        editing = true;
+        reads = null;
+        if (announcement is not null)
+        {
+            var result = await Api.GetAsync<RecordPageResponse>($"/api/records/{HrAccess.AnnouncementReadEntityKey}?announcementId={announcement.Id}&pageSize=200");
+            reads = result.Value?.Items.ToList() ?? [];
+        }
+    }
+
+    private async Task SavedAsync(RecordResponse saved)
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private async Task DeleteAsync(RecordResponse announcement)
+    {
+        var result = await Api.DeleteAsync($"{Url}/{announcement.Id}?version={announcement.Version}");
+        message = result.IsSuccess ? null : result.Error;
+        if (result.IsSuccess && selected?.Id == announcement.Id)
+        {
+            editing = false;
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

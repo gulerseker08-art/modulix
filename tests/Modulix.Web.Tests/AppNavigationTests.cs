@@ -422,6 +422,26 @@ public class AppNavigationTests
         Assert.Equal(["Zimmetlerim"], Nav([HrAccess.ModuleKey], [HrAccess.AssetsRead]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
         Assert.Equal(["Zimmetlerim", "Demirbaşlar"], Nav([HrAccess.ModuleKey], [HrAccess.AssetsRead, HrAccess.AssetsManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
 
+        // İşe giriş/çıkış: okuma "Görevlerim"i, yönetim süreç ve şablon ekranlarını açar.
+        Assert.Equal(["Görevlerim"], Nav([HrAccess.ModuleKey], [HrAccess.ChecklistsRead]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["Görevlerim", "İşe giriş ve çıkış", "Süreç şablonları"],
+            Nav([HrAccess.ModuleKey], [HrAccess.ChecklistsRead, HrAccess.ChecklistsManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
+        // Duyurular: okuma akışı en üstte; yönetim ayrı ekran.
+        Assert.Equal(["Duyurular"], Nav([HrAccess.ModuleKey], [HrAccess.AnnouncementsRead]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["Duyurular", "Duyuru yönetimi"],
+            Nav([HrAccess.ModuleKey], [HrAccess.AnnouncementsRead, HrAccess.AnnouncementsManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
+        // Anketler: yanıtlama ekranı duyuruların ardından; yönetim ayrı ekran.
+        Assert.Equal(["Duyurular", "Anketler"], Nav([HrAccess.ModuleKey], [HrAccess.AnnouncementsRead, HrAccess.SurveysRespond]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["Anketler", "Anket yönetimi"],
+            Nav([HrAccess.ModuleKey], [HrAccess.SurveysRespond, HrAccess.SurveysManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
+        // Blog ve galeri: okuma ekranları iletişim ekranlarının ardından; yönetim ekranları en sonda.
+        Assert.Equal(["Blog", "Galeri"], Nav([HrAccess.ModuleKey], [HrAccess.BlogRead, HrAccess.GalleryRead]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["Blog", "Galeri", "Blog yönetimi", "Galeri yönetimi"],
+            Nav([HrAccess.ModuleKey], [HrAccess.BlogRead, HrAccess.GalleryRead, HrAccess.BlogManage, HrAccess.GalleryManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
         Assert.Empty(Nav([], [HrAccess.EmployeesRead]).Roots());
         Assert.Empty(Nav([HrAccess.ModuleKey], []).Roots());
     }

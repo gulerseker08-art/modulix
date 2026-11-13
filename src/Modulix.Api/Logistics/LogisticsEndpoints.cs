@@ -123,4 +123,11 @@ internal sealed class LogisticsPolicyProvider(IServiceProvider services) : ILogi
             .GetValueAsync(LogisticsModule.SettingKeys.CredentialCheck, cancellationToken);
         return value == LogisticsModule.CredentialCheckModes.Block ? LogisticsModule.CredentialCheckModes.Block : LogisticsModule.CredentialCheckModes.Warn;
     }
+
+    public async Task<string?> DefaultCountryAsync(CancellationToken cancellationToken)
+    {
+        var value = await services.GetRequiredService<Modulix.Core.Settings.ITenantSettings>()
+            .GetValueAsync(LogisticsModule.SettingKeys.DefaultCountry, cancellationToken);
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+    }
 }

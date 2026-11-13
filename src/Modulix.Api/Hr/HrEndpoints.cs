@@ -9,7 +9,7 @@ using Modulix.Shared.Records;
 namespace Modulix.Api.Hr;
 
 /// <summary>
-/// İK iş akışı uçları (ADR-0042): izin talebi (dilim 2), masraf beyanı (dilim 3) ve zimmet (dilim 4, tutanak PDF'i dahil). Talepler, haklar ve tatiller genel kayıt uçlarındadır (<c>/api/records/hr.leave-request</c>,
+/// İK iş akışı uçları (ADR-0042): izin talebi (dilim 2), masraf beyanı (dilim 3) ve zimmet (dilim 4, tutanak PDF'i dahil) işe giriş/çıkış (dilim 5), duyuru okundu işareti (dilim 6) ve anketler (dilim 7: durum, yanıt, sonuç). Talepler, haklar ve tatiller genel kayıt uçlarındadır (<c>/api/records/hr.leave-request</c>,
 /// <c>hr.leave-balance</c>, <c>hr.holiday</c>); talebin durumu yalnızca buradaki komutlarla değişir. Yetki ve onaylayan kuralı serviste denetlenir;
 /// tenant oturumdan gelir. Önizleme yazmaz (yolu <c>/preview</c> ile biter); salt okunur lisans evresinde eylem POST'u 403'tür.
 /// </summary>
@@ -109,6 +109,61 @@ public static class HrEndpoints
             return Results.File(AssetAssignmentPdf.Render(model), "application/pdf", $"zimmet-{model.AssetTag}.pdf");
         });
 
+        // İşe giriş/çıkış (dilim 5): süreç başlatma (şablondan görevler tek işlemde), görev ve süreç eylemleri.
+        group.MapPost("/employee-checklists/start", async (StartChecklistRequest request, IChecklistWorkflow workflow, CancellationToken ct) =>
+        {
+            var result = await workflow.StartAsync(request.EmployeeId, request.TemplateId, request.StartDate, ct);
+            return result.IsSuccess
+                ? Results.Ok(new RecordResponse(result.Value!.EntityKey, result.Value.Id, result.Value.Version, result.Value.Values))
+                : RecordEndpoints.ToProblem(result.Error!);
+        });
+
+        group.MapGet("/employee-checklists/{id:guid}/actions", async (Guid id, IChecklistWorkflow workflow, CancellationToken ct) =>
+            Actions(await workflow.ChecklistActionsAsync(id, ct)));
+
+        group.MapPost("/employee-checklists/{id:guid}/actions", async (Guid id, RunHrActionRequest request, IChecklistWorkflow workflow, CancellationToken ct) =>
+            Record(await workflow.RunChecklistAsync(id, request.Action ?? string.Empty, request.Version, request.Reason, ct)));
+
+        group.MapGet("/checklist-tasks/{id:guid}/actions", async (Guid id, IChecklistWorkflow workflow, CancellationToken ct) =>
+            Actions(await workflow.TaskActionsAsync(id, ct)));
+
+        group.MapPost("/checklist-tasks/{id:guid}/actions", async (Guid id, RunHrActionRequest request, IChecklistWorkflow workflow, CancellationToken ct) =>
+            Record(await workflow.RunTaskAsync(id, request.Action ?? string.Empty, request.Version, request.Reason, ct)));
+
+        // Duyurular (dilim 6): okundu işareti. Duyuruyu göremeyen için 404; daha önce okunduysa yeniden yazılmaz.
+        group.MapPost("/announcements/{id:guid}/read", async (Guid id, IAnnouncementService announcements, CancellationToken ct) =>
+            Record(await announcements.MarkReadAsync(id, ct)));
+
+        // Anketler (dilim 7): yanıta aç / kapat, yanıt gönderme (katılım ve cevaplar tek işlemde) ve özet sonuç.
+        group.MapGet("/surveys/{id:guid}/actions", async (Guid id, ISurveyService surveys, CancellationToken ct) =>
+            Actions(await surveys.ActionsAsync(id, ct)));
+
+        group.MapPost("/surveys/{id:guid}/actions", async (Guid id, RunHrActionRequest request, ISurveyService surveys, CancellationToken ct) =>
+            Record(await surveys.RunAsync(id, request.Action ?? string.Empty, request.Version, ct)));
+
+        group.MapPost("/surveys/{id:guid}/responses", async (Guid id, SubmitSurveyRequest request, ISurveyService surveys, CancellationToken ct) =>
+            Record(await surveys.SubmitAsync(id, [.. (request.Answers ?? []).Select(a => new SurveyAnswerInput(a.QuestionId, a.Rating, a.Choice, a.Text))], ct)));
+
+        group.MapGet("/surveys/{id:guid}/results", async (Guid id, ISurveyService surveys, CancellationToken ct) =>
+        {
+            var result = await surveys.ResultsAsync(id, ct);
+            return result.IsSuccess
+                ? Results.Ok(new SurveyResultsDto(result.Value!.SurveyId, result.Value.ResponseCount, result.Value.HiddenReason,
+                    [.. result.Value.Questions.Select(q => new SurveyQuestionResultDto(q.QuestionId, q.Text, q.QuestionType, q.AnswerCount, q.Average,
+                        [.. q.Counts.Select(c => new SurveyOptionCountDto(c.Option, c.Count))], q.Texts))]))
+                : RecordEndpoints.ToProblem(result.Error!);
+        });
+
         return app;
     }
+
+    private static IResult Actions(RecordResult<IReadOnlyList<LeaveActionState>> result) =>
+        result.IsSuccess
+            ? Results.Ok(result.Value!.Select(a => new HrActionDto(a.Action, a.Label, a.Allowed, a.Message, a.RequiresReason, a.Destructive)).ToList())
+            : RecordEndpoints.ToProblem(result.Error!);
+
+    private static IResult Record(RecordResult<RecordData> result) =>
+        result.IsSuccess
+            ? Results.Ok(new RecordResponse(result.Value!.EntityKey, result.Value.Id, result.Value.Version, result.Value.Values))
+            : RecordEndpoints.ToProblem(result.Error!);
 }

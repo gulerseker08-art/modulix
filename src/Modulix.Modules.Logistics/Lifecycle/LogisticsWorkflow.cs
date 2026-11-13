@@ -32,6 +32,7 @@ public static class LogisticsActions
 {
     public const string Approve = "approve";
     public const string Reject = "reject";
+    public const string Resubmit = "resubmit";
     public const string Cancel = "cancel";
     public const string Confirm = "confirm";
     public const string Reopen = "reopen";
@@ -80,6 +81,8 @@ public static class LogisticsTransitions
             [TripExpense.Statuses.Pending], TripExpense.Statuses.Approved, false, "Yalnızca beklemedeki masraf onaylanabilir."),
         new(LogisticsModule.Entities.TripExpense, LogisticsActions.Reject, "Reddet", LogisticsModule.Permissions.ExpensesApprove,
             [TripExpense.Statuses.Pending], TripExpense.Statuses.Rejected, true, "Yalnızca beklemedeki masraf reddedilebilir.", Destructive: true),
+        new(LogisticsModule.Entities.TripExpense, LogisticsActions.Resubmit, "Yeniden onaya gönder", LogisticsModule.Permissions.ExpensesWrite,
+            [TripExpense.Statuses.Rejected], TripExpense.Statuses.Pending, false, "Yalnızca reddedilen masraf yeniden onaya gönderilir."),
     ];
 
     public static Transition? Find(string entityKey, string action) =>
@@ -93,7 +96,7 @@ internal sealed class LogisticsWorkflow(
     /// <summary>Talepten sevkiyata kopyalanan alanlar (yük, güzergâh, taraflar).</summary>
     private static readonly string[] CargoKeys =
     [
-        "customerPartyId", "senderPartyId", "receiverPartyId", "transportModeKey", "pickupCity", "pickupAddress", "deliveryCity", "deliveryAddress",
+        "customerPartyId", "senderPartyId", "receiverPartyId", "transportModeKey", "pickupCity", "pickupCountry", "pickupAddress", "deliveryCity", "deliveryCountry", "deliveryAddress",
         "pickupDate", "deliveryBy", "cargoDescription", "weightKg", "volumeM3", "palletCount", "loadingMeters", "hazardous", "notes",
     ];
 

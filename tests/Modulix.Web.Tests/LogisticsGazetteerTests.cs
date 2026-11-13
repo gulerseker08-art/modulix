@@ -29,6 +29,33 @@ public class LogisticsGazetteerTests
     [InlineData("Bilinmeyen Köy")]
     public void Unknown_or_blank_text_is_not_found(string? text) => Assert.Null(LogisticsGazetteer.Find(text));
 
+    [Theory]
+    [InlineData("Hamburg", "DE", "Hamburg", "DE")]
+    [InlineData("Hamburg", "TR", "Hamburg", "DE")] // eski kayıtlar ülkesiz açıldı ve TR ile gelir; katalogdaki ad tekil olduğundan yurt dışı şehir doğru yere düşer
+    [InlineData("Ankara", "TR", "Ankara", "TR")]
+    public void Catalog_places_resolve_with_or_without_a_matching_country(string city, string country, string name, string expectedCountry)
+    {
+        var place = LogisticsGazetteer.Find(city, country);
+        Assert.NotNull(place);
+        Assert.Equal((name, expectedCountry, false), (place.Name, place.Country, place.Approximate));
+    }
+
+    [Fact]
+    public void Unknown_city_falls_back_to_the_countrys_approximate_center_and_unknown_country_stays_unmapped()
+    {
+        var germany = LogisticsGazetteer.Find("Kleinstadt", "de");
+        Assert.NotNull(germany);
+        Assert.True(germany.Approximate);
+        Assert.Equal(("Kleinstadt", "DE"), (germany.Name, germany.Country));
+        Assert.InRange(germany.Lon, 5, 16);
+        Assert.InRange(germany.Lat, 47, 55);
+
+        Assert.Null(LogisticsGazetteer.Find("Kleinstadt", null));
+        Assert.Null(LogisticsGazetteer.Find("Kleinstadt", "ZZ"));
+        Assert.Null(LogisticsGazetteer.Find("Kleinstadt", "T"));
+        Assert.Null(LogisticsGazetteer.Find("  ", "DE"));
+    }
+
     [Fact]
     public void Every_place_has_valid_coordinates_and_all_81_provinces_are_present()
     {

@@ -128,6 +128,58 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
     }
 
     [Fact]
+    public async Task A_rejected_expense_is_corrected_with_a_document_number_and_resubmitted_then_approved_and_locked()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var manager = await LoginAsync(s.Manager);
+        using var reader = await LoginAsync(s.Reader);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+
+        // Belge no kırpılır ve boş bırakılabilir; çok uzunu reddedilir.
+        var toll = Toll(trip.Id);
+        toll["documentNo"] = "  FŞ-2026-001 ";
+        var expense = await PostAsync(operations, Expenses, toll);
+        Assert.Equal("FŞ-2026-001", expense.Values["documentNo"]!.GetValue<string>());
+        var tooLong = Toll(trip.Id);
+        tooLong["documentNo"] = new string('9', 51);
+        Assert.Contains("documentNo", (await ValidationProblemAsync(await operations.PostAsJsonAsync(Expenses, new RecordWriteRequest(tooLong)))).Errors.Keys);
+
+        // Beklemedeki masraf yeniden gönderilemez; reddedilince giren düzeltir.
+        Assert.Equal(HttpStatusCode.Conflict, (await operations.PostAsJsonAsync($"/api/logistics/expenses/{expense.Id}/actions",
+            new RunLogisticsActionRequest("resubmit", expense.Version, null))).StatusCode);
+        var rejected = await ActAsync(manager, expense, "reject", "Tutar fişle uyuşmuyor");
+        Assert.Equal("Tutar fişle uyuşmuyor", rejected.Values["statusReason"]!.GetValue<string>());
+
+        // Yalnızca okuma izni olan yeniden gönderemez ve düzeltemez; giren eylem listesinde "resubmit" görür, onay/ret görmez.
+        Assert.Equal(HttpStatusCode.Forbidden, (await reader.PostAsJsonAsync($"/api/logistics/expenses/{rejected.Id}/actions",
+            new RunLogisticsActionRequest("resubmit", rejected.Version, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await reader.PutAsJsonAsync($"{Expenses}/{rejected.Id}",
+            new RecordWriteRequest(new JsonObject { ["amount"] = 1 }, rejected.Version))).StatusCode);
+        var opsActions = (await operations.GetFromJsonAsync<List<LogisticsActionDto>>($"/api/logistics/expenses/{rejected.Id}/actions"))!;
+        Assert.Contains(opsActions, a => a.Action == "resubmit" && a.Allowed && !a.RequiresReason);
+        Assert.DoesNotContain(opsActions, a => a.Action is "approve" or "reject");
+
+        var corrected = await PutAsync(operations, $"{Expenses}/{rejected.Id}", rejected.Version, new JsonObject { ["amount"] = 1100, ["documentNo"] = "FŞ-2026-002" });
+        Assert.Equal("rejected", corrected.Values["status"]!.GetValue<string>()); // düzeltme durumu değiştirmez
+        Assert.Equal("FŞ-2026-002", corrected.Values["documentNo"]!.GetValue<string>());
+
+        var resubmitted = await ActAsync(operations, corrected, "resubmit");
+        Assert.Equal("pending", resubmitted.Values["status"]!.GetValue<string>());
+        Assert.Null(resubmitted.Values["statusReason"]);
+
+        var approved = await ActAsync(manager, resubmitted, "approve");
+        Assert.Equal("approved", approved.Values["status"]!.GetValue<string>());
+
+        // Onaylanmış masraf değişmez ve yeniden gönderilemez.
+        Assert.Equal(HttpStatusCode.Conflict, (await operations.PutAsJsonAsync($"{Expenses}/{approved.Id}",
+            new RecordWriteRequest(new JsonObject { ["amount"] = 1 }, approved.Version))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await operations.PostAsJsonAsync($"/api/logistics/expenses/{approved.Id}/actions",
+            new RunLogisticsActionRequest("resubmit", approved.Version, null))).StatusCode);
+        Assert.Equal(1100m, (await GetAsync(operations, $"{Expenses}/{approved.Id}")).Values["amount"]!.GetValue<decimal>());
+    }
+
+    [Fact]
     public async Task Another_tenants_expenses_cannot_be_seen_decided_or_attached_to_foreign_trips()
     {
         var a = await SetUpAsync();
@@ -145,11 +197,19 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
         Assert.Equal(HttpStatusCode.NotFound, (await managerB.PostAsJsonAsync($"/api/logistics/expenses/{expenseA.Id}/actions",
             new RunLogisticsActionRequest("approve", expenseA.Version, null))).StatusCode);
 
+        // Reddedilmiş masrafı başka tenant yeniden gönderemez ve düzeltemez.
+        using var managerA = await LoginAsync(a.Manager);
+        var rejectedA = await ActAsync(managerA, expenseA, "reject", "Fiş eksik");
+        Assert.Equal(HttpStatusCode.NotFound, (await opsB.PostAsJsonAsync($"/api/logistics/expenses/{rejectedA.Id}/actions",
+            new RunLogisticsActionRequest("resubmit", rejectedA.Version, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await opsB.PutAsJsonAsync($"{Expenses}/{rejectedA.Id}",
+            new RecordWriteRequest(new JsonObject { ["amount"] = 1 }, rejectedA.Version))).StatusCode);
+
         // Başka tenant'ın seferine masraf açılamaz (sefer "bulunamadı").
         var foreign = await ValidationProblemAsync(await opsB.PostAsJsonAsync(Expenses, new RecordWriteRequest(Toll(tripA.Id))));
         Assert.Contains("tripId", foreign.Errors.Keys);
 
-        Assert.Equal("pending", (await GetAsync(opsA, $"{Expenses}/{expenseA.Id}")).Values["status"]!.GetValue<string>());
+        Assert.Equal("rejected", (await GetAsync(opsA, $"{Expenses}/{expenseA.Id}")).Values["status"]!.GetValue<string>());
     }
 
     [Fact]

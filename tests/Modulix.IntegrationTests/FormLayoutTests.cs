@@ -104,7 +104,7 @@ public class FormLayoutTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         Assert.Equal(HttpStatusCode.UnprocessableEntity, missing.StatusCode);
         Assert.Contains("industry", await missing.Content.ReadAsStringAsync());
 
-        var created = await rep.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Sektörlü A.Ş.", Industry: "Lojistik"));
+        var created = await rep.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Sektörlü A.Ş.", Industry: "Lojistik ve taşımacılık"));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var company = (await created.Content.ReadFromJsonAsync<CompanyDto>())!;
 
@@ -112,7 +112,7 @@ public class FormLayoutTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         var cleared = await rep.PutAsJsonAsync($"/api/crm/companies/{company.Id}", new SaveCompanyRequest(company.Name, Version: company.Version, Industry: null, OwnerId: a.Rep.Id));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, cleared.StatusCode);
         Assert.Contains("industry", await cleared.Content.ReadAsStringAsync());
-        var kept = await rep.PutAsJsonAsync($"/api/crm/companies/{company.Id}", new SaveCompanyRequest(company.Name, Version: company.Version, Industry: "Taşımacılık", OwnerId: a.Rep.Id));
+        var kept = await rep.PutAsJsonAsync($"/api/crm/companies/{company.Id}", new SaveCompanyRequest(company.Name, Version: company.Version, Industry: "Gıda ve içecek", OwnerId: a.Rep.Id));
         Assert.True(kept.StatusCode == HttpStatusCode.OK, await kept.Content.ReadAsStringAsync());
 
         // Başka firmanın düzeni etkilenmez: sektör orada zorunlu değildir.

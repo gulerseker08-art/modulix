@@ -64,7 +64,10 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         Field.Money<Lead>("estimatedBudget", l => l.EstimatedBudget, (l, v) => l.EstimatedBudget = v),
         Field.Currency<Lead>("currency", l => l.Currency, (l, v) => l.Currency = v),
         Field.Date<Lead>("targetPurchaseDate", l => l.TargetPurchaseDate, (l, v) => l.TargetPurchaseDate = v),
-        Field.Text<Lead>("industry", Company.IndustryMaxLength, l => l.Industry, (l, v) => l.Industry = v),
+        // Sektör (ADR-0043) sektör kataloğundan bir koddur; yazarken kod ya da etkin sektör adı verilebilir. "legacyIndustry" katalog öncesi metindir.
+        Field.Text<Lead>("industry", Company.IndustryMaxLength, l => l.IndustryCode, (l, v) => l.IndustryCode = v),
+        Field.ReadOnly<Lead>("industryName", l => l.IndustryEntry?.Name),
+        Field.ReadOnly<Lead>("legacyIndustry", l => l.Industry),
         Field.ListChoice<Lead>("source", CrmModule.Lists.LeadSource, l => l.Source, (l, v) => l.Source = v, required: false),
         Field.Text<Lead>("sourceDetail", Lead.ShortMaxLength, l => l.SourceDetail, (l, v) => l.SourceDetail = v),
         Field.Text<Lead>("referrer", Lead.UrlMaxLength, l => l.Referrer, (l, v) => l.Referrer = v),
@@ -98,6 +101,8 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         ["ownerNot"] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(l => l.OwnerId == null || l.OwnerId != owner) : null,
         ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.CompanyId == id) : null,
         ["contactId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.ContactId == id) : null,
+        // Sektör (ADR-0043): sektör kataloğu kodu, tam eşleşme.
+        ["industry"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(l => l.IndustryCode == code) : null,
         ["convertedCompanyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.ConvertedCompanyId == id) : null,
         ["convertedContactId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.ConvertedContactId == id) : null,
         ["convertedOpportunityId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.ConvertedOpportunityId == id) : null,
@@ -171,12 +176,14 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         "-phone" => source.OrderBy(l => l.Phone == null).ThenByDescending(l => l.Phone).ThenByDescending(l => l.FirstReceivedAt),
         "city" => source.OrderBy(l => l.City == null).ThenBy(l => l.City).ThenByDescending(l => l.FirstReceivedAt),
         "-city" => source.OrderBy(l => l.City == null).ThenByDescending(l => l.City).ThenByDescending(l => l.FirstReceivedAt),
-        "industry" => source.OrderBy(l => l.Industry == null).ThenBy(l => l.Industry).ThenByDescending(l => l.FirstReceivedAt),
-        "-industry" => source.OrderBy(l => l.Industry == null).ThenByDescending(l => l.Industry).ThenByDescending(l => l.FirstReceivedAt),
+        "industry" => source.OrderBy(l => (l.IndustryEntry!.Name ?? l.Industry) == null).ThenBy(l => l.IndustryEntry!.Name ?? l.Industry).ThenByDescending(l => l.FirstReceivedAt),
+        "-industry" => source.OrderBy(l => (l.IndustryEntry!.Name ?? l.Industry) == null).ThenByDescending(l => l.IndustryEntry!.Name ?? l.Industry).ThenByDescending(l => l.FirstReceivedAt),
         "productInterest" => source.OrderBy(l => l.ProductInterest == null).ThenBy(l => l.ProductInterest).ThenByDescending(l => l.FirstReceivedAt),
         "-productInterest" => source.OrderBy(l => l.ProductInterest == null).ThenByDescending(l => l.ProductInterest).ThenByDescending(l => l.FirstReceivedAt),
         _ => Order(source),
     };
+
+    protected override IQueryable<Lead> Load(IQueryable<Lead> source) => source.Include(l => l.IndustryEntry);
 
     protected override IQueryable<Lead> Search(IQueryable<Lead> source, string term) =>
         source.Where(l => l.Subject.Contains(term) || l.LeadNumber.Contains(term)
@@ -249,7 +256,33 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
             entity.AssignedAt = DateTimeOffset.UtcNow;
         }
 
+        await ResolveIndustryAsync(entity, values, cancellationToken);
         await EnsureReferencesVisibleAsync(entity, values, cancellationToken);
+    }
+
+    /// <summary>Sektör alanı kataloğa göre çözülür (<see cref="IndustryResolution"/>); sektör seçilince katalog öncesi serbest metin temizlenir.</summary>
+    private async Task ResolveIndustryAsync(Lead entity, JsonObject values, CancellationToken cancellationToken)
+    {
+        if (!values.TryGetPropertyValue("industry", out var node) || FieldNamed("industry").IsOmitted(node))
+        {
+            return;
+        }
+
+        if (entity.IndustryCode is not { } written)
+        {
+            entity.IndustryEntry = null;
+            return;
+        }
+
+        var stored = await Context.Data.Set<Lead>().AsNoTracking().Where(l => l.Id == entity.Id).Select(l => l.IndustryCode).SingleOrDefaultAsync(cancellationToken);
+        if (await IndustryResolution.ResolveAsync(Context, written, stored, cancellationToken) is not { } industry)
+        {
+            return;
+        }
+
+        entity.IndustryCode = industry.Code;
+        entity.IndustryEntry = industry;
+        entity.Industry = null;
     }
 
     /// <summary>Sorumluyla açılan Lead, açıldığı anda atanmış sayılır (varsayılan sorumlu atamasından sonra).</summary>

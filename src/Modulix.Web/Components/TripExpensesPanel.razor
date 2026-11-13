@@ -1,6 +1,6 @@
 @* Seferin masrafları (ADR-0038 K10, dilim 8). Masraf girilir (tür, açıklama, tarih, KDV dahil tutar, para birimi, KDV, tedarikçi); yakıt türünde litre ve
-   kilometre, trafik cezasında sürücüye rücu bilgisi istenir (kural türün kategorisine bakar). Beklemedeki masraf düzenlenir; onay ve ret yetkili
-   kişinin eylem çubuğundadır (LogisticsActionsBar, ret gerekçe ister). Karar verilmiş masraf değişmez ve silinmez; makbuz ve fiş masrafa dosya olarak
+   kilometre, trafik cezasında sürücüye rücu bilgisi istenir (kural türün kategorisine bakar). Beklemedeki ve reddedilen masraf düzenlenir; onay, ret ve
+   yeniden gönderme eylem çubuğundadır (LogisticsActionsBar, ret gerekçe ister). Onaylanmış masraf değişmez, masraf silinmez; makbuz ve fiş masrafa dosya olarak
    eklenir. Onaysız masraf toplamlara girmez: "Beklemede" ayrı gösterilir. Kurallar sunucudadır; sayfa içi küçük eylem formu olduğu için sekmesizdir. *@
 @inject ApiClient Api
 
@@ -56,6 +56,11 @@
                     <label class="form-label" for="expense-supplier">Tedarikçi</label>
                     <LookupPicker Id="expense-supplier" LookupKey="@LogisticsAccess.ExpenseSupplierLookup" @bind-Value="form.SupplierPartyId" Placeholder="İstasyon, işletme…" Invalid="@(errors?.ContainsKey("supplierPartyId") == true)" />
                     <FieldError Field="supplierPartyId" Errors="errors" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="expense-document">Belge no</label>
+                    <input id="expense-document" class="form-control" maxlength="50" placeholder="Fiş ya da fatura no" @bind="form.DocumentNo" />
+                    <FieldError Field="documentNo" Errors="errors" />
                 </div>
                 @if (IsFuel)
                 {
@@ -124,6 +129,10 @@
                         <td data-label="Tür" class="primary">@Lookups.Label(LogisticsAccess.ExpenseKindList, WarehouseLabels.Text(expense, "kindKey"))</td>
                         <td data-label="Açıklama">
                             @WarehouseLabels.Text(expense, "description")
+                            @if (WarehouseLabels.Text(expense, "documentNo") is { Length: > 0 } documentNo)
+                            {
+                                <small class="text-muted"> · Belge: @documentNo</small>
+                            }
                             @if (expense.Values["liters"]?.GetValue<decimal>() is { } liters)
                             {
                                 <small class="text-muted"> · @FleetLabels.Capacity(liters, "L")</small>
@@ -140,14 +149,14 @@
                         <td data-label="Tutar">@FleetLabels.Money(expense.Values["amount"]?.GetValue<decimal>(), WarehouseLabels.Text(expense, "currency"))</td>
                         <td data-label="Durum"><span class="badge @StatusBadge(status)">@StatusLabel(status)</span></td>
                         <td class="row-menu-cell actions">
-                            @if (status == "pending" && CanWrite)
+                            @if ((status is "pending" or "rejected") && CanWrite)
                             {
                                 <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => Edit(expense)">Düzenle</button>
                             }
                             <button type="button" class="btn btn-ghost btn-sm" aria-expanded="@(receipts == expense.Id ? "true" : "false")" @onclick="() => ToggleReceipts(expense.Id)">Makbuz</button>
                         </td>
                     </tr>
-                    @if (status == "pending")
+                    @if (status is "pending" or "rejected")
                     {
                         <tr>
                             <td colspan="6">
@@ -255,6 +264,7 @@
             ["currency"] = string.IsNullOrWhiteSpace(form.Currency) ? null : form.Currency.Trim(),
             ["vatAmount"] = form.VatAmount,
             ["supplierPartyId"] = form.SupplierPartyId?.ToString(),
+            ["documentNo"] = string.IsNullOrWhiteSpace(form.DocumentNo) ? null : form.DocumentNo.Trim(),
             ["liters"] = IsFuel ? form.Liters : null,
             ["odometerKm"] = IsFuel ? form.OdometerKm : null,
             ["chargeToDriver"] = IsFine && form.ChargeToDriver,
@@ -298,6 +308,7 @@
             Currency = WarehouseLabels.Text(expense, "currency"),
             VatAmount = expense.Values["vatAmount"]?.GetValue<decimal>(),
             SupplierPartyId = WarehouseLabels.Id(expense, "supplierPartyId"),
+            DocumentNo = WarehouseLabels.Text(expense, "documentNo"),
             Liters = expense.Values["liters"]?.GetValue<decimal>(),
             OdometerKm = expense.Values["odometerKm"]?.GetValue<int>(),
             ChargeToDriver = WarehouseLabels.Flag(expense, "chargeToDriver"),
@@ -344,6 +355,8 @@
         public decimal? VatAmount { get; set; }
 
         public Guid? SupplierPartyId { get; set; }
+
+        public string? DocumentNo { get; set; }
 
         public decimal? Liters { get; set; }
 

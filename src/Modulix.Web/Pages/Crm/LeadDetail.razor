@@ -103,7 +103,7 @@
                 }
                 <div><dt>@Texts.Get("crm.lead.budget")</dt><dd>@(lead.EstimatedBudget is { } budget ? CrmLabels.Amount(budget, lead.Currency) : Texts.Get("crm.lead.unknown"))</dd></div>
                 <div><dt>@Texts.Get("crm.lead.targetPurchase")</dt><dd>@(lead.TargetPurchaseDate is { } target ? CrmLabels.Date(target) : Texts.Get("crm.lead.unknown"))</dd></div>
-                <div><dt>@Texts.Get("crm.companies.col.industry")</dt><dd>@(lead.Industry ?? "—")</dd></div>
+                <div><dt>@Texts.Get("crm.companies.col.industry")</dt><dd>@(lead.IndustryName ?? lead.LegacyIndustry ?? "—")</dd></div>
                 @if (lead.NeedDescription is { } need)
                 {
                     <div class="span-all"><dt>@Texts.Get("crm.lead.need")</dt><dd class="notes">@need</dd></div>

@@ -54,6 +54,8 @@ public static class PlatformAccessRules
         ["POST /api/platform/sectors/starter-packages/{code}/retire"] = Ops, // pasife alır, silmez (Dilim G)
         ["POST /api/platform/sectors/relationship-roles"] = Ops, // firma ilişki rolü kataloğu (Dilim E)
         ["PUT /api/platform/sectors/relationship-roles/{code}/active"] = Ops,
+        ["POST /api/platform/sectors/industries"] = Ops, // sektör kataloğu (ADR-0043)
+        ["PUT /api/platform/sectors/industries/{code}/active"] = Ops,
         // GTİP kataloğu (ADR-0032 K9): ürün standardı katalog; Operasyon yönetir.
         ["POST /api/platform/gtip/versions"] = Ops,
         ["POST /api/platform/gtip/versions/preview"] = Ops,

@@ -2,14 +2,14 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Ürün kategorileri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.productCategories.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ProductsRead">
     <div class="page-header">
-        <h1>Ürün kategorileri</h1>
+        <h1>@Texts.Get("crm.productCategories.title")</h1>
         @if (Session.Can(CrmAccess.ProductsWrite) && form is null)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => form = new()">Yeni kategori</button>
+            <button type="button" class="btn btn-primary" @onclick="() => form = new()">@Texts.Get("crm.productCategories.new")</button>
         }
     </div>
 
@@ -21,16 +21,16 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>@(form.Id is null ? "Yeni kategori" : "Kategoriyi düzenle")</h2>
-            <FormTabs Title="Kategori bilgileri" Label="Ürün kategorisi formu bölümleri">
+            <h2>@(form.Id is null ? Texts.Get("crm.productCategories.new") : Texts.Get("crm.productCategories.edit"))</h2>
+            <FormTabs Title="@Texts.Get("crm.productCategories.info")" Label="@Texts.Get("crm.productCategories.formSections")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="name">Ad *</label>
+                    <label class="form-label" for="name">@Texts.Get("common.field.nameRequired")</label>
                     <input id="name" class="form-control" maxlength="100" @bind="form.Name" />
                     <FieldError Field="name" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="parent">Üst kategori</label>
+                    <label class="form-label" for="parent">@Texts.Get("crm.productCategories.parent")</label>
                     <select id="parent" class="form-select" @bind="form.ParentId">
                         <option value="">—</option>
                         @foreach (var item in all.Where(c => c.Id != form.Id))
@@ -41,20 +41,20 @@
                     <FieldError Field="parentId" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="active">Durum</label>
+                    <label class="form-label" for="active">@Texts.Get("common.field.status")</label>
                     <select id="active" class="form-select" @bind="form.IsActive">
-                        <option value="True">Aktif</option>
-                        <option value="False">Pasif</option>
+                        <option value="True">@Texts.Get("common.active")</option>
+                        <option value="False">@Texts.Get("common.inactive")</option>
                     </select>
                 </div>
             </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </form>
@@ -62,26 +62,26 @@
 
     @if (!loaded)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else if (all.Count == 0)
     {
-        <p class="text-muted">Kategori yok.</p>
+        <p class="text-muted">@Texts.Get("crm.productCategories.none")</p>
     }
     else
     {
         <table class="table record-table">
-            <thead><tr><th>Kategori</th><th>Durum</th><th></th></tr></thead>
+            <thead><tr><th>@Texts.Get("crm.products.field.category")</th><th>@Texts.Get("common.field.status")</th><th></th></tr></thead>
             <tbody>
                 @foreach (var category in all.OrderBy(PathOf, StringComparer.CurrentCulture))
                 {
                     <tr>
-                        <td data-label="Kategori" class="primary">@PathOf(category)</td>
-                        <td data-label="Durum"><span class="badge status-@(category.IsActive ? "success" : "muted")">@(category.IsActive ? "Aktif" : "Pasif")</span></td>
+                        <td data-label="@Texts.Get("crm.products.field.category")" class="primary">@PathOf(category)</td>
+                        <td data-label="@Texts.Get("common.field.status")"><span class="badge status-@(category.IsActive ? "success" : "muted")">@(category.IsActive ? Texts.Get("common.active") : Texts.Get("common.inactive"))</span></td>
                         <td class="actions">
                             @if (Session.Can(CrmAccess.ProductsWrite))
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(category)">Düzenle</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(category)">@Texts.Get("common.edit")</button>
                             }
                         </td>
                     </tr>

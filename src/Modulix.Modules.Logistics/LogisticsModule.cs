@@ -92,7 +92,7 @@ public sealed class LogisticsModule : IModule
         new(Permissions.TripsWrite, "Sefer planlar, araç ve sürücü atar, sevkiyat ekler, seferi yürütür ve iptal eder", "Seferler"),
         new(Permissions.FreightRead, "Navlun ve taşıyıcı hakedişi tutarlarını görür ve girer (sevkiyat ve sefer yazma izniyle birlikte)", "Navlun ve hakediş"),
         new(Permissions.ExpensesRead, "Sefer masraflarını görüntüler", "Sefer masrafları"),
-        new(Permissions.ExpensesWrite, "Sefer masrafı girer ve beklemedeki masrafı düzenler; makbuz ekler", "Sefer masrafları"),
+        new(Permissions.ExpensesWrite, "Sefer masrafı girer, beklemedeki ya da reddedilen masrafı düzenler ve yeniden onaya gönderir; makbuz ekler", "Sefer masrafları"),
         new(Permissions.ExpensesApprove, "Sefer masrafını onaylar ya da reddeder", "Sefer masrafları"),
     ];
 
@@ -216,6 +216,9 @@ public sealed class LogisticsModule : IModule
     public static class SettingKeys
     {
         public const string CredentialCheck = "logistics.trips.credential-check";
+
+        /// <summary>Talep ve sevkiyatta ülke gönderilmediğinde kullanılan ülke (ISO 3166-1 alfa-2; ADR-0043 K2).</summary>
+        public const string DefaultCountry = "logistics.default-country";
     }
 
     /// <summary>Belge kuralı değerleri: uyar (onay uyarıyla verilir) ya da engelle (onay verilmez).</summary>
@@ -231,6 +234,11 @@ public sealed class LogisticsModule : IModule
         {
             Description = "Seferi hazır yaparken araç, dorse ya da sürücü belgesinin (muayene, sigorta, ehliyet, SRC…) süresi doluyorsa ne olsun? Uyar: onay uyarıyla verilir ve uyarı seferde saklanır. Engelle: belge yenilenmeden sefer hazır olmaz.",
             Options = [new SettingOption(CredentialCheckModes.Warn, "Uyar"), new SettingOption(CredentialCheckModes.Block, "Engelle")],
+        },
+        new(SettingKeys.DefaultCountry, "Varsayılan ülke", "Lojistik", SettingType.Text, Domain.CargoEntity.DefaultCountry)
+        {
+            Description = "Taşıma talebi ve sevkiyatta yükleme ya da teslim ülkesi girilmediğinde kullanılan ülke. ISO 3166-1 alfa-2 kodu yazın (ör. TR, DE, BG). Geçersiz değer Türkiye (TR) sayılır.",
+            MaxLength = 2,
         },
     ];
 
@@ -261,7 +269,10 @@ public sealed class LogisticsModule : IModule
         new(entity, "cargoDescription", "Yük tanımı", AutomationFieldType.Text),
         new(entity, "transportModeKey", "Taşıma türü (anahtar)", AutomationFieldType.Text),
         new(entity, "pickupCity", "Yükleme şehri", AutomationFieldType.Text),
+        new(entity, "pickupCountry", "Yükleme ülkesi (ISO kodu)", AutomationFieldType.Text),
         new(entity, "deliveryCity", "Teslim şehri", AutomationFieldType.Text),
+        new(entity, "deliveryCountry", "Teslim ülkesi (ISO kodu)", AutomationFieldType.Text),
+        new(entity, "international", "Uluslararası (ülkeler farklı)", AutomationFieldType.Boolean),
         new(entity, "pickupDate", "Yükleme günü", AutomationFieldType.Date) { Hint = "\"Yükleme gününe 1 gün kala\" gibi uyarılar için tarihe bağlı tetikleyicide kullanın." },
         new(entity, "deliveryBy", "En geç teslim", AutomationFieldType.Date),
         new(entity, "weightKg", "Ağırlık (kg)", AutomationFieldType.Number),
@@ -484,7 +495,8 @@ public sealed class LogisticsModule : IModule
         new(entity, name, permission, new Dictionary<string, string>(extra)
         {
             ["customerPartyId"] = "Müşteri", ["senderPartyId"] = "Gönderen", ["receiverPartyId"] = "Alıcı", ["transportModeKey"] = "Taşıma türü",
-            ["pickupCity"] = "Yükleme şehri", ["pickupAddress"] = "Yükleme adresi", ["deliveryCity"] = "Teslim şehri", ["deliveryAddress"] = "Teslim adresi",
+            ["pickupCity"] = "Yükleme şehri", ["pickupCountry"] = "Yükleme ülkesi", ["pickupAddress"] = "Yükleme adresi",
+            ["deliveryCity"] = "Teslim şehri", ["deliveryCountry"] = "Teslim ülkesi", ["deliveryAddress"] = "Teslim adresi",
             ["pickupDate"] = "Yükleme günü", ["deliveryBy"] = "En geç teslim", ["cargoDescription"] = "Yük tanımı", ["weightKg"] = "Ağırlık (kg)",
             ["volumeM3"] = "Hacim (m³)", ["palletCount"] = "Palet", ["loadingMeters"] = "Yükleme metresi (LDM)", ["hazardous"] = "Tehlikeli madde",
             ["notes"] = "Notlar", ["status"] = "Durum", ["statusReason"] = "Gerekçe",

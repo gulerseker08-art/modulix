@@ -456,3 +456,372 @@ public sealed class AssetAssignment : HrEntity
 
     public Guid? ClosedByUserId { get; internal set; }
 }
+
+/// <summary>Süreç türleri ve görev sorumluları (dilim 5): sabit, kod buna göre davranır.</summary>
+public static class Checklists
+{
+    public static class Kinds
+    {
+        public const string Onboarding = "onboarding";
+        public const string Offboarding = "offboarding";
+
+        public static IReadOnlyList<string> All { get; } = [Onboarding, Offboarding];
+    }
+
+    /// <summary>Görevin sorumlusu: çalışanın kendisi, yöneticisi ya da İK (İK görevini "süreç yönetimi" izni olan herkes tamamlar).</summary>
+    public static class Responsibles
+    {
+        public const string Employee = "employee";
+        public const string Manager = "manager";
+        public const string Hr = "hr";
+
+        public static IReadOnlyList<string> All { get; } = [Employee, Manager, Hr];
+    }
+
+    /// <summary>Görev türü: elle tamamlanan ya da çalışanın açık zimmeti kalmayınca tamamlanabilen "zimmet iadesi".</summary>
+    public static class TaskTypes
+    {
+        public const string Manual = "manual";
+        public const string AssetReturn = "assetReturn";
+
+        public static IReadOnlyList<string> All { get; } = [Manual, AssetReturn];
+    }
+}
+
+/// <summary>
+/// İşe giriş ya da çıkış süreci şablonu (ADR-0042 dilim 5): adımların listesi. Şablon değişikliği yalnızca sonra başlatılan süreçleri etkiler;
+/// başlatılmış süreç kendi görevlerini taşır. Kullanılmış şablon silinmez, pasife alınır.
+/// </summary>
+public sealed class ChecklistTemplate : HrEntity
+{
+    public const int NameMaxLength = 150;
+    public const int TextMaxLength = 1000;
+
+    public string Name { get; internal set; } = string.Empty;
+
+    public string Kind { get; internal set; } = Checklists.Kinds.Onboarding;
+
+    public string? Description { get; internal set; }
+
+    public bool IsActive { get; internal set; } = true;
+}
+
+/// <summary>Şablon adımı: başlık, sorumlu, başlangıç tarihine göre gün farkı (çıkışta eksi olabilir) ve görev türü.</summary>
+public sealed class ChecklistTemplateItem : HrEntity
+{
+    public const int TitleMaxLength = 200;
+    public const int TextMaxLength = 1000;
+    public const int MaxOffsetDays = 365;
+
+    public Guid TemplateId { get; internal set; }
+
+    public int Sequence { get; internal set; }
+
+    public string Title { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    public string ResponsibleRole { get; internal set; } = Checklists.Responsibles.Hr;
+
+    /// <summary>Son tarih = sürecin başlangıç tarihi + bu kadar gün.</summary>
+    public int DueOffsetDays { get; internal set; }
+
+    public string TaskType { get; internal set; } = Checklists.TaskTypes.Manual;
+}
+
+/// <summary>
+/// Çalışana başlatılmış işe giriş ya da çıkış süreci (ADR-0042 dilim 5). Başlatılırken şablonun adımları aynı işlemde görevlere dönüşür; sorumlu
+/// kullanıcı (çalışan, yöneticisi) o anda çözülür. Bütün görevler tamamlanınca ya da atlanınca süreç kendiliğinden tamamlanır; çıkış sürecindeki
+/// "zimmet iadesi" görevi çalışanın açık zimmeti varken tamamlanamaz, bu yüzden açık zimmetle çıkış süreci kapanmaz. Süreç silinmez, iptal edilir.
+/// </summary>
+public sealed class EmployeeChecklist : HrEntity
+{
+    public const int ReasonMaxLength = 500;
+
+    public static class Statuses
+    {
+        public const string Open = "open";
+        public const string Completed = "completed";
+        public const string Cancelled = "cancelled";
+
+        public static IReadOnlyList<string> All { get; } = [Open, Completed, Cancelled];
+    }
+
+    public Guid EmployeeId { get; internal set; }
+
+    public Guid TemplateId { get; internal set; }
+
+    /// <summary>Şablondan kopyalanır (şablon sonradan değişse de sürecin türü ve adı korunur).</summary>
+    public string Kind { get; internal set; } = Checklists.Kinds.Onboarding;
+
+    public string Name { get; internal set; } = string.Empty;
+
+    /// <summary>Görev son tarihlerinin hesaplandığı gün (işe girişte giriş tarihi, çıkışta ayrılış tarihi önerilir).</summary>
+    public DateOnly StartDate { get; internal set; }
+
+    public string Status { get; internal set; } = Statuses.Open;
+
+    public int TaskCount { get; internal set; }
+
+    /// <summary>Tamamlanan ya da atlanan görev sayısı.</summary>
+    public int ClosedCount { get; internal set; }
+
+    public Guid? OwnerId { get; internal set; }
+
+    public Guid? StartedByUserId { get; internal set; }
+
+    public DateTimeOffset? CompletedAt { get; internal set; }
+
+    public string? CancelReason { get; internal set; }
+
+    internal void SetProgress(int total, int closed)
+    {
+        TaskCount = total;
+        ClosedCount = closed;
+        if (Status != Statuses.Cancelled)
+        {
+            var done = total > 0 && closed == total;
+            Status = done ? Statuses.Completed : Statuses.Open;
+            CompletedAt = done ? CompletedAt ?? DateTimeOffset.UtcNow : null;
+        }
+
+        Touch();
+    }
+}
+
+/// <summary>Süreç görevi: şablon adımının bu çalışana açılmış kopyası. Yalnızca komutla tamamlanır, atlanır ya da yeniden açılır.</summary>
+public sealed class ChecklistTask : HrEntity
+{
+    public const int NoteMaxLength = 500;
+
+    public static class Statuses
+    {
+        public const string Open = "open";
+        public const string Done = "done";
+        public const string Skipped = "skipped";
+
+        public static IReadOnlyList<string> All { get; } = [Open, Done, Skipped];
+    }
+
+    public Guid ChecklistId { get; internal set; }
+
+    public Guid EmployeeId { get; internal set; }
+
+    public int Sequence { get; internal set; }
+
+    public string Title { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    public string ResponsibleRole { get; internal set; } = Checklists.Responsibles.Hr;
+
+    /// <summary>Görevi yapacak kullanıcı (çalışan ya da yöneticisi); İK görevinde boş.</summary>
+    public Guid? AssigneeUserId { get; internal set; }
+
+    public DateOnly DueDate { get; internal set; }
+
+    public string TaskType { get; internal set; } = Checklists.TaskTypes.Manual;
+
+    public string Status { get; internal set; } = Statuses.Open;
+
+    /// <summary>Çalışanın kullanıcısı (veri kapsamı).</summary>
+    public Guid? OwnerId { get; internal set; }
+
+    public Guid? CompletedByUserId { get; internal set; }
+
+    public DateTimeOffset? CompletedAt { get; internal set; }
+
+    public string? Note { get; internal set; }
+}
+
+/// <summary>
+/// Kurum içi duyuru (ADR-0042 K7, dilim 6). Yayında olan, başlangıç günü gelmiş ve süresi dolmamış duyuruyu hedef kitle görür: hedef departman boşsa
+/// herkes, doluysa yalnızca o departmandaki çalışanlar (kullanıcının çalışan kartından). Sabitlenmiş duyuru listenin başındadır. Metin düz metindir;
+/// ekranda HTML olarak yorumlanmaz. Okundu bilgisi ayrı kayıtta tutulur (<see cref="AnnouncementRead"/>).
+/// </summary>
+public sealed class Announcement : HrEntity
+{
+    public const int TitleMaxLength = 200;
+    public const int BodyMaxLength = 8000;
+
+    public string Title { get; internal set; } = string.Empty;
+
+    public string Body { get; internal set; } = string.Empty;
+
+    /// <summary>Hedef departman (Y9b <c>hr.department</c>); boşsa bütün çalışanlar.</summary>
+    public string? AudienceDepartmentKey { get; internal set; }
+
+    public bool IsPinned { get; internal set; }
+
+    public bool IsPublished { get; internal set; }
+
+    /// <summary>Okurlara görünmeye başladığı gün.</summary>
+    public DateOnly PublishOn { get; internal set; }
+
+    /// <summary>Bu günden sonra okurlara görünmez; boşsa süresiz.</summary>
+    public DateOnly? ExpiresOn { get; internal set; }
+
+    public Guid? AuthorUserId { get; internal set; }
+}
+
+/// <summary>Duyurunun bir kullanıcı tarafından okunduğu an (duyuru başına kullanıcı tekil). Okur duyuruyu açınca yazılır; değişmez.</summary>
+public sealed class AnnouncementRead : HrEntity
+{
+    public Guid AnnouncementId { get; internal set; }
+
+    public Guid UserId { get; internal set; }
+
+    public DateTimeOffset ReadAt { get; internal set; }
+}
+
+/// <summary>
+/// Çalışan anketi (ADR-0042 dilim 7, K8). Taslakken soruları düzenlenir; "yanıta aç" ile hedef kitleye görünür, "kapat" ile yanıt almaz. Kimliği gizli
+/// ankette sonuçlar ve kayıt uçları yanıtlayanı göstermez (denetim kaydı yazanı tutar; bkz. ADR). Durum yalnızca komutla değişir.
+/// </summary>
+public sealed class Survey : HrEntity
+{
+    public const int TitleMaxLength = 200;
+    public const int DescriptionMaxLength = 2000;
+
+    /// <summary>Kimliği gizli ankette sonuçların gösterilmesi için gereken en az yanıt (tek kişinin yanıtı sonuçtan okunamasın).</summary>
+    public const int MinAnonymousResponses = 3;
+
+    public static class Statuses
+    {
+        public const string Draft = "draft";
+        public const string Open = "open";
+        public const string Closed = "closed";
+
+        public static IReadOnlyList<string> All { get; } = [Draft, Open, Closed];
+    }
+
+    public string Title { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    public string Status { get; internal set; } = Statuses.Draft;
+
+    /// <summary>Yalnızca oluştururken seçilir; yanıt toplandıktan sonra değişmesi verilen sözü bozar.</summary>
+    public bool IsAnonymous { get; internal set; }
+
+    /// <summary>Hedef departman (Y9b <c>hr.department</c>); boşsa bütün çalışanlar.</summary>
+    public string? AudienceDepartmentKey { get; internal set; }
+
+    /// <summary>Bu günden sonra yanıt alınmaz; boşsa elle kapatılana kadar açık.</summary>
+    public DateOnly? ClosesOn { get; internal set; }
+
+    public Guid? AuthorUserId { get; internal set; }
+
+    /// <summary>İlk kez yanıta açıldığı an.</summary>
+    public DateTimeOffset? OpenedAt { get; internal set; }
+}
+
+/// <summary>Anket sorusu: 1–5 puan, tek seçim (satır başına bir seçenek) ya da serbest metin. Yalnızca taslak ankette eklenir, değişir, silinir.</summary>
+public sealed class SurveyQuestion : HrEntity
+{
+    public const int TextMaxLength = 500;
+    public const int OptionsMaxLength = 2000;
+    public const int OptionMaxLength = 200;
+    public const int MaxOptions = 20;
+
+    public static class Types
+    {
+        public const string Rating = "rating";
+        public const string Choice = "choice";
+        public const string Text = "text";
+
+        public static IReadOnlyList<string> All { get; } = [Rating, Choice, Text];
+    }
+
+    public Guid SurveyId { get; internal set; }
+
+    public int Sequence { get; internal set; }
+
+    public string Text { get; internal set; } = string.Empty;
+
+    public string QuestionType { get; internal set; } = Types.Rating;
+
+    /// <summary>Tek seçim sorusunun seçenekleri, satır başına bir tane; diğer türlerde boş.</summary>
+    public string? Options { get; internal set; }
+
+    public bool IsRequired { get; internal set; } = true;
+
+    public IReadOnlyList<string> OptionList() =>
+        Options is null ? [] : [.. Options.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+}
+
+/// <summary>Bir kullanıcının ankete katılımı (anket başına kullanıcı tekil). Yalnızca yanıt gönderme komutu yazar; değişmez.</summary>
+public sealed class SurveyResponse : HrEntity
+{
+    public Guid SurveyId { get; internal set; }
+
+    /// <summary>Tekrar yanıtı engellemek için tutulur; kimliği gizli ankette hiçbir uçta gösterilmez.</summary>
+    public Guid RespondentUserId { get; internal set; }
+
+    public DateTimeOffset SubmittedAt { get; internal set; }
+}
+
+/// <summary>Yanıttaki tek bir sorunun cevabı. Yalnızca yanıt gönderme komutu yazar; değişmez.</summary>
+public sealed class SurveyAnswer : HrEntity
+{
+    public const int TextMaxLength = 2000;
+
+    public Guid ResponseId { get; internal set; }
+
+    public Guid SurveyId { get; internal set; }
+
+    public Guid QuestionId { get; internal set; }
+
+    public int? Rating { get; internal set; }
+
+    public string? Choice { get; internal set; }
+
+    public string? TextValue { get; internal set; }
+}
+
+/// <summary>
+/// Kurum içi blog yazısı (ADR-0042 dilim 8). İletişim/İK ekibi yazar ve yayınlar; okurlar yalnızca yayındaki yazıları görür. Metin düz metindir
+/// (HTML yorumlanmaz); ekler ADR-0040 dosya deposundadır (kayda bağlı).
+/// </summary>
+public sealed class BlogPost : HrEntity
+{
+    public const int TitleMaxLength = 200;
+    public const int SummaryMaxLength = 500;
+    public const int BodyMaxLength = 20_000;
+
+    public string Title { get; internal set; } = string.Empty;
+
+    public string? Summary { get; internal set; }
+
+    public string Body { get; internal set; } = string.Empty;
+
+    public bool IsPublished { get; internal set; }
+
+    /// <summary>İlk yayınlandığı an (yeniden taslağa alınıp yayınlansa da değişmez); okur listesi buna göre sıralanır.</summary>
+    public DateTimeOffset? PublishedAt { get; internal set; }
+
+    public Guid? AuthorUserId { get; internal set; }
+}
+
+/// <summary>
+/// Fotoğraf albümü (ADR-0042 dilim 8). Fotoğraflar albüm kaydına bağlı ADR-0040 dosyalarıdır (kayıt başına en çok 20 dosya); okurlar yalnızca
+/// yayındaki albümleri ve onların fotoğraflarını görür (dosya erişimi bağlı kaydın erişimidir).
+/// </summary>
+public sealed class PhotoAlbum : HrEntity
+{
+    public const int TitleMaxLength = 200;
+    public const int DescriptionMaxLength = 2000;
+
+    public string Title { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    /// <summary>Etkinliğin günü (ör. yılbaşı kutlaması); okur listesi buna göre sıralanır.</summary>
+    public DateOnly? EventDate { get; internal set; }
+
+    public bool IsPublished { get; internal set; }
+
+    public DateTimeOffset? PublishedAt { get; internal set; }
+
+    public Guid? AuthorUserId { get; internal set; }
+}
