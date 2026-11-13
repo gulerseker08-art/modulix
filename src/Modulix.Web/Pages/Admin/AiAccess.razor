@@ -1,0 +1,109 @@
+@page "/yonetim/yapay-zeka"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Yapay zekâ erişimi · Modulix</PageTitle>
+
+@* Firmanın yapay zekâ özelliklerini açıp kapatır (core.ai.enabled). Kayıt Kuruluş ayarlarıyla aynı uçtan geçer; izin ve
+   sürüm denetimi sunucudadır, menüde gizlemek yetkilendirme değildir. *@
+<AuthGate Permission="@CoreAccess.ManageSettings">
+    <a class="back-link" href="yonetim">← Yönetim</a>
+    <h1>Yapay zekâ erişimi</h1>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (setting is null)
+    {
+        @if (message is null)
+        {
+            <p class="text-muted">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@setting.Group</h2>
+            @if (notice is not null)
+            {
+                <div class="alert alert-success" role="status">@notice</div>
+            }
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="ai-enabled">@setting.Label</label>
+                    <select id="ai-enabled" class="form-select" value="@value" @onchange="e => value = e.Value as string ?? setting.Value">
+                        @foreach (var option in setting.Options)
+                        {
+                            <option value="@option.Value">@option.Label</option>
+                        }
+                    </select>
+                    @if (setting.Description is { } description)
+                    {
+                        <div class="form-text">@description</div>
+                    }
+                    <FieldError Field="@setting.Key" Errors="errors" />
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || value == setting.Value)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+            </div>
+        </form>
+    }
+</AuthGate>
+
+@code {
+    private const string Key = "core.ai.enabled";
+
+    private SettingDto? setting;
+    private string value = string.Empty;
+    private string? notice;
+    private string? message;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        var result = await Api.GetAsync<SettingsResponse>("/api/settings");
+        message = result.Error;
+        if (result.Value is { } loaded)
+        {
+            Load(loaded);
+        }
+    }
+
+    private void Load(SettingsResponse response)
+    {
+        setting = response.Settings.FirstOrDefault(s => s.Key == Key);
+        value = setting?.Value ?? string.Empty;
+        message ??= setting is null ? "Yapay zekâ ayarı bulunamadı." : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (setting is null || value == setting.Value)
+        {
+            return;
+        }
+
+        busy = true;
+        notice = null;
+        message = null;
+        var result = await Api.PutAsync<SettingsResponse>("/api/settings",
+            new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { [Key] = new(value, setting.Version) }));
+        busy = false;
+        errors = result.FieldErrors;
+
+        if (result.Value is { } saved)
+        {
+            Load(saved);
+            notice = "Kaydedildi.";
+        }
+        else
+        {
+            message = result.Error;
+        }
+    }
+}

@@ -251,6 +251,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>Acil durdurma (ADR-0027): "Hayır" ise firmanın hiçbir kuralı çalışmaz; kuyruktaki çalışmalar iptal edilir.</summary>
         public const string AutomationEnabled = "core.automation.enabled";
+
+        /// <summary>Yapay zekâ erişimi: "Hayır" ise firmada yapay zekâ özellikleri kapalıdır (varsayılan kapalı; açık rıza).</summary>
+        public const string AiEnabled = "core.ai.enabled";
     }
 
     /// <summary>Evet/Hayır ayarlarının değerleri.</summary>
@@ -267,6 +270,7 @@ public sealed class CoreModule : IModule
     private const string RegionalGroup = "Bölgesel ayarlar";
     private const string SecurityGroup = "Güvenlik";
     private const string AutomationGroup = "Otomasyon";
+    private const string AiGroup = "Yapay zekâ";
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
     [
@@ -318,6 +322,13 @@ public sealed class CoreModule : IModule
         {
             Description = "Hayır derseniz bu firmanın hiçbir otomasyon kuralı çalışmaz ve kuyruktaki çalışmalar iptal edilir; kurallar silinmez. "
                 + "Beklenmedik bir davranışta hızlıca durdurmak içindir.",
+            Options = [new(SettingValues.No, "Hayır"), new(SettingValues.Yes, "Evet")],
+        },
+
+        new(SettingKeys.AiEnabled, "Yapay zekâ özellikleri açık", AiGroup, SettingType.Choice, SettingValues.No)
+        {
+            Description = "Açıksa firmanın yapay zekâ özellikleri kullanılabilir. Yapay zekâ yalnızca kullanıcının kendi yetkisi kadar veriye erişir "
+                + "ve yaptığı her işlem denetim kaydına yazılır. Kapalıyken hiçbir veri yapay zekâya gönderilmez.",
             Options = [new(SettingValues.No, "Hayır"), new(SettingValues.Yes, "Evet")],
         },
     ];
