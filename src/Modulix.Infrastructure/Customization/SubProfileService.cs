@@ -39,8 +39,9 @@ internal sealed class SubProfileService(
                 .Select(g => new { Id = g.Key, Total = g.Count(), Pending = g.Count(o => o.AppliedAt == null) })
                 .ToListAsync(cancellationToken))
             .ToDictionary(c => c.Id);
+        var features = (await db.SubProfileFeatures.AsNoTracking().OrderBy(f => f.SortOrder).ToListAsync(cancellationToken)).ToLookup(f => f.SubProfileId);
         var names = await ActivityNamesAsync(rows.Select(r => r.ActivityCode), cancellationToken);
-        return [.. rows.Select(r => ToView(r, [], counts.GetValueOrDefault(r.Id)?.Total ?? 0, counts.GetValueOrDefault(r.Id)?.Pending ?? 0, names))];
+        return [.. rows.Select(r => ToView(r, [], counts.GetValueOrDefault(r.Id)?.Total ?? 0, counts.GetValueOrDefault(r.Id)?.Pending ?? 0, names, [.. features[r.Id].Select(ToView)]))];
     }
 
     public async Task<SubProfileView?> GetAsync(Guid id, CancellationToken cancellationToken)
@@ -290,6 +291,51 @@ internal sealed class SubProfileService(
         return await GetAsync(id, cancellationToken);
     }
 
+    public async Task<SubProfileView?> AddFeatureAsync(Guid id, SubProfileFeatureInput input, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var row = await db.SubProfiles.SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
+        if (row is null)
+        {
+            return null;
+        }
+
+        var normalized = SubProfileRules.NormalizeFeature(input);
+        var features = await db.SubProfileFeatures.Where(f => f.SubProfileId == id).ToListAsync(cancellationToken);
+        if (SubProfileRules.IsDuplicateFeature(normalized, features))
+        {
+            throw new ArgumentException($"Bu özellik zaten var: '{normalized.Group}: {normalized.Value}'.", "value");
+        }
+
+        var before = FeatureSnapshot(row, features);
+        var feature = new SubProfileFeature(id, normalized.Group, normalized.Value, features.Count == 0 ? 0 : features.Max(f => f.SortOrder) + 1);
+        db.SubProfileFeatures.Add(feature);
+        features.Add(feature);
+        row.Touch();
+        Audit(tenant, row.Id, AuditAction.Updated, before, FeatureSnapshot(row, features));
+        await SaveAsync(cancellationToken);
+        return await GetAsync(id, cancellationToken);
+    }
+
+    public async Task<SubProfileView?> RemoveFeatureAsync(Guid id, Guid featureId, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var row = await db.SubProfiles.SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
+        var features = row is null ? [] : await db.SubProfileFeatures.Where(f => f.SubProfileId == id).ToListAsync(cancellationToken);
+        if (row is null || features.SingleOrDefault(f => f.Id == featureId) is not { } feature)
+        {
+            return null;
+        }
+
+        var before = FeatureSnapshot(row, features);
+        db.SubProfileFeatures.Remove(feature);
+        features.Remove(feature);
+        row.Touch();
+        Audit(tenant, row.Id, AuditAction.Updated, before, FeatureSnapshot(row, features));
+        await SaveAsync(cancellationToken);
+        return await GetAsync(id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<SubProfileStarterView>> ListStartersAsync(CancellationToken cancellationToken)
     {
         var tenant = RequireTenant();
@@ -302,6 +348,7 @@ internal sealed class SubProfileService(
             s.Description,
             s.ActivityCode is { } code ? names.GetValueOrDefault(code) : null,
             [.. s.Options.Select(o => o.Label)],
+            SubProfileRules.GroupLabels(s.Features ?? []),
             MissingModules(s, enabled),
             codes.Contains(s.Key)))];
     }
@@ -338,6 +385,11 @@ internal sealed class SubProfileService(
             foreach (var option in starter.Options)
             {
                 _ = await AddOptionAsync(created.Id, option, cancellationToken);
+            }
+
+            foreach (var feature in starter.Features ?? [])
+            {
+                _ = await AddFeatureAsync(created.Id, feature, cancellationToken);
             }
 
             if (transaction is not null)
@@ -449,13 +501,18 @@ internal sealed class SubProfileService(
     private async Task<SubProfileView> LoadViewAsync(SubProfile row, CancellationToken cancellationToken)
     {
         var options = await db.SubProfileOptions.AsNoTracking().Where(o => o.SubProfileId == row.Id).OrderBy(o => o.SortOrder).ToListAsync(cancellationToken);
+        var features = await db.SubProfileFeatures.AsNoTracking().Where(f => f.SubProfileId == row.Id).OrderBy(f => f.SortOrder).ToListAsync(cancellationToken);
         var names = await ActivityNamesAsync([row.ActivityCode], cancellationToken);
-        return ToView(row, [.. options.Select(ToView)], options.Count, options.Count(o => !o.IsApplied), names);
+        return ToView(row, [.. options.Select(ToView)], options.Count, options.Count(o => !o.IsApplied), names, [.. features.Select(ToView)]);
     }
 
-    private static SubProfileView ToView(SubProfile row, IReadOnlyList<SubProfileOptionView> options, int total, int pending, IReadOnlyDictionary<string, string> names) => new(
+    private static SubProfileView ToView(
+        SubProfile row, IReadOnlyList<SubProfileOptionView> options, int total, int pending, IReadOnlyDictionary<string, string> names,
+        IReadOnlyList<SubProfileFeatureView> features) => new(
         row.Id, row.Code, row.Name, row.Description, row.ActivityCode, row.ActivityCode is { } code ? names.GetValueOrDefault(code) : null,
-        row.Status, row.Revision, total, pending, row.CreatedAt, row.ActivatedAt, options);
+        row.Status, row.Revision, total, pending, row.CreatedAt, row.ActivatedAt, options, features);
+
+    private static SubProfileFeatureView ToView(SubProfileFeature f) => new(f.Id, f.Group, f.Value);
 
     private static SubProfileOptionView ToView(SubProfileOption o) => new(
         o.Id, o.Kind, o.TargetKey, o.Label, o.FieldType, o.Required, o.ShowInList, o.Choices, o.Category, o.AppliedAt, o.SortOrder);
@@ -549,6 +606,13 @@ internal sealed class SubProfileService(
             RecordDiff.Compute(before, after),
             ExecutionSource.Api,
             Activity.Current?.TraceId.ToString()));
+
+    // Özellik değişiklikleri kendi kaydıyla denetlenir: yalnızca ad ve özellikler (seçenek ve durum farkı gürültü olmasın).
+    private static JsonObject FeatureSnapshot(SubProfile row, IEnumerable<SubProfileFeature> features) => new()
+    {
+        ["name"] = row.Name,
+        ["features"] = new JsonArray([.. features.OrderBy(f => f.SortOrder).Select(f => JsonValue.Create($"{f.Group}: {f.Value}"))]),
+    };
 
     private static JsonObject Snapshot(SubProfile row, IEnumerable<SubProfileOption> options) => new()
     {

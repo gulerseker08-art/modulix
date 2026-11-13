@@ -193,6 +193,51 @@ public sealed class SubProfileOption : ITenantEntity, ICompanyShared
     public void MarkApplied() => AppliedAt ??= DateTimeOffset.UtcNow;
 }
 
+/// <summary>
+/// Alt profilin hizmet özelliği (ADR-0041 dilim 4): "nasıl yapıyoruz" ekseni; <see cref="Group"/> özelliğin adı (ör. "Taşıma türü"),
+/// <see cref="Value"/> alt profilin sunduğu değer (ör. "Komple"). Firma tanımlar, kodda sabit liste yoktur. Etiket ve süzgeçtir: seçenek
+/// (alan/liste değeri) gibi firmaya bir şey uygulamaz, bu yüzden her durumda eklenip kaldırılabilir. Tenant verisidir; RLS ile korunur.
+/// </summary>
+public sealed class SubProfileFeature : ITenantEntity, ICompanyShared
+{
+    public const int GroupMaxLength = 60;
+    public const int ValueMaxLength = 100;
+
+    private SubProfileFeature()
+    {
+        // EF Core için
+    }
+
+    public SubProfileFeature(Guid subProfileId, string group, string value, int sortOrder)
+    {
+        Id = Guid.CreateVersion7();
+        SubProfileId = subProfileId;
+        Group = group;
+        Value = value;
+        SortOrder = sortOrder;
+        CreatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid TenantId { get; set; }
+
+    public Guid SubProfileId { get; private set; }
+
+    public string Group { get; private set; } = string.Empty;
+
+    public string Value { get; private set; } = string.Empty;
+
+    public int SortOrder { get; private set; }
+
+    public DateTimeOffset CreatedAt { get; private set; }
+}
+
+/// <summary>Hizmet özelliği girdisi: grup ve değer.</summary>
+public sealed record SubProfileFeatureInput(string Group, string Value);
+
+public sealed record SubProfileFeatureView(Guid Id, string Group, string Value);
+
 /// <summary>Alt profil girdisi. <see cref="Code"/> yalnızca oluştururken kullanılır; boşsa addan üretilir.</summary>
 public sealed record SubProfileInput(string Name, string? Description, string? ActivityCode, string? Code = null);
 
@@ -219,7 +264,10 @@ public sealed record SubProfileOptionView(
     DateTimeOffset? AppliedAt,
     int SortOrder);
 
-/// <summary>Listede <see cref="Options"/> boştur (yalnızca <see cref="OptionCount"/>); tek alt profil okunurken dolar.</summary>
+/// <summary>
+/// Listede <see cref="Options"/> boştur (yalnızca <see cref="OptionCount"/>); tek alt profil okunurken dolar. <see cref="Features"/> her ikisinde de
+/// dolu gelir (liste süzgeci için).
+/// </summary>
 public sealed record SubProfileView(
     Guid Id,
     string Code,
@@ -233,7 +281,8 @@ public sealed record SubProfileView(
     int PendingCount,
     DateTimeOffset CreatedAt,
     DateTimeOffset? ActivatedAt,
-    IReadOnlyList<SubProfileOptionView> Options);
+    IReadOnlyList<SubProfileOptionView> Options,
+    IReadOnlyList<SubProfileFeatureView> Features);
 
 /// <summary>Bilinmeyen alt profil ya da seçenek (404).</summary>
 public sealed class SubProfileNotFoundException(string message) : Exception(message);
@@ -278,6 +327,15 @@ public interface ISubProfileService
 
     /// <summary>Yalnızca uygulanmamış seçenek kaldırılır. Alt profil ya da seçenek yoksa null.</summary>
     Task<SubProfileView?> RemoveOptionAsync(Guid id, Guid optionId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Hizmet özelliği ekler (grup + değer; durumdan bağımsız, hiçbir şeyi uygulamaz). Aynı grup+değer iki kez eklenemez (büyük/küçük harf fark etmez).
+    /// Alt profil yoksa null.
+    /// </summary>
+    Task<SubProfileView?> AddFeatureAsync(Guid id, SubProfileFeatureInput input, CancellationToken cancellationToken);
+
+    /// <summary>Hizmet özelliğini kaldırır. Alt profil ya da özellik yoksa null.</summary>
+    Task<SubProfileView?> RemoveFeatureAsync(Guid id, Guid featureId, CancellationToken cancellationToken);
 
     /// <summary>Hazır alt profiller ve bu firma için durumları (eklenmiş mi, hangi modül kapalı).</summary>
     Task<IReadOnlyList<SubProfileStarterView>> ListStartersAsync(CancellationToken cancellationToken);

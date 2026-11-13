@@ -47,7 +47,12 @@ public sealed record SubProfileOptionDto(
     string? Category,
     DateTimeOffset? AppliedAt);
 
-/// <summary>Alt profil. Listede <see cref="Options"/> boştur (yalnızca sayılar); tek alt profil okunurken dolar.</summary>
+/// <summary>Hizmet özelliği (ADR-0041 dilim 4): <see cref="Group"/> özelliğin adı, <see cref="Value"/> alt profilin sunduğu değer.</summary>
+public sealed record SubProfileFeatureDto(Guid Id, string Group, string Value);
+
+public sealed record SaveSubProfileFeatureRequest(string Group, string Value);
+
+/// <summary>Alt profil. Listede <see cref="Options"/> boştur (yalnızca sayılar); tek alt profil okunurken dolar. <see cref="Features"/> ikisinde de dolu gelir.</summary>
 public sealed record SubProfileDto(
     Guid Id,
     string Code,
@@ -61,7 +66,8 @@ public sealed record SubProfileDto(
     int PendingCount,
     DateTimeOffset CreatedAt,
     DateTimeOffset? ActivatedAt,
-    IReadOnlyList<SubProfileOptionDto> Options);
+    IReadOnlyList<SubProfileOptionDto> Options,
+    IReadOnlyList<SubProfileFeatureDto> Features);
 
 /// <summary>
 /// Hazır alt profil (öneri): tek tıkla firmanın taslak alt profili olarak eklenir. <see cref="MissingModules"/> kapalı olduğu için
@@ -73,6 +79,7 @@ public sealed record SubProfileStarterDto(
     string Description,
     string? ActivityName,
     IReadOnlyList<string> Options,
+    IReadOnlyList<string> Features,
     IReadOnlyList<string> MissingModules,
     bool Added);
 

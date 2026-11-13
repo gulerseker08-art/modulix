@@ -94,6 +94,26 @@ internal sealed class SubProfileOptionConfiguration : IEntityTypeConfiguration<S
     }
 }
 
+internal sealed class SubProfileFeatureConfiguration : IEntityTypeConfiguration<SubProfileFeature>
+{
+    public void Configure(EntityTypeBuilder<SubProfileFeature> builder)
+    {
+        // Tenant verisi (ADR-0041 dilim 4): alt profilin hizmet özellikleri; Row-Level Security ile korunur (migration: TenantIsolationSql).
+        builder.ToTable("SubProfileFeatures", DatabaseSchemas.Meta);
+        builder.HasKey(f => f.Id);
+        builder.Property(f => f.Id).ValueGeneratedNever();
+        builder.Property(f => f.TenantId).IsRequired();
+        builder.Property(f => f.SubProfileId).IsRequired();
+        builder.Property(f => f.Group).HasMaxLength(SubProfileFeature.GroupMaxLength).IsRequired();
+        builder.Property(f => f.Value).HasMaxLength(SubProfileFeature.ValueMaxLength).IsRequired();
+        builder.Property(f => f.CreatedAt).IsRequired();
+        builder.HasIndex(f => new { f.TenantId, f.SubProfileId, f.Group, f.Value }).IsUnique();
+        builder.HasAlternateKey(f => new { f.TenantId, f.Id });
+        builder.HasOne<SubProfile>().WithMany().HasForeignKey(f => new { f.TenantId, f.SubProfileId })
+            .HasPrincipalKey(p => new { p.TenantId, p.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class TenantFormLayoutConfiguration : IEntityTypeConfiguration<TenantFormLayout>
 {
     public void Configure(EntityTypeBuilder<TenantFormLayout> builder)

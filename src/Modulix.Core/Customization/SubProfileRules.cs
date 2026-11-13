@@ -83,6 +83,34 @@ public static class SubProfileRules
         return new SubProfileOptionInput(input.Kind, input.TargetKey, label, type, input.Required, input.ShowInList, choices, null);
     }
 
+    /// <summary>Hizmet özelliği girdisini kırpar ve doğrular. Hatalar <see cref="ArgumentException"/> (ParamName: group ya da value).</summary>
+    public static SubProfileFeatureInput NormalizeFeature(SubProfileFeatureInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        var group = input.Group?.Trim() ?? string.Empty;
+        var value = input.Value?.Trim() ?? string.Empty;
+        if (group.Length == 0 || group.Length > SubProfileFeature.GroupMaxLength)
+        {
+            throw new ArgumentException($"Özellik adı zorunludur ve en çok {SubProfileFeature.GroupMaxLength} karakter olabilir.", "group");
+        }
+
+        if (value.Length == 0 || value.Length > SubProfileFeature.ValueMaxLength)
+        {
+            throw new ArgumentException($"Özellik değeri zorunludur ve en çok {SubProfileFeature.ValueMaxLength} karakter olabilir.", "value");
+        }
+
+        return new SubProfileFeatureInput(group, value);
+    }
+
+    /// <summary>Aynı grup ve değer iki kez olamaz (büyük/küçük harf fark etmez).</summary>
+    public static bool IsDuplicateFeature(SubProfileFeatureInput input, IEnumerable<SubProfileFeature> others) =>
+        others.Any(f => string.Equals(f.Group, input.Group, StringComparison.CurrentCultureIgnoreCase)
+            && string.Equals(f.Value, input.Value, StringComparison.CurrentCultureIgnoreCase));
+
+    /// <summary>Özellikleri grup adıyla, ilk görülme sırasıyla kümeler ("Taşıma türü: Komple, Parsiyel").</summary>
+    public static IReadOnlyList<string> GroupLabels(IEnumerable<SubProfileFeatureInput> features) =>
+        [.. features.GroupBy(f => f.Group, StringComparer.CurrentCultureIgnoreCase).Select(g => $"{g.First().Group}: {string.Join(", ", g.Select(f => f.Value))}")];
+
     /// <summary>Aynı alt profilde aynı hedefte aynı ad iki kez olamaz (büyük/küçük harf fark etmez).</summary>
     public static bool IsDuplicate(SubProfileOptionInput input, IEnumerable<SubProfileOption> others) =>
         others.Any(o => o.Kind == input.Kind
