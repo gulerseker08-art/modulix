@@ -121,6 +121,11 @@
             }
         </div>
 
+        @if (d.Shipments is { } mapShipments)
+        {
+            <RouteMap Routes="mapShipments.Routes" />
+        }
+
         <div class="dash-grid">
             @if (d.Trips is { } tr)
             {
