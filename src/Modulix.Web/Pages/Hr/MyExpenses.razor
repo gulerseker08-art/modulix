@@ -1,0 +1,142 @@
+@page "/ik/masraflarim"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Masraflarım · Modulix</PageTitle>
+
+@* Self servis (ADR-0042 dilim 3): kullanıcının bağlı çalışan kartı bulunur; masraf beyanları, yeni beyan, satırlar ve fişler, onaya gönderme.
+   Kullanıcı hesabı bir çalışan kartına bağlı değilse İK'ya yönlendirilir. Görünürlük sunucudadır (veri kapsamı "kendi"). *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.ExpensesRequest">
+    <PageHeader Title="Masraflarım" Icon="wallet" Subtitle="Harcamalarınızı fişleriyle beyan edin, onaya gönderin ve ödemesini izleyin." />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (!loaded)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (employee is null)
+    {
+        <div class="alert alert-info" role="status">Kullanıcı hesabınız bir çalışan kartına bağlı değil. Masraf beyan edebilmek için İK'dan çalışan kartınıza hesabınızı bağlamasını isteyin.</div>
+    }
+    else
+    {
+        @if (creating)
+        {
+            <ExpenseClaimEditor EmployeeId="employee.Id" EmployeeName="@HrLabels.Name(employee)" Lookups="Lookups" Saved="CreatedAsync" Cancelled="() => creating = false" />
+        }
+        else if (selected is not null)
+        {
+            <ExpenseClaimCard Claim="selected" Lookups="Lookups" Changed="ChangedAsync" Closed="() => selected = null" />
+        }
+
+        <div class="list-toolbar">
+            <h2 class="h5 mb-0 me-auto">Beyanlarım</h2>
+            @if (!creating)
+            {
+                <button type="button" class="btn btn-primary" @onclick="Create"><AppIcon Name="plus" Size="16" /> Yeni masraf beyanı</button>
+            }
+        </div>
+
+        @if (claims is null || claims.Items.Count == 0)
+        {
+            <p class="text-muted" role="status">Henüz masraf beyanınız yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">Masraf beyanlarım</caption>
+                <thead>
+                    <tr>
+                        <th scope="col"><AppIcon Name="type" Size="14" /> Başlık</th>
+                        <th scope="col" class="text-end"><AppIcon Name="coins" Size="14" /> Toplam</th>
+                        <th scope="col"><AppIcon Name="check-circle" Size="14" /> Durum</th>
+                        <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var claim in claims.Items)
+                    {
+                        <tr>
+                            <td data-label="Başlık" class="primary">@WarehouseLabels.Text(claim, "title")</td>
+                            <td data-label="Toplam" class="text-end">@HrLabels.Money(HrLabels.Decimal(claim, "totalAmount"), WarehouseLabels.Text(claim, "currency"))</td>
+                            <td data-label="Durum"><span class="badge @HrLabels.ExpenseStatusBadge(WarehouseLabels.Text(claim, "status"))">@HrLabels.ExpenseStatus(WarehouseLabels.Text(claim, "status"))</span></td>
+                            <td class="row-menu-cell">
+                                <RowMenu Label="@($"{WarehouseLabels.Text(claim, "title")} eylemleri")">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(claim)"><AppIcon Name="eye" Size="16" /> <span>Aç</span></button>
+                                </RowMenu>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <Pager Page="claims.Page" PageSize="claims.PageSize" TotalCount="claims.TotalCount" PageChanged="LoadAsync" />
+        }
+    }
+</AuthGate>
+
+@code {
+    private RecordResponse? employee;
+    private RecordPageResponse? claims;
+    private RecordResponse? selected;
+    private bool creating;
+    private bool loaded;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(HrAccess.ExpensesRequest) || Session.User is not { } user)
+        {
+            return;
+        }
+
+        await Lookups.LoadAsync();
+        var cards = await Api.GetAsync<RecordPageResponse>($"/api/records/{HrAccess.EmployeeEntityKey}?userId={user.UserId}&pageSize=1");
+        employee = cards.Value?.Items.FirstOrDefault();
+        message = cards.Error;
+        if (employee is not null)
+        {
+            await LoadAsync(1);
+        }
+
+        loaded = true;
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var result = await Api.GetAsync<RecordPageResponse>(
+            $"/api/records/{HrAccess.ExpenseClaimEntityKey}?employeeId={employee!.Id}&page={pageNumber}&pageSize={ListPaging.Size}");
+        claims = result.Value;
+        message = result.Error;
+    }
+
+    private void Create()
+    {
+        selected = null;
+        creating = true;
+    }
+
+    private void Open(RecordResponse claim)
+    {
+        creating = false;
+        selected = claim;
+    }
+
+    private async Task CreatedAsync(RecordResponse created)
+    {
+        creating = false;
+        selected = created;
+        await LoadAsync(1);
+    }
+
+    private async Task ChangedAsync(RecordResponse changed)
+    {
+        selected = changed;
+        await LoadAsync(claims?.Page ?? 1);
+    }
+}

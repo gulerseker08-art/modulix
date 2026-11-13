@@ -1,4 +1,5 @@
 @inject ApiClient Api
+@inject SessionState Session
 
 @* İçe aktarma ayrıntısı (ADR-0033): en sık hatalar ve satır hataları. Ham hücre değeri yoktur; düzeltme için asıl satır
    hata raporunda verilir. *@
@@ -21,6 +22,37 @@ else
     @if (run.Note is not null)
     {
         <p>@run.Note</p>
+    }
+
+    @* Geri alma (ADR-0033 Dilim 4d): yalnızca kayıt almış uygulamada ve geri alma izniyle. Onay adımında gerekçe zorunludur; düz kırmızı düğme
+       onay adımındadır. Sonradan değişmiş, başka kayda bağlı ya da silme yetkisi olmayan kayıtlar silinmez, sayıyla bildirilir. *@
+    @if (CanRollBack(run))
+    {
+        @if (!confirming)
+        {
+            <div class="list-toolbar">
+                <button type="button" class="btn btn-outline-danger" @onclick="() => confirming = true">İçe aktarılan kayıtları geri al</button>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-warning" role="alertdialog" aria-labelledby="rollback-title">
+                <h3 id="rollback-title" class="h6">@run.CreatedCount kaydı geri al</h3>
+                <p>Bu içe aktarmanın oluşturduğu kayıtlar silinir. Sonradan değiştirilmiş ya da başka kayda bağlanmış kayıtlar korunur.</p>
+                <label class="form-label required" for="rollback-reason">Gerekçe</label>
+                <input id="rollback-reason" class="form-control mb-2" maxlength="300" @bind="reason" @bind:event="oninput" />
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = false">Vazgeç</button>
+                    <button type="button" class="btn btn-danger" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" aria-busy="@(busy ? "true" : "false")" @onclick="RollBackAsync">Geri al</button>
+                </div>
+            </div>
+        }
+    }
+    @if (outcome is not null)
+    {
+        <div class="alert @(outcome.Kept.Count == 0 ? "alert-success" : "alert-warning")" role="status">
+            @outcome.Removed kayıt silindi@(outcome.AlreadyRemoved > 0 ? $", {outcome.AlreadyRemoved} kayıt zaten silinmişti" : string.Empty)@(outcome.Kept.Count > 0 ? $"; {outcome.Kept.Count} kayıt korundu: {string.Join(" ", outcome.Kept.Select(k => k.Reason).Distinct())}" : ".")
+        </div>
     }
 
     @if (detail.IssueCodes.Count == 0)
@@ -70,6 +102,30 @@ else
     private ImportRunDetailDto? detail;
     private string? message;
     private string? code;
+    private bool confirming;
+    private bool busy;
+    private string? reason;
+    private ImportRollbackDto? outcome;
+
+    private bool CanRollBack(ImportRunDto run) =>
+        Session.Can(CoreAccess.RollbackImports) && run.Mode == "Apply" && run.Status is "Succeeded" or "PartiallySucceeded" && run.CreatedCount > 0;
+
+    private async Task RollBackAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<ImportRollbackDto>($"/api/imports/{RunId}/rollback", new ImportRollbackRequest(reason));
+        busy = false;
+        if (result.Value is not { } done)
+        {
+            message = result.FieldErrors?.Values.SelectMany(v => v).FirstOrDefault() ?? result.Error;
+            return;
+        }
+
+        outcome = done;
+        confirming = false;
+        reason = null;
+        await LoadAsync(1);
+    }
 
     protected override async Task OnParametersSetAsync()
     {

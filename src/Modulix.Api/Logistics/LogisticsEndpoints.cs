@@ -79,6 +79,15 @@ public static class LogisticsEndpoints
         });
 
         // Sefer planlama (dilim 5): uygunluk denetimi, sevkiyat ekleme ve çıkarma. Yazma izni ve sefer durumu serviste denetlenir.
+        // Operasyon panosu (dilim 9a): bölümler okuma iznine göre gelir; hiçbir bölümü okuyamayan için 403.
+        group.MapGet("/dashboard", async (Modulix.Modules.Logistics.Dashboard.ILogisticsDashboard dashboard, CancellationToken ct) =>
+        {
+            var result = await dashboard.GetAsync(ct);
+            return result.IsEmpty
+                ? Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Yetkiniz yok.", detail: "Panoyu görmek için talep, sevkiyat, sefer ya da sürücü okuma izni gerekir.")
+                : Results.Ok(result);
+        });
+
         group.MapGet("/trips/{id:guid}/check", async (Guid id, ITripPlanner planner, CancellationToken ct) =>
         {
             var result = await planner.CheckAsync(id, ct);

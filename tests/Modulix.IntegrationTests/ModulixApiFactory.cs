@@ -174,15 +174,16 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
 
     /// <summary>
     /// İstek benzeri bir kapsam açar. <paramref name="tenantId"/> verilirse o tenant aktif sayılır
-    /// (gerçek istekte bunu sunucudaki üyelik doğrulaması yapar); null ise aktif tenant yoktur.
+    /// (gerçek istekte bunu sunucudaki üyelik doğrulaması yapar); null ise aktif tenant yoktur. İşlemi yapan üyelik
+    /// <paramref name="actor"/> ile verilirse yetki kontrolleri onun üzerinden çalışır; verilmezse rastgele (yetkisiz) bir üyeliktir.
     /// </summary>
-    public IServiceScope OpenScope(Guid? tenantId)
+    public IServiceScope OpenScope(Guid? tenantId, (Guid UserId, Guid MembershipId)? actor = null)
     {
         var scope = Services.CreateScope();
         if (tenantId is { } id)
         {
             scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current =
-                new TenantContext(id, Guid.NewGuid(), Guid.NewGuid());
+                new TenantContext(id, actor?.UserId ?? Guid.NewGuid(), actor?.MembershipId ?? Guid.NewGuid());
         }
 
         return scope;

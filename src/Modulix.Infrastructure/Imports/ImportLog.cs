@@ -16,7 +16,7 @@ internal sealed class ImportLog(ModulixDbContext db, ModuleCatalog catalog) : II
     public async Task<ImportRunPage> ListAsync(ImportRunQuery query, Guid? onlyUserId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var page = Math.Max(1, query.Page);
+        var page = Math.Clamp(query.Page, 1, 100_000);
         var pageSize = Math.Clamp(query.PageSize, 1, ImportRunQuery.MaxPageSize);
 
         var runs = Visible(onlyUserId);
@@ -87,7 +87,7 @@ internal sealed class ImportLog(ModulixDbContext db, ModuleCatalog catalog) : II
             return null;
         }
 
-        var page = Math.Max(1, issues.Page);
+        var page = Math.Clamp(issues.Page, 1, 100_000);
         var pageSize = Math.Clamp(issues.PageSize, 1, ImportIssueQuery.MaxPageSize);
 
         var all = db.ImportRowIssues.AsNoTracking().Where(i => i.RunId == runId);

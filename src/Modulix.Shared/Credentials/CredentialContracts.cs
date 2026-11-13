@@ -13,6 +13,7 @@ public static class CredentialAccess
     /// <summary>Belge türü kategorileri: sahip kayıt türünün kategorisi.</summary>
     public const string Vehicle = "vehicle";
     public const string Driver = "driver";
+    public const string Employee = "employee";
 
     public const string Active = "active";
     public const string Revoked = "revoked";

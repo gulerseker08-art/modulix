@@ -48,9 +48,11 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | GoalMeter | Var | `<GoalMeter Realized="…" Weighted="…" Tempo="…" Label="…" />`: hedef göstergesi; yüzdeler hedefe oranla, tempo dikey işaret; yalnızca `dash-hero` içinde |
 | DashKpi | Var | Pano KPI kutusu: `<DashKpi Label Icon Tone Value Detail Partial Trend Delta DeltaTrend />`; `Delta` önceki döneme göre değişimdir (`dash-delta` hapı: artı başarı tonu, eksi tehlike, sıfır nötr; işaret ve ok metinde de var, renk tek başına anlam taşımaz); `dash-kpis` ızgarasında (telefonda 2×2). `Trend` verilirse `Sparkline` çizer (telefonda gizli) |
 | MyDayPanel | Var | CRM panosunun "Benim günüm" sekmesi (`dash-day`: solda öneriler + `TodayActivities`, sağda `dash-hero-compact` kişisel hedef, "Bu ay kapanabilecekler" ve `dash-week`). Öneri satırı `dash-steps` (`dash-kpi-icon` tonlu ikon, `dash-list-main`, `btn-tonal` eylem; telefonda eylem alta kayar), kapanış satırı `dash-closing-head` + `dash-closing-track` (olasılık çubuğu; metinde yüzde de yazılır). Kart başlığında ikon `h2.dash-card-title`. `dash-kpi-icon.tone-danger` gecikmiş iş, `tone-success` kabul edilen teklif içindir. Önerilerin kurallarla üretildiği kartta yazılır ("Otomatik öneri" rozeti, yapay zekâ değil) |
+| RouteMap | Var | `<RouteMap Routes="…" />`: koyu hero zeminli güzergâh haritası (`dash-map`; Lojistik panosu, `Logistics/LogisticsDashboard.razor`). Sınırlar `wwwroot/maps/{tr,europe,world}.json` yerel dosyalarından gelir (CDN yok); şehir metni `LogisticsGazetteer` ile noktaya çevrilir, bulunamayan yer haritada çizilmez ve altında sayılır. Görünüm otomatik seçilir (hepsi Türkiye ise il haritası, değilse Avrupa ya da Dünya) ya da `segmented` ile elle seçilir. Renk yalnızca `--mx-map-*` tokenlarından gelir (`map-land`, `map-land-hot`, `map-line`, `map-dot`, `map-label`, `map-route-0..3`; iki temada aynı, zemin koyudur). Güzergâh çizgisi akar ve ışır (`map-route`; ışıma yalnızca burada serbesttir), araç noktaları çizgi boyunca ilerler, şehirlerde nabız halkası vardır; `prefers-reduced-motion` altında animasyon durur. Sağdaki `dash-map-legend` güzergâhları listeler, üzerine gelinince/odaklanınca diğerleri sönükleşir. Renk anlamı tek başına taşımaz: sayı ve güzergâh adı metindedir. Ekranda en çok bir tane |
 | Sparkline | Var | `<Sparkline Values="…" Label="…" />`: eksensiz küçük eğilim çizgisi (`--chart-c0`), son nokta işaretli |
 | ColumnChart | Var | `<ColumnChart Items="…" Title="…" />`: dikey sütun grafik, tek renk, son sütun (güncel dönem) tam tonda, her sütunda değer etiketi |
-| DashCard | Stil | `dash-grid` + `dash-card` (+ `dash-card-head`): pano kutusu; `dash-stage` aşama satırları, `dash-list` kayıt listesi |
+| PairColumnChart | Var | `<PairColumnChart Items="…" Title="…" FirstName="Giriş" SecondName="Çıkış" />`: iki serili dikey sütun grafik (`pair-chart`, `--chart-c0` ve `--chart-c1`), üstte `pair-chart-legend` göstergesi; eksende ilk, orta ve son etiket; değerler ipucunda. Örnek: `Warehouse/WarehouseDashboard.razor` |
+| DashCard | Stil | `dash-grid` + `dash-card` (+ `dash-card-head`): pano kutusu; `dash-stage` aşama satırları, `dash-list` kayıt listesi. Ek parçalar: `dash-totals` (kart altında küçük toplamlar), `stack-bar` (yığılmış dağılım çubuğu, `role="img"` + metin etiketi), `dash-swatch` (renk kutusu), `dash-meter` (satır içi doluluk ölçeri; değer yanında yüzde olarak yazılır). Renkler `chart-fill-0`…`chart-fill-5` (`--chart-c0`…`--chart-c5`) sınıflarıyla verilir |
 | Tabs (kayıt sekmeleri) | Var | `Components/TabBar.razor` + `TabState` (`TabItem(Key, Label, Count)`): sekme ilk seçilişte çizilir, sonra gizli kalır (kaydedilmemiş form kaybolmaz); paneller `role="tabpanel"`, `hidden` |
 | Segmented / chip | Stil | `filters` + `chip` (`aria-pressed`), `segmented` |
 | Accordion | Stil | `sub-section` + `section-toggle` |
@@ -76,6 +78,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Dinamik (özel) alanlar | Var | `CustomFieldInputs.razor` — aynı form sınıflarıyla çizilir; `Only` ile tek alan (form düzeni içinde) |
 | Metadata'dan form (LayoutForm) | Var | `Components/LayoutForm.razor` — `Layout` (`FormLayoutDto`), `Field` şablonu, `Shows`, özel alanlar; sekme / bölüm / alan düzeni firmanın form düzeninden (ADR-0021). Yönetim: `Pages/Admin/FormDesigner.razor` |
 | FieldError | Var | Alanın altında doğrulama iletisi |
+| Alan açıklaması baloncuğu | Var | Giriş alanıyla aynı kapsayıcıdaki `form-text`, alanın üzerine gelince/odaklanınca alanın üstünde baloncuk olarak açılır (yalnızca CSS, `app.css`; ikon yok, formda yer kaplamaz). Hata metni (`form-text text-danger`) ve girişle aynı kapsayıcıda olmayan `form-text` satır içi kalır |
 | FileUpload, RichTextEditor, MultiLookup | Yok | |
 
 ## Veri
@@ -88,6 +91,8 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Takvim | Var | `ActivityCalendar.razor`: ay ızgarası, hafta/gün saat çizelgesi (`cal-time-*`, çakışanlar yan yana, şimdiki zaman çizgisi), ajanda; renk `FamilyOf` → `fam-*` |
 | Günün ajandası | Var | `TodayActivities.razor` |
 | Grafikler | Var | `BarChart.razor`, `DonutChart.razor` (`--chart-c*`) |
+| Kişi kartları (rehber) | Var | `ul.profile-cards` + `li.profile-card`; kişi satırı `owner-cell` + `avatar avatar-tone-*` (baş harfler). Örnek: `Hr/Directory.razor` |
+| Organizasyon ağacı | Var | `ul.org-tree` (rol `tree`, alt düğümler `ul[role=group]`): her düğüm `org-node` (avatar + ad + ikincil satır), alt düzeyler sol kenarda ince çizgiyle girintili; vurgulanan düğüm `org-node active` (marka tonu zemin). Renk, köşe ve çizgi yalnızca `--mx-*` tokenlarından. Örnek: `Hr/OrgChart.razor` (13.11.2026) |
 
 ## Pano bandı ve adım izi
 

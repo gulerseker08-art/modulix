@@ -15,7 +15,7 @@ services:
       SQLCMDPASSWORD: ${MSSQL_SA_PASSWORD}
     ports:
       # 1433 yerine 14333: bilgisayarinizdaki olasi SQL Server kurulumuyla cakismasin
-      - "${MSSQL_PORT:-14333}:1433"
+      - "127.0.0.1:${MSSQL_PORT:-14333}:1433"
     volumes:
       - sqlserver-data:/var/opt/mssql
     healthcheck:
@@ -45,8 +45,8 @@ services:
   mailpit:
     image: axllent/mailpit:v1.32
     ports:
-      - "${MAILPIT_SMTP_PORT:-1025}:1025"
-      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
   api:
     build:
       context: .
@@ -55,7 +55,7 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_HTTP_PORTS: "8080"
       ConnectionStrings__Modulix: "Server=sqlserver,1433;Database=Modulix;User Id=modulix_app;Password=${MODULIX_APP_PASSWORD:?MODULIX_APP_PASSWORD eksik};TrustServerCertificate=True"
       ConnectionStrings__ModulixMigrations: "Server=sqlserver,1433;Database=Modulix;User Id=modulix_migrator;Password=${MODULIX_MIGRATOR_PASSWORD:?MODULIX_MIGRATOR_PASSWORD eksik};TrustServerCertificate=True"

@@ -1,0 +1,303 @@
+@page "/depo/partiler"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+@inject NavigationManager Navigation
+
+<PageTitle>Partiler · Modulix</PageTitle>
+
+<AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.LotsRead">
+    <PageHeader Title="Partiler" Icon="package" Subtitle="@(page is null ? "Depodaki malların malik ve stok kartına göre partilerini yönetin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <LotEditor Lot="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Parti görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Parti ara" placeholder="Parti no veya açıklama ara" @bind="search" />
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(WarehouseAccess.LotsWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni parti</button>
+        }
+    </div>
+
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <LookupPicker Id="lot-stock-item-filter" LookupKey="@WarehouseAccess.LotStockItemLookup" Value="stockItemId" ValueChanged="ChooseStockItemAsync" Placeholder="Tüm stok kartları" />
+            <LookupPicker Id="lot-owner-filter" LookupKey="@WarehouseAccess.LotOwnerLookup" Value="ownerId" ValueChanged="ChooseOwnerAsync" Placeholder="Tüm malikler" />
+        </div>
+    }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan parti yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) parti listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Parti listesi</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var lot in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, lot)
+                        }
+                        <td class="row-menu-cell">
+                            @if (Session.Can(WarehouseAccess.LotsWrite) || Session.Can(WarehouseAccess.MovementsRead))
+                            {
+                            <RowMenu Label="@($"{WarehouseLabels.Text(lot, "lotNo")} eylemleri")">
+                                @if (Session.Can(WarehouseAccess.LotsWrite))
+                                {
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(lot)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                }
+                                @if (Session.Can(WarehouseAccess.MovementsRead))
+                                {
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="@(() => Navigation.NavigateTo($"depo/bakiyeler?lotId={lot.Id}"))"><AppIcon Name="list" Size="16" /> <span>Bakiyeleri</span></button>
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="@(() => Navigation.NavigateTo($"depo/hareketler?lotId={lot.Id}"))"><AppIcon Name="repeat" Size="16" /> <span>Hareketleri</span></button>
+                                }
+                            </RowMenu>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + WarehouseAccess.LotEntityKey;
+
+    private const string AllViews = "all";
+    private const string ActiveView = "active";
+    private const string InactiveView = "inactive";
+
+    // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (LotRecordStore.SortKeys).
+    // Stok kartı ve firma adları sunucuda sıralanmaz (firma görünürlüğü sıralamayla dolanılmasın).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("lotNo", "Parti no", "hash", "lotNo", "-lotNo", Locked: true),
+        new("stockItem", "Stok kartı", "package"),
+        new("owner", "Malik", "building"),
+        new("billTo", "Faturalanan", "wallet", DefaultVisible: false),
+        new("description", "Açıklama", "message-square", DefaultVisible: false),
+        new("isActive", "Durum", "tag", "isActive", "-isActive"),
+    ];
+
+    private readonly GridViewState grid = new("warehouse.lots", "lotNo");
+    private PersonalGridViews views = default!;
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private readonly Dictionary<Guid, string> stockItemNames = [];
+    private readonly Dictionary<Guid, string> partyNames = [];
+    private bool editing;
+    private bool filtersOpen;
+    private string? message;
+    private string? search;
+    private string view = AllViews;
+    private string? isActive;
+    private Guid? stockItemId;
+    private Guid? ownerId;
+
+    private int ActiveFilters => (stockItemId is null ? 0 : 1) + (ownerId is null ? 0 : 1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, "warehouse.lots");
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(WarehouseAccess.LotsRead))
+        {
+            await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(WarehouseAccess.LotEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private GridViewDto? Active => views.Find(view);
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Etkin, Pasif, kişisel); stok kartı ve malik "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm partiler", Icon: "package"),
+        new(ActiveView, "Etkin partiler", Icon: "check-circle"),
+        new(InactiveView, "Pasif partiler", Icon: "clock"),
+        .. views.Options,
+    ];
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            // Kişisel görünüm: sütunlar, sıralama ve süzgeç birlikte gelir.
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            isActive = filters.GetValueOrDefault("isActive");
+            stockItemId = Guid.TryParse(filters.GetValueOrDefault("stockItemId"), out var item) ? item : null;
+            ownerId = Guid.TryParse(filters.GetValueOrDefault("ownerPartyId"), out var owner) ? owner : null;
+        }
+        else
+        {
+            grid.Reset();
+            isActive = key switch { ActiveView => "true", InactiveView => "false", _ => null };
+            stockItemId = ownerId = null;
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task ChooseStockItemAsync(Guid? id)
+    {
+        stockItemId = id;
+        await LoadAsync(1);
+    }
+
+    private async Task ChooseOwnerAsync(Guid? id)
+    {
+        ownerId = id;
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    // Sütun seçimi/sırası değişince veri yeniden çekilmez; olay işleyicisi sayfada olduğu için tablo yeniden çizilir.
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(
+        isActive is { } a ? ("isActive", a) : null,
+        stockItemId is { } s ? ("stockItemId", s.ToString()) : null, ownerId is { } o ? ("ownerPartyId", o.ToString()) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (isActive is { } active)
+        {
+            url += $"&isActive={Uri.EscapeDataString(active)}";
+        }
+
+        if (stockItemId is { } item)
+        {
+            url += $"&stockItemId={item}";
+        }
+
+        if (ownerId is { } owner)
+        {
+            url += $"&ownerPartyId={owner}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+        if (page is not null)
+        {
+            // Adlar yalnızca bu sayfanın kimlikleri için, seçim kutusunun çözümleme ucundan gelir; okuma izni yoksa "—" görünür.
+            await WarehouseLabels.ResolveNamesAsync(Api, WarehouseAccess.LotStockItemLookup, page.Items.Select(l => WarehouseLabels.Id(l, "stockItemId")).OfType<Guid>(), stockItemNames);
+            var parties = page.Items.SelectMany(l => new[] { WarehouseLabels.Id(l, "ownerPartyId"), WarehouseLabels.Id(l, "billToPartyId") }).OfType<Guid>();
+            await WarehouseLabels.ResolveNamesAsync(Api, WarehouseAccess.LotOwnerLookup, parties, partyNames);
+        }
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse lot) => @<td data-label="@column.Label" class="@(column.Key == "lotNo" ? "primary" : null)">@CellContent(column.Key, lot)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse lot) => key switch
+    {
+        "lotNo" => @<text>@WarehouseLabels.Text(lot, "lotNo")</text>,
+        "stockItem" => @<text>@WarehouseLabels.NameOf(stockItemNames, WarehouseLabels.Id(lot, "stockItemId"))</text>,
+        "owner" => @<text>@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(lot, "ownerPartyId"))</text>,
+        "billTo" => @<text>@(WarehouseLabels.Id(lot, "billToPartyId") is { } billTo ? WarehouseLabels.NameOf(partyNames, billTo) : "Malikle aynı")</text>,
+        "description" => @<text>@(WarehouseLabels.Text(lot, "description") is { Length: > 0 } d ? d : "—")</text>,
+        "isActive" => @<span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(lot, "isActive", true))">@(WarehouseLabels.Flag(lot, "isActive", true) ? "Etkin" : "Pasif")</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(WarehouseAccess.LotEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, lot.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private void Open(RecordResponse? lot)
+    {
+        selected = lot;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

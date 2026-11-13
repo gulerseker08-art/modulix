@@ -1,0 +1,158 @@
+@* Masraf beyanı başlık formu (ADR-0042 dilim 3): yeni beyan ya da taslak beyanın başlığı, para birimi ve açıklaması. Düzen firmanın form düzenine
+   (ADR-0021) göre çizilir. Çalışan verilmişse (self servis) sabittir; "masraf yönetimi" izni olan kullanıcı çalışanı seçer. Satırlar beyan kartında
+   eklenir; toplam sunucuda hesaplanır. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Claim is null ? "Yeni masraf beyanı" : "Beyan bilgileri")</h2>
+            @if (EmployeeName is not null)
+            {
+                <p>@EmployeeName</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">@(Claim is null ? "Beyanı aç" : "Kaydet")</button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Masraf beyanı bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
+            {
+                case "employeeId":
+                    @if (Claim is not null || EmployeeId is not null)
+                    {
+                        <span class="@f.LabelClass()">@f.Label</span>
+                        <p class="mb-0"><strong>@(EmployeeName ?? "—")</strong></p>
+                    }
+                    else
+                    {
+                        <label class="@f.LabelClass()" for="expense-employee">@f.Label</label>
+                        <LookupPicker Id="expense-employee" LookupKey="@HrAccess.ExpenseClaimEmployeeLookup" @bind-Value="form.EmployeeId" Required="true" Placeholder="Çalışanı seçin…" Invalid="@(errors?.ContainsKey("employeeId") == true)" />
+                    }
+                    <FieldError Field="employeeId" Errors="errors" />
+                    break;
+                case "title":
+                    <label class="@f.LabelClass()" for="expense-title">@f.Label</label>
+                    <input id="expense-title" class="form-control" maxlength="200" required aria-required="true" placeholder="ör. Ankara müşteri ziyareti" @bind="form.Title" />
+                    <FieldError Field="title" Errors="errors" />
+                    break;
+                case "currency":
+                    <label class="@f.LabelClass()" for="expense-currency">@f.Label</label>
+                    <input id="expense-currency" class="form-control" maxlength="3" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Currency" />
+                    <FieldError Field="currency" Errors="errors" />
+                    break;
+                case "description":
+                    <label class="@f.LabelClass()" for="expense-description">@f.Label</label>
+                    <textarea id="expense-description" class="form-control" rows="3" maxlength="1000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                    <FieldError Field="description" Errors="errors" />
+                    break;
+            }
+        </Field>
+    </LayoutForm>
+</form>
+
+@code {
+    private const string EntityKey = HrAccess.ExpenseClaimEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private ClaimForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    /// <summary>Düzenlenecek taslak beyan; null ise yeni beyan.</summary>
+    [Parameter] public RecordResponse? Claim { get; set; }
+
+    /// <summary>Sabit çalışan (self servis); null ise çalışan seçilir.</summary>
+    [Parameter] public Guid? EmployeeId { get; set; }
+
+    [Parameter] public string? EmployeeName { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        form = Claim is { } c
+            ? new ClaimForm
+            {
+                Id = c.Id, Version = c.Version, Title = WarehouseLabels.Text(c, "title"), Currency = WarehouseLabels.Text(c, "currency"),
+                Description = WarehouseLabels.Text(c, "description"), Custom = c.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new ClaimForm { EmployeeId = EmployeeId };
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var values = new JsonObject
+        {
+            ["title"] = string.IsNullOrWhiteSpace(form.Title) ? null : form.Title.Trim(),
+            ["currency"] = string.IsNullOrWhiteSpace(form.Currency) ? "TRY" : form.Currency.Trim(),
+            ["description"] = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            values["employeeId"] = form.EmployeeId?.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request) : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class ClaimForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? EmployeeId { get; set; }
+
+        public string? Title { get; set; }
+
+        public string? Currency { get; set; } = "TRY";
+
+        public string? Description { get; set; }
+    }
+}

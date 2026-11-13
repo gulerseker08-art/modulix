@@ -55,7 +55,7 @@ public class AdministrationTests(ModulixApiFactory factory) : IClassFixture<Modu
         var userManager = await factory.CreateUserAsync(tenant);
         var member = await factory.CreateUserAsync(tenant);
         var role = await factory.CreateRoleAsync(tenant.Id, [ManageRoles], roleManager);
-        await factory.CreateRoleAsync(tenant.Id, [ManageUsers], userManager);
+        var userRole = await factory.CreateRoleAsync(tenant.Id, [ManageUsers], userManager);
         var membershipId = await factory.GetMembershipIdAsync(member.Id, tenant.Id);
 
         using var roleClient = await LoginAsync(roleManager);
@@ -68,8 +68,11 @@ public class AdministrationTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.Equal(HttpStatusCode.Forbidden,
             (await userClient.PostAsJsonAsync("/api/roles", new SaveRoleRequest("Yeni", []))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await userClient.GetAsync("/api/roles/permissions")).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent,
+        // Yetki yükseltme engeli: kullanıcı yöneticisi kendi izin sınırındaki bir rolü verebilir, roles.manage içeren rolü veremez.
+        Assert.Equal(HttpStatusCode.Forbidden,
             (await userClient.PutAsJsonAsync($"/api/memberships/{membershipId}/roles", new SetMembershipRolesRequest([role.Id]))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await userClient.PutAsJsonAsync($"/api/memberships/{membershipId}/roles", new SetMembershipRolesRequest([userRole.Id]))).StatusCode);
     }
 
     [Fact]

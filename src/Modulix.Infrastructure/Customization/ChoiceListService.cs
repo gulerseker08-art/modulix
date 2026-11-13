@@ -21,7 +21,8 @@ internal sealed class ChoiceListService(
     ITenantContextAccessor tenantAccessor,
     ModuleCatalog catalog,
     IModuleEntitlements entitlements,
-    IAuditWriter audit) : IChoiceListService, IChoiceLists
+    IAuditWriter audit,
+    CustomizationLimits limits) : IChoiceListService, IChoiceLists
 {
     private readonly Dictionary<(Guid TenantId, string ListKey), ChoiceList> cache = [];
 
@@ -68,7 +69,7 @@ internal sealed class ChoiceListService(
 
         var row = await db.ChoiceLists.SingleOrDefaultAsync(l => l.ListKey == listKey, cancellationToken);
         var current = ChoiceListRules.Resolve(definition, row?.Values);
-        var updated = ChoiceListRules.Apply(definition, current, values);
+        var updated = ChoiceListRules.Apply(definition, current, values, limits.MaxValuesPerList);
         var after = ChoiceListRules.Resolve(definition, updated);
         // İlk düzenleme firmanın listesini oluşturur: denetim kaydında tam liste görünür (ve listenin adı kayda geçer).
         var created = row is null;

@@ -1,0 +1,305 @@
+@page "/lojistik/pano"
+@* Lojistik operasyon panosu (ADR-0038 dilim 9a). Veri tek uçtan gelir (/api/logistics/dashboard); her bölüm kendi okuma iznine bağlıdır ve izni
+   olmayana sunucu bölümü göndermez. Ortak pano sınıfları (dash-hero, dash-kpis, dash-grid, dash-card, dash-stage, dash-list) ve grafik bileşenleri
+   kullanılır; ekrana özel CSS yoktur. Tutar gösterilmez (navlun hassas alan; kârlılık dilim 9b). *@
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Lojistik panosu · Modulix</PageTitle>
+
+<AuthGate Module="@LogisticsAccess.ModuleKey" AnyPermission="LogisticsAccess.DashboardAny">
+    <div class="page-header">
+        <div>
+            <h1>Lojistik panosu</h1>
+            <p class="page-subtitle">@(data is null ? "Operasyonun bugünkü durumu" : $"{FleetLabels.Date(data.Today)} · talepten teslime operasyonun durumu")</p>
+        </div>
+        <div class="header-actions">
+            <button type="button" class="btn btn-outline-secondary" disabled="@loading" aria-busy="@(loading ? "true" : null)" @onclick="LoadAsync">
+                <AppIcon Name="repeat" Size="16" /> Yenile
+            </button>
+            @if (Session.Can(LogisticsAccess.TripsWrite))
+            {
+                <a class="btn btn-outline-secondary" href="lojistik/seferler"><AppIcon Name="map-pin" Size="16" /> Seferler</a>
+            }
+            @if (Session.Can(LogisticsAccess.RequestsWrite))
+            {
+                <a class="btn btn-primary" href="lojistik/talepler"><AppIcon Name="plus" Size="16" /> Yeni talep</a>
+            }
+        </div>
+    </div>
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @error
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">Tekrar dene</button>
+        </div>
+    }
+
+    @if (data is null)
+    {
+        @if (error is null)
+        {
+            <p class="text-muted" role="status">Yükleniyor…</p>
+        }
+    }
+    else
+    {
+        var d = data;
+        <section class="dash-hero" aria-label="Bugünün operasyonu">
+            <div>
+                <p class="dash-hero-kicker">Bugünün operasyonu</p>
+                <div class="dash-hero-headline">
+                    @if (d.Trips is { } t)
+                    {
+                        <span class="dash-hero-value">@Count(t.InProgress) sefer yolda</span>
+                        <span class="dash-hero-note">@Count(t.Ready) hazır · @Count(t.StartingToday) sefer bugün başlıyor</span>
+                    }
+                    else if (d.Shipments is { } s)
+                    {
+                        <span class="dash-hero-value">@Count(s.InTransit) sevkiyat yolda</span>
+                    }
+                    else
+                    {
+                        <span class="dash-hero-value">Operasyon özeti</span>
+                    }
+                </div>
+                @if (d.Deliveries is { } del)
+                {
+                    <div class="dash-hero-legend">
+                        <span>Son 30 günde @Count(del.Delivered + del.Partial + del.Failed) teslim kaydı</span>
+                        @if (del.Damaged > 0)
+                        {
+                            <span>@Count(del.Damaged) hasar işaretli</span>
+                        }
+                    </div>
+                }
+            </div>
+            <dl class="dash-hero-stats">
+                @if (d.Requests is { } r)
+                {
+                    <div>
+                        <dd>@Count(r.Awaiting)</dd>
+                        <dt>Onay bekleyen talep</dt>
+                    </div>
+                }
+                @if (d.Shipments is { } sh)
+                {
+                    <div>
+                        <dd>@Count(sh.Pending)</dd>
+                        <dt>Planlama bekleyen sevkiyat</dt>
+                    </div>
+                    <div>
+                        <dd>@Count(sh.Late)</dd>
+                        <dt>Teslim günü geçmiş</dt>
+                    </div>
+                }
+            </dl>
+        </section>
+
+        <div class="dash-kpis" role="group" aria-label="Operasyon özeti">
+            @if (d.Requests is { } req)
+            {
+                <DashKpi Label="Onay bekleyen talep" Icon="inbox" Tone="@(req.Awaiting > 0 ? "warning" : "brand")" Value="@Count(req.Awaiting)"
+                         Detail="@(req.OldestWaitingDays is { } days ? (days == 0 ? "En eskisi bugün açıldı" : $"En eskisi {days} gündür bekliyor") : "Bekleyen talep yok")" />
+            }
+            @if (d.Shipments is { } ship)
+            {
+                <DashKpi Label="Planlama bekleyen sevkiyat" Icon="hourglass" Tone="@(ship.PickupSoonUnplanned > 0 ? "warning" : "brand")" Value="@Count(ship.Pending)"
+                         Detail="@(ship.PickupSoonUnplanned > 0 ? $"{ship.PickupSoonUnplanned} tanesinin yüklemesi yarına kadar" : "Yarına kadar yüklemesi olan yok")" />
+            }
+            @if (d.Trips is { } trips)
+            {
+                <DashKpi Label="Yoldaki sefer" Icon="truck" Tone="teal" Value="@Count(trips.InProgress)"
+                         Detail="@($"{trips.Ready} hazır · {trips.Planning} planlanıyor")" />
+            }
+            @if (d.Deliveries is { } dl)
+            {
+                <DashKpi Label="Teslim başarısı" Icon="check-circle" Tone="success" Value="@(dl.SuccessPercent is { } rate ? $"%{rate.ToString("0.#", Regional.Numbers)}" : "Veri yok")"
+                         Detail="@($"30 gün: {dl.Delivered} teslim · {dl.Partial} kısmi · {dl.Failed} başarısız")"
+                         Trend="@(dl.Days.Select(x => (decimal)(x.Delivered + x.Partial)).ToList())" />
+            }
+        </div>
+
+        @if (d.Shipments is { } mapShipments)
+        {
+            <RouteMap Routes="mapShipments.Routes" />
+        }
+
+        <div class="dash-grid">
+            @if (d.Trips is { } tr)
+            {
+                <section class="dash-card" aria-labelledby="lp-trips">
+                    <div class="dash-card-head">
+                        <h2 id="lp-trips">Yoldaki ve yaklaşan seferler</h2>
+                        <a href="lojistik/seferler">Seferlere git</a>
+                    </div>
+                    @if (tr.Active.Count == 0)
+                    {
+                        <p class="text-muted mb-0">Yolda, hazır ya da bugün-yarın başlayacak sefer yok.</p>
+                    }
+                    else
+                    {
+                        @foreach (var trip in tr.Active)
+                        {
+                            var width = trip.Stops > 0 ? trip.Arrived * 100m / trip.Stops : 0m;
+                            <div class="dash-stage">
+                                <span class="dash-stage-label" title="@TripTitle(trip)">@trip.Number</span>
+                                <div><div class="dash-stage-bar" style="width:@Math.Max(width, trip.Stops > 0 ? 8m : 0m).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%">@trip.Arrived/@trip.Stops</div></div>
+                                <span class="badge @LogisticsLabels.TripStatusBadge(trip.Status)">@LogisticsLabels.TripStatus(trip.Status)</span>
+                            </div>
+                        }
+                        <p class="small text-muted mb-0 mt-3"><AppIcon Name="info" Size="14" /> Çubuk, varış girilen durakların oranıdır; sefer adının üzerine gelince araç ve sıradaki durak görünür.</p>
+                    }
+                </section>
+            }
+
+            @if (d.Shipments is { } st)
+            {
+                <section class="dash-card" aria-labelledby="lp-status">
+                    <div class="dash-card-head">
+                        <h2 id="lp-status">Açık sevkiyatlar</h2>
+                        <a href="lojistik/sevkiyatlar">Sevkiyatlara git</a>
+                    </div>
+                    @if (st.ByStatus.All(x => x.Count == 0))
+                    {
+                        <p class="text-muted mb-0">Açık sevkiyat yok.</p>
+                    }
+                    else
+                    {
+                        <DonutChart Slices="@(st.ByStatus.Select(x => new ChartSlice(LogisticsLabels.CargoStatus(LogisticsLabels.Shipments, x.Status), x.Count)).ToList())"
+                                    Title="Açık sevkiyatların duruma göre dağılımı" Caption="açık sevkiyat" />
+                    }
+                </section>
+            }
+
+            @if (d.Deliveries is { } dd)
+            {
+                <section class="dash-card" aria-labelledby="lp-deliveries">
+                    <div class="dash-card-head"><h2 id="lp-deliveries">Son @dd.Days.Count günün teslimleri</h2></div>
+                    @if (dd.Days.All(x => x.Delivered + x.Partial + x.Failed == 0))
+                    {
+                        <p class="text-muted mb-0">Bu günlerde teslim kaydı yok.</p>
+                    }
+                    else
+                    {
+                        <ColumnChart Title="Günlere göre teslim edilen ve kısmi teslim edilen sevkiyat"
+                                     Items="@(dd.Days.Select(x => new ColumnChart.Item(x.Day.Day.ToString(Regional.Numbers), FleetLabels.Date(x.Day), x.Delivered + x.Partial, Count(x.Delivered + x.Partial))).ToList())" />
+                        @if (dd.Failed > 0)
+                        {
+                            <p class="small text-muted mb-0 mt-3"><AppIcon Name="alert-circle" Size="14" /> Son 30 günde @dd.Failed teslim başarısız oldu.</p>
+                        }
+                    }
+                </section>
+            }
+
+            @if (d.Shipments is { } late)
+            {
+                <section class="dash-card" aria-labelledby="lp-late">
+                    <div class="dash-card-head">
+                        <h2 id="lp-late">Teslim günü geçenler</h2>
+                        @if (late.Late > late.LateItems.Count)
+                        {
+                            <a href="lojistik/sevkiyatlar">@late.Late sevkiyatın tümü</a>
+                        }
+                    </div>
+                    @if (late.LateItems.Count == 0)
+                    {
+                        <p class="text-muted mb-0">En geç teslim günü geçmiş açık sevkiyat yok.</p>
+                    }
+                    else
+                    {
+                        <ul class="dash-list">
+                            @foreach (var item in late.LateItems)
+                            {
+                                <li>
+                                    <div class="dash-list-main">
+                                        <a href="lojistik/sevkiyatlar" title="@($"{item.PickupCity} → {item.DeliveryCity}")">@item.PickupCity → @item.DeliveryCity</a>
+                                        <small>@($"En geç {FleetLabels.Date(item.DeliveryBy)} · {LogisticsLabels.CargoStatus(LogisticsLabels.Shipments, item.Status)}")</small>
+                                    </div>
+                                    <span class="badge stage-lost">@item.DaysLate gün</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+            }
+
+            @if (d.Credentials is { } cr)
+            {
+                <section class="dash-card" aria-labelledby="lp-credentials">
+                    <div class="dash-card-head">
+                        <h2 id="lp-credentials">Sürücü belgeleri</h2>
+                        <a href="lojistik/surucu-belgeleri">Belgelere git</a>
+                    </div>
+                    @if (cr.Items.Count == 0)
+                    {
+                        <p class="text-muted mb-0">Önümüzdeki 30 günde süresi dolan sürücü belgesi yok.</p>
+                    }
+                    else
+                    {
+                        <p class="small text-muted">@($"{cr.Expired} belgenin süresi dolmuş · {cr.ExpiringSoon} belge 30 gün içinde doluyor")</p>
+                        <ul class="dash-list">
+                            @foreach (var item in cr.Items)
+                            {
+                                var expired = item.ValidTo < d.Today;
+                                <li>
+                                    <OwnerCell Name="@item.DriverName" AvatarOnly="true" />
+                                    <div class="dash-list-main">
+                                        <span>@item.DriverName</span>
+                                        <small>@($"{item.TypeLabel} · {FleetLabels.Date(item.ValidTo)}")</small>
+                                    </div>
+                                    <span class="badge @(expired ? "stage-lost" : "stage-negotiation")">@(expired ? "Süresi doldu" : $"{item.ValidTo.DayNumber - d.Today.DayNumber} gün")</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+            }
+        </div>
+    }
+</AuthGate>
+
+@code {
+    private readonly Dictionary<Guid, string> plates = [];
+    private LogisticsDashboardDto? data;
+    private string? error;
+    private bool loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.CanAny(LogisticsAccess.DashboardAny))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        var result = await Api.GetAsync<LogisticsDashboardDto>("/api/logistics/dashboard");
+        loading = false;
+        error = result.Error;
+        if (result.Value is { } value)
+        {
+            data = value;
+            if (value.Trips is { } trips)
+            {
+                await WarehouseLabels.ResolveNamesAsync(Api, LogisticsAccess.TripVehicleLookup,
+                    trips.Active.SelectMany(t => new[] { t.VehicleId, t.TrailerId }).OfType<Guid>(), plates);
+            }
+        }
+    }
+
+    private static string Count(int value) => value.ToString("N0", Regional.Numbers);
+
+    /// <summary>"34 ABC 12 + 34 DRS 5 · sıradaki: Ankara" (ipucu).</summary>
+    private string TripTitle(DashboardTripDto trip)
+    {
+        string[] vehicles = [.. new[] { trip.VehicleId, trip.TrailerId }.OfType<Guid>().Select(id => WarehouseLabels.NameOf(plates, id))];
+        var vehicle = vehicles.Length == 0 ? "Araç seçilmedi" : string.Join(" + ", vehicles);
+        var next = trip.NextCity is { } city ? $" · sıradaki durak: {city}" : trip.Stops > 0 ? " · bütün duraklara varıldı" : " · durak yok";
+        return $"{vehicle} · {FleetLabels.Date(trip.PlannedStart)}{next}";
+    }
+}

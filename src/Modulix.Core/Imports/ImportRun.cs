@@ -60,10 +60,13 @@ public static class ImportIssueCodes
     public const string FileInvalid = "file-invalid";
     public const string SystemError = "system-error";
 
+    /// <summary>Aynı dosya (özeti aynı) aynı kayıt türüne daha önce uygulanmış: uyarıdır, yüklemeyi engellemez (ADR-0033 Dilim 4b).</summary>
+    public const string FileRepeated = "file-repeated";
+
     public static IReadOnlyList<string> All { get; } =
     [
         RequiredMissing, FormatInvalid, LookupUnresolved, DuplicateExact, DuplicatePossible,
-        CustomFieldInvalid, PermissionDenied, BusinessRule, FileInvalid, SystemError,
+        CustomFieldInvalid, PermissionDenied, BusinessRule, FileInvalid, SystemError, FileRepeated,
     ];
 
     public static bool IsKnown(string code) => All.Contains(code, StringComparer.Ordinal);
@@ -266,6 +269,26 @@ public sealed class ImportRun : ITenantEntity, ICompanyShared
 
         Status = ImportRunStatus.Cancelled;
         Finish(null, now);
+    }
+
+    /// <summary>Geri alınabilir mi (Dilim 4d): yalnızca kayıt almış ve bitmiş bir uygulama; kuru çalışma ve başarısız koşu kayıt yazmamıştır.</summary>
+    public bool CanRollBack => Mode == ImportRunMode.Apply
+        && Status is ImportRunStatus.Succeeded or ImportRunStatus.PartiallySucceeded && CreatedCount > 0;
+
+    /// <summary>
+    /// Koşunun oluşturduğu kayıtlar geri alındı. Sonradan değiştirilmiş ya da başka kayda bağlanmış kayıtlar silinmez; not kaç kaydın
+    /// silindiğini ve kaçının neden korunduğunu söyler (kişisel veri içermez). Alınan satır sayıları özgün sonucu gösterdiği için değişmez.
+    /// </summary>
+    public void RollBack(string note)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(note);
+        if (!CanRollBack)
+        {
+            throw new InvalidOperationException("Yalnızca kayıt almış ve bitmiş bir içe aktarma geri alınabilir.");
+        }
+
+        Status = ImportRunStatus.RolledBack;
+        Note = Truncate(note, NoteMaxLength);
     }
 
     private void Finish(string? note, DateTimeOffset now)

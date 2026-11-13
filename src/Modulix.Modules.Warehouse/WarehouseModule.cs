@@ -458,5 +458,6 @@ public sealed class WarehouseModule : IModule
         services.AddScoped<IRecordStore, StockMovementRecordStore>();
         services.AddScoped<IRecordStore, StockBalanceRecordStore>();
         services.AddScoped<IRegistrationNoCheck, RegistrationNoCheck>();
+        services.AddScoped<Dashboard.IWarehouseDashboard, WarehouseDashboard>();
     }
 }

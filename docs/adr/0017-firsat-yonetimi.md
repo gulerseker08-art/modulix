@@ -10,7 +10,7 @@ kapanış bilgisi (tarih, gerçekleşen tutar, neden), kişi rolleri, rakipler, 
 
 ## Kararlar
 
-1. **Tenant başına ayrı veritabanı** (ADR-0009) zaten mimaridir; fırsat bu mimariyi değiştirmez. Yeni tablolar tenant iş
+1. **Tenant başına ayrı veritabanı** (ADR-0009; **ADR-0020 ile tek veritabanına dönüldü**, en alttaki güncel durum notuna bakın) zaten mimaridir; fırsat bu mimariyi değiştirmez. Yeni tablolar tenant iş
    veritabanındadır (`crm.OpportunityContacts`, `crm.OpportunityCompetitors`, `crm.OpportunityHistory`), RLS'e eklenmiştir.
 2. **Durum ayrı bir kavramdır** (`Open`, `OnHold`, `Won`, `Lost`, `Cancelled`) ve aşama kategorisiyle şöyle ilişkilidir:
 
@@ -78,3 +78,9 @@ toplu geri doldurma için politika yalnızca o işlem boyunca (aynı işlemde) k
   fazla bekleme bildirimleri yazılmadı (zamanlanmış iş/bildirim tercihi altyapısı yok).
 - Toplu işlemler, sunucu taraflı sıralama seçimi, kayıtlı görünümler, kur dönüşümü.
 - Ekranlar derleniyor ancak tarayıcıda elle doğrulanmadı.
+
+## Güncel durum notu (13 Kasım 2026)
+
+- **Veritabanı modeli:** "Tenant başına ayrı veritabanı" (Kararlar, madde 1) [ADR-0020](0020-tek-veritabanina-donus.md) ile değişti: tek paylaşımlı veritabanı, tenant tabloları EF süzgeci + SQL Server RLS ile korunur. Fırsat tablolarının `TenantId` + RLS ile korunması bu modelde de geçerlidir.
+- **Kalan işler listesinden kapananlar:** teklif modülü ve teklif–fırsat entegrasyonu ([ADR-0019](0019-teklif-yonetimi.md), dokuzuncu dilim); sipariş ([ADR-0023](0023-siparis-ve-satis-devri.md)) ve sözleşme ([ADR-0022](0022-sozlesme-yonetimi.md)) devri; dosya eki altyapısı ([ADR-0040](0040-dosya-ve-ekler.md)); bildirim ve zamanlanmış iş altyapısı ([ADR-0027](0027-kural-ve-is-akisi-altyapisi.md)); kayıtlı/kişisel görünümler ve sunucu sıralaması ([ADR-0036](0036-kisisel-liste-gorunumleri.md)); satış tahmini raporları ([ADR-0035](0035-raporlama-ve-satis-tahmini.md)); kazanıldı/kaybedildi iş olayları ([ADR-0039](0039-modul-is-olaylari.md)).
+- **Hâlâ geçerli:** çoklu pipeline (ürün kararı), fırsata `CampaignId` ve iş birimi sahipliği (A-12), iş birliği yapan kullanıcılar, ayrı atama izni, geciken aksiyon/yaklaşan kapanış bildirimleri (altyapı var, kural yazılmadı).

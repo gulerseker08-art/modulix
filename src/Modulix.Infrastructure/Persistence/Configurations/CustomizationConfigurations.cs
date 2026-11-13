@@ -46,6 +46,54 @@ internal sealed class TenantChoiceListConfiguration : IEntityTypeConfiguration<T
     }
 }
 
+internal sealed class SubProfileConfiguration : IEntityTypeConfiguration<SubProfile>
+{
+    public void Configure(EntityTypeBuilder<SubProfile> builder)
+    {
+        // Tenant verisi (ADR-0041): firmanın alt profilleri; Row-Level Security ile korunur (migration: TenantIsolationSql).
+        builder.ToTable("SubProfiles", DatabaseSchemas.Meta);
+        builder.HasKey(p => p.Id);
+        builder.Property(p => p.Id).ValueGeneratedNever();
+        builder.Property(p => p.TenantId).IsRequired();
+        builder.Property(p => p.Code).HasMaxLength(SubProfile.CodeMaxLength).IsRequired();
+        builder.Property(p => p.Name).HasMaxLength(SubProfile.NameMaxLength).IsRequired();
+        builder.Property(p => p.Description).HasMaxLength(SubProfile.DescriptionMaxLength);
+        builder.Property(p => p.ActivityCode).HasMaxLength(50);
+        builder.Property(p => p.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(p => p.Revision).IsRequired().IsConcurrencyToken();
+        builder.Property(p => p.CreatedAt).IsRequired();
+        builder.Property(p => p.UpdatedAt).IsRequired();
+        builder.HasIndex(p => new { p.TenantId, p.Code }).IsUnique();
+        builder.HasAlternateKey(p => new { p.TenantId, p.Id });
+    }
+}
+
+internal sealed class SubProfileOptionConfiguration : IEntityTypeConfiguration<SubProfileOption>
+{
+    public void Configure(EntityTypeBuilder<SubProfileOption> builder)
+    {
+        builder.ToTable("SubProfileOptions", DatabaseSchemas.Meta);
+        builder.HasKey(o => o.Id);
+        builder.Property(o => o.Id).ValueGeneratedNever();
+        builder.Property(o => o.TenantId).IsRequired();
+        builder.Property(o => o.SubProfileId).IsRequired();
+        builder.Property(o => o.Kind).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(o => o.TargetKey).HasMaxLength(SubProfileOption.TargetMaxLength).IsRequired();
+        builder.Property(o => o.Label).HasMaxLength(SubProfileOption.LabelMaxLength).IsRequired();
+        builder.Property(o => o.FieldType);
+        builder.Property(o => o.ChoicesJson).IsRequired();
+        builder.Property(o => o.Category).HasMaxLength(100);
+        builder.Property(o => o.CreatedAt).IsRequired();
+        builder.Ignore(o => o.Choices);
+        builder.Ignore(o => o.IsApplied);
+        builder.HasIndex(o => new { o.TenantId, o.SubProfileId, o.Kind, o.TargetKey, o.Label }).IsUnique();
+        builder.HasAlternateKey(o => new { o.TenantId, o.Id });
+        // Alt profil ile seçenek aynı tenant'tadır (bileşik yabancı anahtar); alt profil silinmediği için kaskad yoktur.
+        builder.HasOne<SubProfile>().WithMany().HasForeignKey(o => new { o.TenantId, o.SubProfileId })
+            .HasPrincipalKey(p => new { p.TenantId, p.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class TenantFormLayoutConfiguration : IEntityTypeConfiguration<TenantFormLayout>
 {
     public void Configure(EntityTypeBuilder<TenantFormLayout> builder)

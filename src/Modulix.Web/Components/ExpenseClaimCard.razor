@@ -1,0 +1,209 @@
+@* Masraf beyanı kartı (ADR-0042 dilim 3): beyan özeti, iş akışı eylemleri, satırlar ve satır başına fiş/fatura dosyaları. Taslak beyanda sahibi ya da
+   İK başlığı düzenler, satır ekler, değiştirir ve siler; diğer durumlarda kart salt okunurdur (sunucu denetler). Her satır değişikliğinden sonra
+   beyan yeniden okunur (toplam ve sürüm sunucudadır). *@
+@inject ApiClient Api
+@inject SessionState Session
+
+<section class="record-form sectioned" aria-label="Masraf beyanı">
+    <div class="form-toolbar">
+        <div>
+            <h2>@WarehouseLabels.Text(Claim, "title")</h2>
+            <p>@WarehouseLabels.Text(Claim, "employeeName") · <span class="badge @HrLabels.ExpenseStatusBadge(Status)">@HrLabels.ExpenseStatus(Status)</span></p>
+        </div>
+        <div class="form-toolbar-actions">
+            @if (CanEdit && !editingHeader)
+            {
+                <button type="button" class="btn btn-ghost" @onclick="() => editingHeader = true"><AppIcon Name="pencil" Size="16" /> Beyanı düzenle</button>
+            }
+            <button type="button" class="btn btn-outline-secondary" @onclick="Closed">Kapat</button>
+        </div>
+    </div>
+
+    @if (editingHeader)
+    {
+        <ExpenseClaimEditor Claim="Claim" EmployeeName="@WarehouseLabels.Text(Claim, "employeeName")" Lookups="Lookups" Saved="HeaderSavedAsync" Cancelled="() => editingHeader = false" />
+    }
+
+    <LeaveActionsBar Record="Claim" BaseUrl="/api/hr/expense-claims" Changed="ChangedAsync" />
+
+    <div class="stat-grid">
+        <div class="stat-card"><span>Toplam (KDV dahil)</span><strong>@HrLabels.Money(HrLabels.Decimal(Claim, "totalAmount"), Currency)</strong></div>
+        <div class="stat-card"><span>Satır</span><strong>@WarehouseLabels.Number(Claim, "lineCount")</strong></div>
+    </div>
+
+    <dl class="summary-facts mt-3">
+        <div><dt>Onaylayan</dt><dd>@(WarehouseLabels.Id(Claim, "approverUserId") is { } approver ? Lookups.MemberName(approver) : Status == "draft" ? "Gönderimde belirlenir" : "İK")</dd></div>
+        @if (WarehouseLabels.Text(Claim, "decisionReason") is { Length: > 0 } reason)
+        {
+            <div><dt>Gerekçe</dt><dd>@reason</dd></div>
+        }
+        @if (WarehouseLabels.Text(Claim, "paymentReference") is { Length: > 0 } reference)
+        {
+            <div><dt>Ödeme referansı</dt><dd>@reference</dd></div>
+        }
+        @if (WarehouseLabels.Text(Claim, "description") is { Length: > 0 } description)
+        {
+            <div><dt>Açıklama</dt><dd>@description</dd></div>
+        }
+    </dl>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editingLine)
+    {
+        <ExpenseLineEditor ClaimId="Claim.Id" Currency="@Currency" Line="selectedLine" Lookups="Lookups" Saved="LineSavedAsync" Cancelled="() => editingLine = false" />
+    }
+
+    <div class="list-toolbar mt-3">
+        <h3 class="h6 mb-0 me-auto">Masraf satırları</h3>
+        @if (CanEdit && !editingLine)
+        {
+            <button type="button" class="btn btn-tonal" @onclick="() => OpenLine(null)"><AppIcon Name="plus" Size="16" /> Satır ekle</button>
+        }
+    </div>
+
+    @if (lines is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (lines.Count == 0)
+    {
+        <p class="text-muted" role="status">Henüz masraf satırı yok. Onaya göndermeden önce en az bir satır ekleyin.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Masraf satırları</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><AppIcon Name="calendar" Size="14" /> Tarih</th>
+                    <th scope="col"><AppIcon Name="tag" Size="14" /> Tür</th>
+                    <th scope="col"><AppIcon Name="type" Size="14" /> Açıklama</th>
+                    <th scope="col" class="text-end"><AppIcon Name="coins" Size="14" /> Tutar</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var line in lines)
+                {
+                    <tr>
+                        <td data-label="Tarih" class="primary">@HrLabels.Date(WarehouseLabels.Text(line, "expenseDate"))</td>
+                        <td data-label="Tür">@Lookups.Label(HrAccess.ExpenseTypeList, WarehouseLabels.Text(line, "expenseTypeKey"))</td>
+                        <td data-label="Açıklama">@(WarehouseLabels.Text(line, "description") is { Length: > 0 } d ? d : "—")</td>
+                        <td data-label="Tutar" class="text-end">@HrLabels.Money(HrLabels.Decimal(line, "amount"), Currency)</td>
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{HrLabels.Date(WarehouseLabels.Text(line, "expenseDate"))} satırı eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => receiptsFor = line.Id"><AppIcon Name="file-text" Size="16" /> <span>Fiş ve fatura</span></button>
+                                @if (CanEdit)
+                                {
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenLine(line)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteLineAsync(line)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                }
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (receiptsFor is { } lineId)
+    {
+        <AttachmentPanel EntityKey="@HrAccess.ExpenseLineEntityKey" RecordId="lineId" CanWrite="CanEdit" Title="Fiş ve fatura"
+                         EmptyText="Bu satıra henüz fiş ya da fatura eklenmedi." />
+    }
+</section>
+
+@code {
+    private List<RecordResponse>? lines;
+    private RecordResponse? selectedLine;
+    private bool editingLine;
+    private bool editingHeader;
+    private Guid? receiptsFor;
+    private string? message;
+    private Guid loadedFor;
+
+    [Parameter, EditorRequired] public RecordResponse Claim { get; set; } = default!;
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    /// <summary>Beyan değişince (eylem, başlık ya da satır) yeni hali.</summary>
+    [Parameter] public EventCallback<RecordResponse> Changed { get; set; }
+
+    [Parameter] public EventCallback Closed { get; set; }
+
+    private string Status => WarehouseLabels.Text(Claim, "status");
+
+    private string Currency => WarehouseLabels.Text(Claim, "currency");
+
+    /// <summary>Taslak beyanı sahibi ya da İK düzenler (arayüz kolaylığı; kural sunucudadır).</summary>
+    private bool CanEdit => Status == "draft"
+        && (Session.Can(HrAccess.ExpensesManage)
+            || (Session.Can(HrAccess.ExpensesRequest) && WarehouseLabels.Id(Claim, "employeeUserId") is { } owner && owner == Session.User?.UserId));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == Claim.Id)
+        {
+            return;
+        }
+
+        loadedFor = Claim.Id;
+        editingLine = editingHeader = false;
+        receiptsFor = null;
+        await LoadLinesAsync();
+    }
+
+    private async Task LoadLinesAsync()
+    {
+        var result = await Api.GetAsync<RecordPageResponse>($"/api/records/{HrAccess.ExpenseLineEntityKey}?claimId={Claim.Id}&pageSize=200");
+        lines = result.Value?.Items.ToList() ?? [];
+        message = result.Error;
+    }
+
+    private void OpenLine(RecordResponse? line)
+    {
+        selectedLine = line;
+        editingLine = true;
+    }
+
+    private async Task LineSavedAsync(RecordResponse saved)
+    {
+        editingLine = false;
+        receiptsFor = saved.Id;
+        await RefreshAsync();
+    }
+
+    private async Task DeleteLineAsync(RecordResponse line)
+    {
+        var result = await Api.DeleteAsync($"/api/records/{HrAccess.ExpenseLineEntityKey}/{line.Id}?version={line.Version}");
+        message = result.IsSuccess ? null : result.Error;
+        if (receiptsFor == line.Id)
+        {
+            receiptsFor = null;
+        }
+
+        await RefreshAsync();
+    }
+
+    private async Task HeaderSavedAsync(RecordResponse saved)
+    {
+        editingHeader = false;
+        await Changed.InvokeAsync(saved);
+    }
+
+    private async Task ChangedAsync(RecordResponse changed) => await Changed.InvokeAsync(changed);
+
+    /// <summary>Satırlar ve beyan (toplam, sürüm) yeniden okunur.</summary>
+    private async Task RefreshAsync()
+    {
+        await LoadLinesAsync();
+        if ((await Api.GetAsync<RecordResponse>($"/api/records/{HrAccess.ExpenseClaimEntityKey}/{Claim.Id}")).Value is { } fresh)
+        {
+            await Changed.InvokeAsync(fresh);
+        }
+    }
+}

@@ -54,7 +54,7 @@ internal sealed class UserAdministration(
     public async Task<UserPage> ListAsync(UserQuery query, CancellationToken cancellationToken)
     {
         var tenant = RequireTenant();
-        var page = Math.Max(1, query.Page);
+        var page = Math.Clamp(query.Page, 1, 100_000);
         var pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
 
         var members =
@@ -185,6 +185,12 @@ internal sealed class UserAdministration(
         if (!byPlatform && assignable.Any(r => r.IsSystem))
         {
             await EnsureActorIsAdministratorAsync(tenant, cancellationToken);
+        }
+
+        // Davetle de kendinde olmayan izin ya da kapsam verilemez (yetki yükseltmeye karşı; rol atamasıyla aynı kural).
+        if (!byPlatform)
+        {
+            await roles.EnsureActorMayAssignRolesAsync(tenant.MembershipId, roleIds, cancellationToken);
         }
 
         var businessUnit = await ResolveInviteBusinessUnitAsync(tenant, invitation.BusinessUnitId, byPlatform, cancellationToken);
@@ -700,6 +706,7 @@ internal sealed class UserAdministration(
         }
 
         await EnsureMayManageAsync(tenant, membershipId, cancellationToken);
+        await EnsureAccountOwnedByTenantAsync(tenant, membership.UserId, cancellationToken);
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await sessions.CloseAllAsync(membership.UserId, except: null, cancellationToken);
@@ -719,6 +726,7 @@ internal sealed class UserAdministration(
         }
 
         await EnsureMayManageAsync(tenant, membershipId, cancellationToken);
+        await EnsureAccountOwnedByTenantAsync(tenant, user.Id, cancellationToken);
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         ThrowIfFailed(await users.SetLockoutEndDateAsync(user, null));
@@ -830,6 +838,23 @@ internal sealed class UserAdministration(
     }
 
     /// <summary>Hedef üyelik yöneticiyse işlemi yalnızca yönetici yapabilir.</summary>
+    /// <summary>
+    /// Hesap düzeyindeki işlemler (kilidi açma, bütün oturumları kapatma) yalnızca hesap bu firmaya aitse yapılır.
+    /// Hesap başka bir firmada da üyeyse ya da platform hesabıysa firma yöneticisi o hesabın küresel kilidini
+    /// sıfırlayamaz ve öteki firmalardaki oturumlarını kapatamaz (kilit atlatılarak şifre denemesi engellenir).
+    /// </summary>
+    private async Task EnsureAccountOwnedByTenantAsync(TenantContext tenant, Guid userId, CancellationToken cancellationToken)
+    {
+        bool isPlatformAccount = await db.Users.AsNoTracking()
+            .AnyAsync(u => u.Id == userId && (u.IsPlatformAdministrator || u.PlatformRoles != Modulix.Core.Platform.PlatformRole.None), cancellationToken);
+        bool sharedWithOtherTenant = await db.Memberships.AsNoTracking()
+            .AnyAsync(m => m.UserId == userId && m.TenantId != tenant.TenantId, cancellationToken);
+        if (isPlatformAccount || sharedWithOtherTenant)
+        {
+            throw Conflict("Bu hesap başka kuruluşlarda da kullanılıyor; kilit ve oturumlar hesabın sahibi tarafından yönetilir.");
+        }
+    }
+
     private async Task EnsureMayManageAsync(TenantContext tenant, Guid membershipId, CancellationToken cancellationToken)
     {
         if (await IsAdministratorAsync(membershipId, cancellationToken))

@@ -58,6 +58,21 @@ internal sealed class StockMovementRecordStore(WarehouseStoreContext context) : 
 
     protected override IOrderedQueryable<StockMovement> Order(IQueryable<StockMovement> source) => source.OrderByDescending(m => m.OccurredAt);
 
+    // Liste başlıklarına göre sıralama; eşit kayıtlar en yeni önce gelir.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } = WithDescending("occurredAt", "typeKey", "quantity");
+
+    protected override IOrderedQueryable<StockMovement> Order(IQueryable<StockMovement> source, string? sort)
+    {
+        var desc = sort?.StartsWith('-') == true;
+        return sort?.TrimStart('-') switch
+        {
+            "occurredAt" => By(source, m => m.OccurredAt, desc),
+            "typeKey" => By(source, m => m.TypeKey, desc).ThenByDescending(m => m.OccurredAt),
+            "quantity" => By(source, m => m.Quantity, desc).ThenByDescending(m => m.OccurredAt),
+            _ => Order(source),
+        };
+    }
+
     protected override IQueryable<StockMovement> Search(IQueryable<StockMovement> source, string term) =>
         source.Where(m => (m.DocumentReference != null && m.DocumentReference.Contains(term)) || (m.IdempotencyKey != null && m.IdempotencyKey.Contains(term)));
 

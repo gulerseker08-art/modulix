@@ -83,7 +83,8 @@ internal sealed class QuoteWorkflow(
     TimeProvider time,
     ITenantContextAccessor tenant,
     IQuotePolicyProvider? policyProvider = null,
-    IActivityCodeCatalog? activityCodes = null) : IQuoteWorkflow
+    IActivityCodeCatalog? activityCodes = null,
+    Modulix.Core.Contracts.Events.IBusinessEventPublisher? events = null) : IQuoteWorkflow
 {
     private const string Key = CrmModule.Entities.Quote;
     private const string RequiredApproval = "Required";
@@ -337,7 +338,20 @@ internal sealed class QuoteWorkflow(
         RecordResult<RecordData> result;
         using (gate.Open([permission], eventKind, Trim(historyReason ?? reason)))
         {
-            result = await pipeline.UpdateAsync(new RecordCommand(Key, id, values, version) { Reason = $"quote.{eventKind}" }, cancellationToken);
+            var command = new RecordCommand(Key, id, values, version) { Reason = $"quote.{eventKind}" };
+            result = action == QuoteAction.Accept && events is not null
+                // Kabul iş olayı (ADR-0039) durum değişikliğiyle aynı işlemde yazılır.
+                ? await pipeline.RunAtomicAsync(async ct =>
+                {
+                    var updated = await pipeline.UpdateAsync(command, ct);
+                    if (updated.IsSuccess)
+                    {
+                        await QuoteAcceptedEvent.PublishAsync(events, updated.Value!, QuoteAcceptedEvent.Manual, ct);
+                    }
+
+                    return updated;
+                }, cancellationToken)
+                : await pipeline.UpdateAsync(command, cancellationToken);
         }
 
         return result;

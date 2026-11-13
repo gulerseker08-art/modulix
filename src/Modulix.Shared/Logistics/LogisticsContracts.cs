@@ -68,6 +68,9 @@ public static class LogisticsAccess
     public const string TripsRead = "logistics.trips.read";
     public const string TripsWrite = "logistics.trips.write";
 
+    /// <summary>Panoyu açmak için bunlardan biri yeter; her bölüm kendi okuma iznine bağlıdır.</summary>
+    public static IReadOnlyList<string> DashboardAny { get; } = [RequestsRead, ShipmentsRead, TripsRead, DriversRead];
+
     public const string TripEntityKey = "logistics.trip";
     public const string TripStopEntityKey = "logistics.trip-stop";
     public const string DeliveryProofEntityKey = "logistics.delivery-proof";
@@ -169,3 +172,40 @@ public sealed record RecordDeliveryRequest(long Version, string Outcome, string?
 
 /// <summary>Teslim komutunun sonucu: güncel sevkiyat ve yazılan (değişmez) teslim kanıtı.</summary>
 public sealed record DeliveryResponse(RecordResponse Shipment, RecordResponse Proof);
+
+/// <summary>
+/// Lojistik operasyon panosu (ADR-0038 dilim 9a; <c>GET /api/logistics/dashboard</c>). Bölümler okuma iznine göre gelir: izni olmayan bölüm boştur.
+/// Alan adları sunucudaki <c>LogisticsDashboard</c> kaydıyla aynıdır.
+/// </summary>
+public sealed record LogisticsDashboardDto(
+    DateOnly Today,
+    DashboardRequestsDto? Requests,
+    DashboardShipmentsDto? Shipments,
+    DashboardTripsDto? Trips,
+    DashboardDeliveriesDto? Deliveries,
+    DashboardCredentialsDto? Credentials);
+
+public sealed record DashboardRequestsDto(int Awaiting, int? OldestWaitingDays);
+
+public sealed record DashboardShipmentsDto(
+    int Pending, int PickupSoonUnplanned, int Late, int InTransit, IReadOnlyList<DashboardStatusCountDto> ByStatus, IReadOnlyList<DashboardLateShipmentDto> LateItems,
+    IReadOnlyList<DashboardRouteDto> Routes);
+
+/// <summary>Güzergâh özeti (harita): etkin sevkiyatların yükleme ve teslim şehri (kayıttaki metin) ve sayısı.</summary>
+public sealed record DashboardRouteDto(string From, string To, int Count);
+
+public sealed record DashboardStatusCountDto(string Status, int Count);
+
+public sealed record DashboardLateShipmentDto(Guid Id, string PickupCity, string DeliveryCity, DateOnly DeliveryBy, string Status, int DaysLate);
+
+public sealed record DashboardTripsDto(int Planning, int Ready, int InProgress, int StartingToday, IReadOnlyList<DashboardTripDto> Active);
+
+public sealed record DashboardTripDto(Guid Id, string Number, string Status, DateOnly PlannedStart, Guid? VehicleId, Guid? TrailerId, int Stops, int Arrived, string? NextCity);
+
+public sealed record DashboardDeliveriesDto(int Delivered, int Partial, int Failed, int Damaged, decimal? SuccessPercent, IReadOnlyList<DashboardDayDto> Days);
+
+public sealed record DashboardDayDto(DateOnly Day, int Delivered, int Partial, int Failed);
+
+public sealed record DashboardCredentialsDto(int Expired, int ExpiringSoon, IReadOnlyList<DashboardCredentialDto> Items);
+
+public sealed record DashboardCredentialDto(Guid DriverId, string DriverName, string TypeLabel, DateOnly ValidTo);

@@ -29,6 +29,47 @@ public class ImportDesignRulesTests
     public void A_code_required_column_survives_even_a_stored_exclusion() =>
         Assert.Contains(ImportDesignRules.Apply([Name], new ImportDesignInput(true, false, ["name"], [])), f => f.Key == "name");
 
+    // ADR-0033 Dilim 4c: kayıtlı sütun eşlemesi.
+    [Fact]
+    public void Saved_aliases_bind_file_headers_to_their_column_but_never_steal_another_columns_name()
+    {
+        var aliases = new Dictionary<string, IReadOnlyList<string>> { ["city"] = ["İL", "Bulunduğu şehir"] };
+        var fields = ImportDesignRules.Apply([Name, City, Notes], new ImportDesignInput(true, false, [], [], aliases));
+
+        Assert.Equal(["İL", "Bulunduğu şehir"], fields[1].Aliases);
+        var map = ImportColumns.Bind(["ad", "il", "Notlar"], fields);
+        Assert.Equal(["name", "city", "notes"], map.Columns.Select(c => c.Field.Key));
+        Assert.Empty(map.Unknown);
+    }
+
+    [Fact]
+    public void Alias_validation_rejects_unknown_columns_taken_names_shared_aliases_and_limits()
+    {
+        IReadOnlyList<Modulix.Core.Contracts.Records.RecordFieldError> Errors(Dictionary<string, IReadOnlyList<string>> aliases) =>
+            ImportDesignRules.Validate([Name, City, Notes], new ImportDesignInput(true, false, [], [], aliases));
+
+        Assert.Empty(Errors(new() { ["city"] = ["İl", "Şehir"] })); // kendi adı tekrar yazılabilir
+        Assert.Equal("yok", Assert.Single(Errors(new() { ["yok"] = ["X"] })).Field);
+        Assert.Contains("başka bir sütunun adı", Assert.Single(Errors(new() { ["city"] = ["notlar"] })).Message);
+        Assert.Contains("hata raporunun", Assert.Single(Errors(new() { ["city"] = ["Hata"] })).Message);
+        Assert.Contains("birden çok sütuna", Assert.Single(Errors(new() { ["city"] = ["Bölge"], ["notes"] = ["BÖLGE"] })).Message);
+        Assert.Single(Errors(new() { ["city"] = [.. Enumerable.Range(1, ImportDesignRules.MaxAliasesPerField + 1).Select(i => $"Ad {i}")] }));
+        Assert.Single(Errors(new() { ["city"] = [new string('x', ImportDesignRules.MaxAliasLength + 1)] }));
+    }
+
+    [Fact]
+    public void Aliases_are_trimmed_deduplicated_and_empty_entries_dropped()
+    {
+        var normalized = ImportDesignRules.NormalizeAliases(new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["city"] = ["  İl ", "il", "", "Şehir adı"],
+            ["notes"] = ["  "],
+        });
+
+        Assert.Equal(["İl", "Şehir adı"], Assert.Single(normalized!).Value);
+        Assert.Null(ImportDesignRules.NormalizeAliases(new Dictionary<string, IReadOnlyList<string>> { ["notes"] = [""] }));
+    }
+
     [Fact]
     public void Validation_rejects_unknown_locked_and_contradictory_columns()
     {

@@ -20,7 +20,8 @@ internal sealed class CustomFieldService(
     ITenantContextAccessor tenantAccessor,
     ModuleCatalog catalog,
     IModuleEntitlements entitlements,
-    IAuditWriter audit) : ICustomFieldService, ICustomFieldProvider
+    IAuditWriter audit,
+    CustomizationLimits limits) : ICustomFieldService, ICustomFieldProvider
 {
     private readonly Dictionary<(Guid TenantId, string EntityKey), IReadOnlyList<CustomFieldInfo>> cache = [];
 
@@ -71,9 +72,9 @@ internal sealed class CustomFieldService(
         await EnsureCustomizableAsync(entityKey, cancellationToken);
 
         var existing = await db.CustomFields.Where(f => f.EntityKey == entityKey).ToListAsync(cancellationToken);
-        if (existing.Count(f => !f.IsArchived) >= CustomField.MaxPerEntity)
+        if (limits.MaxFieldsPerEntity is { } maxFields && existing.Count(f => !f.IsArchived) >= maxFields)
         {
-            throw new ArgumentException($"Bir kayıt türünde en fazla {CustomField.MaxPerEntity} özel alan olabilir.", "label");
+            throw new ArgumentException($"Bir kayıt türünde en fazla {maxFields} özel alan olabilir.", "label");
         }
 
         if (string.IsNullOrWhiteSpace(input.Label))
@@ -135,9 +136,9 @@ internal sealed class CustomFieldService(
         if (!archived)
         {
             var active = await db.CustomFields.CountAsync(f => f.EntityKey == field.EntityKey && f.ArchivedAt == null, cancellationToken);
-            if (active >= CustomField.MaxPerEntity)
+            if (limits.MaxFieldsPerEntity is { } maxFields && active >= maxFields)
             {
-                throw new ArgumentException($"Bir kayıt türünde en fazla {CustomField.MaxPerEntity} özel alan olabilir.", "archived");
+                throw new ArgumentException($"Bir kayıt türünde en fazla {maxFields} özel alan olabilir.", "archived");
             }
 
             await EnsureUniqueLabelAsync(field.EntityKey, field.Label, field.Id, cancellationToken);
@@ -180,7 +181,7 @@ internal sealed class CustomFieldService(
     }
 
     // Ad türde benzersizdir (arşivdekiler hariç); seçenekler yalnızca seçim tiplerinde, pasife alınabilir ama silinmez.
-    private static void Apply(CustomField field, CustomFieldInput input, IReadOnlyCollection<CustomField> others)
+    private void Apply(CustomField field, CustomFieldInput input, IReadOnlyCollection<CustomField> others)
     {
         if (!field.IsArchived && others.Any(f => !f.IsArchived && string.Equals(f.Label, field.Label, StringComparison.CurrentCultureIgnoreCase)))
         {
@@ -229,9 +230,9 @@ internal sealed class CustomFieldService(
 
         // Listede verilmeyen eski seçenek silinmez, pasif kalır: kayıtlardaki değeri anlamını korur.
         options.AddRange(current.Where(o => options.All(n => n.Key != o.Key)).Select(o => o with { Active = false }));
-        if (options.Count > CustomField.MaxOptions)
+        if (limits.MaxOptionsPerField is { } maxOptions && options.Count > maxOptions)
         {
-            throw new ArgumentException($"En fazla {CustomField.MaxOptions} seçenek olabilir.", "options");
+            throw new ArgumentException($"En fazla {maxOptions} seçenek olabilir.", "options");
         }
 
         if (!options.Any(o => o.Active))

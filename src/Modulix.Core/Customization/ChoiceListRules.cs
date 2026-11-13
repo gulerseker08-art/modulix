@@ -10,7 +10,6 @@ public sealed record ChoiceValueInput(string? Key, string Label, string? Categor
 public static class ChoiceListRules
 {
     public const int LabelMaxLength = 60;
-    public const int MaxValues = 50;
 
     /// <summary>
     /// Firmanın listesi: saklanan değerler sırasıyla, ardından kodda sonradan eklenmiş hazır değerler. Hazır değerin
@@ -44,7 +43,7 @@ public static class ChoiceListRules
     /// Düzenlemeyi uygular. Listede verilmeyen değer silinmez, pasif olarak sona eklenir (kayıtlarda anahtarı olabilir).
     /// Hatalar <see cref="ArgumentException"/> ("values") olarak döner.
     /// </summary>
-    public static IReadOnlyList<StoredChoiceValue> Apply(ChoiceListDefinition definition, ChoiceList current, IReadOnlyList<ChoiceValueInput> inputs)
+    public static IReadOnlyList<StoredChoiceValue> Apply(ChoiceListDefinition definition, ChoiceList current, IReadOnlyList<ChoiceValueInput> inputs, int? maxValues = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(current);
@@ -109,9 +108,9 @@ public static class ChoiceListRules
         }
 
         values.AddRange(current.Values.Where(c => values.All(v => v.Key != c.Key)).Select(c => new StoredChoiceValue(c.Key, c.Label, c.Category, false)));
-        if (values.Count > MaxValues)
+        if (maxValues is { } max && values.Count > max)
         {
-            throw new ArgumentException($"Bir listede en fazla {MaxValues} değer olabilir.", "values");
+            throw new ArgumentException($"Bir listede en fazla {max} değer olabilir.", "values");
         }
 
         if (!values.Any(v => v.Active))
