@@ -1,4 +1,4 @@
-namespace Modulix.Core.Contracts.Fleet;
+namespace Modulix.Modules.Fleet.Contracts;
 
 /// <summary>
 /// Araç kimliğinin okuma sözleşmesi (ADR-0038 K1). Araç Filo modülündedir (<c>fleet.Vehicles</c>); lojistik ve araç kiralama araca
