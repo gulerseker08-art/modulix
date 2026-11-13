@@ -38,6 +38,12 @@ public sealed record ImportField(string Key, string Label, ImportFieldType Type 
     public string? ChoiceListKey { get; init; }
 
     public ImportReference? Reference { get; init; }
+
+    /// <summary>
+    /// Firmanın kaydettiği ek başlık adları (ADR-0033 Dilim 4c, kayıtlı sütun eşlemesi): dosyada bu adlardan biri de bu sütuna bağlanır.
+    /// Modül tanımı vermez; içe aktarma tasarımından gelir.
+    /// </summary>
+    public IReadOnlyList<string> Aliases { get; init; } = [];
 }
 
 /// <summary>Hücre değerinin hedef kaydı nasıl bulduğu: süzgeçler sırayla denenir, tek kayıt eşleşmelidir. Süzgeçler kayıt deposunda tanımlıdır.</summary>

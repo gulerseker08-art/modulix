@@ -74,7 +74,8 @@ public static class ImportEndpoints
         design.MapGet("/", async (IImportDesignService service, CancellationToken ct) => (await service.ListAsync(ct)).Select(ToDto).ToList());
         design.MapPut("/{entityKey}", async (string entityKey, SaveImportDesignRequest request, IImportDesignService service, CancellationToken ct) =>
         {
-            var input = new ImportDesignInput(request.Enabled, request.RunAutomation, request.Excluded ?? [], request.Required ?? []);
+            var input = new ImportDesignInput(
+                request.Enabled, request.RunAutomation, request.Excluded ?? [], request.Required ?? [], ImportDesignRules.NormalizeAliases(request.Aliases));
             var result = await service.SaveAsync(entityKey, input, request.Version, ct);
             return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
         });
@@ -158,7 +159,7 @@ public static class ImportEndpoints
         info.DisplayName,
         info.Enabled,
         info.RunAutomation,
-        [.. info.Fields.Select(f => new ImportDesignFieldDto(f.Key, f.Label, f.Included, f.Required, f.Locked))],
+        [.. info.Fields.Select(f => new ImportDesignFieldDto(f.Key, f.Label, f.Included, f.Required, f.Locked, f.Aliases))],
         info.Version);
 
     private static IResult NotImportable() =>

@@ -169,10 +169,16 @@ Mutlu yol (yükle, uygula, sonuç); hata/doğrulama (her hata kodu, biçim, dosy
 - **Hücre türleri:** Excel hücresi gerçek tiptedir. Sayı Türkçe ondalık metne (`1250,5`), tarih `gg.aa.yyyy`'ye, mantıksal değer `Evet/Hayır`'a çevrilir ve mevcut hücre yorumundan geçer; böylece CSV'deki "12.5 reddedilir" kuralı bozulmaz. Saatli tarih `gg.aa.yyyy SS:dd` olur (tarih sütunu bunu reddeder). **Bilinen sınır:** telefon gibi sayı olarak saklanmış değerin baştaki sıfırı Excel'de zaten yoktur; metin biçimli hücre kullanılmalıdır.
 - **Güvenlik:** yalnızca ilk sayfa okunur; zip imzası ("PK") ve açılmış boyut (200 MB, zip bombası) denetlenir; fiziksel satır okuması 100.000'de, sütun okuması 201'de, dolu satır okuması 2.001'de durur (büyük ama boş biçimli sayfa belleği doldurmaz). Formül hücresinde yalnızca kayıtlı sonuç okunur; makro ve dış bağlantı çalışmaz. Bozuk dosya 400 değil, `file-invalid` hatalı `Failed` koşu olarak günlüğe yazılır; `.xls` uzantısı ise uçta 400 ile reddedilir.
 - Hata raporu ve şablon CSV kalır (ADR'deki "CSV/XLSX" ikinci biçim sonraya bırakıldı): Türkçe Excel UTF-8 BOM'lu CSV'yi doğrudan açar ve rapor düzeltilip yeniden yüklenebilir.
-- **Kalan (Dilim 4):** geri alma, kayıtlı sütun eşlemesi, "hepsi ya da hiç" modu.
+- **Kalan (Dilim 4):** geri alma, "hepsi ya da hiç" modu.
 
 **Dilim 4b:** uygulandı (aynı dosya uyarısı, 13 Kasım 2026).
 
 - Koşu açılırken dosya özeti (SHA-256) firmanın günlüğünde aranır: aynı özetli dosya aynı kayıt türüne daha önce **uygulanıp kayıt almışsa** (`Succeeded` ya da `PartiallySucceeded`) koşuya dosya düzeyinde (satır 0) `file-repeated` **uyarısı** yazılır. Kuru çalışmada da görünür, böylece uygulamadan önce fark edilir. Uyarı engellemez: düzeltilmiş dosya ya da bilerek tekrar yükleme olabilir; mükerrer satırlar zaten eşleşme kurallarıyla (`duplicate-exact`) yakalanır.
 - Kuru çalışma ve kayıt almamış (`Failed`) uygulama sayılmaz. Sorgu tenant süzgecindedir ve mevcut `(TenantId, FileHash, CreatedAt)` indeksini kullanır; migration yok. İleti önceki yükleyenin adını taşımaz (yalnızca tarih, UTC).
 - **Sonra değerlendirilecek:** uyarının firma ayarıyla engele çevrilmesi (dinamik tasarım ilkesi; "hepsi ya da hiç" ile birlikte ele alınabilir) ve tarihin firmanın saat diliminde gösterilmesi.
+
+**Dilim 4c:** uygulandı (kayıtlı sütun eşlemesi, 13 Kasım 2026).
+
+- Firma yöneticisi İçe aktarma tasarımı ekranında her sütun için "Dosyadaki diğer adlar"ı kaydeder; dosya başlığı alanın adı, anahtarı ya da bu adlardan biriyse sütuna bağlanır. Bağlamada önce bütün alanların adı ve anahtarı, sonra eşlemeler eklenir: bir alanın kendi adı başka alanın eşlemesine kaptırılmaz.
+- Eşleme tasarım JSON'undadır (`ImportDesignInput.Aliases`: alan anahtarı → adlar); **migration yok**, eski satırlar değişmeden okunur. Sunucu kuralları: bilinmeyen sütun, başka sütunun adı/anahtarı, hata raporu sütunu, iki sütuna aynı ad, alan başına en çok 10 ad, ad en çok 100 karakter → 422; adlar kırpılır, büyük/küçük harf duyarsız tekrarlar atılır. Değişiklik denetim kaydına (`aliases`) yazılır.
+- **Karar:** eşleme dosya başına değil firma + kayıt türü başınadır. **Sonra değerlendirilecek:** birden çok eşleme profili (farklı kaynak sistemlerden gelen dosyalar) ve yükleme ekranında tanınmayan sütunu oradan eşlemeye ekleme.

@@ -112,7 +112,7 @@ internal sealed class ImportDesignService(
             definition.DisplayName,
             design.Enabled,
             design.RunAutomation,
-            [.. fields.Select(f => new ImportDesignField(f.Key, f.Label, f.Required || !design.Excluded.Contains(f.Key), f.Required || design.Required.Contains(f.Key), f.Required))],
+            [.. fields.Select(f => new ImportDesignField(f.Key, f.Label, f.Required || !design.Excluded.Contains(f.Key), f.Required || design.Required.Contains(f.Key), f.Required) { Aliases = design.AliasesOf(f.Key) })],
             row?.Version ?? 0);
     }
 
@@ -126,6 +126,7 @@ internal sealed class ImportDesignService(
         ["runAutomation"] = design.RunAutomation,
         ["excluded"] = string.Join(", ", design.Excluded.Order(StringComparer.Ordinal)),
         ["required"] = string.Join(", ", design.Required.Order(StringComparer.Ordinal)),
+        ["aliases"] = string.Join("; ", (design.Aliases ?? new Dictionary<string, IReadOnlyList<string>>()).OrderBy(a => a.Key, StringComparer.Ordinal).Select(a => $"{a.Key}: {string.Join(", ", a.Value)}")),
     };
 
     private static RecordResult<ImportDesignInfo> Conflict() =>
