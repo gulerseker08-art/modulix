@@ -9064,6 +9064,130 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Vehicles", "fleet");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Hr.Domain.Employee", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("BirthDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DepartmentKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("EmergencyContactName")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("EmergencyContactPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("EmployeeNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("EmploymentType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateOnly>("HireDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("HomeAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Iban")
+                        .HasMaxLength(26)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(26)");
+
+                    b.Property<string>("JobTitle")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<Guid?>("ManagerEmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("NationalId")
+                        .HasMaxLength(11)
+                        .IsUnicode(false)
+                        .HasColumnType("char(11)")
+                        .IsFixedLength();
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("TerminationDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("WorkLocation")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "EmployeeNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Employees_Number")
+                        .HasFilter("[EmployeeNumber] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ManagerEmployeeId")
+                        .HasDatabaseName("IX_Employees_Manager");
+
+                    b.HasIndex("TenantId", "NationalId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Employees_NationalId")
+                        .HasFilter("[NationalId] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "PersonId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Employees_Person");
+
+                    b.HasIndex("TenantId", "Status")
+                        .HasDatabaseName("IX_Employees_Status");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Employees_User")
+                        .HasFilter("[UserId] IS NOT NULL");
+
+                    b.ToTable("Employees", "hr");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Logistics.Domain.CarrierTerms", b =>
                 {
                     b.Property<Guid>("Id")
@@ -15232,6 +15356,15 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Hr.Domain.Employee", b =>
+                {
+                    b.HasOne("Modulix.Modules.Hr.Domain.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ManagerEmployeeId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Modulix.Modules.Logistics.Domain.DeliveryProof", b =>

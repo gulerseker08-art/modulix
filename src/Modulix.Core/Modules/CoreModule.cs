@@ -324,7 +324,7 @@ public sealed class CoreModule : IModule
 
     /// <summary>
     /// Süreli belge türü (ADR-0038 K3, Y9b): hazır değerler örnektir; tenant kendi türlerini ekler, yeni türde kategori seçilir. Kategori
-    /// belgenin hangi kayda eklenebileceğini belirler (araç, sürücü, firma, tesis; sahip türünü modül bildirir).
+    /// belgenin hangi kayda eklenebileceğini belirler (araç, sürücü, firma, tesis, çalışan; sahip türünü modül bildirir).
     /// </summary>
     IReadOnlyList<ChoiceListDefinition> IModule.ChoiceLists { get; } =
     [
@@ -339,6 +339,7 @@ public sealed class CoreModule : IModule
                 new(CredentialCategories.Driver, "Sürücü belgesi"),
                 new(CredentialCategories.Party, "Firma belgesi"),
                 new(CredentialCategories.Facility, "Tesis belgesi"),
+                new(CredentialCategories.Employee, "Özlük belgesi"),
             ],
             [
                 new("Inspection", "Araç muayenesi", CredentialCategories.Vehicle),
@@ -354,6 +355,12 @@ public sealed class CoreModule : IModule
                 new("AuthorizationCertificate", "Yetki belgesi", CredentialCategories.Party),
                 new("PowerOfAttorney", "Vekâletname", CredentialCategories.Party),
                 new("OperatingPermit", "Faaliyet izni", CredentialCategories.Facility),
+                new("EmploymentContract", "İş sözleşmesi", CredentialCategories.Employee),
+                new("HealthReport", "Sağlık raporu", CredentialCategories.Employee),
+                new("Diploma", "Diploma", CredentialCategories.Employee),
+                new("TrainingCertificate", "Eğitim sertifikası", CredentialCategories.Employee),
+                new("OhsTraining", "İş sağlığı ve güvenliği eğitimi", CredentialCategories.Employee),
+                new("WorkPermit", "Çalışma izni", CredentialCategories.Employee),
             ]),
     ];
 

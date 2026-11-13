@@ -46,6 +46,7 @@ using Modulix.Api.Support;
 using Modulix.Modules.Marketing;
 using Modulix.Modules.Warehouse;
 using Modulix.Modules.Fleet;
+using Modulix.Modules.Hr;
 using Modulix.Modules.Support;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -293,5 +294,5 @@ public partial class Program;
 /// </summary>
 internal static class ModulixModules
 {
-    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule(), new SupportModule(), new MarketingModule(), new WarehouseModule(), new FleetModule()];
+    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule(), new SupportModule(), new MarketingModule(), new WarehouseModule(), new FleetModule(), new HrModule()];
 }
