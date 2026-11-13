@@ -113,7 +113,10 @@ internal sealed class ImportDesignService(
             design.Enabled,
             design.RunAutomation,
             [.. fields.Select(f => new ImportDesignField(f.Key, f.Label, f.Required || !design.Excluded.Contains(f.Key), f.Required || design.Required.Contains(f.Key), f.Required) { Aliases = design.AliasesOf(f.Key) })],
-            row?.Version ?? 0);
+            row?.Version ?? 0)
+        {
+            AllOrNothing = design.AllOrNothing,
+        };
     }
 
     private static ImportDesignInput Parse(TenantImportDesign row) =>
@@ -124,6 +127,7 @@ internal sealed class ImportDesignService(
         ["entityKey"] = entityKey,
         ["enabled"] = design.Enabled,
         ["runAutomation"] = design.RunAutomation,
+        ["allOrNothing"] = design.AllOrNothing,
         ["excluded"] = string.Join(", ", design.Excluded.Order(StringComparer.Ordinal)),
         ["required"] = string.Join(", ", design.Required.Order(StringComparer.Ordinal)),
         ["aliases"] = string.Join("; ", (design.Aliases ?? new Dictionary<string, IReadOnlyList<string>>()).OrderBy(a => a.Key, StringComparer.Ordinal).Select(a => $"{a.Key}: {string.Join(", ", a.Value)}")),

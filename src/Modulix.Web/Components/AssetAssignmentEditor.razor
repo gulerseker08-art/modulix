@@ -1,0 +1,154 @@
+@* Zimmet formu (ADR-0042 dilim 4): demirbaşı bir çalışana teslim eder. Düzen firmanın form düzenine (ADR-0021) göre çizilir. Demirbaş ya da çalışan
+   verilmişse sabittir; seçim kutusu yalnızca depodaki demirbaşları listeler. Demirbaşın durumu, çalışanın ayrılmamış olması ve tarihler sunucuda
+   denetlenir; kaydedilince demirbaş aynı işlemde "zimmetli" olur. Zimmet sonradan değiştirilmez; iade alınıp yeniden zimmetlenir. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>Zimmetle</h2>
+            <p>@(AssetLabel ?? EmployeeName ?? "Demirbaşı çalışana teslim edin")</p>
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Zimmetle</button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Zimmet bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
+            {
+                case "assetId":
+                    @if (AssetId is not null)
+                    {
+                        <span class="@f.LabelClass()">@f.Label</span>
+                        <p class="mb-0"><strong>@AssetLabel</strong></p>
+                    }
+                    else
+                    {
+                        <label class="@f.LabelClass()" for="assignment-asset">@f.Label</label>
+                        <LookupPicker Id="assignment-asset" LookupKey="@HrAccess.AssignmentAssetLookup" @bind-Value="form.AssetId" Required="true" Placeholder="Depodaki demirbaşı seçin…" Invalid="@(errors?.ContainsKey("assetId") == true)" />
+                    }
+                    <FieldError Field="assetId" Errors="errors" />
+                    break;
+                case "employeeId":
+                    @if (EmployeeId is not null)
+                    {
+                        <span class="@f.LabelClass()">@f.Label</span>
+                        <p class="mb-0"><strong>@EmployeeName</strong></p>
+                    }
+                    else
+                    {
+                        <label class="@f.LabelClass()" for="assignment-employee">@f.Label</label>
+                        <LookupPicker Id="assignment-employee" LookupKey="@HrAccess.AssignmentEmployeeLookup" @bind-Value="form.EmployeeId" Required="true" Placeholder="Çalışanı seçin…" Invalid="@(errors?.ContainsKey("employeeId") == true)" />
+                    }
+                    <FieldError Field="employeeId" Errors="errors" />
+                    break;
+                case "assignedOn":
+                    <label class="@f.LabelClass()" for="assignment-on">@f.Label</label>
+                    <input id="assignment-on" class="form-control" type="date" required aria-required="true" @bind="form.AssignedOn" />
+                    <FieldError Field="assignedOn" Errors="errors" />
+                    break;
+                case "expectedReturnOn":
+                    <label class="@f.LabelClass()" for="assignment-return">@f.Label</label>
+                    <input id="assignment-return" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ExpectedReturnOn" />
+                    <FieldError Field="expectedReturnOn" Errors="errors" />
+                    break;
+                case "conditionOut":
+                    <label class="@f.LabelClass()" for="assignment-condition">@f.Label</label>
+                    <textarea id="assignment-condition" class="form-control" rows="2" maxlength="1000" placeholder="ör. Şarj aleti ve çanta ile, çiziksiz" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ConditionOut"></textarea>
+                    <FieldError Field="conditionOut" Errors="errors" />
+                    break;
+            }
+        </Field>
+    </LayoutForm>
+</form>
+
+@code {
+    private const string EntityKey = HrAccess.AssetAssignmentEntityKey;
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private AssignmentForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    [Parameter] public Guid? AssetId { get; set; }
+
+    [Parameter] public string? AssetLabel { get; set; }
+
+    [Parameter] public Guid? EmployeeId { get; set; }
+
+    [Parameter] public string? EmployeeName { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        form = new AssignmentForm { AssetId = AssetId, EmployeeId = EmployeeId, AssignedOn = DateOnly.FromDateTime(DateTime.Today) };
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await Api.PostAsync<RecordResponse>("/api/records/" + EntityKey, new RecordWriteRequest(new JsonObject
+        {
+            ["assetId"] = form.AssetId?.ToString(),
+            ["employeeId"] = form.EmployeeId?.ToString(),
+            ["assignedOn"] = form.AssignedOn?.ToString("yyyy-MM-dd"),
+            ["expectedReturnOn"] = form.ExpectedReturnOn?.ToString("yyyy-MM-dd"),
+            ["conditionOut"] = string.IsNullOrWhiteSpace(form.ConditionOut) ? null : form.ConditionOut.Trim(),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        }));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class AssignmentForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? AssetId { get; set; }
+
+        public Guid? EmployeeId { get; set; }
+
+        public DateOnly? AssignedOn { get; set; }
+
+        public DateOnly? ExpectedReturnOn { get; set; }
+
+        public string? ConditionOut { get; set; }
+    }
+}
