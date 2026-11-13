@@ -29,8 +29,10 @@ internal abstract class CargoRecordStore<TEntity>(LogisticsStoreContext context)
         Field.PartyRef<TEntity>("receiverPartyId", "Alıcı firma bulunamadı.", e => e.ReceiverPartyId, (e, v) => e.ReceiverPartyId = v),
         Field.ListChoice<TEntity>("transportModeKey", LogisticsModule.Lists.TransportMode, e => e.TransportModeKey, (e, v) => e.TransportModeKey = v!),
         Field.Text<TEntity>("pickupCity", CargoEntity.CityMaxLength, e => e.PickupCity, (e, v) => e.PickupCity = v!, required: true),
+        Field.Text<TEntity>("pickupCountry", CargoEntity.CountryLength, e => e.PickupCountry, (e, v) => e.PickupCountry = v ?? string.Empty, upperCase: true),
         Field.Text<TEntity>("pickupAddress", CargoEntity.AddressMaxLength, e => e.PickupAddress, (e, v) => e.PickupAddress = v),
         Field.Text<TEntity>("deliveryCity", CargoEntity.CityMaxLength, e => e.DeliveryCity, (e, v) => e.DeliveryCity = v!, required: true),
+        Field.Text<TEntity>("deliveryCountry", CargoEntity.CountryLength, e => e.DeliveryCountry, (e, v) => e.DeliveryCountry = v ?? string.Empty, upperCase: true),
         Field.Text<TEntity>("deliveryAddress", CargoEntity.AddressMaxLength, e => e.DeliveryAddress, (e, v) => e.DeliveryAddress = v),
         Field.Date<TEntity>("pickupDate", e => e.PickupDate, (e, v) => e.PickupDate = v!.Value, required: true),
         Field.Date<TEntity>("deliveryBy", e => e.DeliveryBy, (e, v) => e.DeliveryBy = v),
@@ -41,6 +43,7 @@ internal abstract class CargoRecordStore<TEntity>(LogisticsStoreContext context)
         Field.Decimal<TEntity>("loadingMeters", e => e.LoadingMeters, (e, v) => e.LoadingMeters = v, 2, 0, 100),
         Field.Flag<TEntity>("hazardous", e => e.Hazardous, (e, v) => e.Hazardous = v),
         Field.Text<TEntity>("notes", CargoEntity.TextMaxLength, e => e.Notes, (e, v) => e.Notes = v),
+        Field.Computed<TEntity>("international", e => JsonValue.Create(e.PickupCountry != e.DeliveryCountry)),
         Field.Computed<TEntity>("status", e => e.Status),
         Field.Computed<TEntity>("statusReason", e => e.StatusReason),
     ];
@@ -54,6 +57,14 @@ internal abstract class CargoRecordStore<TEntity>(LogisticsStoreContext context)
         ["senderPartyId"] = (q, v) => FilterValue.Id(v) is { } id ? q.Where(e => e.SenderPartyId == id) : null,
         ["receiverPartyId"] = (q, v) => FilterValue.Id(v) is { } id ? q.Where(e => e.ReceiverPartyId == id) : null,
         ["transportModeKey"] = (q, v) => q.Where(e => e.TransportModeKey == v),
+        ["pickupCountry"] = (q, v) => IsoCountryCodes.IsValid(v) ? q.Where(e => e.PickupCountry == v) : null,
+        ["deliveryCountry"] = (q, v) => IsoCountryCodes.IsValid(v) ? q.Where(e => e.DeliveryCountry == v) : null,
+        ["international"] = (q, v) => v switch
+        {
+            "true" => q.Where(e => e.PickupCountry != e.DeliveryCountry),
+            "false" => q.Where(e => e.PickupCountry == e.DeliveryCountry),
+            _ => null,
+        },
         ["pickupFrom"] = (q, v) => FilterValue.Day(v) is { } day ? q.Where(e => e.PickupDate >= day) : null,
         ["pickupTo"] = (q, v) => FilterValue.Day(v) is { } day ? q.Where(e => e.PickupDate <= day) : null,
     };
@@ -105,6 +116,8 @@ internal abstract class CargoRecordStore<TEntity>(LogisticsStoreContext context)
             throw new RecordConflictException(LockedMessage);
         }
 
+        await NormalizeCountriesAsync(entity, values, isNew, cancellationToken);
+
         if (entity.DeliveryBy is { } by && by < entity.PickupDate)
         {
             throw new RecordValidationException([new RecordFieldError("deliveryBy", "Teslim günü yükleme gününden önce olamaz.")]);
@@ -117,6 +130,44 @@ internal abstract class CargoRecordStore<TEntity>(LogisticsStoreContext context)
 
         await CargoAppliedAsync(entity, values, isNew, cancellationToken);
     }
+
+    /// <summary>
+    /// Ülke (ADR-0043 K2): gönderilmeyen (boş) ülke firmanın varsayılan ülkesi olur; ISO 3166-1 alfa-2 dışındaki kod 422 verir. Ülke hassas alan değildir.
+    /// </summary>
+    private async Task NormalizeCountriesAsync(TEntity entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
+    {
+        // Yeni kayıtta gönderilmeyen ya da null gelen ülke firmanın varsayılanıdır (alan varsayılanı "TR" yalnızca son çaredir).
+        if (isNew)
+        {
+            entity.PickupCountry = values["pickupCountry"] is null ? string.Empty : entity.PickupCountry;
+            entity.DeliveryCountry = values["deliveryCountry"] is null ? string.Empty : entity.DeliveryCountry;
+        }
+
+        if (string.IsNullOrEmpty(entity.PickupCountry) || string.IsNullOrEmpty(entity.DeliveryCountry))
+        {
+            var fallback = await Context.DefaultCountryAsync(cancellationToken);
+            entity.PickupCountry = string.IsNullOrEmpty(entity.PickupCountry) ? fallback : entity.PickupCountry;
+            entity.DeliveryCountry = string.IsNullOrEmpty(entity.DeliveryCountry) ? fallback : entity.DeliveryCountry;
+        }
+
+        List<RecordFieldError> errors = [];
+        if (!IsoCountryCodes.IsValid(entity.PickupCountry))
+        {
+            errors.Add(new RecordFieldError("pickupCountry", CountryMessage));
+        }
+
+        if (!IsoCountryCodes.IsValid(entity.DeliveryCountry))
+        {
+            errors.Add(new RecordFieldError("deliveryCountry", CountryMessage));
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new RecordValidationException(errors);
+        }
+    }
+
+    private const string CountryMessage = "Geçerli bir ülke kodu girin (ISO 3166-1 alfa-2, ör. TR, DE).";
 
     /// <summary>Türe özgü kurallar (ortak kurallardan sonra).</summary>
     protected virtual Task CargoAppliedAsync(TEntity entity, JsonObject values, bool isNew, CancellationToken cancellationToken) => Task.CompletedTask;

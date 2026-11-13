@@ -135,6 +135,10 @@ public sealed class CarrierTerms : LogisticsEntity
 public abstract class CargoEntity : LogisticsEntity
 {
     public const int CityMaxLength = 100;
+    public const int CountryLength = 2;
+
+    /// <summary>Ülke gönderilmediğinde ve firma ayarı yokken kullanılan ülke (ADR-0043 K2); sütun varsayılanı da budur (geriye uyumlu geçiş).</summary>
+    public const string DefaultCountry = "TR";
     public const int AddressMaxLength = 500;
     public const int TextMaxLength = 2000;
     public const int ReasonMaxLength = 500;
@@ -150,9 +154,15 @@ public abstract class CargoEntity : LogisticsEntity
 
     public string PickupCity { get; internal set; } = string.Empty;
 
+    /// <summary>Yükleme yerinin ülkesi: ISO 3166-1 alfa-2, büyük harf (ADR-0043 K1). Gönderilmezse firmanın varsayılan ülkesi.</summary>
+    public string PickupCountry { get; internal set; } = DefaultCountry;
+
     public string? PickupAddress { get; internal set; }
 
     public string DeliveryCity { get; internal set; } = string.Empty;
+
+    /// <summary>Teslim yerinin ülkesi: ISO 3166-1 alfa-2, büyük harf (ADR-0043 K1).</summary>
+    public string DeliveryCountry { get; internal set; } = DefaultCountry;
 
     public string? DeliveryAddress { get; internal set; }
 
