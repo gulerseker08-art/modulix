@@ -2,15 +2,15 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Ürün ve hizmetler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.products.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ProductsRead">
     <div class="page-header">
-        <h1>Ürün ve hizmetler</h1>
+        <h1>@Texts.Get("crm.products.title")</h1>
     </div>
 
     <p class="text-muted">
-        <a href="crm/urun-kategorileri">Kategoriler</a> · <a href="crm/birimler">Ölçü birimleri</a> · <a href="crm/fiyat-listeleri">Fiyat listeleri</a> · <a href="crm/vergi-kur">Vergi ve kur</a> · <a href="crm/indirimler">İndirimler</a> · <a href="crm/fiyat-hesapla">Fiyat hesapla</a>    </p>
+        <a href="crm/urun-kategorileri">@Texts.Get("crm.products.link.categories")</a> · <a href="crm/birimler">@Texts.Get("crm.products.link.units")</a> · <a href="crm/fiyat-listeleri">@Texts.Get("crm.priceLists.title")</a> · <a href="crm/vergi-kur">@Texts.Get("crm.products.link.taxRates")</a> · <a href="crm/indirimler">@Texts.Get("crm.products.link.discounts")</a> · <a href="crm/fiyat-hesapla">@Texts.Get("crm.priceCalculator.title")</a>    </p>
 
     @if (message is not null)
     {
@@ -20,23 +20,23 @@
     @if (form is not null)
     {
         <div class="record-form">
-            <h2>@(form.Id is null ? "Yeni ürün/hizmet" : "Ürün/hizmeti düzenle")</h2>
-            <TabBar Tabs="FormTabs" State="tabs" Label="Ürün formu bölümleri" Changed="_ => { }" />
+            <h2>@(form.Id is null ? Texts.Get("crm.products.new") : Texts.Get("crm.products.edit"))</h2>
+            <TabBar Tabs="FormTabs" State="tabs" Label="@Texts.Get("crm.products.formSections")" Changed="_ => { }" />
             <form novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault hidden="@(tabs.Active == PackageTab)">
                 <TabPanel State="tabs" Key="form-genel">
                     <div class="form-grid">
                         <div>
-                            <label class="form-label" for="code">Kod *</label>
+                            <label class="form-label" for="code">@Texts.Get("crm.products.field.code")</label>
                             <input id="code" class="form-control" maxlength="50" @bind="form.Code" />
                             <FieldError Field="code" Errors="errors" />
                         </div>
                         <div>
-                            <label class="form-label" for="name">Ad *</label>
+                            <label class="form-label" for="name">@Texts.Get("common.field.nameRequired")</label>
                             <input id="name" class="form-control" maxlength="200" @bind="form.Name" />
                             <FieldError Field="name" Errors="errors" />
                         </div>
                         <div>
-                            <label class="form-label" for="kind">Tür</label>
+                            <label class="form-label" for="kind">@Texts.Get("common.field.kind")</label>
                             <select id="kind" class="form-select" @bind="form.Kind">
                                 @foreach (var kind in CatalogLabels.Kinds)
                                 {
@@ -46,7 +46,7 @@
                             <FieldError Field="kind" Errors="errors" />
                         </div>
                         <div>
-                            <label class="form-label" for="status">Durum</label>
+                            <label class="form-label" for="status">@Texts.Get("common.field.status")</label>
                             <select id="status" class="form-select" @bind="form.Status">
                                 @foreach (var status in CatalogLabels.Statuses)
                                 {
@@ -56,7 +56,7 @@
                             <FieldError Field="status" Errors="errors" />
                         </div>
                         <div>
-                            <label class="form-label" for="category">Kategori</label>
+                            <label class="form-label" for="category">@Texts.Get("crm.products.field.category")</label>
                             <select id="category" class="form-select" @bind="form.CategoryId">
                                 <option value="">—</option>
                                 @foreach (var category in categories)
@@ -67,7 +67,7 @@
                             <FieldError Field="categoryId" Errors="errors" />
                         </div>
                         <div>
-                            <label class="form-label" for="unit">Temel birim *</label>
+                            <label class="form-label" for="unit">@Texts.Get("crm.products.field.baseUnit")</label>
                             <select id="unit" class="form-select" @bind="form.BaseUnitId">
                                 <option value="@Guid.Empty">—</option>
                                 @foreach (var unit in units)
@@ -78,7 +78,7 @@
                             <FieldError Field="baseUnitId" Errors="errors" />
                         </div>
                         <div>
-                            <label class="form-label" for="precision">Miktar hassasiyeti (ondalık)</label>
+                            <label class="form-label" for="precision">@Texts.Get("crm.products.field.precision")</label>
                             <input id="precision" class="form-control" type="number" min="0" max="4" @bind="form.QuantityPrecision" />
                             <FieldError Field="quantityPrecision" Errors="errors" />
                         </div>
@@ -87,19 +87,19 @@
                 <TabPanel State="tabs" Key="form-fiyat">
                     <div class="form-grid">
                         <div>
-                            <label class="form-label" for="taxCategory">Vergi kategorisi</label>
+                            <label class="form-label" for="taxCategory">@Texts.Get("crm.products.field.taxCategory")</label>
                             <input id="taxCategory" class="form-control" maxlength="30" @bind="form.TaxCategory" />
                             <FieldError Field="taxCategory" Errors="errors" />
                         </div>
                         <div>
-                            <label class="form-label" for="includesTax">Fiyatlar</label>
+                            <label class="form-label" for="includesTax">@Texts.Get("crm.products.field.prices")</label>
                             <select id="includesTax" class="form-select" @bind="form.PriceIncludesTax">
-                                <option value="False">Vergi hariç</option>
-                                <option value="True">Vergi dahil</option>
+                                <option value="False">@Texts.Get("crm.products.taxExcluded")</option>
+                                <option value="True">@Texts.Get("crm.products.taxIncluded")</option>
                             </select>
                         </div>
                         <div>
-                            <label class="form-label" for="chargeType">Ücretlendirme</label>
+                            <label class="form-label" for="chargeType">@Texts.Get("crm.products.field.chargeType")</label>
                             <select id="chargeType" class="form-select" @bind="form.ChargeType">
                                 @foreach (var charge in CatalogLabels.ChargeTypes)
                                 {
@@ -111,7 +111,7 @@
                         @if (form.ChargeType == "Recurring")
                         {
                             <div>
-                                <label class="form-label" for="period">Periyot *</label>
+                                <label class="form-label" for="period">@Texts.Get("crm.products.field.period")</label>
                                 <select id="period" class="form-select" @bind="form.RecurringPeriod">
                                     <option value="">—</option>
                                     @foreach (var period in CatalogLabels.RecurringPeriods)
@@ -123,24 +123,24 @@
                             </div>
                         }
                         <div>
-                            <label class="form-label" for="saleStart">Satış başlangıcı</label>
+                            <label class="form-label" for="saleStart">@Texts.Get("crm.products.field.saleStart")</label>
                             <input id="saleStart" class="form-control" type="date" @bind="form.SaleStart" />
                             <FieldError Field="saleStart" Errors="errors" />
                         </div>
                         <div>
-                            <label class="form-label" for="saleEnd">Satış bitişi</label>
+                            <label class="form-label" for="saleEnd">@Texts.Get("crm.products.field.saleEnd")</label>
                             <input id="saleEnd" class="form-control" type="date" @bind="form.SaleEnd" />
                             <FieldError Field="saleEnd" Errors="errors" />
                         </div>
                         @if (Session.Can(CrmAccess.ProductCostsRead))
                         {
                             <div>
-                                <label class="form-label" for="cost">Maliyet</label>
+                                <label class="form-label" for="cost">@Texts.Get("crm.products.field.cost")</label>
                                 <input id="cost" class="form-control" type="number" step="any" min="0" @bind="form.Cost" />
                                 <FieldError Field="cost" Errors="errors" />
                             </div>
                             <div>
-                                <label class="form-label" for="costCurrency">Maliyet para birimi</label>
+                                <label class="form-label" for="costCurrency">@Texts.Get("crm.products.field.costCurrency")</label>
                                 <input id="costCurrency" class="form-control" maxlength="3" @bind="form.CostCurrency" />
                                 <FieldError Field="costCurrency" Errors="errors" />
                             </div>
@@ -152,12 +152,12 @@
                         @if (form.Kind == "Service")
                         {
                             <div>
-                                <label class="form-label" for="duration">Hizmet süresi (dk)</label>
+                                <label class="form-label" for="duration">@Texts.Get("crm.products.field.duration")</label>
                                 <input id="duration" class="form-control" type="number" min="1" @bind="form.ServiceDurationMinutes" />
                                 <FieldError Field="serviceDurationMinutes" Errors="errors" />
                             </div>
                             <div>
-                                <label class="form-label" for="delivery">Sunum şekli</label>
+                                <label class="form-label" for="delivery">@Texts.Get("crm.products.field.delivery")</label>
                                 <select id="delivery" class="form-select" @bind="form.DeliveryMode">
                                     <option value="">—</option>
                                     @foreach (var mode in CatalogLabels.DeliveryModes)
@@ -169,69 +169,69 @@
                             </div>
                         }
                         <div>
-                            <label class="form-label" for="barcode">Barkod</label>
+                            <label class="form-label" for="barcode">@Texts.Get("crm.products.field.barcode")</label>
                             <input id="barcode" class="form-control" maxlength="50" @bind="form.Barcode" />
                             <FieldError Field="barcode" Errors="errors" />
                         </div>
                         <div>
-                            <label class="form-label" for="externalCode">Dış kod</label>
+                            <label class="form-label" for="externalCode">@Texts.Get("crm.products.field.externalCode")</label>
                             <input id="externalCode" class="form-control" maxlength="50" @bind="form.ExternalCode" />
                             <FieldError Field="externalCode" Errors="errors" />
                         </div>
                         <div>
-                            <label class="form-label" for="brand">Marka</label>
+                            <label class="form-label" for="brand">@Texts.Get("crm.products.field.brand")</label>
                             <input id="brand" class="form-control" maxlength="100" @bind="form.Brand" />
                             <FieldError Field="brand" Errors="errors" />
                         </div>
                         <div>
-                            <label class="form-label" for="model">Model</label>
+                            <label class="form-label" for="model">@Texts.Get("crm.products.field.model")</label>
                             <input id="model" class="form-control" maxlength="100" @bind="form.Model" />
                             <FieldError Field="model" Errors="errors" />
                         </div>
                         <div class="span-all">
-                            <label class="form-label" for="tags">Etiketler</label>
-                            <input id="tags" class="form-control" maxlength="500" placeholder="Virgülle ayırın" @bind="form.Tags" />
+                            <label class="form-label" for="tags">@Texts.Get("common.field.tags")</label>
+                            <input id="tags" class="form-control" maxlength="500" placeholder="@Texts.Get("crm.products.field.tagsPlaceholder")" @bind="form.Tags" />
                             <FieldError Field="tags" Errors="errors" />
                         </div>
                         <div class="span-all">
-                            <label class="form-label" for="description">Açıklama</label>
+                            <label class="form-label" for="description">@Texts.Get("crm.products.field.description")</label>
                             <textarea id="description" class="form-control" rows="3" maxlength="4000" @bind="form.Description"></textarea>
                             <FieldError Field="description" Errors="errors" />
                         </div>
                     </div>
                 </TabPanel>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="Close">Vazgeç</button>
+                    <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Close">@Texts.Get("common.dismiss")</button>
                     @if (form.Id is not null)
                     {
-                        <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                        <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                     }
                 </div>
             </form>
             @if (form.Id is { } packageId)
             {
                 <TabPanel State="tabs" Key="form-paket">
-            <h3>Paket bileşenleri</h3>
-            <p class="text-muted">Bu ürüne bileşen eklerseniz paket olarak davranır; fiyat hesabında bileşenler miktarla çarpılarak listelenir. Paket kendisini ya da (dolaylı olarak) kendisini içeren bir ürünü bileşen yapamaz.</p>
+            <h3>@Texts.Get("crm.products.components.title")</h3>
+            <p class="text-muted">@Texts.Get("crm.products.components.help")</p>
             @if (components.Count == 0)
             {
-                <p class="text-muted">Bileşen yok.</p>
+                <p class="text-muted">@Texts.Get("crm.products.components.none")</p>
             }
             else
             {
                 <table class="table record-table">
-                    <thead><tr><th>Bileşen</th><th>Miktar (temel birim)</th><th></th></tr></thead>
+                    <thead><tr><th>@Texts.Get("crm.products.components.col.component")</th><th>@Texts.Get("crm.products.components.col.quantity")</th><th></th></tr></thead>
                     <tbody>
                         @foreach (var component in components)
                         {
                             <tr>
-                                <td data-label="Bileşen" class="primary">@component.ComponentCode — @component.ComponentName</td>
-                                <td data-label="Miktar">@component.Quantity</td>
+                                <td data-label="@Texts.Get("crm.products.components.col.component")" class="primary">@component.ComponentCode — @component.ComponentName</td>
+                                <td data-label="@Texts.Get("crm.quoteDetail.col.quantity")">@component.Quantity</td>
                                 <td class="actions">
                                     @if (Session.Can(CrmAccess.ProductsWrite))
                                     {
-                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => DeleteComponentAsync(component)">Sil</button>
+                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => DeleteComponentAsync(component)">@Texts.Get("common.delete")</button>
                                     }
                                 </td>
                             </tr>
@@ -249,7 +249,7 @@
             {
                 <form class="form-grid" novalidate @onsubmit="() => AddComponentAsync(packageId)" @onsubmit:preventDefault>
                     <div>
-                        <label class="form-label" for="componentProduct">Bileşen ürünü *</label>
+                        <label class="form-label" for="componentProduct">@Texts.Get("crm.products.components.product")</label>
                         <select id="componentProduct" class="form-select" @bind="componentForm.ComponentId">
                             <option value="@Guid.Empty">—</option>
                             @foreach (var candidate in allProducts.Where(p => p.Id != packageId))
@@ -260,12 +260,12 @@
                         <FieldError Field="componentId" Errors="componentErrors" />
                     </div>
                     <div>
-                        <label class="form-label" for="componentQty">Miktar *</label>
+                        <label class="form-label" for="componentQty">@Texts.Get("crm.products.components.quantity")</label>
                         <input id="componentQty" class="form-control" type="number" step="any" min="0" @bind="componentForm.Quantity" />
                         <FieldError Field="quantity" Errors="componentErrors" />
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-outline-primary" disabled="@busy">Bileşen ekle</button>
+                        <button type="submit" class="btn btn-outline-primary" disabled="@busy">@Texts.Get("crm.products.components.add")</button>
                     </div>
                 </form>
             }
@@ -275,26 +275,26 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır (tür); durum süzgeci "Filtrele" satırındadır ve görünümle birlikte kaydedilir. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Ürün görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("crm.products.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Ürün ara" placeholder="Kod, ad, barkod veya etiket ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("crm.products.searchLabel")" placeholder="@Texts.Get("crm.products.searchPlaceholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="status is null ? 0 : 1" />
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(CrmAccess.ProductsWrite) && form is null)
         {
-            <button type="button" class="btn btn-primary" @onclick="New"><AppIcon Name="plus" Size="16" /> Yeni ürün/hizmet</button>
+            <button type="button" class="btn btn-primary" @onclick="New"><AppIcon Name="plus" Size="16" /> @Texts.Get("crm.products.new")</button>
         }
     </div>
 
     @if (filtersOpen || status is not null)
     {
         <div class="filters">
-            <label class="visually-hidden" for="status-filter">Durum</label>
+            <label class="visually-hidden" for="status-filter">@Texts.Get("common.field.status")</label>
             <select id="status-filter" class="form-select form-select-sm filter-select" @bind="statusValue" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm durumlar</option>
+                <option value="">@Texts.Get("common.allStatuses")</option>
                 @foreach (var s in CatalogLabels.Statuses)
                 {
                     <option value="@s.Key">@s.Label</option>
@@ -308,11 +308,11 @@
 
     @if (page is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Kayıt yok.</p>
+        <p class="text-muted">@Texts.Get("common.noRecords")</p>
     }
     else
     {
@@ -323,7 +323,7 @@
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -337,8 +337,8 @@
                         <td class="row-menu-cell">
                             @if (Session.Can(CrmAccess.ProductsWrite))
                             {
-                                <RowMenu Label="@($"{product.Name} eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Edit(product)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <RowMenu Label="@Texts.Get("common.rowActionsOf", product.Name)">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Edit(product)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 </RowMenu>
                             }
                         </td>
@@ -354,17 +354,18 @@
     private const string Url = "/api/crm/products";
 
     // Sütunların sırası varsayılan sıradır; Birim ve Barkod sunucuda sıralanamaz (ilişkili tablo / sıralama anahtarı yok).
-    private static readonly GridColumnDef[] Columns =
+    // Özellik olarak tanımlıdır: başlıklar sınıf yüklenirken değil, sayfa açılırken sözlükten çözülür (ADR-0034).
+    private static GridColumnDef[] Columns =>
     [
-        new("code", "Kod", "hash", "code", "-code", Locked: true),
-        new("name", "Ad", "type", "name", "-name"),
-        new("kind", "Tür", "layers", "kind", "-kind"),
-        new("status", "Durum", "tag", "status", "-status"),
-        new("category", "Kategori", "list", "category", "-category"),
-        new("unit", "Birim", "percent"),
-        new("brand", "Marka", "briefcase", "brand", "-brand", DefaultVisible: false),
-        new("tags", "Etiketler", "tag", "tags", "-tags", DefaultVisible: false),
-        new("barcode", "Barkod", "hash", DefaultVisible: false),
+        new("code", Texts.Get("crm.products.col.code"), "hash", "code", "-code", Locked: true),
+        new("name", Texts.Get("common.field.name"), "type", "name", "-name"),
+        new("kind", Texts.Get("common.field.kind"), "layers", "kind", "-kind"),
+        new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
+        new("category", Texts.Get("crm.products.field.category"), "list", "category", "-category"),
+        new("unit", Texts.Get("crm.products.col.unit"), "percent"),
+        new("brand", Texts.Get("crm.products.field.brand"), "briefcase", "brand", "-brand", DefaultVisible: false),
+        new("tags", Texts.Get("common.field.tags"), "tag", "tags", "-tags", DefaultVisible: false),
+        new("barcode", Texts.Get("crm.products.field.barcode"), "hash", DefaultVisible: false),
     ];
 
     private readonly GridViewState grid = new("crm.products", "code");
@@ -388,13 +389,13 @@
         {
             List<TabItem> items =
             [
-                new("form-genel", "Genel", Errors: ErrorCount("code", "name", "kind", "status", "categoryId", "baseUnitId", "quantityPrecision")),
-                new("form-fiyat", "Fiyatlama", Errors: ErrorCount("taxCategory", "chargeType", "recurringPeriod", "saleStart", "saleEnd", "cost", "costCurrency")),
-                new("form-detay", "Ayrıntılar", Errors: ErrorCount("serviceDurationMinutes", "deliveryMode", "barcode", "externalCode", "brand", "model", "tags", "description")),
+                new("form-genel", Texts.Get("crm.products.tab.general"), Errors: ErrorCount("code", "name", "kind", "status", "categoryId", "baseUnitId", "quantityPrecision")),
+                new("form-fiyat", Texts.Get("crm.products.tab.pricing"), Errors: ErrorCount("taxCategory", "chargeType", "recurringPeriod", "saleStart", "saleEnd", "cost", "costCurrency")),
+                new("form-detay", Texts.Get("crm.products.tab.details"), Errors: ErrorCount("serviceDurationMinutes", "deliveryMode", "barcode", "externalCode", "brand", "model", "tags", "description")),
             ];
             if (form?.Id is not null)
             {
-                items.Add(new(PackageTab, "Paket bileşenleri", Count: components.Count));
+                items.Add(new(PackageTab, Texts.Get("crm.products.components.title"), Count: components.Count));
             }
 
             return items;
@@ -454,7 +455,7 @@
     // Görünümler yalnızca süzgeçtir (tüm kayıtlar, tür, kişisel); kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllView, "Tüm ürün ve hizmetler", Icon: "package"),
+        new(AllView, Texts.Get("crm.products.view.all"), Icon: "package"),
         .. CatalogLabels.Kinds.Select(k => new ViewOption(KindPrefix + k.Key, k.Label, Icon: "layers")),
         .. views.Options,
     ];

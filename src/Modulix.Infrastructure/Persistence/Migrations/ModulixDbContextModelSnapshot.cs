@@ -10688,6 +10688,15 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("DeliveryCountry")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2)
+                        .IsUnicode(false)
+                        .HasColumnType("char(2)")
+                        .HasDefaultValue("TR")
+                        .IsFixedLength();
+
                     b.Property<decimal?>("FreightAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -10720,6 +10729,15 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PickupCountry")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2)
+                        .IsUnicode(false)
+                        .HasColumnType("char(2)")
+                        .HasDefaultValue("TR")
+                        .IsFixedLength();
 
                     b.Property<DateOnly>("PickupDate")
                         .HasColumnType("date");
@@ -10818,6 +10836,15 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("DeliveryCountry")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2)
+                        .IsUnicode(false)
+                        .HasColumnType("char(2)")
+                        .HasDefaultValue("TR")
+                        .IsFixedLength();
+
                     b.Property<string>("ExternalRef")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -10844,6 +10871,15 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PickupCountry")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2)
+                        .IsUnicode(false)
+                        .HasColumnType("char(2)")
+                        .HasDefaultValue("TR")
+                        .IsFixedLength();
 
                     b.Property<DateOnly>("PickupDate")
                         .HasColumnType("date");
