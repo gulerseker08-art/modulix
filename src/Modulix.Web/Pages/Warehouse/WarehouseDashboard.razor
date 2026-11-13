@@ -1,0 +1,350 @@
+@page "/depo"
+@page "/depo/pano"
+@using System.Globalization
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Depo ve Antrepo panosu · Modulix</PageTitle>
+
+@* Depo ve antrepo panosu. Her bölüm kendi okuma iznine bağlıdır ve sunucuda süzülür: izni olmayana bölüm hiç gelmez (yalnızca gizlenmez).
+   Tesis süzgeci lokasyon, doluluk ve hareket bölümlerine uygulanır; beyanname, vekâlet ve stok kartı tesise bağlı değildir. Sayılar adettir. *@
+<AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.FacilitiesRead">
+    <PageHeader Title="Depo ve Antrepo panosu" Icon="warehouse" Subtitle="Tesis, stok ve gümrük işlerinin bugünkü durumu">
+        <select class="form-select dash-filter" aria-label="Tesis" @bind="facility" @bind:after="LoadAsync" disabled="@loading">
+            <option value="">Tüm tesisler</option>
+            @foreach (var option in facilities)
+            {
+                <option value="@option.Id">@option.Label</option>
+            }
+        </select>
+        <div class="segmented" role="group" aria-label="Dönem">
+            @foreach (var option in Periods)
+            {
+                <button type="button" class="chip @(days == option ? "active" : null)" aria-pressed="@(days == option ? "true" : "false")" disabled="@loading"
+                        @onclick="() => ChooseDaysAsync(option)">@option gün</button>
+            }
+        </div>
+    </PageHeader>
+
+    @if (loading && data is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @error
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">Tekrar dene</button>
+        </div>
+    }
+
+    @if (data is { } d)
+    {
+        <div class="dash-kpis" role="group" aria-label="Depo özeti">
+            @if (d.Facilities is { } f)
+            {
+                <DashKpi Label="Etkin tesis" Icon="warehouse" Value="@Count(f.Active)"
+                         Detail="@(f.CustomsEnabled == 0 ? "Gümrük uzantılı tesis yok" : $"{Count(f.CustomsEnabled)} gümrük uzantılı")" />
+            }
+            @if (d.Occupancy is { } o)
+            {
+                <DashKpi Label="Lokasyon doluluğu" Icon="map-pin" Tone="teal" Value="@(o.Locations == 0 ? "—" : Percent(o.Occupied, o.Locations))"
+                         Detail="@(o.Locations == 0 ? "Stok tutulabilen lokasyon yok" : $"{Count(o.Occupied)} / {Count(o.Locations)} lokasyon dolu")" />
+            }
+            @if (d.StockItems is { } s)
+            {
+                <DashKpi Label="Etkin stok kartı" Icon="package" Tone="success" Value="@Count(s.Active)"
+                         Delta="@(s.NewInPeriod > 0 ? $"+{Count(s.NewInPeriod)} yeni" : null)" DeltaTrend="1" Detail="@($"Son {d.Days} günde eklenen")" />
+            }
+            @if (d.Declarations is { } decl)
+            {
+                <DashKpi Label="Taslak beyanname" Icon="clipboard-list" Tone="warning" Value="@Count(InCategory(decl, DraftCategory))"
+                         Detail="@($"{Count(InCategory(decl, RegisteredCategory))} tescilli")" />
+            }
+        </div>
+
+        <div class="dash-day">
+            <div class="dash-day-col">
+                @if (d.Movements is { } m)
+                {
+                    <section class="dash-card" aria-labelledby="wh-movements">
+                        <div class="dash-card-head"><h2 id="wh-movements">Stok hareketleri</h2><span class="small text-muted">Son @d.Days gün · hareket sayısı</span></div>
+                        @if (m.Daily.All(x => x.Inbound == 0 && x.Outbound == 0 && x.Transfer == 0 && x.Adjustment == 0))
+                        {
+                            <p class="text-muted mb-0">Bu dönemde stok hareketi yok.</p>
+                        }
+                        else
+                        {
+                            <PairColumnChart Title="@($"Son {d.Days} günün günlük giriş ve çıkış hareket sayıları")" FirstName="Giriş" SecondName="Çıkış"
+                                             Items="@(m.Daily.Select(x => new PairColumnChart.Item(x.Day.ToString("d MMM", Turkish), x.Day.ToString("d MMMM yyyy", Turkish), x.Inbound, x.Outbound)).ToList())" />
+                        }
+                        <div class="dash-totals">
+                            <span><strong>@Count(m.Inbound)</strong> giriş</span>
+                            <span><strong>@Count(m.Outbound)</strong> çıkış</span>
+                            <span><strong>@Count(m.Transfer)</strong> transfer</span>
+                        </div>
+                    </section>
+                }
+
+                @if (d.Occupancy is { } occ)
+                {
+                    <section class="dash-card" aria-labelledby="wh-occupancy">
+                        <div class="dash-card-head">
+                            <h2 id="wh-occupancy">Tesis bazında doluluk</h2>
+                            <a href="depo/tesisler">Tüm tesisler</a>
+                        </div>
+                        @if (occ.ByFacility.Count == 0)
+                        {
+                            <p class="text-muted mb-0">Stok tutulabilen lokasyon yok. <a href="depo/lokasyonlar">Lokasyon tanımla</a></p>
+                        }
+                        else
+                        {
+                            <ul class="dash-list">
+                                @foreach (var row in occ.ByFacility)
+                                {
+                                    var share = row.Locations == 0 ? 0m : row.Occupied / (decimal)row.Locations * 100m;
+                                    <li>
+                                        <div class="dash-list-main">
+                                            <a href="depo/lokasyonlar" title="@row.Name">@row.Name</a>
+                                            <small>@row.Code@(row.CustomsEnabled ? " · gümrük uzantılı" : null) · @Count(row.Occupied) / @Count(row.Locations) lokasyon</small>
+                                        </div>
+                                        <div class="dash-meter" aria-hidden="true">
+                                            <i class="@(share >= HighOccupancy ? "chart-fill-2" : "chart-fill-0")" style="width:@share.ToString("0.#", CultureInfo.InvariantCulture)%"></i>
+                                        </div>
+                                        <span class="dash-num">@Percent(row.Occupied, row.Locations)</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </section>
+                }
+
+                @if (d.Movements is { } recent)
+                {
+                    <section class="dash-card" aria-labelledby="wh-recent">
+                        <div class="dash-card-head"><h2 id="wh-recent">Son hareketler</h2></div>
+                        @if (recent.Recent.Count == 0)
+                        {
+                            <p class="text-muted mb-0">Henüz stok hareketi yok.</p>
+                        }
+                        else
+                        {
+                            <ul class="dash-list">
+                                @foreach (var row in recent.Recent)
+                                {
+                                    <li>
+                                        <span class="badge @MovementBadge(row.Category)">@row.TypeLabel</span>
+                                        <div class="dash-list-main">
+                                            <strong class="small">@ItemText(row)</strong>
+                                            <small class="d-block">@Route(row) · @Regional.ToTenant(row.OccurredAt).ToString($"{Regional.DatePattern} {Regional.TimePattern}", CultureInfo.InvariantCulture)</small>
+                                        </div>
+                                        <span class="dash-num">@row.Quantity.ToString("#,0.###", Regional.Numbers)</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </section>
+                }
+            </div>
+
+            <div class="dash-day-col">
+                @if (d.Declarations is { } decls)
+                {
+                    var total = decls.ByStatus.Sum(x => x.Count);
+                    <section class="dash-card" aria-labelledby="wh-declarations">
+                        <div class="dash-card-head">
+                            <h2 id="wh-declarations">Beyanname durumları</h2>
+                            <a href="depo/beyannameler">Beyannameler</a>
+                        </div>
+                        @if (total == 0)
+                        {
+                            <p class="text-muted mb-0">Henüz beyanname yok.</p>
+                        }
+                        else
+                        {
+                            <div class="stack-bar" role="img" aria-label="@string.Join(", ", decls.ByStatus.Where(x => x.Count > 0).Select(x => $"{x.Label} {x.Count}"))">
+                                @foreach (var status in decls.ByStatus.Where(x => x.Count > 0))
+                                {
+                                    <i class="@StatusFill(status.Category)" style="width:@((status.Count / (decimal)total * 100m).ToString("0.##", CultureInfo.InvariantCulture))%"></i>
+                                }
+                            </div>
+                            <ul class="dash-list">
+                                @foreach (var status in decls.ByStatus)
+                                {
+                                    <li>
+                                        <span class="dash-swatch @StatusFill(status.Category)" aria-hidden="true"></span>
+                                        <span class="dash-list-main small">@status.Label</span>
+                                        <span class="dash-num">@Count(status.Count)</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </section>
+                }
+
+                <section class="dash-card" aria-labelledby="wh-attention">
+                    <div class="dash-card-head"><h2 id="wh-attention" class="dash-card-title"><AppIcon Name="alert-circle" Size="18" /> Dikkat gerektirenler</h2></div>
+                    @if (Attention(d).Count == 0)
+                    {
+                        <p class="text-muted mb-0">Şu an dikkat gerektiren kayıt yok.</p>
+                    }
+                    else
+                    {
+                        <ul class="dash-list">
+                            @foreach (var item in Attention(d))
+                            {
+                                <li>
+                                    <span class="dash-kpi-icon tone-@item.Tone" aria-hidden="true"><AppIcon Name="@item.Icon" Size="18" /></span>
+                                    <div class="dash-list-main">
+                                        <a href="@item.Href">@item.Title</a>
+                                        <small>@item.Detail</small>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+
+                <p class="small text-muted mb-0">
+                    Doluluk, alt lokasyonu olmayan etkin lokasyonların bakiyesi olanlarıdır (kapasite tanımı henüz yok). Günler UTC'ye göre sayılır.
+                    @if (d.FacilityId is not null)
+                    {
+                        <span>Tesis seçimi beyanname, vekâlet ve stok kartı sayılarını etkilemez.</span>
+                    }
+                </p>
+            </div>
+        </div>
+    }
+</AuthGate>
+
+@code {
+    private const string DraftCategory = "draft";
+    private const string RegisteredCategory = "registered";
+    private const string CancelledCategory = "cancelled";
+    private const decimal HighOccupancy = 85m;
+
+    private static readonly int[] Periods = [7, 14, 30];
+    private static readonly CultureInfo Turkish = new("tr-TR");
+
+    private sealed record FacilityOption(Guid Id, string Label);
+
+    private sealed record AttentionItem(string Icon, string Tone, string Title, string Detail, string Href);
+
+    private WarehouseDashboardDto? data;
+    private List<FacilityOption> facilities = [];
+    private string facility = string.Empty;
+    private int days = 14;
+    private string? error;
+    private bool loading;
+    private int requestId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(WarehouseAccess.FacilitiesRead))
+        {
+            return;
+        }
+
+        var list = await Api.GetAsync<RecordPageResponse>($"/api/records/{WarehouseAccess.FacilityEntityKey}?isActive=true&pageSize=200&sort=code");
+        facilities = [.. (list.Value?.Items ?? []).Select(i => new FacilityOption(i.Id, $"{Text(i, "code")} · {Text(i, "name")}"))];
+        await LoadAsync();
+    }
+
+    private async Task ChooseDaysAsync(int value)
+    {
+        days = value;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var current = ++requestId;
+        loading = true;
+        error = null;
+        var url = $"/api/warehouse/dashboard?days={days}{(Guid.TryParse(facility, out var id) ? $"&facilityId={id}" : null)}";
+        var result = await Api.GetAsync<WarehouseDashboardDto>(url);
+        if (current != requestId)
+        {
+            return;
+        }
+
+        loading = false;
+        if (result.IsSuccess)
+        {
+            data = result.Value;
+        }
+        else
+        {
+            error = result.Error ?? "Pano yüklenemedi.";
+        }
+    }
+
+    private static string Text(RecordResponse item, string field) =>
+        item.Values.TryGetPropertyValue(field, out var node) && node is not null ? node.ToString() : string.Empty;
+
+    private static string Count(int value) => value.ToString("N0", Regional.Numbers);
+
+    private static string Percent(int part, int whole) =>
+        whole == 0 ? "—" : $"%{Math.Round(part / (decimal)whole * 100m).ToString("0", Regional.Numbers)}";
+
+    private static int InCategory(WarehouseDeclarationSummaryDto declarations, string category) =>
+        declarations.ByStatus.Where(s => s.Category == category).Sum(s => s.Count);
+
+    // Durum rengi kategoriye göredir (adı firmanındır): taslak sarı, tescilli mavi, iptal gri, kategorisiz koyu mavi.
+    private static string StatusFill(string? category) => category switch
+    {
+        DraftCategory => "chart-fill-2",
+        RegisteredCategory => "chart-fill-0",
+        CancelledCategory => "chart-fill-5",
+        _ => "chart-fill-3",
+    };
+
+    private static string MovementBadge(string? category) => category switch
+    {
+        "in" => "stage-open",
+        "out" => "stage-won",
+        "transfer" => "stage-proposal",
+        _ => "stage-onhold",
+    };
+
+    private static string ItemText(WarehouseRecentMovementDto row)
+    {
+        var item = row.StockItemCode is null ? null : $"{row.StockItemCode} {row.StockItemName}";
+        var lot = row.LotNo is null ? null : $"Parti {row.LotNo}";
+        return string.Join(" · ", new[] { item, lot }.Where(x => x is not null)) is { Length: > 0 } text ? text : "Stok hareketi";
+    }
+
+    private static string Route(WarehouseRecentMovementDto row) => (row.FromLocation, row.ToLocation) switch
+    {
+        ({ } from, { } to) => $"{from} → {to}",
+        ({ } from, null) => from,
+        (null, { } to) => to,
+        _ => "Lokasyon gösterilmiyor",
+    };
+
+    private IReadOnlyList<AttentionItem> Attention(WarehouseDashboardDto d)
+    {
+        var items = new List<AttentionItem>();
+        if (d.Attorneys is { Expiring: > 0 } a)
+        {
+            items.Add(new("clock", "warning", $"{Count(a.Expiring)} vekâletin süresi {a.WindowDays} gün içinde bitiyor",
+                a.Nearest is { } nearest ? $"En yakın bitiş: {nearest.ToString(Regional.DatePattern, CultureInfo.InvariantCulture)}" : string.Empty, "depo/vekaletler"));
+        }
+
+        if (d.Declarations is { StaleDrafts: > 0 } decl)
+        {
+            items.Add(new("clipboard-list", "danger", $"{Count(decl.StaleDrafts)} beyanname {decl.StaleDraftDays} günden uzun süredir taslakta",
+                string.Join(", ", decl.StaleSample.Select(x => x.RegistrationNo)), "depo/beyannameler"));
+        }
+
+        if (d.Occupancy is { PassiveWithStock: > 0 } occ)
+        {
+            items.Add(new("map-pin", "warning", $"{Count(occ.PassiveWithStock)} pasif lokasyonda hâlâ stok var",
+                "Pasif lokasyon yeni yerleştirme almaz; stok boşaltılmalı", "depo/lokasyonlar"));
+        }
+
+        return items;
+    }
+}
