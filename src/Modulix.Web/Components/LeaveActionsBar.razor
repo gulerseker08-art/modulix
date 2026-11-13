@@ -1,15 +1,16 @@
-@* İzin talebi eylemleri (ADR-0042 dilim 2): onayla, reddet, iptal et. Eylemler ve yapılabilirlik sunucudan gelir (/api/hr/leave-requests/{id}/actions);
+@* İK iş akışı eylemleri (ADR-0042): izin talebinde onayla, reddet, iptal et; masraf beyanında gönder, onayla, iade et, reddet, ödendi, iptal.
+   Eylemler ve yapılabilirlik sunucudan gelir ({BaseUrl}/{id}/actions);
    ilgisi olmayan kullanıcıya eylem gelmez, yapılamayan eylem nedeniyle pasif görünür. Ret gerekçe ister. Kararı sunucu verir; sürüm değiştiyse
    409 iletisi gösterilir. *@
 @inject ApiClient Api
 
 @if (actions is { Count: > 0 })
 {
-    <section class="list-toolbar" aria-label="İzin talebi eylemleri">
+    <section class="list-toolbar" aria-label="İş akışı eylemleri">
         @if (pending is { } asking)
         {
             <label class="visually-hidden" for="leave-action-reason">Gerekçe</label>
-            <input id="leave-action-reason" class="form-control" maxlength="500" placeholder="@($"{asking.Label} gerekçesi")" @bind="reason" @bind:event="oninput" />
+            <input id="leave-action-reason" class="form-control" maxlength="500" placeholder="@(asking.Action == "pay" ? "Ödeme referansı (isteğe bağlı)" : $"{asking.Label} gerekçesi")" @bind="reason" @bind:event="oninput" />
             <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => pending = null">Vazgeç</button>
             <button type="button" class="btn btn-danger" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" aria-busy="@(busy ? "true" : null)" @onclick="() => RunAsync(asking)">@asking.Label</button>
         }
@@ -45,6 +46,9 @@
 
     [Parameter, EditorRequired] public RecordResponse Record { get; set; } = default!;
 
+    /// <summary>Eylem uçlarının kökü: izin talebi ya da masraf beyanı.</summary>
+    [Parameter] public string BaseUrl { get; set; } = "/api/hr/leave-requests";
+
     /// <summary>Eylem başarılı olunca talebin yeni hali.</summary>
     [Parameter] public EventCallback<RecordResponse> Changed { get; set; }
 
@@ -57,7 +61,7 @@
 
         loadedFor = (Record.Id, Record.Version);
         pending = null;
-        var result = await Api.GetAsync<List<HrActionDto>>($"/api/hr/leave-requests/{Record.Id}/actions");
+        var result = await Api.GetAsync<List<HrActionDto>>($"{BaseUrl}/{Record.Id}/actions");
         actions = result.Value ?? [];
         message = result.Error;
     }
@@ -78,7 +82,7 @@
     {
         busy = true;
         message = null;
-        var result = await Api.PostAsync<RecordResponse>($"/api/hr/leave-requests/{Record.Id}/actions", new RunHrActionRequest(action.Action, Record.Version, reason));
+        var result = await Api.PostAsync<RecordResponse>($"{BaseUrl}/{Record.Id}/actions", new RunHrActionRequest(action.Action, Record.Version, reason));
         busy = false;
         if (!result.IsSuccess)
         {

@@ -105,3 +105,42 @@ internal sealed class HolidayConfiguration : IEntityTypeConfiguration<Holiday>
         builder.HasIndex(h => new { h.TenantId, h.Date }).IsUnique().HasDatabaseName("UX_Holidays_Date");
     }
 }
+
+internal sealed class ExpenseClaimConfiguration : IEntityTypeConfiguration<ExpenseClaim>
+{
+    public void Configure(EntityTypeBuilder<ExpenseClaim> builder)
+    {
+        HrTables.ConfigureCommon(builder, "ExpenseClaims");
+        builder.Property(c => c.Title).HasMaxLength(ExpenseClaim.TitleMaxLength).IsRequired();
+        builder.Property(c => c.Currency).HasMaxLength(3).IsFixedLength().IsUnicode(false).IsRequired();
+        builder.Property(c => c.Description).HasMaxLength(ExpenseClaim.TextMaxLength);
+        builder.Property(c => c.TotalAmount).HasPrecision(18, 2);
+        builder.Property(c => c.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(c => c.DecisionReason).HasMaxLength(ExpenseClaim.ReasonMaxLength);
+        builder.Property(c => c.PaymentReference).HasMaxLength(ExpenseClaim.ReasonMaxLength);
+
+        builder.HasOne<Employee>().WithMany().HasForeignKey(c => new { c.TenantId, c.EmployeeId })
+            .HasPrincipalKey(e => new { e.TenantId, e.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(c => new { c.TenantId, c.EmployeeId, c.CreatedAt }).HasDatabaseName("IX_ExpenseClaims_Employee");
+        builder.HasIndex(c => new { c.TenantId, c.Status }).HasDatabaseName("IX_ExpenseClaims_Status");
+        builder.HasIndex(c => new { c.TenantId, c.OwnerId }).HasDatabaseName("IX_ExpenseClaims_Owner");
+        builder.HasIndex(c => new { c.TenantId, c.ApproverUserId }).HasDatabaseName("IX_ExpenseClaims_Approver");
+    }
+}
+
+internal sealed class ExpenseLineConfiguration : IEntityTypeConfiguration<ExpenseLine>
+{
+    public void Configure(EntityTypeBuilder<ExpenseLine> builder)
+    {
+        HrTables.ConfigureCommon(builder, "ExpenseLines");
+        builder.Property(l => l.ExpenseTypeKey).HasMaxLength(100).IsRequired();
+        builder.Property(l => l.Description).HasMaxLength(ExpenseLine.DescriptionMaxLength);
+        builder.Property(l => l.Amount).HasPrecision(18, 2);
+        builder.Property(l => l.VatAmount).HasPrecision(18, 2);
+
+        builder.HasOne<ExpenseClaim>().WithMany().HasForeignKey(l => new { l.TenantId, l.ClaimId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(l => new { l.TenantId, l.ClaimId, l.ExpenseDate }).HasDatabaseName("IX_ExpenseLines_Claim");
+        builder.HasIndex(l => new { l.TenantId, l.OwnerId }).HasDatabaseName("IX_ExpenseLines_Owner");
+    }
+}

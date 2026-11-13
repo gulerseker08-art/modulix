@@ -48,13 +48,17 @@ internal sealed class HrWorkflowGate
 
     public string? Reason { get; private set; }
 
+    /// <summary>Gönderimde yazılacak onaylayan (masraf beyanı; gönderim anındaki yönetici).</summary>
+    public Guid? ApproverUserId { get; private set; }
+
     public bool IsOpen => Permission is not null;
 
-    public IDisposable Open(string permission, string status, string? reason)
+    public IDisposable Open(string permission, string status, string? reason, Guid? approverUserId = null)
     {
         Permission = permission;
         Status = status;
         Reason = reason;
+        ApproverUserId = approverUserId;
         return new Closer(this);
     }
 
@@ -65,6 +69,7 @@ internal sealed class HrWorkflowGate
             gate.Permission = null;
             gate.Status = null;
             gate.Reason = null;
+            gate.ApproverUserId = null;
         }
     }
 }

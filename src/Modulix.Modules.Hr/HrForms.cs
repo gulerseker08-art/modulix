@@ -76,5 +76,34 @@ public static class HrForms
             new("carriedOverDays", "Devreden (gün)", "hak", 6),
             new("notes", "Notlar", "notlar", 12),
         ]),
+
+        new(HrModule.Entities.ExpenseClaim, "Masraf beyanı",
+        [new(General, "Beyan"), new("aciklama", "Açıklama ve ek bilgiler")],
+        [
+            new("beyan", "Masraf beyanı", "wallet"),
+            new("aciklama", "Açıklama", "message-square", Tab: "aciklama"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "aciklama"),
+        ],
+        [
+            new("employeeId", "Çalışan", "beyan", 6, Required: true, Fixed: true),
+            new("title", "Başlık", "beyan", 3, Required: true, Fixed: true),
+            new("currency", "Para birimi", "beyan", 3),
+            new("description", "Açıklama", "aciklama", 12),
+        ]),
+
+        new(HrModule.Entities.ExpenseLine, "Masraf satırı",
+        [new(General, "Masraf"), new("aciklama", "Açıklama ve ek bilgiler")],
+        [
+            new("masraf", "Masraf", "coins"),
+            new("aciklama", "Açıklama", "message-square", Tab: "aciklama"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "aciklama"),
+        ],
+        [
+            new("expenseDate", "Tarih", "masraf", 3, Required: true, Fixed: true),
+            new("expenseTypeKey", "Masraf türü", "masraf", 3, Required: true, Fixed: true),
+            new("amount", "Tutar (KDV dahil)", "masraf", 3, Required: true, Fixed: true),
+            new("vatAmount", "KDV tutarı", "masraf", 3),
+            new("description", "Açıklama", "aciklama", 12),
+        ]),
     ];
 }

@@ -103,7 +103,7 @@ Her dilim dört testle teslim edilir (mutlu yol, doğrulama, tenant izolasyonu, 
 | 0 | Bu ADR | — |
 | 1 | Modül, çalışan kartı (özlük, hassas alanlar, özlük belgeleri), rehber, organizasyon şeması | — |
 | 2 | İzin türleri, hak/bakiye, talep, onay (**yapıldı**, bölüm 10); takvim, Ç6a bağlantısı, işveren şirket bağı (2b) | 1, Ç6a (var) |
-| 3 | Masraf beyanı, belge, onay, ödeme durumu | 1, ADR-0040 (var), Ç6a |
+| 3 | Masraf beyanı, belge, onay, ödeme durumu (**yapıldı**, bölüm 11); Ç6a tutar onayı (3b) | 1, ADR-0040 (var), Ç6a |
 | 4 | Demirbaş ve zimmet, tutanak çıktısı | 1 |
 | 5 | İşe giriş/çıkış kontrol listeleri | 1, 4 |
 | 6 | Duyurular | 1 |
@@ -170,4 +170,28 @@ Bölüm 5'teki izin akışı şu kararlarla uygulandı; K6'nın genel onay süre
 | `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
 | `dotnet test tests/Modulix.Core.Tests` | 940/940 geçti |
 | `HrLeaveTests` (entegrasyon, 4 test: mutlu yol, doğrulama, tenant izolasyonu, yetki) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |
+
+## 11. Dilim 3: masraf yönetimi (13 Kasım 2026)
+
+Bölüm 5'teki masraf akışı izin dilimindeki kalıpla (iş akışı kapısı, veri kapsamı + onaylayan) uygulandı.
+
+- **Masraf beyanı** `hr.ExpenseClaims`: çalışan, başlık, para birimi (beyan başına tek para birimi; satırlar onda), açıklama; toplam ve satır sayısı satırlardan aynı işlemde türetilir (sürüm alanıyla). Durumlar: taslak → onaya gönderildi → onaylandı → ödendi; gönderilmiş beyan **düzeltmeye iade** edilebilir (taslağa döner, gerekçeli) ya da reddedilir (gerekçeli); taslak ve gönderilmiş beyan iptal edilir. Beyan silinmez.
+- **Masraf satırı** `hr.ExpenseLines`: tarih (ileri olamaz), tür (Y9b `hr.expense-type`; kategori ulaşım/konaklama/yemek/diğer), açıklama, KDV dahil tutar, isteğe bağlı KDV (tutarı aşamaz). KDV indirimi, harcırah ve belge türü kuralları vergi doğrulaması beklediği için koda yazılmadı (bölüm 8). Fiş ve fatura satıra ADR-0040 dosyası olarak eklenir; dosya yetkisi satırın güncelleme iznidir (çalışanın kendi satırı).
+- **Onaylayan** gönderim anında çalışanın yöneticisinin kullanıcısıdır; iade sonrası yeniden gönderimde yeniden belirlenir. Kimse kendi beyanına karar veremez.
+- **Ödeme** finans işidir (ADR-0037): burada yalnızca "ödendi" işareti, işaretleyen, zaman ve ödeme referansı tutulur; muhasebe fişi ve kasa/banka hareketi üretilmez. Görev ayrılığı: kimse kendi beyanının ödemesini işaretleyemez; "Finans (masraf ödemesi)" şablonu karar veremez.
+- **Görünürlük:** veri kapsamı alanı `employeeUserId`; onaylayan beyanı ve satırlarını "kendi" kapsamıyla da görür.
+- **Arayüz:** Masraflarım (beyanlarım, yeni beyan, beyan kartı: satırlar, satır başına fiş/fatura, onaya gönder) ve Masraf beyanları (grid; görünümler Onayımı bekleyenler / Onay bekleyen / Ödenecek / Ödenen / Reddedilen / Tüm beyanlar). Yeni CSS sınıfı yok.
+- Migration `HrExpenses`: iki tablo + `TenantIsolationSql.AddTable`.
+
+**Dilim 3b'ye kalanlar:** Ç6a tutar eşiğine bağlı çok adımlı onay (ör. 5.000 TRY üstü İK/finans), beyanın Excel/PDF çıktısı, faturalanabilir kalem/muhasebe köprüsü (ADR-0037), kart/avans mahsubu, fiş zorunluluğu ayarı.
+
+### Test sonuçları (Dilim 3)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 27/27 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
+| `dotnet test tests/Modulix.Core.Tests` | 964/964 geçti |
+| `HrExpenseTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |

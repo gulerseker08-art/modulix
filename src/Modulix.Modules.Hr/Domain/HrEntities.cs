@@ -235,3 +235,100 @@ public sealed class Holiday : HrEntity
 
     public bool HalfDay { get; internal set; }
 }
+
+/// <summary>
+/// Masraf beyanı (ADR-0042 dilim 3): çalışanın bir dönemdeki harcamalarını topladığı belge; tutarlar satırlardadır, toplam sunucuda tutulur.
+/// Durum yalnızca komutla değişir: taslak → onaya gönderildi → onaylandı → ödendi; onaya gönderilen beyan düzeltme için taslağa iade edilebilir,
+/// reddedilebilir; taslak ve onay bekleyen beyan iptal edilebilir. Onaylayan, gönderim anındaki yöneticinin kullanıcısıdır ve değişmez (M4.2).
+/// Ödeme kaydı (kasa/banka) finans işidir (ADR-0037); burada yalnızca "ödendi" bilgisi ve ödeme referansı tutulur. Beyan silinmez.
+/// </summary>
+public sealed class ExpenseClaim : HrEntity
+{
+    public const int TitleMaxLength = 200;
+    public const int TextMaxLength = 1000;
+    public const int ReasonMaxLength = 500;
+
+    public static class Statuses
+    {
+        public const string Draft = "draft";
+        public const string Submitted = "submitted";
+        public const string Approved = "approved";
+        public const string Paid = "paid";
+        public const string Rejected = "rejected";
+        public const string Cancelled = "cancelled";
+
+        public static IReadOnlyList<string> All { get; } = [Draft, Submitted, Approved, Paid, Rejected, Cancelled];
+    }
+
+    public Guid EmployeeId { get; internal set; }
+
+    public string Title { get; internal set; } = string.Empty;
+
+    /// <summary>ISO 4217 para birimi; satırlar beyanın para birimindedir.</summary>
+    public string Currency { get; internal set; } = "TRY";
+
+    public string? Description { get; internal set; }
+
+    /// <summary>Satırların toplamı (KDV dahil); yalnızca satır deposu yazar.</summary>
+    public decimal TotalAmount { get; internal set; }
+
+    public int LineCount { get; internal set; }
+
+    public string Status { get; internal set; } = Statuses.Draft;
+
+    /// <summary>Çalışanın bağlı kullanıcısı (veri kapsamı).</summary>
+    public Guid? OwnerId { get; internal set; }
+
+    /// <summary>Gönderim anındaki onaylayan (yöneticinin kullanıcısı); yoksa yalnızca İK karar verir.</summary>
+    public Guid? ApproverUserId { get; internal set; }
+
+    public DateTimeOffset? SubmittedAt { get; internal set; }
+
+    public Guid? DecidedByUserId { get; internal set; }
+
+    public DateTimeOffset? DecidedAt { get; internal set; }
+
+    /// <summary>İade, ret ya da iptal gerekçesi.</summary>
+    public string? DecisionReason { get; internal set; }
+
+    public Guid? PaidByUserId { get; internal set; }
+
+    public DateTimeOffset? PaidAt { get; internal set; }
+
+    /// <summary>Ödemenin dekont/havale referansı (serbest metin).</summary>
+    public string? PaymentReference { get; internal set; }
+
+    internal void SetTotals(decimal total, int count)
+    {
+        TotalAmount = total;
+        LineCount = count;
+        Touch();
+    }
+}
+
+/// <summary>
+/// Masraf satırı (ADR-0042 dilim 3): tarih, masraf türü (Y9b <c>hr.expense-type</c>), açıklama, KDV dahil tutar ve isteğe bağlı KDV tutarı. Fiş ya da
+/// fatura satıra dosya olarak eklenir (ADR-0040). Satır yalnızca beyan taslakken eklenir, değişir ve silinir; beyanın toplamı aynı işlemde güncellenir.
+/// Görünürlük beyanınkiyle aynıdır (sahip ve onaylayan).
+/// </summary>
+public sealed class ExpenseLine : HrEntity
+{
+    public const int DescriptionMaxLength = 500;
+    public const decimal MaxAmount = 1_000_000m;
+
+    public Guid ClaimId { get; internal set; }
+
+    public DateOnly ExpenseDate { get; internal set; }
+
+    public string ExpenseTypeKey { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    /// <summary>KDV dahil tutar (beyanın para biriminde).</summary>
+    public decimal Amount { get; internal set; }
+
+    public decimal? VatAmount { get; internal set; }
+
+    /// <summary>Beyanın sahibi (veri kapsamı; beyandan kopyalanır, değişmez).</summary>
+    public Guid? OwnerId { get; internal set; }
+}
