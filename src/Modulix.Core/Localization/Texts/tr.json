@@ -94,6 +94,7 @@
   "shell.search.busy": "Aranıyor…",
   "shell.search.more": "Tümünü {0} listesinde ara →",
   "shell.search.failed": "{0} aranamadı; daha sonra yeniden deneyin.",
+  "shell.search.screens": "Ekranlar",
   "shell.license.readOnly": "lisans süresi {0} tarihinde doldu; modül salt okunur. Kayıtlarınız silinmedi, yalnızca görüntülenebilir. Yeniden etkinleştirmek için ürün sahibiyle iletişime geçin.",
   "shell.license.grace": "lisans süresi {0} tarihinde doldu. {1} tarihine kadar kullanmaya devam edebilirsiniz; sonrasında modül salt okunur olur.",
   "shell.license.expiring": "lisansı {0} tarihinde sona erecek.",

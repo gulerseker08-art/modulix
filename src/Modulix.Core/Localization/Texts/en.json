@@ -94,6 +94,7 @@
   "shell.search.busy": "Searching…",
   "shell.search.more": "Search all in {0} →",
   "shell.search.failed": "{0} could not be searched; try again later.",
+  "shell.search.screens": "Screens",
   "shell.license.readOnly": "license expired on {0}; the module is read-only. Your records have not been deleted and can still be viewed. Contact the product owner to reactivate it.",
   "shell.license.grace": "license expired on {0}. You can keep using it until {1}; after that the module becomes read-only.",
   "shell.license.expiring": "license will expire on {0}.",

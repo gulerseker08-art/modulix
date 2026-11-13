@@ -55,7 +55,7 @@
 
         @if (requests is null || requests.Items.Count == 0)
         {
-            <p class="text-muted" role="status">Henüz izin talebiniz yok.</p>
+            <EmptyState Icon="calendar" Title="Henüz izin talebiniz yok." Text="@(Session.Can(HrAccess.LeavesRequest) ? "Yeni izin talebi ile ilk talebinizi açabilirsiniz." : null)" />
         }
         else
         {
@@ -63,10 +63,10 @@
                 <caption class="visually-hidden">İzin taleplerim</caption>
                 <thead>
                     <tr>
-                        <th scope="col"><AppIcon Name="calendar" Size="14" /> Tarih</th>
-                        <th scope="col"><AppIcon Name="tag" Size="14" /> Tür</th>
-                        <th scope="col"><AppIcon Name="clock" Size="14" /> Süre</th>
-                        <th scope="col"><AppIcon Name="check-circle" Size="14" /> Durum</th>
+                        <th scope="col"><SortHeader Label="Tarih" ColumnIcon="calendar" Asc="startDate" Desc="-startDate" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="Tür" ColumnIcon="tag" Asc="leaveTypeKey" Desc="-leaveTypeKey" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="Süre" ColumnIcon="clock" Asc="days" Desc="-days" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="Durum" ColumnIcon="check-circle" Asc="status" Desc="-status" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
                         <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                     </tr>
                 </thead>
@@ -142,9 +142,20 @@
     private async Task LoadRequestsAsync(int pageNumber)
     {
         var result = await Api.GetAsync<RecordPageResponse>(
-            $"/api/records/{HrAccess.LeaveRequestEntityKey}?employeeId={employee!.Id}&page={pageNumber}&pageSize={ListPaging.Size}");
+            $"/api/records/{HrAccess.LeaveRequestEntityKey}?employeeId={employee!.Id}&page={pageNumber}&pageSize={ListPaging.Size}{SortQuery}");
         requests = result.Value;
         message = result.Error;
+    }
+
+    // Sıralama sunucudadır (kayıt deposunun sort anahtarları); boş değer deponun varsayılan sırasıdır.
+    private string sort = "";
+
+    private string SortQuery => sort.Length == 0 ? "" : "&sort=" + Uri.EscapeDataString(sort);
+
+    private async Task SortAsync(string value)
+    {
+        sort = value;
+        await LoadRequestsAsync(1);
     }
 
     private void Create()

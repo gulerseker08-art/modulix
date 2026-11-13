@@ -4939,6 +4939,34 @@ button.pipeline-label {
         box-shadow: var(--mx-focus-ring);
     }
 
+/* Kısayol ipucu (Ctrl K): kutu boşken sağda durur; odaklanınca ve telefonda gizlenir. */
+.global-search-kbd {
+    position: absolute;
+    right: var(--mx-space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0 var(--mx-space-2);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-surface-muted);
+    color: var(--mx-text-secondary);
+    font-family: var(--mx-font);
+    font-size: var(--mx-fs-helper);
+    font-weight: 600;
+    line-height: 1.5rem;
+    pointer-events: none;
+}
+
+.global-search:focus-within .global-search-kbd {
+    display: none;
+}
+
+@media (max-width: 767.98px) {
+    .global-search-kbd {
+        display: none;
+    }
+}
+
 /* Panelin dışına tıklanınca kapanır. */
 .global-search-backdrop {
     position: fixed;

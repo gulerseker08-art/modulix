@@ -94,6 +94,7 @@
   "shell.search.busy": "Axtarılır…",
   "shell.search.more": "Hamısını {0} siyahısında axtar →",
   "shell.search.failed": "{0} axtarıla bilmədi; sonra yenidən cəhd edin.",
+  "shell.search.screens": "Ekranlar",
   "shell.license.readOnly": "lisenziyanın müddəti {0} tarixində bitdi; modul yalnız oxuna bilər. Qeydləriniz silinməyib, yalnız baxıla bilər. Yenidən aktivləşdirmək üçün məhsul sahibi ilə əlaqə saxlayın.",
   "shell.license.grace": "lisenziyanın müddəti {0} tarixində bitdi. {1} tarixinədək istifadəyə davam edə bilərsiniz; sonra modul yalnız oxuna bilən olacaq.",
   "shell.license.expiring": "lisenziyası {0} tarixində başa çatacaq.",

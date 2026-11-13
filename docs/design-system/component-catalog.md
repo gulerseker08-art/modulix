@@ -17,7 +17,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | ThemeToggle | Var | `Components/ThemeToggle.razor` |
 | PageHeader | Var | `Components/PageHeader.razor` — `Title`, `Icon`, `Subtitle`, aksiyonlar `ChildContent` |
 | Breadcrumb | Stil | `<ol class="breadcrumb-trail">`; bugün detay sayfaları `back-link` kullanır |
-| Global arama | Var | `Components/GlobalSearch.razor`: üst çubukta "Arama yapın..." kutusu; 2+ karakterde 300ms gecikmeyle firma, kişi, fırsat, lead ve teklif liste uç noktalarını (`?search=&pageSize=5`) yalnızca izin olan türler için paralel çağırır; sonuçlar gruplu açılır panelde (ok tuşları, Enter, Escape, dışarı tıklama). Ayrı genel arama uç noktası yoktur; tenant, yetki ve kapsam süzgeçleri sunucudaki liste uç noktalarındadır |
+| Global arama | Var | `Components/GlobalSearch.razor`: üst çubukta "Arama yapın..." kutusu; 2+ karakterde 300ms gecikmeyle firma, kişi, fırsat, lead ve teklif liste uç noktalarını (`?search=&pageSize=5`) yalnızca izin olan türler için paralel çağırır; sonuçlar gruplu açılır panelde (ok tuşları, Enter, Escape, dışarı tıklama). Ayrı genel arama uç noktası yoktur; tenant, yetki ve kapsam süzgeçleri sunucudaki liste uç noktalarındadır **Komut paleti (13.11.2026):** `Ctrl+K` (macOS `⌘K`) kutuya odaklanır (`shell.js`; kutu boşken sağda `global-search-kbd` ipucu). Sonuçların ilk grubu **Ekranlar**dır: kullanıcının menüsünde görünen ekranlar (`AppNavigation`) adına göre istemcide, beklemeden eşleşir (`ScreenSearch`; büyük/küçük harf ve Türkçe işaret duyarsız: "firsat" → "Fırsatlar"); kayıt sonuçları gelince altına eklenir. Menüde gizli ekran burada da çıkmaz; yetki yine route ve sunucuda denetlenir. |
 | NotificationCenter | Yok | Bildirim altyapısı yok |
 
 ## Temel
