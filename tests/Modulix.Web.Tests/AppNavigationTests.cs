@@ -391,6 +391,12 @@ public class AppNavigationTests
         Assert.Equal(AppCatalog.Hr, nav.Context("ik/rehber")!.Root.Id);
         Assert.Equal(AppCatalog.Hr, nav.Context("ik/organizasyon-semasi")!.Root.Id);
 
+        // İzin ekranları kendi izinlerine bağlıdır: çalışan "İzinlerim"i, yönetici talepleri, İK hakları ve tatilleri görür.
+        Assert.Equal(["Çalışanlar", "Rehber", "Organizasyon şeması", "İzinlerim"],
+            Nav([HrAccess.ModuleKey], [HrAccess.EmployeesRead, HrAccess.LeavesRead, HrAccess.LeavesRequest]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Contains("İzin talepleri", Nav([HrAccess.ModuleKey], [HrAccess.LeavesApprove]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["İzin talepleri", "İzin hakları", "Resmî tatiller"], Nav([HrAccess.ModuleKey], [HrAccess.LeavesManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
         Assert.Empty(Nav([], [HrAccess.EmployeesRead]).Roots());
         Assert.Empty(Nav([HrAccess.ModuleKey], []).Roots());
     }

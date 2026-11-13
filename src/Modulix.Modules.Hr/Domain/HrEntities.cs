@@ -124,3 +124,114 @@ public sealed class Employee : HrEntity
 
     public string? Notes { get; internal set; }
 }
+
+/// <summary>
+/// Yıllık izin hakkı (ADR-0042 dilim 2): bir çalışanın bir takvim yılındaki hakkı. Hak ve devreden gün İK tarafından girilir; kıdeme göre
+/// otomatik hak ediş hesabı mevzuat doğrulaması bekler (ADR-0042 bölüm 8), koda yazılmaz. Kullanılan gün yalnızca onaylanan ve iptal edilen
+/// yıllık izin taleplerinden sunucuda güncellenir; sürüm alanı eşzamanlı iki onayın bakiyeyi aşmasını engeller (M4.3). Kayıt sahibi çalışanın
+/// kullanıcısıdır (veri kapsamı "kendi": çalışan yalnızca kendi hakkını görür).
+/// </summary>
+public sealed class LeaveBalance : HrEntity
+{
+    public const decimal MaxDays = 366m;
+    public const int NotesMaxLength = 1000;
+
+    public Guid EmployeeId { get; internal set; }
+
+    /// <summary>Takvim yılı (izin talebi yılın içinde kalır).</summary>
+    public int Year { get; internal set; }
+
+    public decimal EntitledDays { get; internal set; }
+
+    public decimal CarriedOverDays { get; internal set; }
+
+    /// <summary>Onaylanmış yıllık izinlerin toplamı; yalnızca izin talebi iş akışı yazar.</summary>
+    public decimal UsedDays { get; internal set; }
+
+    /// <summary>Çalışanın bağlı kullanıcısı (veri kapsamı için; çalışan kartından kopyalanır).</summary>
+    public Guid? OwnerId { get; internal set; }
+
+    public string? Notes { get; internal set; }
+
+    public decimal RemainingDays => EntitledDays + CarriedOverDays - UsedDays;
+
+    internal void AddUsed(decimal days)
+    {
+        UsedDays += days;
+        Touch();
+    }
+}
+
+/// <summary>
+/// İzin talebi (ADR-0042 dilim 2). Çalışan kendisi için (ya da İK herkes için) açar; gün sayısı sunucuda hafta sonu ve resmî tatiller düşülerek
+/// hesaplanır, yarım gün yalnızca tek günlük talepte seçilir. Talep açılırken çalışanın yöneticisinin kullanıcısı onaylayan olarak kaydedilir:
+/// yönetici sonradan değişse de bu talebin onay mercii değişmez (M4.2). Durum yalnızca komutla değişir (onayla, reddet, iptal); onaylanan yıllık
+/// izin aynı işlemde bakiyeden düşer, onaylanmış iznin iptali bakiyeye geri ekler. Talep değiştirilmez ve silinmez: iptal edilip yenisi açılır.
+/// </summary>
+public sealed class LeaveRequest : HrEntity
+{
+    public const int TextMaxLength = 1000;
+    public const int ReasonMaxLength = 500;
+
+    public static class Statuses
+    {
+        public const string Pending = "pending";
+        public const string Approved = "approved";
+        public const string Rejected = "rejected";
+        public const string Cancelled = "cancelled";
+
+        public static IReadOnlyList<string> All { get; } = [Pending, Approved, Rejected, Cancelled];
+
+        /// <summary>Takvimde yer tutan (çakışma denetimine giren) durumlar.</summary>
+        public static IReadOnlyList<string> Active { get; } = [Pending, Approved];
+    }
+
+    public Guid EmployeeId { get; internal set; }
+
+    /// <summary>İzin türü (Y9b seçim listesi <c>hr.leave-type</c>); yalnızca "yıllık izin" kategorisi bakiyeden düşer.</summary>
+    public string LeaveTypeKey { get; internal set; } = string.Empty;
+
+    /// <summary>Talep anındaki tür kategorisi (tür listesi sonradan değişse de bakiye hesabı bozulmaz).</summary>
+    public string LeaveCategory { get; internal set; } = string.Empty;
+
+    public DateOnly StartDate { get; internal set; }
+
+    public DateOnly EndDate { get; internal set; }
+
+    public bool HalfDay { get; internal set; }
+
+    /// <summary>İş günü sayısı (yarım gün 0,5); sunucuda hesaplanır.</summary>
+    public decimal Days { get; internal set; }
+
+    public string? Description { get; internal set; }
+
+    public string Status { get; internal set; } = Statuses.Pending;
+
+    /// <summary>Talebin sahibi: çalışanın bağlı kullanıcısı (veri kapsamı; çalışanın hesabı yoksa boş).</summary>
+    public Guid? OwnerId { get; internal set; }
+
+    /// <summary>Talep anındaki onaylayan: çalışanın yöneticisinin kullanıcısı (yoksa boş; yalnızca İK onaylar).</summary>
+    public Guid? ApproverUserId { get; internal set; }
+
+    public Guid? DecidedByUserId { get; internal set; }
+
+    public DateTimeOffset? DecidedAt { get; internal set; }
+
+    /// <summary>Ret ya da iptal gerekçesi.</summary>
+    public string? DecisionReason { get; internal set; }
+}
+
+/// <summary>
+/// Resmî tatil ve idari izin günü (ADR-0042 dilim 2): izin gün sayısından düşülür. Firma kendi listesini girer; tarihler koda yazılmaz
+/// (dinî bayramlar her yıl değişir). Yarım gün tatil (arife) yarım gün düşer.
+/// </summary>
+public sealed class Holiday : HrEntity
+{
+    public const int NameMaxLength = 150;
+
+    public DateOnly Date { get; internal set; }
+
+    public string Name { get; internal set; } = string.Empty;
+
+    public bool HalfDay { get; internal set; }
+}

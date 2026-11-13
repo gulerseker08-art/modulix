@@ -44,7 +44,9 @@ public class HrModuleTests
         });
 
         var staff = Assert.Single(Module.RoleTemplates, t => t.Key == "hr.staff");
-        Assert.Equal([HrModule.Permissions.EmployeesRead], staff.Permissions);
+        Assert.Contains(HrModule.Permissions.EmployeesRead, staff.Permissions);
+        Assert.DoesNotContain(HrModule.Permissions.EmployeesPersonal, staff.Permissions);
+        Assert.DoesNotContain(HrModule.Permissions.EmployeesWrite, staff.Permissions);
     }
 
     [Fact]
@@ -57,23 +59,28 @@ public class HrModuleTests
         Assert.Contains("nationalId", sensitive.Fields);
         Assert.Contains("iban", sensitive.Fields);
 
-        var audited = Assert.Single(Module.AuditedEntities);
+        var audited = Assert.Single(Module.AuditedEntities, a => a.EntityKey == HrModule.Entities.Employee);
         Assert.All(sensitive.Fields, field => Assert.True(audited.Fields.ContainsKey(field), field));
     }
 
     [Fact]
     public void Default_form_has_several_tabs_keeps_identity_first_and_groups_personal_data_on_its_own_tab()
     {
-        var form = Assert.Single(HrForms.All);
-        Assert.Equal(HrModule.Entities.Employee, form.EntityKey);
-        Assert.True(form.Tabs.Count >= 2);
-        Assert.Equal("genel", form.Tabs[0].Key);
-        Assert.All(form.Tabs, tab => Assert.Contains(form.Sections, s => s.Tab == tab.Key));
-        Assert.Contains(form.Sections, s => s.Key == FormDefinition.ExtrasSection);
-        var firstTab = form.Sections.Where(s => s.Tab == form.Tabs[0].Key).Select(s => s.Key).ToHashSet();
-        Assert.All(form.Fields.Where(f => f is { Required: true, Fixed: true }), f => Assert.Contains(f.Section, firstTab));
-        Assert.All(form.Fields, f => Assert.Contains(f.Span, FormSpans.Allowed));
-        Assert.Contains(form.EntityKey, Module.CustomizableEntities.Select(c => c.EntityKey));
+        Assert.Equal(
+            [HrModule.Entities.Employee, HrModule.Entities.LeaveRequest, HrModule.Entities.LeaveBalance], HrForms.All.Select(f => f.EntityKey));
+        foreach (var definition in HrForms.All)
+        {
+            Assert.True(definition.Tabs.Count >= 2, definition.EntityKey);
+            Assert.Equal("genel", definition.Tabs[0].Key);
+            Assert.All(definition.Tabs, tab => Assert.Contains(definition.Sections, s => s.Tab == tab.Key));
+            Assert.Contains(definition.Sections, s => s.Key == FormDefinition.ExtrasSection);
+            var firstTab = definition.Sections.Where(s => s.Tab == definition.Tabs[0].Key).Select(s => s.Key).ToHashSet();
+            Assert.All(definition.Fields.Where(f => f is { Required: true, Fixed: true }), f => Assert.Contains(f.Section, firstTab));
+            Assert.All(definition.Fields, f => Assert.Contains(f.Span, FormSpans.Allowed));
+            Assert.Contains(definition.EntityKey, Module.CustomizableEntities.Select(c => c.EntityKey));
+        }
+
+        var form = HrForms.All[0];
 
         // Özlük alanları ayrı sekmede: izni olmayan kullanıcıda bu sekme boş kalır, diğerleri etkilenmez.
         var personalSections = form.Fields.Where(f => HrModule.PersonalFields.Contains(f.Key)).Select(f => f.Section).ToHashSet();
@@ -87,6 +94,8 @@ public class HrModuleTests
         Assert.All(Module.Lookups, lookup => Assert.StartsWith(HrModule.ModuleKey + ".", lookup.Key, StringComparison.Ordinal));
         Assert.Equal(SharedEntities.Person, Module.Lookups.Single(l => l.Key == HrLookupDefinitions.EmployeePerson).TargetEntityKey);
         Assert.Equal(HrModule.Entities.Employee, Module.Lookups.Single(l => l.Key == HrLookupDefinitions.EmployeeManager).TargetEntityKey);
+        Assert.Equal(HrModule.Entities.Employee, Module.Lookups.Single(l => l.Key == HrLookupDefinitions.LeaveRequestEmployee).TargetEntityKey);
+        Assert.Equal(HrModule.Entities.Employee, Module.Lookups.Single(l => l.Key == HrLookupDefinitions.LeaveBalanceEmployee).TargetEntityKey);
         Assert.True(Module.Lookups.Single(l => l.Key == HrLookupDefinitions.EmployeeUser).IsMember);
         Assert.Equal(["personId"], Module.SharedRecordReferences.Select(r => r.Field));
 
@@ -98,11 +107,53 @@ public class HrModuleTests
     [Fact]
     public void Department_list_has_a_value_for_every_default_and_no_categories()
     {
-        var list = Assert.Single(Module.ChoiceLists);
-        Assert.Equal(HrModule.Lists.Department, list.Key);
+        var list = Assert.Single(Module.ChoiceLists, l => l.Key == HrModule.Lists.Department);
         Assert.False(list.Required);
         Assert.Empty(list.Categories);
         Assert.NotEmpty(list.Values);
+    }
+
+    [Fact]
+    public void Leave_types_are_categorised_and_only_the_annual_category_is_the_default()
+    {
+        var list = Assert.Single(Module.ChoiceLists, l => l.Key == HrModule.Lists.LeaveType);
+        Assert.Equal(
+            [HrModule.LeaveCategories.Annual, HrModule.LeaveCategories.Excuse, HrModule.LeaveCategories.Sick, HrModule.LeaveCategories.Unpaid],
+            list.Categories.Select(c => c.Key));
+        Assert.All(list.Values, v => Assert.Contains(v.Category, list.Categories.Select(c => c.Key)));
+        Assert.All(list.Categories, c => Assert.Contains(list.Values, v => v.Category == c.Key)); // her kategoride en az bir değer
+        Assert.Equal(HrModule.LeaveCategories.Annual, list.Values.Single(v => v.Key == list.Default).Category);
+    }
+
+    [Fact]
+    public void Staff_and_managers_see_their_own_records_and_only_the_specialist_manages_leave()
+    {
+        var staff = Module.RoleTemplates.Single(t => t.Key == "hr.staff");
+        var manager = Module.RoleTemplates.Single(t => t.Key == "hr.manager");
+        var specialist = Module.RoleTemplates.Single(t => t.Key == "hr.specialist");
+
+        Assert.Equal(Core.Contracts.Authorization.RecordScope.Own, staff.Scope);
+        Assert.Equal(Core.Contracts.Authorization.RecordScope.Own, manager.Scope);
+        Assert.Contains(HrModule.Permissions.LeavesRequest, staff.Permissions);
+        Assert.DoesNotContain(HrModule.Permissions.LeavesApprove, staff.Permissions);
+        Assert.Contains(HrModule.Permissions.LeavesApprove, manager.Permissions);
+        Assert.DoesNotContain(HrModule.Permissions.LeavesManage, manager.Permissions);
+        Assert.Contains(HrModule.Permissions.LeavesManage, specialist.Permissions);
+    }
+
+    [Theory]
+    [InlineData("2026-11-16", "2026-11-20", false, 5)] // pazartesi–cuma
+    [InlineData("2026-11-13", "2026-11-16", false, 2)] // cuma–pazartesi: hafta sonu düşülür
+    [InlineData("2026-11-14", "2026-11-15", false, 0)] // yalnızca hafta sonu
+    [InlineData("2026-11-17", "2026-11-17", true, 0.5)] // yarım gün
+    [InlineData("2026-10-28", "2026-10-30", false, 1.5)] // 28 yarım gün tatil, 29 tam gün tatil, 30 iş günü
+    [InlineData("2026-10-29", "2026-10-29", true, 0)] // tatil gününde yarım gün sayılmaz
+    [InlineData("2026-11-20", "2026-11-16", false, 0)] // ters aralık
+    public void Leave_days_skip_weekends_and_holidays(string start, string end, bool halfDay, double expected)
+    {
+        var holidays = new Dictionary<DateOnly, bool> { [new DateOnly(2026, 10, 28)] = true, [new DateOnly(2026, 10, 29)] = false };
+
+        Assert.Equal((decimal)expected, LeaveCalendar.WorkingDays(DateOnly.Parse(start), DateOnly.Parse(end), halfDay, holidays));
     }
 
     [Theory]
@@ -140,5 +191,17 @@ public class HrModuleTests
         Assert.Equal(Employee.Statuses.Terminated, HrAccess.Terminated);
         Assert.Equal(HrModule.PersonalFields, HrAccess.PersonalFields);
         Assert.Equal(CredentialCategories.Employee, CredentialAccess.Employee);
+        Assert.Equal(HrModule.Permissions.LeavesRead, HrAccess.LeavesRead);
+        Assert.Equal(HrModule.Permissions.LeavesRequest, HrAccess.LeavesRequest);
+        Assert.Equal(HrModule.Permissions.LeavesApprove, HrAccess.LeavesApprove);
+        Assert.Equal(HrModule.Permissions.LeavesManage, HrAccess.LeavesManage);
+        Assert.Equal(HrModule.Entities.LeaveRequest, HrAccess.LeaveRequestEntityKey);
+        Assert.Equal(HrModule.Entities.LeaveBalance, HrAccess.LeaveBalanceEntityKey);
+        Assert.Equal(HrModule.Entities.Holiday, HrAccess.HolidayEntityKey);
+        Assert.Equal(HrModule.Lists.LeaveType, HrAccess.LeaveTypeList);
+        Assert.Equal(HrLookupDefinitions.LeaveRequestEmployee, HrAccess.LeaveRequestEmployeeLookup);
+        Assert.Equal(HrLookupDefinitions.LeaveBalanceEmployee, HrAccess.LeaveBalanceEmployeeLookup);
+        Assert.Equal(HrModule.LeaveCategories.Annual, HrAccess.AnnualCategory);
+        Assert.Equal(LeaveRequest.Statuses.All, HrAccess.LeaveStatuses.Select(s => s.Key));
     }
 }

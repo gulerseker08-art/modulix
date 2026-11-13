@@ -94,13 +94,16 @@ internal static class Field
             (e, v) => set(e, v is true));
 
     /// <summary>Sınırlı aralıkta tam sayı. Zorunlu değilse boş bırakılabilir (verilmezse mevcut/varsayılan değer kalır).</summary>
-    public static RecordField<T> Integer<T>(string name, Func<T, int?> get, Action<T, int?> set, int min, int max, bool required = false) =>
+    public static RecordField<T> Integer<T>(string name, Func<T, int?> get, Action<T, int?> set, int min, int max, bool required = false, bool createOnly = false) =>
         new(name, required, nullable: !required, node =>
                 node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var value) && value >= min && value <= max
                     ? ParsedValue.Of(value)
                     : ParsedValue.Fail($"{min} ile {max} arasında bir tam sayı girin."),
             e => get(e) is { } value ? JsonValue.Create(value) : null,
-            (e, v) => set(e, (int?)v));
+            (e, v) => set(e, (int?)v))
+        {
+            CreateOnly = createOnly,
+        };
 
     /// <summary>Sabit anahtar listesinden tek değer (teknik doğrulama seçimi; tenant listesi değildir). Boş gönderilirse verilmemiş sayılır.</summary>
     public static RecordField<T> Choice<T>(string name, IReadOnlyCollection<string> allowed, Func<T, string> get, Action<T, string> set, bool createOnly = false) =>

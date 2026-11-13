@@ -12,8 +12,21 @@ public static class HrAccess
     public const string EmployeesRead = "hr.employees.read";
     public const string EmployeesWrite = "hr.employees.write";
     public const string EmployeesPersonal = "hr.employees.personal";
+    public const string LeavesRead = "hr.leaves.read";
+    public const string LeavesRequest = "hr.leaves.request";
+    public const string LeavesApprove = "hr.leaves.approve";
+    public const string LeavesManage = "hr.leaves.manage";
 
     public const string EmployeeEntityKey = "hr.employee";
+    public const string LeaveRequestEntityKey = "hr.leave-request";
+    public const string LeaveBalanceEntityKey = "hr.leave-balance";
+    public const string HolidayEntityKey = "hr.holiday";
+    public const string LeaveTypeList = "hr.leave-type";
+    public const string LeaveRequestEmployeeLookup = "hr.leave-request.employee";
+    public const string LeaveBalanceEmployeeLookup = "hr.leave-balance.employee";
+
+    /// <summary>Yalnızca bu kategorideki izin türü yıllık haktan düşer.</summary>
+    public const string AnnualCategory = "annual";
 
     public const string DepartmentList = "hr.department";
 
@@ -40,7 +53,28 @@ public static class HrAccess
         ("intern", "Stajyer"),
     ];
 
+    /// <summary>İzin talebi durumları (sabit; sunucudaki <c>LeaveRequest.Statuses</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> LeaveStatuses { get; } =
+    [
+        ("pending", "Onay bekliyor"),
+        ("approved", "Onaylandı"),
+        ("rejected", "Reddedildi"),
+        ("cancelled", "İptal edildi"),
+    ];
+
     /// <summary>Özlük alanları (hassas; <see cref="EmployeesPersonal"/> izni olmadan sunucu göndermez).</summary>
     public static IReadOnlyList<string> PersonalFields { get; } =
         ["nationalId", "birthDate", "homeAddress", "emergencyContactName", "emergencyContactPhone", "iban"];
 }
+
+/// <summary>İzin talebi eylemi (onayla, reddet, iptal): yapılabilir mi, değilse neden; gerekçe ister mi; yıkıcı mı.</summary>
+public sealed record HrActionDto(string Action, string Label, bool Allowed, string? Message, bool RequiresReason, bool Destructive);
+
+/// <summary>Eylem isteği; sürüm eşzamanlı değişikliği yakalar (409).</summary>
+public sealed record RunHrActionRequest(string? Action, long Version, string? Reason);
+
+/// <summary>Gün sayısı önizlemesi isteği (yazmaz).</summary>
+public sealed record LeavePreviewRequest(Guid EmployeeId, string? LeaveTypeKey, DateOnly StartDate, DateOnly EndDate, bool HalfDay);
+
+/// <summary>İş günü sayısı; yıllık izinde görülebiliyorsa o yılın kalan hakkı ve onay bekleyen günler.</summary>
+public sealed record LeavePreviewDto(decimal Days, decimal? RemainingDays, decimal? PendingDays);

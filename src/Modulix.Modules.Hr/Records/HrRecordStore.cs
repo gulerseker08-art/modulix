@@ -47,7 +47,45 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
 
     private Dictionary<string, RecordField<TEntity>> FieldsByName => fieldsByName ??= Fields.ToDictionary(f => f.Name, StringComparer.Ordinal);
 
-    public string? PermissionFor(RecordOperation operation) => operation == RecordOperation.Read ? ReadPermission : WritePermission;
+    /// <summary>
+    /// Okuma kayıt türünün okuma iznidir. Yazmada iş akışı kapısı açıksa eylemin izni (ör. izin onayı), değilse oluşturma ya da yazma izni.
+    /// </summary>
+    public string? PermissionFor(RecordOperation operation) => operation switch
+    {
+        RecordOperation.Read => ReadPermission,
+        _ when context.Gate.Permission is { } action => action,
+        RecordOperation.Create => CreatePermission,
+        _ => WritePermission,
+    };
+
+    /// <summary>Kayıt oluşturma izni; varsayılan yazma iznidir (ör. izin talebi açmak düzenlemeden ayrı izindir).</summary>
+    protected virtual string CreatePermission => WritePermission;
+
+    /// <summary>
+    /// Veri kapsamı (Y8) alanı: değeri kullanıcı kimliği olan sorumlu alanı. Doluysa boru hattı rolün kapsamına göre süzer ("kendi": yalnızca
+    /// kendi kaydı); depo <see cref="ScopeToOwners"/> ile listeye uygular. Boşsa kayıt türü kapsamdan etkilenmez.
+    /// </summary>
+    protected virtual string? OwnerFieldName => null;
+
+    string? IRecordStore.OwnerField => OwnerFieldName;
+
+    Task<bool> IRecordStore.IsInOwnerScopeAsync(RecordData record, IReadOnlySet<Guid> owners, CancellationToken cancellationToken) =>
+        Task.FromResult(IsInScope(record, owners));
+
+    /// <summary>Kayıt kapsamda mı? Varsayılan: sorumlu alanı kapsamdaki kullanıcılardan biri. Liste süzgeci (<see cref="ScopeToOwners"/>) aynı kuralı uygulamalıdır.</summary>
+    protected virtual bool IsInScope(RecordData record, IReadOnlySet<Guid> owners) =>
+        OwnerFieldName is { } field && UserIn(record, field, owners);
+
+    /// <summary>Listeye veri kapsamını uygular (sorguda; sayfalama ve toplam doğru kalır).</summary>
+    protected virtual IQueryable<TEntity> ScopeToOwners(IQueryable<TEntity> source, IReadOnlySet<Guid> owners) => source;
+
+    /// <summary>Kayıttaki kullanıcı alanının değeri verilen kümede mi?</summary>
+    protected static bool UserIn(RecordData record, string field, IReadOnlySet<Guid> users) =>
+        record.Values.TryGetPropertyValue(field, out var node) && node is JsonValue value && value.TryGetValue<string>(out var text)
+        && Guid.TryParse(text, out var user) && users.Contains(user);
+
+    /// <summary>Doluysa genel uçtan güncelleme bu iletiyle çakışma (409) döner (ör. durumu komutla değişen kayıt; kapı açıkken null verilir).</summary>
+    protected virtual string? UpdateBlockedMessage => null;
 
     /// <summary>Tüm İK kayıtlarına özel alan eklenebilir (Y9a).</summary>
     public bool SupportsCustomFields => true;
@@ -96,6 +134,11 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
     {
         var (queryFilters, sort) = SplitSort(query.Filters);
         var source = ApplyFilters(Data.Set<TEntity>().AsNoTracking(), queryFilters);
+        if (query.Owners is { } owners && OwnerFieldName is not null)
+        {
+            source = ScopeToOwners(source, owners);
+        }
+
         if (query.Search is { } term)
         {
             source = Search(source, term);
@@ -137,7 +180,7 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
 
     public async Task<RecordData?> UpdateAsync(Guid id, JsonObject values, long? expectedVersion, CancellationToken cancellationToken)
     {
-        if (ImmutableMessage is { } immutable)
+        if ((ImmutableMessage ?? UpdateBlockedMessage) is { } immutable)
         {
             throw new RecordConflictException(immutable);
         }

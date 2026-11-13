@@ -1,0 +1,247 @@
+@* Yeni izin talebi formu (ADR-0042 dilim 2); İzinlerim ve İzin talepleri ekranları kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir.
+   Çalışan verilmişse (self servis) sabittir; "izin yönetimi" izni olan kullanıcı çalışanı seçer. Tarih ve tür değiştikçe gün sayısı ve (yıllık
+   izinde) kalan hak sunucudan önizlenir (yazmaz). Kalan hak, çakışma ve "yalnızca kendi adına" kuralları sunucuda denetlenir; açılmış talep
+   değiştirilmez, iptal edilip yenisi açılır. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>Yeni izin talebi</h2>
+            @if (EmployeeName is not null)
+            {
+                <p>@EmployeeName</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Talebi gönder
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Talep özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true"><AppIcon Name="calendar" Size="24" /></span>
+                    <strong class="summary-name">@HrLabels.Days(preview?.Days)</strong>
+                    <span class="summary-sub">İş günü (hafta sonu ve resmî tatiller düşülür)</span>
+                </div>
+                <h3 class="summary-heading">Yıllık izin</h3>
+                <dl class="summary-facts">
+                    <div><dt>Kalan hak</dt><dd>@HrLabels.Days(preview?.RemainingDays)</dd></div>
+                    <div><dt>Onay bekleyen</dt><dd>@HrLabels.Days(preview?.PendingDays)</dd></div>
+                </dl>
+                @if (previewError is not null)
+                {
+                    <p class="text-muted mb-0">@previewError</p>
+                }
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="İzin talebi bölümleri">
+                <Field Context="f">
+                    @switch (f.Key)
+                    {
+                        case "employeeId":
+                            @if (EmployeeId is not null)
+                            {
+                                <span class="@f.LabelClass()">@f.Label</span>
+                                <p class="mb-0"><strong>@(EmployeeName ?? "—")</strong></p>
+                            }
+                            else
+                            {
+                                <label class="@f.LabelClass()" for="leave-employee">@f.Label</label>
+                                <LookupPicker Id="leave-employee" LookupKey="@HrAccess.LeaveRequestEmployeeLookup" Value="form.EmployeeId" ValueChanged="EmployeeChangedAsync" Required="true" Placeholder="Çalışanı seçin…" Invalid="@(errors?.ContainsKey("employeeId") == true)" />
+                            }
+                            <FieldError Field="employeeId" Errors="errors" />
+                            break;
+                        case "leaveTypeKey":
+                            <label class="@f.LabelClass()" for="leave-type">@f.Label</label>
+                            <select id="leave-type" class="form-select" @bind="form.LeaveTypeKey" @bind:after="PreviewAsync">
+                                @foreach (var type in Lookups.Choices(HrAccess.LeaveTypeList, form.LeaveTypeKey))
+                                {
+                                    <option value="@type.Key">@type.Label</option>
+                                }
+                            </select>
+                            <FieldError Field="leaveTypeKey" Errors="errors" />
+                            <small class="text-muted">Yalnızca yıllık izin türleri haktan düşer.</small>
+                            break;
+                        case "startDate":
+                            <label class="@f.LabelClass()" for="leave-start">@f.Label</label>
+                            <input id="leave-start" class="form-control" type="date" required aria-required="true" @bind="form.StartDate" @bind:after="StartChangedAsync" />
+                            <FieldError Field="startDate" Errors="errors" />
+                            break;
+                        case "endDate":
+                            <label class="@f.LabelClass()" for="leave-end">@f.Label</label>
+                            <input id="leave-end" class="form-control" type="date" required aria-required="true" min="@form.StartDate?.ToString("yyyy-MM-dd")" @bind="form.EndDate" @bind:after="PreviewAsync" />
+                            <FieldError Field="endDate" Errors="errors" />
+                            break;
+                        case "halfDay":
+                            <div class="form-check mt-4">
+                                <input id="leave-half" class="form-check-input" type="checkbox" disabled="@(form.StartDate != form.EndDate)" @bind="form.HalfDay" @bind:after="PreviewAsync" />
+                                <label class="form-check-label" for="leave-half">@f.Label</label>
+                            </div>
+                            <FieldError Field="halfDay" Errors="errors" />
+                            break;
+                        case "description":
+                            <label class="@f.LabelClass()" for="leave-description">@f.Label</label>
+                            <textarea id="leave-description" class="form-control" rows="3" maxlength="1000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                            <FieldError Field="description" Errors="errors" />
+                            break;
+                    }
+                </Field>
+            </LayoutForm>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Talebi gönder</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+@code {
+    private const string EntityKey = HrAccess.LeaveRequestEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private LeaveForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private LeavePreviewDto? preview;
+    private string? previewError;
+
+    /// <summary>Sabit çalışan (self servis); null ise çalışan seçilir.</summary>
+    [Parameter] public Guid? EmployeeId { get; set; }
+
+    [Parameter] public string? EmployeeName { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        form = new LeaveForm
+        {
+            EmployeeId = EmployeeId,
+            LeaveTypeKey = Lookups.DefaultOf(HrAccess.LeaveTypeList) ?? string.Empty,
+            StartDate = today,
+            EndDate = today,
+        };
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        await PreviewAsync();
+    }
+
+    private async Task EmployeeChangedAsync(Guid? employeeId)
+    {
+        form.EmployeeId = employeeId;
+        await PreviewAsync();
+    }
+
+    // Bitiş başlangıçtan önce kalmasın; tek gün dışında yarım gün kalkar.
+    private async Task StartChangedAsync()
+    {
+        if (form.StartDate is { } start && (form.EndDate is null || form.EndDate < start))
+        {
+            form.EndDate = start;
+        }
+
+        await PreviewAsync();
+    }
+
+    private async Task PreviewAsync()
+    {
+        if (form.StartDate != form.EndDate)
+        {
+            form.HalfDay = false;
+        }
+
+        preview = null;
+        previewError = null;
+        if (form.EmployeeId is not { } employee || form.StartDate is not { } start || form.EndDate is not { } end)
+        {
+            return;
+        }
+
+        var result = await Api.PostAsync<LeavePreviewDto>("/api/hr/leave-requests/preview",
+            new LeavePreviewRequest(employee, string.IsNullOrEmpty(form.LeaveTypeKey) ? null : form.LeaveTypeKey, start, end, form.HalfDay));
+        preview = result.Value;
+        previewError = result.IsSuccess ? null : result.FieldErrors?.Values.SelectMany(v => v).FirstOrDefault() ?? result.Error;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var values = new JsonObject
+        {
+            ["employeeId"] = form.EmployeeId?.ToString(),
+            ["leaveTypeKey"] = form.LeaveTypeKey,
+            ["startDate"] = form.StartDate?.ToString("yyyy-MM-dd"),
+            ["endDate"] = form.EndDate?.ToString("yyyy-MM-dd"),
+            ["halfDay"] = form.HalfDay,
+            ["description"] = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+
+        var result = await Api.PostAsync<RecordResponse>(Url, new RecordWriteRequest(values));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class LeaveForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? EmployeeId { get; set; }
+
+        public string LeaveTypeKey { get; set; } = string.Empty;
+
+        public DateOnly? StartDate { get; set; }
+
+        public DateOnly? EndDate { get; set; }
+
+        public bool HalfDay { get; set; }
+
+        public string? Description { get; set; }
+    }
+}

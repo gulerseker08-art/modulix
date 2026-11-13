@@ -31,4 +31,29 @@ public static class HrLabels
         var last = WarehouseLabels.Text(employee, "lastName");
         return string.Concat(first is { Length: > 0 } f ? f[..1] : string.Empty, last is { Length: > 0 } l ? l[..1] : string.Empty).ToUpper(System.Globalization.CultureInfo.GetCultureInfo("tr-TR"));
     }
+
+    public static string LeaveStatus(string? key) => HrAccess.LeaveStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    /// <summary>Bekleyen dikkat tonu, onaylanan başarı tonu, reddedilen kayıp tonu, iptal nötr ton.</summary>
+    public static string LeaveStatusBadge(string? key) => key switch
+    {
+        "pending" => "stage-negotiation",
+        "approved" => "status-customer",
+        "rejected" => "stage-lost",
+        _ => "status-inactive",
+    };
+
+    /// <summary>Gün sayısı: "3 gün", "0,5 gün".</summary>
+    public static string Days(decimal? days) => days is { } d ? $"{d.ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))} gün" : "—";
+
+    public static decimal? Decimal(RecordResponse record, string field) => record.Values[field]?.GetValue<decimal>();
+
+    /// <summary>İzin aralığı: "12.11.2026 – 14.11.2026" (tek günde tek tarih, yarım günde "(yarım gün)").</summary>
+    public static string Range(RecordResponse request)
+    {
+        var start = Date(WarehouseLabels.Text(request, "startDate"));
+        var end = Date(WarehouseLabels.Text(request, "endDate"));
+        var half = WarehouseLabels.Flag(request, "halfDay") ? " (yarım gün)" : string.Empty;
+        return (start == end ? start : $"{start} – {end}") + half;
+    }
 }

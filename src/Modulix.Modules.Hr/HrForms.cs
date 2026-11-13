@@ -45,5 +45,36 @@ public static class HrForms
             new("emergencyContactPhone", "Acil durum telefonu", "acil", 6),
             new("notes", "Notlar", "notlar", 12),
         ]),
+
+        new(HrModule.Entities.LeaveRequest, "İzin talebi",
+        [new(General, "Talep"), new("aciklama", "Açıklama ve ek bilgiler")],
+        [
+            new("talep", "İzin", "calendar"),
+            new("aciklama", "Açıklama", "message-square", Tab: "aciklama"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "aciklama"),
+        ],
+        [
+            new("employeeId", "Çalışan", "talep", 6, Required: true, Fixed: true),
+            new("leaveTypeKey", "İzin türü", "talep", 6, Required: true, Fixed: true),
+            new("startDate", "Başlangıç", "talep", 4, Required: true, Fixed: true),
+            new("endDate", "Bitiş", "talep", 4, Required: true, Fixed: true),
+            new("halfDay", "Yarım gün", "talep", 4),
+            new("description", "Açıklama", "aciklama", 12),
+        ]),
+
+        new(HrModule.Entities.LeaveBalance, "İzin hakkı",
+        [new(General, "Hak"), new("notlar", "Notlar ve ek bilgiler")],
+        [
+            new("hak", "Yıllık izin hakkı", "calendar"),
+            new("notlar", "Notlar", "message-square", Tab: "notlar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
+        ],
+        [
+            new("employeeId", "Çalışan", "hak", 8, Required: true, Fixed: true),
+            new("year", "Yıl", "hak", 4, Required: true, Fixed: true),
+            new("entitledDays", "Hak (gün)", "hak", 6, Required: true, Fixed: true),
+            new("carriedOverDays", "Devreden (gün)", "hak", 6),
+            new("notes", "Notlar", "notlar", 12),
+        ]),
     ];
 }

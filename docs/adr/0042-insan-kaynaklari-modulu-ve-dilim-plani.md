@@ -102,7 +102,7 @@ Her dilim dört testle teslim edilir (mutlu yol, doğrulama, tenant izolasyonu, 
 |---|---|---|
 | 0 | Bu ADR | — |
 | 1 | Modül, çalışan kartı (özlük, hassas alanlar, özlük belgeleri), rehber, organizasyon şeması | — |
-| 2 | İzin türleri, hak/bakiye, talep, onay, takvim; işveren şirket bağı | 1, Ç6a (var), tatil takvimi kararı |
+| 2 | İzin türleri, hak/bakiye, talep, onay (**yapıldı**, bölüm 10); takvim, Ç6a bağlantısı, işveren şirket bağı (2b) | 1, Ç6a (var) |
 | 3 | Masraf beyanı, belge, onay, ödeme durumu | 1, ADR-0040 (var), Ç6a |
 | 4 | Demirbaş ve zimmet, tutanak çıktısı | 1 |
 | 5 | İşe giriş/çıkış kontrol listeleri | 1, 4 |
@@ -144,3 +144,30 @@ Her dilim dört testle teslim edilir (mutlu yol, doğrulama, tenant izolasyonu, 
 | `dotnet test tests/Modulix.Modules.Fleet.Tests`, `Modulix.Modules.Logistics.Tests` | 14/14, 21/21 geçti |
 | `HrEmployeeTests` (entegrasyon, 4 test) | Derleniyor; bu ortamda SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web.Tests` (menü testleri güncellendi) | Bu ortamın SDK'sı (Ubuntu 10.0.115) mevcut Razor dosyalarında derleme hatası verdiği için **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor (CI 10.0.100 kullanır) |
+
+## 10. Dilim 2: izin yönetimi (13 Kasım 2026)
+
+Bölüm 5'teki izin akışı şu kararlarla uygulandı; K6'nın genel onay süreci (Ç6a) bağlantısı **dilim 2b**'ye kaldı (aşağıda).
+
+- **İzin türü** `hr.leave-type` (Y9b seçim listesi): kategoriler `annual` (yıllık izin, haktan düşer), `excuse` (ücretli; mazeret, evlilik, ölüm, babalık, doğum, idari), `sick` (rapor), `unpaid`. Kod yalnızca kategoriye bakar; talep, açıldığı andaki kategoriyi saklar. Türlerin yasal süreleri koda yazılmadı (bölüm 8).
+- **İzin hakkı** `hr.LeaveBalances`: çalışan + yıl tekil; hak ve devreden gün İK tarafından girilir (kıdeme göre hak ediş hesabı mevzuat doğrulaması bekler); kullanılan gün yalnızca iş akışınca yazılır. Onay, hakkın satırını sürümüyle aynı işlemde günceller: eşzamanlı iki onay bakiyeyi aşamaz (biri 409, M4.3).
+- **Resmî tatil** `hr.Holidays`: tarih tekil, yarım gün (arife) desteklenir; tarihler koda yazılmaz.
+- **Gün hesabı:** başlangıç ve bitiş dahil, cumartesi–pazar düşülür, tatil listesi düşülür; yarım günlük talep 0,5. Talep tek takvim yılında kalır (yıl sonunu aşan izin ikiye bölünür). Cumartesinin iş günü sayılması tenant ayarı olarak sonra eklenebilir (bölüm 8).
+- **İzin talebi** `hr.LeaveRequests`: çakışan bekleyen/onaylı talep yok; yıllık izinde kalan hak, bekleyen yıllık taleplerle birlikte yetmeli. "İzin yönetimi" izni olmayan kullanıcı yalnızca kendi kartına talep açar. Talep anında çalışanın yöneticisinin kullanıcısı onaylayan olarak yazılır ve **değişmez** (M4.2: yönetici değişikliği geçmiş onay merciini yeniden yazmaz); yöneticisi ya da yöneticinin kullanıcısı yoksa yalnızca İK karar verir.
+- **İş akışı:** durum yalnızca `/api/hr/leave-requests/{id}/actions` komutlarıyla değişir (Lojistik K7 kalıbı: iş akışı kapısı + kayıt boru hattı, audit, outbox). Onay/ret: bekleyen talep, `hr.leaves.approve` + (onaylayan ya da `hr.leaves.manage`); kimse kendi talebine karar veremez; ret gerekçelidir. İptal: bekleyen talebi sahibi ya da İK; onaylı talebi yalnızca İK (yıllık izin hakka geri eklenir). Talep değiştirilmez ve silinmez.
+- **Görünürlük:** veri kapsamı (Y8) alanı `employeeUserId`; "kendi" kapsamındaki kullanıcı kendi taleplerini ve hakkını, ayrıca onaylayanı olduğu talepleri görür. Alan adı bilerek `ownerId` değildir: Core'un atama e-postası `ownerId` değişiminde "kayıt size atandı" iletisi gönderir.
+- **Rol şablonları:** "Çalışan (rehber)" artık kendi izinlerini görür ve talep açar (kapsam "kendi"); yeni "Yönetici (izin onayı)" (kapsam "kendi" + onay); "İK uzmanı" hepsi.
+- **Arayüz:** İzinlerim (bu yılın hak kartları, taleplerim, yeni talep; gün sayısı ve kalan hak önizlemeli), İzin talepleri (grid şablonu; görünümler Onayımı bekleyenler / Onay bekleyen / Onaylanan / Reddedilen / Tüm talepler; talep kartında eylemler), İzin hakları (yıl sekmeli grid + sekmeli form), Resmî tatiller (ayar ekranı). Yeni CSS sınıfı yok.
+- Migration `HrLeaves`: üç tablo + `TenantIsolationSql.AddTable`.
+
+**Dilim 2b'ye kalanlar:** firmanın Ç6a onay sürecine bağlanması (`ApprovalTargets`, çok adımlı yönetici → İK), izin takvimi (ekip/departman ay görünümü), onaylanan izinde çalışanın durumunun "İzinde" görünmesi, onaylanan/reddedilen talep bildirimi (Core bildirim), yıl sonu devreden gün aktarımı, cumartesi ayarı, işveren şirket bağı.
+
+### Test sonuçları (Dilim 2)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 26/26 geçti (gün hesabı 7 durum, tür kategorileri, rol kapsamları, sabitler) |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
+| `dotnet test tests/Modulix.Core.Tests` | 940/940 geçti |
+| `HrLeaveTests` (entegrasyon, 4 test: mutlu yol, doğrulama, tenant izolasyonu, yetki) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |

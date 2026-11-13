@@ -1,0 +1,203 @@
+@* Yıllık izin hakkı ekleme/düzenleme formu (ADR-0042 dilim 2); İzin hakları ekranı kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir.
+   Çalışan ve yıl yalnızca oluştururken seçilir; kullanılan gün onaylı izinlerden sunucuda hesaplanır ve formdan değiştirilemez. Hak, kullanılandan
+   aşağı çekilemez (sunucu denetler). *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Balance is null ? "Yeni izin hakkı" : "İzin hakkı")</h2>
+            @if (Balance is not null)
+            {
+                <p>@WarehouseLabels.Text(Balance, "employeeName") · @form.Year</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Hak özeti">
+            <div class="summary-card">
+                <h3 class="summary-heading">@form.Year yılı</h3>
+                <dl class="summary-facts">
+                    <div><dt>Toplam hak</dt><dd>@HrLabels.Days(form.EntitledDays + (form.CarriedOverDays ?? 0m))</dd></div>
+                    <div><dt>Kullanılan</dt><dd>@HrLabels.Days(form.UsedDays)</dd></div>
+                    <div><dt>Kalan</dt><dd>@HrLabels.Days((form.EntitledDays ?? 0m) + (form.CarriedOverDays ?? 0m) - form.UsedDays)</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="İzin hakkı bölümleri">
+                <Field Context="f">
+                    @switch (f.Key)
+                    {
+                        case "employeeId":
+                            @if (form.Id is not null)
+                            {
+                                <span class="@f.LabelClass()">@f.Label</span>
+                                <p class="mb-0"><strong>@WarehouseLabels.Text(Balance!, "employeeName")</strong></p>
+                            }
+                            else
+                            {
+                                <label class="@f.LabelClass()" for="balance-employee">@f.Label</label>
+                                <LookupPicker Id="balance-employee" LookupKey="@HrAccess.LeaveBalanceEmployeeLookup" @bind-Value="form.EmployeeId" Required="true" Placeholder="Çalışanı seçin…" Invalid="@(errors?.ContainsKey("employeeId") == true)" />
+                            }
+                            <FieldError Field="employeeId" Errors="errors" />
+                            break;
+                        case "year":
+                            <label class="@f.LabelClass()" for="balance-year">@f.Label</label>
+                            <input id="balance-year" class="form-control" type="number" min="2000" max="2100" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.Year" />
+                            <FieldError Field="year" Errors="errors" />
+                            break;
+                        case "entitledDays":
+                            <label class="@f.LabelClass()" for="balance-entitled">@f.Label</label>
+                            <input id="balance-entitled" class="form-control" type="number" min="0" max="366" step="0.5" required aria-required="true" @bind="form.EntitledDays" />
+                            <FieldError Field="entitledDays" Errors="errors" />
+                            <small class="text-muted">Yasal hak ediş (kıdeme göre gün) otomatik hesaplanmaz; firmanın politikasına göre girin.</small>
+                            break;
+                        case "carriedOverDays":
+                            <label class="@f.LabelClass()" for="balance-carried">@f.Label</label>
+                            <input id="balance-carried" class="form-control" type="number" min="0" max="366" step="0.5" @bind="form.CarriedOverDays" />
+                            <FieldError Field="carriedOverDays" Errors="errors" />
+                            break;
+                        case "notes":
+                            <label class="@f.LabelClass()" for="balance-notes">@f.Label</label>
+                            <textarea id="balance-notes" class="form-control" rows="3" maxlength="1000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
+                            <FieldError Field="notes" Errors="errors" />
+                            break;
+                    }
+                </Field>
+            </LayoutForm>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+@code {
+    private const string EntityKey = HrAccess.LeaveBalanceEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private BalanceForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek hak; null ise yeni hak.</summary>
+    [Parameter] public RecordResponse? Balance { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Balance))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Balance;
+        form = Balance is { } r
+            ? new BalanceForm
+            {
+                Id = r.Id, Version = r.Version, EmployeeId = WarehouseLabels.Id(r, "employeeId"), Year = WarehouseLabels.Number(r, "year"),
+                EntitledDays = HrLabels.Decimal(r, "entitledDays"), CarriedOverDays = HrLabels.Decimal(r, "carriedOverDays"),
+                UsedDays = HrLabels.Decimal(r, "usedDays") ?? 0m, Notes = WarehouseLabels.Text(r, "notes"),
+                Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new BalanceForm { Year = DateTime.Today.Year };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var values = new JsonObject
+        {
+            ["entitledDays"] = form.EntitledDays,
+            ["carriedOverDays"] = form.CarriedOverDays,
+            ["notes"] = string.IsNullOrWhiteSpace(form.Notes) ? null : form.Notes.Trim(),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            values["employeeId"] = form.EmployeeId?.ToString();
+            values["year"] = form.Year;
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class BalanceForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? EmployeeId { get; set; }
+
+        public int Year { get; set; }
+
+        public decimal? EntitledDays { get; set; }
+
+        public decimal? CarriedOverDays { get; set; }
+
+        public decimal UsedDays { get; init; }
+
+        public string? Notes { get; set; }
+    }
+}

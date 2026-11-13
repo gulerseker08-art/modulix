@@ -56,3 +56,52 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.HasIndex(e => new { e.TenantId, e.ManagerEmployeeId }).HasDatabaseName("IX_Employees_Manager");
     }
 }
+
+internal sealed class LeaveBalanceConfiguration : IEntityTypeConfiguration<LeaveBalance>
+{
+    public void Configure(EntityTypeBuilder<LeaveBalance> builder)
+    {
+        HrTables.ConfigureCommon(builder, "LeaveBalances");
+        builder.Property(b => b.EntitledDays).HasPrecision(5, 1);
+        builder.Property(b => b.CarriedOverDays).HasPrecision(5, 1);
+        builder.Property(b => b.UsedDays).HasPrecision(5, 1);
+        builder.Property(b => b.Notes).HasMaxLength(LeaveBalance.NotesMaxLength);
+        builder.Ignore(b => b.RemainingDays);
+
+        builder.HasOne<Employee>().WithMany().HasForeignKey(b => new { b.TenantId, b.EmployeeId })
+            .HasPrincipalKey(e => new { e.TenantId, e.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(b => new { b.TenantId, b.EmployeeId, b.Year }).IsUnique().HasDatabaseName("UX_LeaveBalances_EmployeeYear");
+        builder.HasIndex(b => new { b.TenantId, b.OwnerId }).HasDatabaseName("IX_LeaveBalances_Owner");
+    }
+}
+
+internal sealed class LeaveRequestConfiguration : IEntityTypeConfiguration<LeaveRequest>
+{
+    public void Configure(EntityTypeBuilder<LeaveRequest> builder)
+    {
+        HrTables.ConfigureCommon(builder, "LeaveRequests");
+        builder.Property(r => r.LeaveTypeKey).HasMaxLength(100).IsRequired();
+        builder.Property(r => r.LeaveCategory).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(r => r.Days).HasPrecision(5, 1);
+        builder.Property(r => r.Description).HasMaxLength(LeaveRequest.TextMaxLength);
+        builder.Property(r => r.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(r => r.DecisionReason).HasMaxLength(LeaveRequest.ReasonMaxLength);
+
+        builder.HasOne<Employee>().WithMany().HasForeignKey(r => new { r.TenantId, r.EmployeeId })
+            .HasPrincipalKey(e => new { e.TenantId, e.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(r => new { r.TenantId, r.EmployeeId, r.StartDate }).HasDatabaseName("IX_LeaveRequests_Employee");
+        builder.HasIndex(r => new { r.TenantId, r.Status, r.StartDate }).HasDatabaseName("IX_LeaveRequests_Status");
+        builder.HasIndex(r => new { r.TenantId, r.OwnerId }).HasDatabaseName("IX_LeaveRequests_Owner");
+        builder.HasIndex(r => new { r.TenantId, r.ApproverUserId }).HasDatabaseName("IX_LeaveRequests_Approver");
+    }
+}
+
+internal sealed class HolidayConfiguration : IEntityTypeConfiguration<Holiday>
+{
+    public void Configure(EntityTypeBuilder<Holiday> builder)
+    {
+        HrTables.ConfigureCommon(builder, "Holidays");
+        builder.Property(h => h.Name).HasMaxLength(Holiday.NameMaxLength).IsRequired();
+        builder.HasIndex(h => new { h.TenantId, h.Date }).IsUnique().HasDatabaseName("UX_Holidays_Date");
+    }
+}

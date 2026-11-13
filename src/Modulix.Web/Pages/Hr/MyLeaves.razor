@@ -1,0 +1,174 @@
+@page "/ik/izinlerim"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>İzinlerim · Modulix</PageTitle>
+
+@* Self servis (ADR-0042 dilim 2): kullanıcının bağlı olduğu çalışan kartı bulunur; bu yılın izin hakkı, talepleri ve yeni talep. Kullanıcı hesabı
+   bir çalışan kartına bağlı değilse İK'ya yönlendirilir. Görünürlük sunucudadır (veri kapsamı "kendi": yalnızca kendi kayıtları). *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.LeavesRead">
+    <PageHeader Title="İzinlerim" Icon="calendar" Subtitle="İzin hakkınızı görün, izin talebi açın ve taleplerinizi izleyin." />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (!loaded)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (employee is null)
+    {
+        <div class="alert alert-info" role="status">Kullanıcı hesabınız bir çalışan kartına bağlı değil. İzin talebi açabilmek için İK'dan çalışan kartınıza hesabınızı bağlamasını isteyin.</div>
+    }
+    else
+    {
+        @if (creating)
+        {
+            <LeaveRequestEditor EmployeeId="employee.Id" EmployeeName="@HrLabels.Name(employee)" Lookups="Lookups" Saved="SavedAsync" Cancelled="() => creating = false" />
+        }
+        else if (selected is not null)
+        {
+            <LeaveRequestCard Request="selected" Changed="ChangedAsync" Closed="() => selected = null" />
+        }
+
+        <div class="stat-grid">
+            <div class="stat-card"><span>@Year yılı hakkı</span><strong>@HrLabels.Days(Entitled)</strong></div>
+            <div class="stat-card"><span>Kullanılan</span><strong>@HrLabels.Days(balance is null ? null : HrLabels.Decimal(balance, "usedDays"))</strong></div>
+            <div class="stat-card"><span>Onay bekleyen</span><strong>@HrLabels.Days(PendingAnnual)</strong></div>
+            <div class="stat-card"><span>Kalan</span><strong>@HrLabels.Days(balance is null ? null : HrLabels.Decimal(balance, "remainingDays"))</strong></div>
+        </div>
+        @if (balance is null)
+        {
+            <p class="text-muted mt-2">@Year yılı için yıllık izin hakkınız henüz tanımlanmamış; yıllık izin dışındaki türlerde talep açabilirsiniz.</p>
+        }
+
+        <div class="list-toolbar mt-3">
+            <h2 class="h5 mb-0 me-auto">Taleplerim</h2>
+            @if (Session.Can(HrAccess.LeavesRequest) && !creating)
+            {
+                <button type="button" class="btn btn-primary" @onclick="Create"><AppIcon Name="plus" Size="16" /> Yeni izin talebi</button>
+            }
+        </div>
+
+        @if (requests is null || requests.Items.Count == 0)
+        {
+            <p class="text-muted" role="status">Henüz izin talebiniz yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">İzin taleplerim</caption>
+                <thead>
+                    <tr>
+                        <th scope="col"><AppIcon Name="calendar" Size="14" /> Tarih</th>
+                        <th scope="col"><AppIcon Name="tag" Size="14" /> Tür</th>
+                        <th scope="col"><AppIcon Name="clock" Size="14" /> Süre</th>
+                        <th scope="col"><AppIcon Name="check-circle" Size="14" /> Durum</th>
+                        <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var request in requests.Items)
+                    {
+                        <tr>
+                            <td data-label="Tarih" class="primary">@HrLabels.Range(request)</td>
+                            <td data-label="Tür">@Lookups.Label(HrAccess.LeaveTypeList, WarehouseLabels.Text(request, "leaveTypeKey"))</td>
+                            <td data-label="Süre">@HrLabels.Days(HrLabels.Decimal(request, "days"))</td>
+                            <td data-label="Durum"><span class="badge @HrLabels.LeaveStatusBadge(WarehouseLabels.Text(request, "status"))">@HrLabels.LeaveStatus(WarehouseLabels.Text(request, "status"))</span></td>
+                            <td class="row-menu-cell">
+                                <RowMenu Label="@($"{HrLabels.Range(request)} eylemleri")">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(request)"><AppIcon Name="eye" Size="16" /> <span>Aç</span></button>
+                                </RowMenu>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <Pager Page="requests.Page" PageSize="requests.PageSize" TotalCount="requests.TotalCount" PageChanged="LoadRequestsAsync" />
+        }
+    }
+</AuthGate>
+
+@code {
+    private static readonly int Year = DateTime.Today.Year;
+
+    private RecordResponse? employee;
+    private RecordResponse? balance;
+    private RecordPageResponse? requests;
+    private RecordResponse? selected;
+    private decimal pendingAnnual;
+    private bool creating;
+    private bool loaded;
+    private string? message;
+
+    private decimal? Entitled => balance is null ? null : (HrLabels.Decimal(balance, "entitledDays") ?? 0m) + (HrLabels.Decimal(balance, "carriedOverDays") ?? 0m);
+
+    private decimal? PendingAnnual => employee is null ? null : pendingAnnual;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(HrAccess.LeavesRead) || Session.User is not { } user)
+        {
+            return;
+        }
+
+        await Lookups.LoadAsync();
+        var cards = await Api.GetAsync<RecordPageResponse>($"/api/records/{HrAccess.EmployeeEntityKey}?userId={user.UserId}&pageSize=1");
+        employee = cards.Value?.Items.FirstOrDefault();
+        message = cards.Error;
+        if (employee is not null)
+        {
+            await LoadAsync();
+        }
+
+        loaded = true;
+    }
+
+    private async Task LoadAsync()
+    {
+        var balances = await Api.GetAsync<RecordPageResponse>($"/api/records/{HrAccess.LeaveBalanceEntityKey}?employeeId={employee!.Id}&year={Year}");
+        balance = balances.Value?.Items.FirstOrDefault();
+        var pending = await Api.GetAsync<RecordPageResponse>(
+            $"/api/records/{HrAccess.LeaveRequestEntityKey}?employeeId={employee.Id}&status=pending&from={Year}-01-01&to={Year}-12-31&pageSize=200");
+        pendingAnnual = pending.Value?.Items.Where(r => WarehouseLabels.Text(r, "leaveCategory") == HrAccess.AnnualCategory)
+            .Sum(r => HrLabels.Decimal(r, "days") ?? 0m) ?? 0m;
+        await LoadRequestsAsync(1);
+    }
+
+    private async Task LoadRequestsAsync(int pageNumber)
+    {
+        var result = await Api.GetAsync<RecordPageResponse>(
+            $"/api/records/{HrAccess.LeaveRequestEntityKey}?employeeId={employee!.Id}&page={pageNumber}&pageSize={ListPaging.Size}");
+        requests = result.Value;
+        message = result.Error;
+    }
+
+    private void Create()
+    {
+        selected = null;
+        creating = true;
+    }
+
+    private void Open(RecordResponse request)
+    {
+        creating = false;
+        selected = request;
+    }
+
+    private async Task SavedAsync(RecordResponse created)
+    {
+        creating = false;
+        selected = created;
+        await LoadAsync();
+    }
+
+    private async Task ChangedAsync(RecordResponse changed)
+    {
+        selected = changed;
+        await LoadAsync();
+    }
+}
