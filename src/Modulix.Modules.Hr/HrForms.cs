@@ -170,5 +170,22 @@ public static class HrForms
             new("taskType", "Görev türü", "adim", 4),
             new("description", "Açıklama", "adim", 12),
         ]),
+
+        new(HrModule.Entities.Announcement, "Duyuru",
+        [new(General, "Duyuru"), new("yayin", "Yayın ve hedef"), new("ek", "Ek bilgiler")],
+        [
+            new("duyuru", "Duyuru", "bell"),
+            new("yayin", "Yayın", "calendar", Tab: "yayin"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ek"),
+        ],
+        [
+            new("title", "Başlık", "duyuru", 12, Required: true, Fixed: true),
+            new("body", "Metin", "duyuru", 12, Required: true, Fixed: true),
+            new("isPublished", "Yayında", "yayin", 4),
+            new("isPinned", "Sabitlenmiş", "yayin", 4),
+            new("audienceDepartmentKey", "Hedef departman", "yayin", 4),
+            new("publishOn", "Başlangıç", "yayin", 6),
+            new("expiresOn", "Bitiş", "yayin", 6),
+        ]),
     ];
 }

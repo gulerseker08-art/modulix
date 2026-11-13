@@ -106,7 +106,7 @@ Her dilim dört testle teslim edilir (mutlu yol, doğrulama, tenant izolasyonu, 
 | 3 | Masraf beyanı, belge, onay, ödeme durumu (**yapıldı**, bölüm 11); Ç6a tutar onayı (3b) | 1, ADR-0040 (var), Ç6a |
 | 4 | Demirbaş ve zimmet, tutanak çıktısı (**yapıldı**, bölüm 12) | 1 |
 | 5 | İşe giriş/çıkış kontrol listeleri (**yapıldı**, bölüm 13) | 1, 4 |
-| 6 | Duyurular | 1 |
+| 6 | Duyurular (**yapıldı**, bölüm 14) | 1 |
 | 7 | Anket (K8) | 1 |
 | 8 | Blog ve galeri | 1, ADR-0040 |
 
@@ -239,4 +239,24 @@ Bölüm 5'teki masraf akışı izin dilimindeki kalıpla (iş akışı kapısı,
 | `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
 | `dotnet test tests/Modulix.Core.Tests` | 964/964 geçti |
 | `HrChecklistTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |
+
+## 14. Dilim 6: duyurular (13 Kasım 2026)
+
+- **Duyuru** `hr.Announcements` (başlık, düz metin gövde en çok 8000 karakter, hedef departman, sabitlenmiş, yayında, yayın ve bitiş günü, yazan) ve **okundu kaydı** `hr.AnnouncementReads` (duyuru + kullanıcı tekil; `UNIQUE(TenantId, AnnouncementId, UserId)`). İki yeni izin: `hr.announcements.read` (çalışan ve yönetici rol şablonlarında) ve `hr.announcements.manage` (İK uzmanında).
+- **Hedefleme sunucuda:** "duyuru yönetimi" izni olmayan okur yalnızca yayında, yayın günü gelmiş, süresi dolmamış ve hedef departmanı boş ya da çalışan kartındaki departmanı olan duyuruları görür; diğerleri liste ve tekil okumada "bulunamadı"dır (sorgu düzeyinde, `HrRecordStore.RestrictAsync`). Yönetici bütün duyuruları görür.
+- **Okundu:** `POST /api/hr/announcements/{id}/read` duyuruyu görebilen kullanıcı için okundu kaydını kayıt boru hattından yazar (tekrar okumada yeni kayıt yazmaz) ve duyurunun güncel halini döner. Okundu kaydı doğrudan yazılamaz ve değişmez (409); listesini (kim okudu) yalnızca yönetici görür. Duyuru silinince okundu kayıtları aynı işlemde silinir.
+- **Doğrulama:** başlık ve metin zorunlu; bitiş günü başlangıçtan önce olamaz; yayın günü verilmezse bugündür; hedef departman seçim listesinden.
+- **Arayüz:** Duyurular (akış: sabitlenmişler üstte, okunmamışlar "Yeni" rozetli, açınca okundu yazılır; metin `.preline` ile düz metin) ve Duyuru yönetimi (Yayında / Taslak / Süresi geçen / Tümü görünümleri, okuyan sayısı, sekmeli form, okuyanlar listesi). Yeni CSS sınıfı yok.
+- Migration `HrAnnouncements`: iki tablo + `TenantIsolationSql.AddTable`.
+
+**Bilerek yapılmadı:** zengin metin/HTML gövde ve görsel (dilim 8'deki dosya altyapısıyla), duyuru yayınlanınca e-posta/anlık bildirim (ADR-0027 kuralıyla bağlanabilir), yorum ve beğeni, birden çok departmana ya da kişiye hedefleme, ana sayfa kutucuğu.
+
+### Test sonuçları (Dilim 6)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 29/29 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
+| `HrAnnouncementTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |

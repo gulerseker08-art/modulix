@@ -213,6 +213,8 @@
   "nav.app.hr.my-tasks": "Görevlerim",
   "nav.app.hr.checklists": "İşe giriş ve çıkış",
   "nav.app.hr.checklist-templates": "Süreç şablonları",
+  "nav.app.hr.announcements": "Duyurular",
+  "nav.app.hr.announcement-admin": "Duyuru yönetimi",
   "nav.app.reports": "Raporlar",
   "nav.app.admin": "Yönetim",
   "nav.app.admin.home": "Genel bakış",
