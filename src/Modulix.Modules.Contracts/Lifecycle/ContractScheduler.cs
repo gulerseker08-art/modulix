@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
-using Modulix.Core.Contracts.Activities;
+using Modulix.Modules.Crm.Contracts.Activities;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Contracts.Domain;
 using Modulix.Modules.Contracts.Records;

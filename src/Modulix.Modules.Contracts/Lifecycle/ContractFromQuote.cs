@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
-using Modulix.Core.Contracts.Sales;
+using Modulix.Modules.Crm.Contracts.Sales;
 using Modulix.Modules.Contracts.Records;
 
 namespace Modulix.Modules.Contracts.Lifecycle;
