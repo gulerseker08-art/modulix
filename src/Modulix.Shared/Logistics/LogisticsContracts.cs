@@ -72,6 +72,26 @@ public static class LogisticsAccess
     public const string TripStopEntityKey = "logistics.trip-stop";
     public const string DeliveryProofEntityKey = "logistics.delivery-proof";
 
+    public const string ExpensesRead = "logistics.expenses.read";
+    public const string ExpensesWrite = "logistics.expenses.write";
+    public const string ExpensesApprove = "logistics.expenses.approve";
+
+    public const string TripExpenseEntityKey = "logistics.trip-expense";
+    public const string ExpenseKindList = "logistics.expense-kind";
+    public const string ExpenseSupplierLookup = "logistics.trip-expense.supplier";
+
+    /// <summary>Masraf durumları (sabit; sunucudaki <c>TripExpense.Statuses</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> ExpenseStatuses { get; } =
+    [
+        ("pending", "Beklemede"),
+        ("approved", "Onaylandı"),
+        ("rejected", "Reddedildi"),
+    ];
+
+    /// <summary>Masraf türü kategorileri (sabit; sunucudaki <c>ExpenseKindCategories</c>): arayüz yakıt alanlarını ve rücu işaretini kategoriye göre gösterir.</summary>
+    public const string FuelCategory = "fuel";
+    public const string FineCategory = "fine";
+
     /// <summary>Teslim sonuçları (sabit; sunucudaki <c>DeliveryProof.Outcomes</c>).</summary>
     public static IReadOnlyList<(string Key, string Label)> DeliveryOutcomes { get; } =
     [

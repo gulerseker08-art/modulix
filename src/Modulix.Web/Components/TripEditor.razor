@@ -126,6 +126,10 @@
 {
     <TripCheckPanel TripId="Record.Id" Refresh="refresh" />
     <TripStopsPanel Trip="Record" CanWrite="@Session.Can(LogisticsAccess.TripsWrite)" Changed="StopsChanged" />
+    @if (Session.Can(LogisticsAccess.ExpensesRead))
+    {
+        <TripExpensesPanel Trip="Record" CanWrite="@Session.Can(LogisticsAccess.ExpensesWrite)" />
+    }
 }
 
 @code {
