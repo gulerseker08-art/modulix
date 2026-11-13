@@ -318,7 +318,7 @@ public class AppNavigationTests
 
         var root = Assert.Single(nav.Roots());
         Assert.Equal((AppCatalog.Logistics, "Lojistik"), (root.Id, root.Name));
-        Assert.Equal(["Sürücüler", "Sürücü belgeleri"], nav.MenuEntries(AppCatalog.Logistics).Select(e => e.Name)); // belge takibi sürücü okuma iznine bağlı
+        Assert.Equal(["Pano", "Sürücüler", "Sürücü belgeleri"], nav.MenuEntries(AppCatalog.Logistics).Select(e => e.Name)); // belge takibi ve pano sürücü okuma iznine bağlı
         Assert.Equal(AppCatalog.Logistics, nav.Context("lojistik/suruculer")!.Root.Id);
         Assert.Equal(AppCatalog.Logistics, nav.Context("lojistik/surucu-belgeleri")!.Root.Id);
 
@@ -326,8 +326,12 @@ public class AppNavigationTests
         Assert.Empty(Nav([LogisticsAccess.ModuleKey], []).Roots());
 
         // Taşıyıcı anlaşmaları kendi iznine bağlıdır: sürücü izni yetmez.
-        Assert.Equal(["Sürücüler", "Taşıyıcı anlaşmaları", "Sürücü belgeleri"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.DriversRead, LogisticsAccess.CarriersRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
+        Assert.Equal(["Pano", "Sürücüler", "Taşıyıcı anlaşmaları", "Sürücü belgeleri"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.DriversRead, LogisticsAccess.CarriersRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
         Assert.Equal(["Taşıyıcı anlaşmaları"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.CarriersRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
+
+        // Pano talep, sevkiyat, sefer ya da sürücü okuma izinlerinden biriyle görünür; taşıyıcı izni yetmez.
+        Assert.Equal("Pano", Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.TripsRead]).MenuEntries(AppCatalog.Logistics).First().Name);
+        Assert.Equal("lojistik/pano", Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.TripsRead]).Find("logistics.dashboard")!.Route);
     }
 
     [Fact]
