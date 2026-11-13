@@ -60,6 +60,28 @@ public class LogisticsCountryTests(ModulixApiFactory factory) : IClassFixture<Mo
     }
 
     [Fact]
+    public async Task Dashboard_routes_carry_countries_and_count_open_international_shipments()
+    {
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+
+        // Yurt dışına giden sevkiyat sefere atanır (etkin olur, haritaya girer); iç sevkiyat planlama bekler (haritada yok).
+        var export = Request(s.CustomerId, "İstanbul", "Hamburg");
+        export["deliveryCountry"] = "DE";
+        var approved = await ActAsync(manager, await PostAsync(manager, Requests, export));
+        var shipment = await GetAsync(manager, $"{Shipments}/{approved.Values["shipmentId"]!.GetValue<string>()}");
+        var trip = await PostAsync(manager, "/api/records/logistics.trip", new JsonObject { ["plannedStart"] = Iso(Today.AddDays(1)) });
+        var assign = await manager.PostAsJsonAsync($"/api/logistics/trips/{trip.Id}/shipments", new AssignShipmentRequest(shipment.Id));
+        Assert.True(assign.StatusCode == HttpStatusCode.OK, await assign.Content.ReadAsStringAsync());
+        await ActAsync(manager, await PostAsync(manager, Requests, Request(s.CustomerId, "Ankara", "İzmir")));
+
+        var board = (await manager.GetFromJsonAsync<LogisticsDashboardDto>("/api/logistics/dashboard"))!;
+        var route = Assert.Single(board.Shipments!.Routes);
+        Assert.Equal(("İstanbul", "TR", "Hamburg", "DE", 1), (route.From, route.FromCountry, route.To, route.ToCountry, route.Count));
+        Assert.Equal(1, board.Shipments.International);
+    }
+
+    [Fact]
     public async Task Invalid_country_codes_are_rejected_and_lower_case_is_normalized()
     {
         var s = await SetUpAsync();
