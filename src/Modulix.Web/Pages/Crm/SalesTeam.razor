@@ -5,49 +5,49 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Ekip performansı · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.salesTeam.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.ReportsRead">
-    <a class="back-link" href="crm/satis-analizi">← Satış analizi</a>
+    <a class="back-link" href="crm/satis-analizi">← @Texts.Get("crm.salesAnalysis.title")</a>
     <div class="page-header">
         <div>
-            <h1>Ekip performansı</h1>
+            <h1>@Texts.Get("crm.salesTeam.title")</h1>
             <p class="text-muted mb-0">
-                Kullanıcı başına gerçekleşen satış, kazanma oranı, açık fırsat iş yükü ve döngü süresi. Tutarlar seçili para biriminde, vergi hariç nettir.
-                Aktivite sayısı başarı ölçütü değildir ve bu tabloda yer almaz.
+                @Texts.Get("crm.salesTeam.intro1")
+                @Texts.Get("crm.salesTeam.intro2")
             </p>
         </div>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="crm/veri-kalitesi">Veri kalitesi</a>
+            <a class="btn btn-outline-secondary" href="crm/veri-kalitesi">@Texts.Get("crm.dataQuality.title")</a>
         </div>
     </div>
 
-    <div class="filters" role="group" aria-label="Dönem türü">
+    <div class="filters" role="group" aria-label="@Texts.Get("crm.sales.periodKind")">
         <div class="segmented">
             @foreach (var (key, label) in SalesLabels.PeriodKinds)
             {
                 <button type="button" class="chip @(kind == key ? "active" : null)" aria-pressed="@(kind == key ? "true" : "false")" disabled="@loading" @onclick="() => ChooseKindAsync(key)">@label</button>
             }
         </div>
-        <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="() => ShiftAsync(-1)">← Önceki dönem</button>
-        <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="TodayAsync">Bugün</button>
-        <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="() => ShiftAsync(1)">Sonraki dönem →</button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="() => ShiftAsync(-1)">@Texts.Get("crm.sales.previousPeriod")</button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="TodayAsync">@Texts.Get("crm.sales.today")</button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="() => ShiftAsync(1)">@Texts.Get("crm.sales.nextPeriod")</button>
     </div>
 
-    <form class="form-grid mb-3" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="Ekip performansı süzgeçleri">
+    <form class="form-grid mb-3" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="@Texts.Get("crm.salesTeam.filters")">
         <div class="span-3">
-            <label class="form-label" for="st-date">Dönemdeki bir gün</label>
+            <label class="form-label" for="st-date">@Texts.Get("crm.sales.anchorDay")</label>
             <input id="st-date" class="form-control" type="date" @bind="anchor" @bind:after="LoadAsync" />
         </div>
         <div class="span-3">
-            <label class="form-label" for="st-currency">Para birimi</label>
+            <label class="form-label" for="st-currency">@Texts.Get("crm.sales.currency")</label>
             <input id="st-currency" class="form-control" maxlength="3" placeholder="@Regional.Currency" aria-describedby="st-currency-help" @bind="currency" @bind:after="LoadAsync" />
-            <div id="st-currency-help" class="form-text">Boşsa firmanın raporlama para birimi (3 harf, ör. USD).</div>
+            <div id="st-currency-help" class="form-text">@Texts.Get("crm.sales.currencyHelp")</div>
         </div>
         <div class="span-4">
-            <label class="form-label" for="st-owner">Kullanıcı (sorumlu)</label>
+            <label class="form-label" for="st-owner">@Texts.Get("crm.sales.ownerFilter")</label>
             <select id="st-owner" class="form-select" @bind="owner" @bind:after="LoadAsync">
-                <option value="">Tüm kullanıcılar</option>
+                <option value="">@Texts.Get("crm.sales.allUsers")</option>
                 @foreach (var member in Lookups.Members)
                 {
                     <option value="@member.UserId">@member.DisplayName</option>
@@ -63,14 +63,14 @@
         <AnalyticsFrame T="List<TeamPerformanceRowDto>" Report="r">
             @if (r.Data.Count == 0)
             {
-                <p class="text-muted">Bu dönem ve süzgeç için gösterilecek kullanıcı verisi yok.</p>
+                <p class="text-muted">@Texts.Get("crm.salesTeam.empty")</p>
             }
             else
             {
                 var rows = Sorted(r.Data);
-                <div class="form-grid mb-2" role="group" aria-label="Sıralama">
+                <div class="form-grid mb-2" role="group" aria-label="@Texts.Get("crm.salesTeam.sorting")">
                     <div class="span-4">
-                        <label class="form-label" for="st-sort">Sırala</label>
+                        <label class="form-label" for="st-sort">@Texts.Get("crm.salesTeam.sort")</label>
                         <select id="st-sort" class="form-select" @bind="sortKey">
                             @foreach (var (key, label) in SortOptions)
                             {
@@ -79,30 +79,30 @@
                         </select>
                     </div>
                     <div class="span-3">
-                        <label class="form-label" for="st-dir">Yön</label>
+                        <label class="form-label" for="st-dir">@Texts.Get("crm.salesTeam.direction")</label>
                         <select id="st-dir" class="form-select" @bind="descending">
-                            <option value="True">Büyükten küçüğe</option>
-                            <option value="False">Küçükten büyüğe</option>
+                            <option value="True">@Texts.Get("crm.salesTeam.descending")</option>
+                            <option value="False">@Texts.Get("crm.salesTeam.ascending")</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="table-responsive">
                     <table class="table record-table">
-                        <caption class="visually-hidden">Kullanıcı başına satış performansı, @r.PeriodLabel</caption>
+                        <caption class="visually-hidden">@Texts.Get("crm.salesTeam.caption", r.PeriodLabel)</caption>
                         <thead>
                             <tr>
-                                <th scope="col" aria-sort="@AriaSort("name")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("name")'>Kullanıcı@(Arrow("name"))</button></th>
-                                <th scope="col" aria-sort="@AriaSort("realized")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("realized")'>Gerçekleşen@(Arrow("realized"))</button></th>
-                                <th scope="col" aria-sort="@AriaSort("won")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("won")'>Kazanılan@(Arrow("won"))</button></th>
-                                <th scope="col" aria-sort="@AriaSort("lost")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("lost")'>Kaybedilen@(Arrow("lost"))</button></th>
-                                <th scope="col" aria-sort="@AriaSort("winrate")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("winrate")'>Kazanma oranı@(Arrow("winrate"))</button></th>
-                                <th scope="col" aria-sort="@AriaSort("open")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("open")'>Açık fırsat (iş yükü)@(Arrow("open"))</button></th>
-                                <th scope="col" aria-sort="@AriaSort("pipeline")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("pipeline")'>Açık pipeline@(Arrow("pipeline"))</button></th>
-                                <th scope="col" aria-sort="@AriaSort("weighted")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("weighted")'>Ağırlıklı@(Arrow("weighted"))</button></th>
-                                <th scope="col" aria-sort="@AriaSort("overdue")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("overdue")'>Gecikmiş açık@(Arrow("overdue"))</button></th>
-                                <th scope="col" aria-sort="@AriaSort("cycle")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("cycle")'>Döngü süresi@(Arrow("cycle"))</button></th>
-                                <th scope="col" aria-sort="@AriaSort("attainment")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("attainment")'>Hedef ve gerçekleşme@(Arrow("attainment"))</button></th>
+                                <th scope="col" aria-sort="@AriaSort("name")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("name")'>@Texts.Get("crm.salesTeam.col.user")@(Arrow("name"))</button></th>
+                                <th scope="col" aria-sort="@AriaSort("realized")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("realized")'>@Texts.Get("crm.sales-card.realized")@(Arrow("realized"))</button></th>
+                                <th scope="col" aria-sort="@AriaSort("won")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("won")'>@Texts.Get("crm.opportunityReport.won")@(Arrow("won"))</button></th>
+                                <th scope="col" aria-sort="@AriaSort("lost")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("lost")'>@Texts.Get("crm.opportunityReport.lost")@(Arrow("lost"))</button></th>
+                                <th scope="col" aria-sort="@AriaSort("winrate")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("winrate")'>@Texts.Get("crm.opportunityReport.winRate")@(Arrow("winrate"))</button></th>
+                                <th scope="col" aria-sort="@AriaSort("open")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("open")'>@Texts.Get("crm.salesTeam.col.open")@(Arrow("open"))</button></th>
+                                <th scope="col" aria-sort="@AriaSort("pipeline")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("pipeline")'>@Texts.Get("crm.sales-card.openpipeline")@(Arrow("pipeline"))</button></th>
+                                <th scope="col" aria-sort="@AriaSort("weighted")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("weighted")'>@Texts.Get("crm.opportunityReport.col.weighted")@(Arrow("weighted"))</button></th>
+                                <th scope="col" aria-sort="@AriaSort("overdue")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("overdue")'>@Texts.Get("crm.salesTeam.col.overdue")@(Arrow("overdue"))</button></th>
+                                <th scope="col" aria-sort="@AriaSort("cycle")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("cycle")'>@Texts.Get("crm.salesTeam.col.cycle")@(Arrow("cycle"))</button></th>
+                                <th scope="col" aria-sort="@AriaSort("attainment")"><button type="button" class="btn btn-link p-0" @onclick='() => SortBy("attainment")'>@Texts.Get("crm.salesTeam.col.target")@(Arrow("attainment"))</button></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -110,61 +110,61 @@
                             {
                                 var p = row.Performance;
                                 <tr>
-                                    <td data-label="Kullanıcı" class="primary">@SalesAnalysisLabels.Owner(Lookups, p.OwnerId)</td>
-                                    <td data-label="Gerçekleşen">
+                                    <td data-label="@Texts.Get("crm.salesTeam.col.user")" class="primary">@SalesAnalysisLabels.Owner(Lookups, p.OwnerId)</td>
+                                    <td data-label="@Texts.Get("crm.sales-card.realized")">
                                         @Money(p.Realized, r)
                                         @if (r.AmountsVisible && p.Realized.IsPartial)
                                         {
-                                            <span class="badge stage-onhold">Kısmi</span>
+                                            <span class="badge stage-onhold">@Texts.Get("crm.sales.partial")</span>
                                             <br /><small class="text-muted">@SalesLabels.PartialHint(p.Realized)</small>
                                         }
                                     </td>
-                                    <td data-label="Kazanılan">@SalesLabels.Count(p.WonCount)</td>
-                                    <td data-label="Kaybedilen">@SalesLabels.Count(p.LostCount)</td>
-                                    <td data-label="Kazanma oranı">@SalesAnalysisLabels.Rate(p.WinRatePercent)</td>
-                                    <td data-label="Açık fırsat (iş yükü)">@SalesLabels.Count(p.OpenCount)</td>
-                                    <td data-label="Açık pipeline">
+                                    <td data-label="@Texts.Get("crm.opportunityReport.won")">@SalesLabels.Count(p.WonCount)</td>
+                                    <td data-label="@Texts.Get("crm.opportunityReport.lost")">@SalesLabels.Count(p.LostCount)</td>
+                                    <td data-label="@Texts.Get("crm.opportunityReport.winRate")">@SalesAnalysisLabels.Rate(p.WinRatePercent)</td>
+                                    <td data-label="@Texts.Get("crm.salesTeam.col.open")">@SalesLabels.Count(p.OpenCount)</td>
+                                    <td data-label="@Texts.Get("crm.sales-card.openpipeline")">
                                         @Money(p.OpenPipeline, r)
                                         @if (r.AmountsVisible && p.OpenPipeline.IsPartial)
                                         {
-                                            <br /><span class="badge stage-onhold">Kısmi</span>
+                                            <br /><span class="badge stage-onhold">@Texts.Get("crm.sales.partial")</span>
                                         }
                                     </td>
-                                    <td data-label="Ağırlıklı">
+                                    <td data-label="@Texts.Get("crm.opportunityReport.col.weighted")">
                                         @Money(p.WeightedOpen, r)
                                         @if (r.AmountsVisible && p.WeightedOpen.IsPartial)
                                         {
-                                            <br /><span class="badge stage-onhold">Kısmi</span>
+                                            <br /><span class="badge stage-onhold">@Texts.Get("crm.sales.partial")</span>
                                         }
                                     </td>
-                                    <td data-label="Gecikmiş açık">@SalesLabels.Count(p.OverdueOpenCount)</td>
-                                    <td data-label="Döngü süresi">
+                                    <td data-label="@Texts.Get("crm.salesTeam.col.overdue")">@SalesLabels.Count(p.OverdueOpenCount)</td>
+                                    <td data-label="@Texts.Get("crm.salesTeam.col.cycle")">
                                         @if (p.CycleSample == 0)
                                         {
                                             <text>@SalesAnalysisLabels.NoData</text>
                                         }
                                         else
                                         {
-                                            <text>Ortalama @SalesAnalysisLabels.Days(p.AverageCycleDays) · medyan @SalesAnalysisLabels.Days(p.MedianCycleDays)</text>
+                                            <text>@Texts.Get("crm.salesTeam.cycleValue", SalesAnalysisLabels.Days(p.AverageCycleDays), SalesAnalysisLabels.Days(p.MedianCycleDays))</text>
                                         }
                                         <br /><small class="text-muted">
-                                            Örneklem: @p.CycleSample kazanılan fırsat
+                                            @Texts.Get("crm.salesTeam.sample", p.CycleSample)
                                             @if (p.CycleSample > 0 && p.CycleSample < SmallSample)
                                             {
-                                                <span class="badge tag">Az örneklem</span>
+                                                <span class="badge tag">@Texts.Get("crm.salesTeam.smallSample")</span>
                                             }
                                         </small>
                                     </td>
-                                    <td data-label="Hedef ve gerçekleşme">@TargetCell(row, r)</td>
+                                    <td data-label="@Texts.Get("crm.salesTeam.col.target")">@TargetCell(row, r)</td>
                                 </tr>
                             }
                         </tbody>
                     </table>
                 </div>
                 <p class="small text-muted mt-2">
-                    Aktivite sayısı (arama, toplantı vb.) başarı ölçütü değildir; yalnızca sonuçlanan satışlar ve açık fırsat yükü gösterilir.
-                    Örneklemi @SmallSample fırsattan az olan döngü süresi, "Az örneklem" notuyla işaretlenir ve tek başına karar için yetersizdir.
-                    Hedefler kullanıcı bazlı tutar hedefidir ve hedef okuma iznini ister; izniniz yoksa ya da kullanıcı için hedef girilmemişse "Hedef tanımlı değil" görünür.
+                    @Texts.Get("crm.salesTeam.note1")
+                    @Texts.Get("crm.salesTeam.note2", SmallSample)
+                    @Texts.Get("crm.salesTeam.note3")
                 </p>
             }
         </AnalyticsFrame>
@@ -175,11 +175,11 @@
     // Bu adetin altındaki örneklemde döngü süresi güvenilir sayılmaz.
     private const int SmallSample = 5;
 
-    private static readonly IReadOnlyList<(string Key, string Label)> SortOptions =
+    private static IReadOnlyList<(string Key, string Label)> SortOptions =>
     [
-        ("name", "Kullanıcı"), ("realized", "Gerçekleşen"), ("won", "Kazanılan adet"), ("lost", "Kaybedilen adet"), ("winrate", "Kazanma oranı"),
-        ("open", "Açık fırsat"), ("pipeline", "Açık pipeline"), ("weighted", "Ağırlıklı"), ("overdue", "Gecikmiş açık"), ("cycle", "Döngü süresi (ortalama)"),
-        ("attainment", "Hedef gerçekleşme %"),
+        ("name", Texts.Get("crm.salesTeam.col.user")), ("realized", Texts.Get("crm.sales-card.realized")), ("won", Texts.Get("crm.salesTeam.sort.won")), ("lost", Texts.Get("crm.salesTeam.sort.lost")), ("winrate", Texts.Get("crm.opportunityReport.winRate")),
+        ("open", Texts.Get("crm.dataQuality.open")), ("pipeline", Texts.Get("crm.sales-card.openpipeline")), ("weighted", Texts.Get("crm.opportunityReport.col.weighted")), ("overdue", Texts.Get("crm.salesTeam.col.overdue")), ("cycle", Texts.Get("crm.salesTeam.sort.cycle")),
+        ("attainment", Texts.Get("crm.salesTeam.sort.attainment")),
     ];
 
     private string kind = SalesPeriodKinds.Month;
@@ -326,20 +326,20 @@
         }
         else if (row.Target is not { } target || row.Progress is not { } progress)
         {
-            <text>Hedef tanımlı değil</text>
+            <text>@Texts.Get("crm.salesTeam.noTarget")</text>
         }
         else
         {
-            <text>Hedef @CrmLabels.Amount(target, r.Currency)</text>
-            <br /><text>Gerçekleşme @SalesLabels.Percent(progress.AttainmentPercent)</text>
+            <text>@Texts.Get("crm.salesTeam.targetValue", CrmLabels.Amount(target, r.Currency))</text>
+            <br /><text>@Texts.Get("crm.salesTeam.attainmentValue", SalesLabels.Percent(progress.AttainmentPercent))</text>
             <br />
             @if (progress.TargetMet)
             {
-                <span class="badge stage-won">Hedef karşılandı</span>
+                <span class="badge stage-won">@Texts.Get("crm.salesTarget.met")</span>
             }
             else
             {
-                <small class="text-muted">Kalan @CrmLabels.Amount(progress.Remaining, r.Currency) · kapsama @SalesAnalysisLabels.Ratio(progress.Coverage)</small>
+                <small class="text-muted">@Texts.Get("crm.salesTeam.remainingValue", CrmLabels.Amount(progress.Remaining, r.Currency), SalesAnalysisLabels.Ratio(progress.Coverage))</small>
             }
         }
     </text>;
