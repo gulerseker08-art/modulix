@@ -169,7 +169,7 @@ Mutlu yol (yükle, uygula, sonuç); hata/doğrulama (her hata kodu, biçim, dosy
 - **Hücre türleri:** Excel hücresi gerçek tiptedir. Sayı Türkçe ondalık metne (`1250,5`), tarih `gg.aa.yyyy`'ye, mantıksal değer `Evet/Hayır`'a çevrilir ve mevcut hücre yorumundan geçer; böylece CSV'deki "12.5 reddedilir" kuralı bozulmaz. Saatli tarih `gg.aa.yyyy SS:dd` olur (tarih sütunu bunu reddeder). **Bilinen sınır:** telefon gibi sayı olarak saklanmış değerin baştaki sıfırı Excel'de zaten yoktur; metin biçimli hücre kullanılmalıdır.
 - **Güvenlik:** yalnızca ilk sayfa okunur; zip imzası ("PK") ve açılmış boyut (200 MB, zip bombası) denetlenir; fiziksel satır okuması 100.000'de, sütun okuması 201'de, dolu satır okuması 2.001'de durur (büyük ama boş biçimli sayfa belleği doldurmaz). Formül hücresinde yalnızca kayıtlı sonuç okunur; makro ve dış bağlantı çalışmaz. Bozuk dosya 400 değil, `file-invalid` hatalı `Failed` koşu olarak günlüğe yazılır; `.xls` uzantısı ise uçta 400 ile reddedilir.
 - Hata raporu ve şablon CSV kalır (ADR'deki "CSV/XLSX" ikinci biçim sonraya bırakıldı): Türkçe Excel UTF-8 BOM'lu CSV'yi doğrudan açar ve rapor düzeltilip yeniden yüklenebilir.
-- **Kalan (Dilim 4):** geri alma, "hepsi ya da hiç" modu.
+- **Kalan (Dilim 4):** "hepsi ya da hiç" modu (Dilim 4e).
 
 **Dilim 4b:** uygulandı (aynı dosya uyarısı, 13 Kasım 2026).
 
@@ -182,3 +182,9 @@ Mutlu yol (yükle, uygula, sonuç); hata/doğrulama (her hata kodu, biçim, dosy
 - Firma yöneticisi İçe aktarma tasarımı ekranında her sütun için "Dosyadaki diğer adlar"ı kaydeder; dosya başlığı alanın adı, anahtarı ya da bu adlardan biriyse sütuna bağlanır. Bağlamada önce bütün alanların adı ve anahtarı, sonra eşlemeler eklenir: bir alanın kendi adı başka alanın eşlemesine kaptırılmaz.
 - Eşleme tasarım JSON'undadır (`ImportDesignInput.Aliases`: alan anahtarı → adlar); **migration yok**, eski satırlar değişmeden okunur. Sunucu kuralları: bilinmeyen sütun, başka sütunun adı/anahtarı, hata raporu sütunu, iki sütuna aynı ad, alan başına en çok 10 ad, ad en çok 100 karakter → 422; adlar kırpılır, büyük/küçük harf duyarsız tekrarlar atılır. Değişiklik denetim kaydına (`aliases`) yazılır.
 - **Karar:** eşleme dosya başına değil firma + kayıt türü başınadır. **Sonra değerlendirilecek:** birden çok eşleme profili (farklı kaynak sistemlerden gelen dosyalar) ve yükleme ekranında tanınmayan sütunu oradan eşlemeye ekleme.
+
+**Dilim 4d:** uygulandı (geri alma, 13 Kasım 2026).
+
+- `POST /api/imports/{runId}/rollback` (`core.imports.rollback`, gerekçe zorunlu). Koşunun oluşturduğu kayıtlar ayrı bir iz tablosundan değil **denetim kaydından** bulunur (koşunun korelasyon kimliği + `ExecutionSource.Import` + "oluşturuldu"); migration yok. Kayıtlar boru hattından tek tek silinir (geri alanın silme yetkisi gerekir).
+- Sonradan değiştirilmiş, başka kayda bağlı ya da yetkinin yetmediği kayıt korunur ve nedeniyle döner; zaten silinmiş olan ayrıca sayılır. En az bir kayıt silinince koşu `RolledBack` olur, not gerekçe ve sayıları taşır. Geri alma hepsi-ya-da-hiç değildir.
+- **Sonra değerlendirilecek:** denetim kaydı saklama süresi koşunun yaşından kısaysa iz kaybolur (bugün denetim kaydı silinmiyor); korunan kayıtların listesi ekranda yalnızca nedenle özetleniyor, kayıt bağlantısı yok; geri almanın kendisi için ayrı denetim satırı yok (silmeler tek tek denetlenir, gerekçe koşunun notundadır).

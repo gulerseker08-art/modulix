@@ -18,7 +18,7 @@ tek başına hiçbir şeyi uygulamaz.
 | 6 | **İçe aktarma dilim 4:** ~~XLSX~~ **XLSX yapıldı** (12 Kasım 2026, dilim 4a; ADR-0033'te MiniExcel sapması yazıldı). Kalan: geri alma, aynı dosya uyarısı, kayıtlı sütun eşlemesi, hepsi-ya-da-hiç | 0033 | D1 pilot şartı (Ç7); Excel taşıma pilotun ön koşulu | O–B |
 | 7 | ~~**Otomasyon dilim 4c:** kayda bağlı onay ("onaya gönder" aksiyonu) ve kalıcı akış~~ **Yapıldı** (4c, 4c-2 ... 4c-5; ADR-0027 uygulama bölümleri) | 0027 | 4a (genel onay) main'de; 4b'den bağımsız yapılabilir | B |
 | 8 | ~~**Depo/antrepo 6b:** Partiler, Hareketler, Bakiyeler ekranları (arka uç 6a main'de)~~ **Yapıldı** (13 Kasım 2026; ADR-0032 "Dilim 6b") | 0032 | Arka ucu var, ekranı yok; mevzuat kararı istemez | O |
-| 9 | **Eskimiş ADR metinleri:** 0010, 0014, 0015, 0016, 0017, 0019'daki "yapılmadı" listeleri artık kodda olan şeyleri (teklif entegrasyonu, satış tahmini, departman, kampanya, sipariş/sözleşme devri) hâlâ "engelli" yazıyor; 0017/0019'daki "tenant başına veritabanı" atıfları; ~~0026 çift numara~~ **Yapıldı** (9 Kasım 2026: raporlama → [ADR-0035](adr/0035-raporlama-ve-satis-tahmini.md)) | belge | Yanlış yönlendiriyor; kod değişikliği yok | K |
+| 9 | ~~**Eskimiş ADR metinleri:**~~ **Yapıldı** (13 Kasım 2026, PR #305; tarihli durum notları) — 0010, 0014, 0015, 0016, 0017, 0019'daki "yapılmadı" listeleri artık kodda olan şeyleri (teklif entegrasyonu, satış tahmini, departman, kampanya, sipariş/sözleşme devri) hâlâ "engelli" yazıyor; 0017/0019'daki "tenant başına veritabanı" atıfları; ~~0026 çift numara~~ **Yapıldı** (9 Kasım 2026: raporlama → [ADR-0035](adr/0035-raporlama-ve-satis-tahmini.md)) | belge | Yanlış yönlendiriyor; kod değişikliği yok | K |
 | 10 | **Arayüz dili aşama 4:** modül ekranlarının metin göçü (Core, CRM, Destek, Sözleşme, Sipariş, Pazarlama, Raporlar) | 0034 | Mekanik ama çok dosya; `az`/`en` çevirisini kimin doğrulayacağı açık | B |
 | 11 | **Raporlama kalanları:** ekip/departman kırılımı (Core.Contracts ekip sözleşmesi), xlsx dışa aktarma, dağıtım listesi, lead sütun daraltma | 0035 | Pilotu kesmiyor; ekip sözleşmesi 0026 departman ADR'sine bağlı | O |
 | 12 | **Artık engelli olmayan CRM bağları:** Lead/Fırsat'a `CampaignId`, `OwningBusinessUnitId`, ürün kataloğu bağı (`productInterest`), indirim onayının genel onay servisine bağlanması, BusinessUnit'e göre kullanıcı lookup'ı | 0014, 0015, 0016, 0017, 0018 | Bağımlılıkları artık main'de; her biri migration ister, ürün önceliği sorulmalı | O–B |
@@ -32,12 +32,12 @@ firma alt profili, sektör bilgisi tablosu, AI erişimi menüsü) bu sıraya al�
 | Sıra | İş | Durum / gerekçe |
 |------|----|-----------------|
 | 1 | Depo/antrepo 6b ekranları (A-8) | Yapıldı (13 Kasım): arka ucu hazırdı, karar istemiyordu, pilotun depo tarafını açar |
-| 2 | Eskimiş ADR metinleri (A-9) | Belge düzeltmesi; yanlış yönlendirmeyi kaldırır, kod riski yok |
-| 3 | İçe aktarma dilim 4 kalanları (A-6): aynı dosya uyarısı, kayıtlı sütun eşlemesi, hepsi-ya-da-hiç, geri alma | D1 pilot şartı (Ç7); her biri ayrı küçük PR |
+| 2 | Eskimiş ADR metinleri (A-9) | Yapıldı (13 Kasım, PR #305): 0010, 0014–0017, 0019 sonuna tarihli güncel durum notu |
+| 3 | İçe aktarma dilim 4 kalanları (A-6) | 4b aynı dosya uyarısı (#306), 4c kayıtlı sütun eşlemesi (#307), 4d geri alma (#312) yapıldı; kalan: "hepsi ya da hiç" (4e) |
 | 4 | Arayüz dili aşama 4 kalan dilimleri (A-10): 8b teklif ayrıntısı → 18 | Mekanik; `az` doğrulaması hâlâ açık (taslak sayılır) |
 | 5 | Raporlama kalanları (A-11) ve CRM bağları (A-12) | Ürün önceliği sorulmalı (B listesi); önerilen varsayılan: önce xlsx dışa aktarma, sonra `CampaignId` bağı |
 | — | Ç4 dosya dilim 1b (A-4) | `AttachmentPanel` ADR-0038 dilim 2a ile geldi; kalan 2 tarama, 3 yaşam döngüsü, 4 portal bağlantısı dış sağlayıcı/ürün kararı bekliyor |
-| — | Ç0.4 kalanları (A-3) | Sevkiyat teslimi olayı ADR-0038 dilim 6 ile geldi; teklif kabul olayı ve webhook kalan |
+| — | Ç0.4 kalanları (A-3) | Sevkiyat teslimi olayı ADR-0038 dilim 6 ile geldi; teklif kabul olayı `crm.quote.accepted` yapıldı (#311); kalan: webhook (dış sağlayıcı kararı) |
 
 ### Sonra değerlendirilecek notlar
 
