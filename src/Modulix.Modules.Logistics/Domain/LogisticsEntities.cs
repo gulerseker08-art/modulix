@@ -420,6 +420,7 @@ public sealed class DeliveryProof : LogisticsEntity
 public sealed class TripExpense : LogisticsEntity
 {
     public const int DescriptionMaxLength = 200;
+    public const int DocumentNoMaxLength = 50;
     public const int ReasonMaxLength = 2000;
     public const int MaxOdometerKm = 9_999_999;
     public const decimal MaxLiters = 999_999.999m;
@@ -456,6 +457,9 @@ public sealed class TripExpense : LogisticsEntity
 
     /// <summary>Tedarikçi (yakıt istasyonu, otoyol işletmesi...): <c>core.Party</c> kaydı; boş olabilir (nakit harcırah).</summary>
     public Guid? SupplierPartyId { get; internal set; }
+
+    /// <summary>Fiş ya da fatura numarası (isteğe bağlı); dosya eki makbuzun görüntüsüdür, bu alan numarasıdır.</summary>
+    public string? DocumentNo { get; internal set; }
 
     /// <summary>Yakıt kategorisinde alınan litre (zorunlu); diğer kategorilerde boştur.</summary>
     public decimal? Liters { get; internal set; }

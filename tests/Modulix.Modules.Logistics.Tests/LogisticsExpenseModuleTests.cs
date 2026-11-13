@@ -54,6 +54,13 @@ public class LogisticsExpenseModuleTests
         Assert.Equal(TripExpense.Statuses.Rejected, reject.To);
         Assert.True(reject.RequiresReason);
 
+        // Reddedilen masraf düzeltilip yeniden onaya gönderilir: yazma izni yeter (onay izni gerekmez), gerekçe istemez, yalnızca reddedilenden.
+        var resubmit = LogisticsTransitions.Find(LogisticsModule.Entities.TripExpense, LogisticsActions.Resubmit)!;
+        Assert.Equal(LogisticsModule.Permissions.ExpensesWrite, resubmit.Permission);
+        Assert.Equal([TripExpense.Statuses.Rejected], resubmit.From);
+        Assert.Equal(TripExpense.Statuses.Pending, resubmit.To);
+        Assert.False(resubmit.RequiresReason);
+
         // Masraf iptal edilmez ve yeniden açılmaz: yanlış masraf reddedilir (K12).
         Assert.Null(LogisticsTransitions.Find(LogisticsModule.Entities.TripExpense, LogisticsActions.Cancel));
         Assert.Null(LogisticsTransitions.Find(LogisticsModule.Entities.TripExpense, LogisticsActions.Reopen));

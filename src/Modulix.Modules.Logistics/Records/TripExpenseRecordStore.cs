@@ -10,8 +10,8 @@ namespace Modulix.Modules.Logistics.Records;
 /// Sefer masrafı deposu (ADR-0038 K10, dilim 8). Masraf bir sefere bağlıdır (yalnızca oluştururken); iptal edilmiş sefere masraf açılmaz. Tür
 /// firmanın listesindendir ve kural türün kategorisine bakar: yakıtta litre zorunludur (kilometre isteğe bağlı), yakıt dışında litre ve kilometre
 /// girilmez; sürücüye rücu bayrağı yalnızca ceza kategorisinde işaretlenir. Tutar sıfırdan büyük, para birimi üç harflidir; KDV payı tutarı aşamaz;
-/// masraf tarihi ileri bir gün olamaz. Yalnızca beklemedeki masraf düzenlenir (karar verilmiş masraf değişmez: onay tutara bağlıdır); durum
-/// yalnızca iş akışı komutuyla (onay, ret) değişir. Masraf silinmez (K12): yanlış masraf reddedilir. Makbuz ve fiş kayda Core dosya deposuyla
+/// masraf tarihi ileri bir gün olamaz. Beklemedeki ve reddedilmiş masraf düzenlenir (reddedilen düzeltilip yeniden gönderilir); onaylanmış masraf
+/// değişmez: onay tutara bağlıdır. Durum yalnızca iş akışı komutuyla (onay, ret, yeniden gönderme) değişir. Masraf silinmez (K12): yanlış masraf reddedilir. Makbuz ve fiş kayda Core dosya deposuyla
 /// eklenir (okuma = masraf okuma izni, ekleme = masraf yazma izni).
 /// </summary>
 internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : LogisticsRecordStore<TripExpense>(context)
@@ -32,6 +32,7 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
         MoneyRules.Currency<TripExpense>("currency", e => e.Currency.Length == 0 ? null : e.Currency, (e, v) => e.Currency = v ?? string.Empty),
         MoneyRules.Amount<TripExpense>("vatAmount", e => e.VatAmount, (e, v) => e.VatAmount = v),
         Field.PartyRef<TripExpense>("supplierPartyId", "Tedarikçi bulunamadı.", e => e.SupplierPartyId, (e, v) => e.SupplierPartyId = v),
+        Field.Text<TripExpense>("documentNo", TripExpense.DocumentNoMaxLength, e => e.DocumentNo, (e, v) => e.DocumentNo = v),
         Field.Decimal<TripExpense>("liters", e => e.Liters, (e, v) => e.Liters = v, 3, 0, TripExpense.MaxLiters),
         Field.Integer<TripExpense>("odometerKm", e => e.OdometerKm, (e, v) => e.OdometerKm = v, 0, TripExpense.MaxOdometerKm),
         Field.Flag<TripExpense>("chargeToDriver", e => e.ChargeToDriver, (e, v) => e.ChargeToDriver = v),
@@ -85,9 +86,9 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
                 entity.StatusReason = Context.Gate.Reason;
             }
         }
-        else if (!isNew && entity.Status != TripExpense.Statuses.Pending)
+        else if (!isNew && entity.Status is not (TripExpense.Statuses.Pending or TripExpense.Statuses.Rejected))
         {
-            throw new RecordConflictException("Karar verilmiş masraf değiştirilemez; hatalıysa yeni masraf girin.");
+            throw new RecordConflictException("Onaylanmış masraf değiştirilemez; hatalıysa yeni masraf girin.");
         }
 
         if (isNew)
@@ -101,6 +102,7 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
 
         entity.Description = entity.Description.Trim();
         entity.Currency = entity.Currency.Trim();
+        entity.DocumentNo = string.IsNullOrWhiteSpace(entity.DocumentNo) ? null : entity.DocumentNo.Trim();
         var errors = new List<RecordFieldError>();
 
         if (entity.Description.Length == 0)

@@ -188,6 +188,7 @@ internal sealed class TripExpenseConfiguration : IEntityTypeConfiguration<TripEx
         builder.Property(e => e.Amount).HasPrecision(18, 2);
         builder.Property(e => e.Currency).HasMaxLength(LogisticsEntity.CurrencyLength).IsFixedLength().IsUnicode(false).IsRequired();
         builder.Property(e => e.VatAmount).HasPrecision(18, 2);
+        builder.Property(e => e.DocumentNo).HasMaxLength(TripExpense.DocumentNoMaxLength);
         builder.Property(e => e.Liters).HasPrecision(12, 3);
         builder.Property(e => e.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
         builder.Property(e => e.StatusReason).HasMaxLength(TripExpense.ReasonMaxLength);
