@@ -70,7 +70,7 @@ public class HrModuleTests
             [
                 HrModule.Entities.Employee, HrModule.Entities.LeaveRequest, HrModule.Entities.LeaveBalance, HrModule.Entities.ExpenseClaim,
                 HrModule.Entities.ExpenseLine, HrModule.Entities.Asset, HrModule.Entities.AssetAssignment, HrModule.Entities.ChecklistTemplate,
-                HrModule.Entities.ChecklistTemplateItem,
+                HrModule.Entities.ChecklistTemplateItem, HrModule.Entities.Announcement,
             ],
             HrForms.All.Select(f => f.EntityKey));
         foreach (var definition in HrForms.All)
@@ -298,6 +298,10 @@ public class HrModuleTests
         Assert.Equal(HrModule.Entities.ChecklistTemplateItem, HrAccess.ChecklistTemplateItemEntityKey);
         Assert.Equal(HrModule.Entities.EmployeeChecklist, HrAccess.EmployeeChecklistEntityKey);
         Assert.Equal(HrModule.Entities.ChecklistTask, HrAccess.ChecklistTaskEntityKey);
+        Assert.Equal(HrModule.Permissions.AnnouncementsRead, HrAccess.AnnouncementsRead);
+        Assert.Equal(HrModule.Permissions.AnnouncementsManage, HrAccess.AnnouncementsManage);
+        Assert.Equal(HrModule.Entities.Announcement, HrAccess.AnnouncementEntityKey);
+        Assert.Equal(HrModule.Entities.AnnouncementRead, HrAccess.AnnouncementReadEntityKey);
         Assert.Equal(HrLookupDefinitions.ChecklistEmployee, HrAccess.ChecklistEmployeeLookup);
         Assert.Equal(HrLookupDefinitions.ChecklistTemplate, HrAccess.ChecklistTemplateLookup);
         Assert.Equal(Checklists.Kinds.All, HrAccess.ChecklistKinds.Select(s => s.Key));

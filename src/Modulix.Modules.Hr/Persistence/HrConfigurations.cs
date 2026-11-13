@@ -253,3 +253,26 @@ internal sealed class ChecklistTaskConfiguration : IEntityTypeConfiguration<Chec
         builder.HasIndex(t => new { t.TenantId, t.OwnerId }).HasDatabaseName("IX_ChecklistTasks_Owner");
     }
 }
+
+internal sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Announcement>
+{
+    public void Configure(EntityTypeBuilder<Announcement> builder)
+    {
+        HrTables.ConfigureCommon(builder, "Announcements");
+        builder.Property(a => a.Title).HasMaxLength(Announcement.TitleMaxLength).IsRequired();
+        builder.Property(a => a.Body).HasMaxLength(Announcement.BodyMaxLength).IsRequired();
+        builder.Property(a => a.AudienceDepartmentKey).HasMaxLength(100);
+        builder.HasIndex(a => new { a.TenantId, a.IsPublished, a.PublishOn }).HasDatabaseName("IX_Announcements_Published");
+    }
+}
+
+internal sealed class AnnouncementReadConfiguration : IEntityTypeConfiguration<AnnouncementRead>
+{
+    public void Configure(EntityTypeBuilder<AnnouncementRead> builder)
+    {
+        HrTables.ConfigureCommon(builder, "AnnouncementReads");
+        builder.HasOne<Announcement>().WithMany().HasForeignKey(r => new { r.TenantId, r.AnnouncementId })
+            .HasPrincipalKey(a => new { a.TenantId, a.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(r => new { r.TenantId, r.AnnouncementId, r.UserId }).IsUnique().HasDatabaseName("UX_AnnouncementReads_User");
+    }
+}
