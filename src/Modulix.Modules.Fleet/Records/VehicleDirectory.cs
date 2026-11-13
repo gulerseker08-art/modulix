@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
-using Modulix.Core.Contracts.Fleet;
+using Modulix.Modules.Fleet.Contracts;
 using Modulix.Modules.Fleet.Domain;
 
 namespace Modulix.Modules.Fleet.Records;

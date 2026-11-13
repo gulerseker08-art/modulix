@@ -23,6 +23,16 @@ internal static class RepositoryLayout
     public static string ProjectName(FileInfo csproj) =>
         Path.GetFileNameWithoutExtension(csproj.Name);
 
+    /// <summary>
+    /// Modül sözleşme projesi mi (<c>Modulix.Modules.&lt;Ad&gt;.Contracts</c>, ADR-0044)? Satış sözleşmeleri modülü
+    /// <c>Modulix.Modules.Contracts</c> üç parçalı olduğu için bu kalıba uymaz; o bir modüldür.
+    /// </summary>
+    public static bool IsModuleContracts(string projectName)
+    {
+        string[] parts = projectName.Split('.');
+        return parts is ["Modulix", "Modules", _, "Contracts"];
+    }
+
     public static IReadOnlyList<string> ProjectReferences(FileInfo csproj) =>
         XDocument.Load(csproj.FullName)
             .Descendants("ProjectReference")
