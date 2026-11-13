@@ -1,4 +1,5 @@
 @page "/ik/galeri-yonetimi"
+@using System.Text.Json.Nodes
 @inject ApiClient Api
 @inject SessionState Session
 @inject CrmLookups Lookups
@@ -26,17 +27,21 @@
         }
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Albüm görünümleri" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Albüm görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <input class="form-control" type="search" aria-label="Albüm ara" placeholder="Başlık ya da açıklamada ara" @bind="search" />
         </form>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (!editing)
         {
             <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni albüm</button>
         }
     </div>
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
 
     @if (page is null)
     {
@@ -48,24 +53,26 @@
     }
     else
     {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) albüm listelendi.</p>
         <table class="table record-table">
             <caption class="visually-hidden">Albümler</caption>
             <thead>
                 <tr>
-                    <th scope="col"><SortHeader Label="Başlık" ColumnIcon="image" Asc="title" Desc="-title" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><SortHeader Label="Etkinlik günü" ColumnIcon="calendar" Asc="eventDate" Desc="-eventDate" Value="@sort" Default="@DefaultSort" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> Durum</span></th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
                     <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var album in page.Items)
                 {
-                    var published = WarehouseLabels.Flag(album, "isPublished");
                     <tr>
-                        <td data-label="Başlık" class="primary">@WarehouseLabels.Text(album, "title")</td>
-                        <td data-label="Etkinlik günü">@(WarehouseLabels.Text(album, "eventDate") is { Length: > 0 } day ? HrLabels.Date(day) : "—")</td>
-                        <td data-label="Durum"><span class="badge @(published ? "status-customer" : "status-inactive")">@(published ? "Yayında" : "Taslak")</span></td>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, album)
+                        }
                         <td class="row-menu-cell">
                             <RowMenu Label="@($"{WarehouseLabels.Text(album, "title")} eylemleri")">
                                 <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(album)"><AppIcon Name="pencil" Size="16" /> <span>Aç</span></button>
@@ -81,8 +88,23 @@
 </AuthGate>
 
 @code {
-    private const string DefaultSort = "-eventDate";
     private static readonly string Url = "/api/records/" + HrAccess.PhotoAlbumEntityKey;
+
+    private const string AllViews = "all";
+
+    // Sıralama anahtarları kayıt deposunun beyanıdır (PhotoAlbumRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("title", "Başlık", "image", "title", "-title", Locked: true),
+        new("eventDate", "Etkinlik günü", "calendar", "eventDate", "-eventDate"),
+        new("description", "Açıklama", "type", DefaultVisible: false),
+        new("status", "Durum", "tag"),
+    ];
+
+    private readonly GridViewState grid = new("hr.gallery-admin", "-eventDate");
+    private PersonalGridViews views = default!;
+    private string view = "all";
+    private (string Key, string Value)? filter = null;
 
     private RecordPageResponse? page;
     private RecordResponse? selected;
@@ -90,22 +112,27 @@
     private int revision;
     private string? message;
     private string? search;
-    private string sort = DefaultSort;
-    private string view = "all";
 
-    private static IReadOnlyList<ViewOption> ViewOptions { get; } =
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
     [
         new("all", "Tüm albümler", Icon: "list"),
         new("isPublished=true", "Yayında", Icon: "image"),
         new("isPublished=false", "Taslak", Icon: "pencil"),
+        .. views.Options,
     ];
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "hr.gallery-admin");
         await Session.EnsureLoadedAsync();
         if (Session.Can(HrAccess.GalleryManage))
         {
             await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(HrAccess.PhotoAlbumEntityKey)
+                .Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
             await LoadAsync(1);
         }
     }
@@ -113,27 +140,90 @@
     private async Task ChooseViewAsync(string key)
     {
         view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            filter = GridFilters.Parse(saved.Filters).Select(p => ((string, string)?)(p.Key, p.Value)).FirstOrDefault();
+        }
+        else
+        {
+            grid.Reset();
+            filter = key == AllViews ? null : (key.Split('=')[0], key.Split('=')[1]);
+        }
+
         await LoadAsync(1);
     }
 
     private async Task SortAsync(string key)
     {
-        sort = key;
+        grid.Sort = key;
         await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(filter);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
     }
 
     private async Task LoadAsync(int pageNumber)
     {
-        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&sort={Uri.EscapeDataString(sort)}&search={Uri.EscapeDataString(search ?? string.Empty)}";
-        if (view != "all")
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
         {
-            url += "&" + view;
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (filter is { } f)
+        {
+            url += $"&{f.Key}={Uri.EscapeDataString(f.Value)}";
         }
 
         var result = await Api.GetAsync<RecordPageResponse>(url);
         page = result.Value;
         message = result.Error;
     }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse record) =>
+        @<td data-label="@column.Label" class="@(column.Key == "title" ? "primary" : null)">@CellContent(column.Key, record)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse record) => key switch
+    {
+        "title" => @<text>@WarehouseLabels.Text(record, "title")</text>,
+        "eventDate" => @<text>@(WarehouseLabels.Text(record, "eventDate") is { Length: > 0 } day ? HrLabels.Date(day) : "—")</text>,
+        "description" => @<text>@(WarehouseLabels.Text(record, "description") is { Length: > 0 } d ? d : "—")</text>,
+        "status" => @<span class="badge @(WarehouseLabels.Flag(record, "isPublished") ? "status-customer" : "status-inactive")">@(WarehouseLabels.Flag(record, "isPublished") ? "Yayında" : "Taslak")</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.PhotoAlbumEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, record.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
 
     private void Open(RecordResponse? album)
     {
