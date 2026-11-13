@@ -208,6 +208,9 @@ public sealed class CoreModule : IModule
         /// <summary>Tenant'ın alan kuralı uyarlaması (ADR-0029 K8); kaydın kimliği tenant'ın kimliğidir. Kural anahtarları yazılır.</summary>
         public const string RuleAdaptation = "core.rule-adaptation";
 
+        /// <summary>Firma alt profili (ADR-0041); seçenekleri aynı kaydın "options" alanında listelenir.</summary>
+        public const string SubProfile = "core.sub-profile";
+
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
         public const string Audit = "core.audit";
@@ -612,6 +615,16 @@ public sealed class CoreModule : IModule
         {
             ["rules"] = "Firmanın kuralları", ["disabled"] = "Kapatılan kurallar",
         }, "rules"),
+        new(AuditedEntityKeys.SubProfile, "Alt profil", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["code"] = "Kod", ["description"] = "Açıklama", ["activity"] = "Bağlı faaliyet", ["status"] = "Durum", ["options"] = "Seçenekler",
+        }, "name")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string> { ["Draft"] = "Taslak", ["Active"] = "Etkin", ["Inactive"] = "Pasif" },
+            },
+        },
         new(AuditedEntityKeys.TenantSetting, "Firma ayarı", null, new Dictionary<string, string>
         {
             ["key"] = "Ayar", ["value"] = "Değer",

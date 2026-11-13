@@ -41,6 +41,8 @@ Lojistik firmaları tek tip değildir: pilot (Makaroğlu) karayolu taşımacıl�
 
 **K9 — Başlangıç alt profilleri.** Lojistik kartı pilot için "Kara taşımacılığı", "Gümrüklü antrepo" ve "Deniz taşımacılığı" alt profillerini getirir. Bugünkü kartın üç alanı (güzergâh, araç tipi, yük tipi) "Kara taşımacılığı" alt profiline taşınır. Önceden uygulanmış firmalar bozulmaz (alanlar zaten vardır, aynı ad atlanır). İçerik ürün önerisidir, doğrulanmamıştır.
 
+Uygulama notu (dilim 1, 13.11.2026): tablolar `meta.SubProfiles` / `meta.SubProfileOptions`; servis `ISubProfileService`; uçlar `/api/customization/sub-profiles`; arayüz Sektör profili sayfasındaki "Alt profiller" bölümü. K7 ayar düzeyi **uygulama yapılandırması** seçildi (`Customization:Limits`, platform geneli, varsayılan sınırsız); firma bazında sınır ve ekran yoktur. K3'e iki somutlaştırma eklendi: (1) **uygulanmış seçenek değişmez ve kaldırılmaz** (alan artık firmanındır; düzeltme Özel alanlar/Listeler sayfasındandır), uygulanmamış seçenek düzenlenir ve kaldırılır; (2) durum geçişleri yalnızca Taslak→Etkin, Etkin→Pasif, Pasif→Etkin'dir (etkin alt profilin alanları firmaya eklendiğinden taslağa dönüş yoktur). Kural seçeneği, başlangıç alt profilleri ve eski kartın bağlanması sonraki dilimlerdedir.
+
 ## 3. Dilimler (öneri)
 
 1. **Veri modeli ve alan/liste değeri.** Tablolar + RLS, `ISubProfileService`, uçlar, tablo ekranı, etkinleştirme önizlemesi ve uygulama. Dört test: mutlu yol, doğrulama, tenant izolasyonu, yetki.

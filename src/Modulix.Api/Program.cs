@@ -66,6 +66,9 @@ builder.Services.AddProblemDetails();
 builder.Services.AddModulixPersistence(
     RequiredConnectionString(builder.Configuration, PersistenceSetup.AppConnectionName),
     RequiredConnectionString(builder.Configuration, PersistenceSetup.MigrationsConnectionName));
+// Özelleştirme sınırları (ADR-0041 K7): yapılandırma verilmezse sınırsız; sınır gerekirse "Customization:Limits" altına yazılır.
+builder.Services.AddSingleton(builder.Configuration.GetSection("Customization:Limits").Get<Modulix.Core.Customization.CustomizationLimits>()
+    ?? new Modulix.Core.Customization.CustomizationLimits());
 builder.Services.AddModulixAuth();
 builder.Services.AddModulixTenancy();
 
@@ -243,6 +246,7 @@ app.MapFormLayoutEndpoints();
 app.MapGridViewEndpoints();
 app.MapFileEndpoints();
 app.MapSectorProfileEndpoints();
+app.MapSubProfileEndpoints();
 app.MapSectorEndpoints();
 app.MapGtipEndpoints();
 app.MapRegimeProfileEndpoints();

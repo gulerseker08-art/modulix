@@ -386,6 +386,16 @@ Profil, bir sektör için hazır başlangıç paketidir: modüller, özel alanla
 - Firma yöneticisi Yönetim → Sektör profili'nden uygular (`/yonetim/sektor-profili`, `core.customization.manage`; `GET /api/customization/profiles`, `GET /{anahtar}/preview`, `POST /{anahtar}/apply`). Modül açamaz: kapalı modülün alanları ve değerleri eklenmez, önizlemede ayrıca belirtilir.
 - Menü sırası profilden gelmez: şimdilik yalnızca CRM'in ekranları var.
 
+#### Firma alt profilleri (ADR-0041 taslak, dilim 1)
+
+Sektör profilinin altında firma kendi alt profillerini tanımlar ([ADR-0041](docs/adr/0041-firma-alt-profili.md)): tek seviye, firma başına istediği kadar alt profil, alt profil başına istediği kadar seçenek. Seçenek bir kayıt türüne **alan** ya da bir listeye **değer** ekler (kural seçeneği dilim 2). Ekran Yönetim → Sektör profili sayfasının altındaki "Alt profiller" bölümüdür; uçlar `/api/customization/sub-profiles` (`core.customization.manage`).
+
+- Tablolar `meta.SubProfiles` ve `meta.SubProfileOptions` (tenant verisi, RLS altında, `UNIQUE(TenantId, Code)`); alt profil silinmez, pasife alınır. Kod addan üretilir ve değişmez; ad firma içinde benzersizdir. Faaliyet kodu (`activityCode`) isteğe bağlıdır ve katalogda etkin bir "Faaliyet" olmalıdır.
+- Durum yalnızca komutla değişir: `POST /{id}/status` (`{ status: Draft|Active|Inactive, revision }`); geçerli geçişler Taslak→Etkin, Etkin→Pasif, Pasif→Etkin. `revision` eskiyse 409. Etkinleştirme uygulanmamış seçenekleri firmaya ekler (tek işlem; yalnızca ekler, aynı adlı alan/değer atlanır, kapalı modülün seçeneği bekler). Önizleme `GET /{id}/apply/preview`, bekleyenleri yeniden uygulama `POST /{id}/apply` (yalnızca etkin alt profil).
+- Seçenek: `POST /{id}/options`, `PUT`/`DELETE /{id}/options/{optionId}` (`{ kind: Field|ListValue, targetKey, label, fieldType, required, showInList, choices, category }`). Etkin alt profilde eklenen seçenek hemen uygulanır; pasifte ve taslakta bekler. **Uygulanmış seçenek değişmez ve kaldırılmaz** (409): alan artık firmanındır, Özel alanlar ve Listeler sayfasından düzenlenir. Pasife almak eklenen alan ve değerleri silmez.
+- Sınırlar (ADR-0041 K7) varsayılan olarak yoktur; `Customization:Limits` altında `MaxFieldsPerEntity`, `MaxOptionsPerField`, `MaxValuesPerList`, `MaxSubProfiles`, `MaxOptionsPerSubProfile` ile konabilir (eski sabit 30/100/50 sınırları buna taşındı).
+- Her yazma `core.sub-profile` olarak denetim kaydına yazılır; alan ve liste değerleri Y9a/Y9b servisleriyle eklendiğinden onların denetim kaydı da oluşur.
+
 #### Sektör/faaliyet kataloğu ve tenant seçimi (ADR-0029 taslak, Dilim A)
 
 Tek profil anahtarının yanında, sektör → faaliyet grubu → alt faaliyet ağacı ve yetenek kataloğu vardır ([ADR-0029](docs/adr/0029-sektor-profili-genisletme-ve-lojistik-kurulum.md), taslak). Henüz ekranı ve hazır içeriği yoktur: yalnızca API ve servisler; katalog boş başlar ve hiçbir modülü kendiliğinden açmaz.
