@@ -221,12 +221,17 @@
     border-radius: var(--mx-radius-panel);
     background: var(--mx-panel-bg);
     box-shadow: var(--mx-shadow-panel);
+    /* Çok sütunlu tablo gibi daralmayan içerik varsa panel onunla birlikte genişler (tablo panelden taşmaz, sayfa yatay kayar).
+       Panelin kendisini kaydırılabilir yapmak satır menüsünü keser ve yapışkan (sticky) çubukları bozar. */
+    width: fit-content;
+    min-width: calc(100% - 2 * var(--mx-space-4));
 }
 
 @media (max-width: 640.98px) {
     .content {
         margin: 0 var(--mx-space-2) var(--mx-space-2);
         border-radius: var(--mx-radius-drawer);
+        min-width: calc(100% - 2 * var(--mx-space-2));
     }
 }
 
