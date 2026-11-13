@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Approvals;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Logistics.Domain;
@@ -38,6 +39,7 @@ public static class LogisticsActions
     public const string Complete = "complete";
     public const string StartLoading = "startLoading";
     public const string Depart = "depart";
+    public const string Resubmit = "resubmit";
 }
 
 /// <summary>Geçiş tablosu: eylem, izin, hangi durumlardan, hangi duruma, gerekçe gerekir mi.</summary>
@@ -64,6 +66,13 @@ public static class LogisticsTransitions
             [Shipment.Statuses.Pending, Shipment.Statuses.Planned, Shipment.Statuses.Loading], Shipment.Statuses.Cancelled, true,
             "Yola çıkmış ya da kapanmış sevkiyat iptal edilemez.", Destructive: true),
 
+        new(LogisticsModule.Entities.TripExpense, LogisticsActions.Approve, "Onayla", LogisticsModule.Permissions.ExpensesApprove,
+            [TripExpense.Statuses.Pending], TripExpense.Statuses.Approved, false, "Yalnızca bekleyen masraf onaylanabilir."),
+        new(LogisticsModule.Entities.TripExpense, LogisticsActions.Reject, "Reddet", LogisticsModule.Permissions.ExpensesApprove,
+            [TripExpense.Statuses.Pending], TripExpense.Statuses.Rejected, true, "Yalnızca bekleyen masraf reddedilebilir.", Destructive: true),
+        new(LogisticsModule.Entities.TripExpense, LogisticsActions.Resubmit, "Yeniden onaya gönder", LogisticsModule.Permissions.ExpensesWrite,
+            [TripExpense.Statuses.Rejected], TripExpense.Statuses.Pending, false, "Yalnızca reddedilen masraf yeniden beklemeye alınır."),
+
         new(LogisticsModule.Entities.Trip, LogisticsActions.Confirm, "Planı onayla", LogisticsModule.Permissions.TripsWrite,
             [Trip.Statuses.Planning], Trip.Statuses.Ready, false, "Yalnızca planlanan sefer onaylanır."),
         new(LogisticsModule.Entities.Trip, LogisticsActions.Reopen, "Planlamaya geri al", LogisticsModule.Permissions.TripsWrite,
@@ -81,7 +90,8 @@ public static class LogisticsTransitions
 }
 
 internal sealed class LogisticsWorkflow(
-    IRecordPipeline pipeline, LogisticsWorkflowGate gate, ICurrentAccess access, ITripPlanner planner, LogisticsStoreContext context) : ILogisticsWorkflow
+    IRecordPipeline pipeline, LogisticsWorkflowGate gate, ICurrentAccess access, ITripPlanner planner, LogisticsStoreContext context,
+    IApprovalGate approvalGate) : ILogisticsWorkflow
 {
     /// <summary>Talepten sevkiyata kopyalanan alanlar (yük, güzergâh, taraflar).</summary>
     private static readonly string[] CargoKeys =
@@ -203,6 +213,14 @@ internal sealed class LogisticsWorkflow(
     /// </summary>
     private async Task<string?> PreconditionAsync(string entityKey, Guid id, string action, CancellationToken cancellationToken)
     {
+        if (entityKey == LogisticsModule.Entities.TripExpense)
+        {
+            // Firma masrafı onaylamayı bir onay sürecine bağladıysa son talep onaylanmadan masraf onaylanmaz (Ç6a.3); karar vermek yine izne bağlıdır.
+            return action == LogisticsActions.Approve
+                ? await approvalGate.BlockReasonAsync(new RecordRef(entityKey, id), LogisticsModule.ApprovalCommands.ApproveExpense, cancellationToken)
+                : null;
+        }
+
         if (entityKey != LogisticsModule.Entities.Trip)
         {
             return null;

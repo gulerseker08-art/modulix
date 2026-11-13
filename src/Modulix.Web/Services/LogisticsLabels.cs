@@ -24,6 +24,15 @@ public static class LogisticsLabels
         _ => "status-inactive",
     };
 
+    public static string ExpenseStatus(string? key) => LogisticsAccess.ExpenseStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    public static string ExpenseStatusBadge(string? key) => key switch
+    {
+        "approved" => "status-customer",
+        "pending" => "stage-qualified",
+        _ => "status-inactive",
+    };
+
     public static string StopType(string? key) => LogisticsAccess.StopTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Durak türü ikonu: yükleme, boşaltma, sınır, mola, boş dönüş.</summary>

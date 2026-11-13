@@ -65,6 +65,22 @@ public static class LogisticsAccess
         ("cancelled", "İptal edildi"),
     ];
 
+    public const string ExpensesRead = "logistics.expenses.read";
+    public const string ExpensesWrite = "logistics.expenses.write";
+    public const string ExpensesApprove = "logistics.expenses.approve";
+    public const string ExpenseEntityKey = "logistics.trip-expense";
+    public const string ExpenseTypeList = "logistics.expense-type";
+    public const string ExpenseFuelCategory = "fuel";
+    public const string ExpenseFineCategory = "fine";
+
+    /// <summary>Masraf durumları (sabit; sunucudaki <c>TripExpense.Statuses</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> ExpenseStatuses { get; } =
+    [
+        ("pending", "Beklemede"),
+        ("approved", "Onaylandı"),
+        ("rejected", "Reddedildi"),
+    ];
+
     public const string TripsRead = "logistics.trips.read";
     public const string TripsWrite = "logistics.trips.write";
 

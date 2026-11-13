@@ -177,3 +177,26 @@ internal sealed class DeliveryProofConfiguration : IEntityTypeConfiguration<Deli
             .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class TripExpenseConfiguration : IEntityTypeConfiguration<TripExpense>
+{
+    public void Configure(EntityTypeBuilder<TripExpense> builder)
+    {
+        LogisticsTables.ConfigureCommon(builder, "TripExpenses");
+        builder.Property(e => e.ExpenseTypeKey).HasMaxLength(40).IsUnicode(false).IsRequired();
+        builder.Property(e => e.Amount).HasPrecision(18, 2);
+        builder.Property(e => e.Currency).HasMaxLength(LogisticsEntity.CurrencyLength).IsFixedLength().IsUnicode(false).IsRequired();
+        builder.Property(e => e.VatAmount).HasPrecision(18, 2);
+        builder.Property(e => e.DocumentNo).HasMaxLength(TripExpense.DocumentNoMaxLength);
+        builder.Property(e => e.Liters).HasPrecision(12, 3);
+        builder.Property(e => e.Notes).HasMaxLength(TripExpense.TextMaxLength);
+        builder.Property(e => e.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(e => e.StatusReason).HasMaxLength(TripExpense.TextMaxLength);
+
+        // Sefer masrafları ve duruma göre bekleyen listesi; sefere aynı modül içinde bileşik yabancı anahtar (silinmez, K12).
+        builder.HasIndex(e => new { e.TenantId, e.TripId, e.ExpenseDate }).HasDatabaseName("IX_TripExpenses_Trip");
+        builder.HasIndex(e => new { e.TenantId, e.Status, e.ExpenseDate }).HasDatabaseName("IX_TripExpenses_Status");
+        builder.HasOne<Trip>().WithMany().HasForeignKey(e => new { e.TenantId, e.TripId })
+            .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
