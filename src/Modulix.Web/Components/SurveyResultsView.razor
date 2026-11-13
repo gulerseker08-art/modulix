@@ -1,0 +1,85 @@
+@* Anket sonucu (ADR-0042 dilim 7): soru başına cevap sayısı, puan ortalaması ve dağılımı, seçenek dağılımı, metin cevapları. Yanıtlayan bilgisi yoktur;
+   kimliği gizli ankette yanıt azsa sunucu sonucu göstermez ve nedenini söyler. *@
+@using System.Globalization
+@inject ApiClient Api
+
+<section aria-label="Anket sonuçları">
+    <div class="list-toolbar mt-3"><h3 class="h6 mb-0 me-auto">Sonuçlar</h3></div>
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    else if (results is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (results.HiddenReason is { } hidden)
+    {
+        <p class="text-muted" role="status">@results.ResponseCount yanıt. @hidden</p>
+    }
+    else if (results.ResponseCount == 0)
+    {
+        <p class="text-muted" role="status">Henüz yanıt yok.</p>
+    }
+    else
+    {
+        <p class="text-muted">@results.ResponseCount yanıt</p>
+        @foreach (var question in results.Questions)
+        {
+            <div class="summary-card mb-3">
+                <h4 class="h6">@question.Text</h4>
+                <p class="text-muted mb-2">
+                    @HrLabels.QuestionType(question.QuestionType) · @question.AnswerCount cevap@(question.Average is { } average ? $" · ortalama {average.ToString("0.##", Turkish)}" : "")
+                </p>
+                @if (question.Counts.Count > 0)
+                {
+                    <table class="table record-table">
+                        <caption class="visually-hidden">@question.Text dağılımı</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">@(question.QuestionType == "rating" ? "Puan" : "Seçenek")</th>
+                                <th scope="col">Cevap</th>
+                                <th scope="col">Oran</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var count in question.Counts)
+                            {
+                                <tr>
+                                    <td data-label="@(question.QuestionType == "rating" ? "Puan" : "Seçenek")">@count.Option</td>
+                                    <td data-label="Cevap">@count.Count</td>
+                                    <td data-label="Oran">@(question.AnswerCount == 0 ? "—" : $"%{Math.Round(100m * count.Count / question.AnswerCount).ToString("0", Turkish)}")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                @if (question.Texts.Count > 0)
+                {
+                    <ul class="mb-0">
+                        @foreach (var text in question.Texts)
+                        {
+                            <li class="preline">@text</li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
+
+    private SurveyResultsDto? results;
+    private string? message;
+
+    [Parameter, EditorRequired] public Guid SurveyId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var result = await Api.GetAsync<SurveyResultsDto>($"/api/hr/surveys/{SurveyId}/results");
+        results = result.Value;
+        message = result.Error;
+    }
+}

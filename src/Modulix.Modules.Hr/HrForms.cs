@@ -187,5 +187,33 @@ public static class HrForms
             new("publishOn", "Başlangıç", "yayin", 6),
             new("expiresOn", "Bitiş", "yayin", 6),
         ]),
+        new(HrModule.Entities.Survey, "Anket",
+        [new(General, "Anket"), new("hedef", "Hedef ve süre"), new("ek", "Ek bilgiler")],
+        [
+            new("anket", "Anket", "clipboard-list"),
+            new("hedef", "Hedef ve süre", "users", Tab: "hedef"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ek"),
+        ],
+        [
+            new("title", "Başlık", "anket", 12, Required: true, Fixed: true),
+            new("description", "Açıklama", "anket", 12),
+            new("isAnonymous", "Kimliği gizli", "hedef", 4),
+            new("audienceDepartmentKey", "Hedef departman", "hedef", 4),
+            new("closesOn", "Kapanış günü", "hedef", 4),
+        ]),
+        new(HrModule.Entities.SurveyQuestion, "Anket sorusu",
+        [new(General, "Soru"), new("secenek", "Cevap biçimi"), new("ek", "Ek bilgiler")],
+        [
+            new("soru", "Soru", "message-square"),
+            new("bicim", "Cevap biçimi", "list", Tab: "secenek"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ek"),
+        ],
+        [
+            new("text", "Soru", "soru", 12, Required: true, Fixed: true),
+            new("sequence", "Sıra", "bicim", 6),
+            new("isRequired", "Zorunlu", "bicim", 6),
+            new("questionType", "Tür", "soru", 6, Required: true, Fixed: true),
+            new("options", "Seçenekler (satır başına bir tane)", "bicim", 12),
+        ]),
     ];
 }
