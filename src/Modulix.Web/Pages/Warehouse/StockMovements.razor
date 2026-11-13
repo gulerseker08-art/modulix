@@ -401,7 +401,7 @@
 
     private RenderFragment CellContent(string key, RecordResponse movement) => key switch
     {
-        "occurredAt" => @<text>@(DateTimeOffset.TryParse(WarehouseLabels.Text(movement, "occurredAt"), out var at) ? CrmLookups.Time(at) : "—")</text>,
+        "occurredAt" => @<text>@(DateTimeOffset.TryParse(WarehouseLabels.Text(movement, "occurredAt"), out var at) ? CrmLabels.Time(at) : "—")</text>,
         "typeKey" => @<span class="badge @TypeBadge(movement)">@Lookups.Label(WarehouseAccess.MovementTypeList, WarehouseLabels.Text(movement, "typeKey"))</span>,
         "lot" => @<text>@WarehouseLabels.NameOf(lotNames, WarehouseLabels.Id(movement, "lotId"))</text>,
         "from" => @<text>@WarehouseLabels.NameOf(locationNames, WarehouseLabels.Id(movement, "fromLocationId"))</text>,
