@@ -27,6 +27,8 @@ public static class HrAccess
     public const string ChecklistsManage = "hr.checklists.manage";
     public const string AnnouncementsRead = "hr.announcements.read";
     public const string AnnouncementsManage = "hr.announcements.manage";
+    public const string SurveysRespond = "hr.surveys.respond";
+    public const string SurveysManage = "hr.surveys.manage";
 
     public const string EmployeeEntityKey = "hr.employee";
     public const string LeaveRequestEntityKey = "hr.leave-request";
@@ -51,6 +53,9 @@ public static class HrAccess
     public const string ChecklistEmployeeLookup = "hr.employee-checklist.employee";
     public const string ChecklistTemplateLookup = "hr.employee-checklist.template";
     public const string AnnouncementEntityKey = "hr.announcement";
+    public const string SurveyEntityKey = "hr.survey";
+    public const string SurveyQuestionEntityKey = "hr.survey-question";
+    public const string SurveyResponseEntityKey = "hr.survey-response";
     public const string AnnouncementReadEntityKey = "hr.announcement-read";
 
     /// <summary>Yalnızca bu kategorideki izin türü yıllık haktan düşer.</summary>
@@ -157,6 +162,22 @@ public static class HrAccess
         ("skipped", "Atlandı"),
     ];
 
+    /// <summary>Anket durumları (sabit; sunucudaki <c>Survey.Statuses</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> SurveyStatuses { get; } =
+    [
+        ("draft", "Taslak"),
+        ("open", "Yanıta açık"),
+        ("closed", "Kapalı"),
+    ];
+
+    /// <summary>Soru türleri (sabit; sunucudaki <c>SurveyQuestion.Types</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> QuestionTypes { get; } =
+    [
+        ("rating", "1–5 puan"),
+        ("choice", "Tek seçim"),
+        ("text", "Serbest metin"),
+    ];
+
     /// <summary>Özlük alanları (hassas; <see cref="EmployeesPersonal"/> izni olmadan sunucu göndermez).</summary>
     public static IReadOnlyList<string> PersonalFields { get; } =
         ["nationalId", "birthDate", "homeAddress", "emergencyContactName", "emergencyContactPhone", "iban"];
@@ -176,3 +197,17 @@ public sealed record LeavePreviewDto(decimal Days, decimal? RemainingDays, decim
 
 /// <summary>İşe giriş/çıkış süreci başlatma isteği: çalışan, şablon ve görev son tarihlerinin hesaplanacağı başlangıç günü.</summary>
 public sealed record StartChecklistRequest(Guid EmployeeId, Guid TemplateId, DateOnly StartDate);
+
+/// <summary>Anket yanıtı: soru başına bir cevap (puan, seçenek ya da metin; sorunun türüne göre biri dolu).</summary>
+public sealed record SubmitSurveyRequest(IReadOnlyList<SurveyAnswerItem>? Answers);
+
+public sealed record SurveyAnswerItem(Guid QuestionId, int? Rating, string? Choice, string? Text);
+
+/// <summary>Anket sonucu; <see cref="HiddenReason"/> doluysa (kimliği gizli ankette yanıt az) sorular boştur.</summary>
+public sealed record SurveyResultsDto(Guid SurveyId, int ResponseCount, string? HiddenReason, IReadOnlyList<SurveyQuestionResultDto> Questions);
+
+/// <summary>Soru sonucu: cevap sayısı, puan ortalaması, puan/seçenek dağılımı, metin cevapları (yanıtlayan bilgisi olmadan).</summary>
+public sealed record SurveyQuestionResultDto(
+    Guid QuestionId, string Text, string QuestionType, int AnswerCount, decimal? Average, IReadOnlyList<SurveyOptionCountDto> Counts, IReadOnlyList<string> Texts);
+
+public sealed record SurveyOptionCountDto(string Option, int Count);

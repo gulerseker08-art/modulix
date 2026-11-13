@@ -44,7 +44,7 @@ Kapsam dışı (bu ADR'de yok): bordro ve SGK/vergi bildirimleri (M4.6–M4.7, D
 
 **K7 — Kurum içi iletişim İK modülündedir.** Duyuru, blog ve galeri sektörsüzdür ve İK paketinin parçası olarak satılır; ayrı bir "intranet" modülü bugün açılmaz (ADR-0028 lisans tanımı yeterli). Hedef kitle departman/çalışma yeri/herkes olarak çalışan kartından seçilir. Ayrı modül ihtiyacı (İK almadan duyuru) doğarsa kayıt türleri taşınabilir; şema adı `hr` kalır.
 
-**K8 — Anket motoru tekrar yazılmaz.** Pazarlama modülünün anket portalı (`SurveyPortal`) müşteri anketidir; çalışan anketi kimlik doğrulamalı ve isteğe bağlı anonimdir. Dilim 7'de Pazarlama motorunun Core'a taşınabilir parçaları (soru tipi, yanıt toplama) incelenir; taşınamıyorsa İK'da küçük bir anket kaydı açılır. Karar dilim 7'ye ertelendi.
+**K8 — Anket motoru tekrar yazılmaz.** Pazarlama modülünün anket portalı (`SurveyPortal`) müşteri anketidir; çalışan anketi kimlik doğrulamalı ve isteğe bağlı anonimdir. Dilim 7'de Pazarlama motorunun Core'a taşınabilir parçaları (soru tipi, yanıt toplama) incelenir; taşınamıyorsa İK'da küçük bir anket kaydı açılır. Karar dilim 7'ye ertelendi. **Dilim 7 kararı:** repodaki tek "anket" Destek modülünün talep memnuniyeti puanıdır (tek 1–5 puan, belirteçli bağlantı); soru tipi ve yanıt toplama motoru yoktur, Core'a taşınacak parça çıkmadı. İK'da küçük bir anket kaydı açıldı (bölüm 15).
 
 **K9 — Silme yoktur.** Çalışan kartı, izin talebi, masraf beyanı, zimmet hareketi silinmez: iptal edilir ya da durumu değişir (yasal saklama). Tenant dışa aktarma ve silme (`tenant-export`/`tenant-delete`) bütün `hr` tablolarını kapsar.
 
@@ -107,7 +107,7 @@ Her dilim dört testle teslim edilir (mutlu yol, doğrulama, tenant izolasyonu, 
 | 4 | Demirbaş ve zimmet, tutanak çıktısı (**yapıldı**, bölüm 12) | 1 |
 | 5 | İşe giriş/çıkış kontrol listeleri (**yapıldı**, bölüm 13) | 1, 4 |
 | 6 | Duyurular (**yapıldı**, bölüm 14) | 1 |
-| 7 | Anket (K8) | 1 |
+| 7 | Anket (K8; **yapıldı**, bölüm 15) | 1 |
 | 8 | Blog ve galeri | 1, ADR-0040 |
 
 ## 7. Riskler
@@ -259,4 +259,26 @@ Bölüm 5'teki masraf akışı izin dilimindeki kalıpla (iş akışı kapısı,
 | `dotnet test tests/Modulix.Modules.Hr.Tests` | 29/29 geçti |
 | `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
 | `HrAnnouncementTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |
+
+## 15. Dilim 7: anketler (13 Kasım 2026)
+
+- **Anket** `hr.Surveys` (başlık, açıklama, durum taslak / yanıta açık / kapalı, kimliği gizli, hedef departman, kapanış günü, hazırlayan), **soru** `hr.SurveyQuestions` (sıra, metin, tür: 1–5 puan / tek seçim / serbest metin, seçenekler satır başına, zorunlu), **katılım** `hr.SurveyResponses` (anket + kullanıcı tekil; `UNIQUE(TenantId, SurveyId, RespondentUserId)`) ve **cevap** `hr.SurveyAnswers`. İzinler: `hr.surveys.respond` (çalışan ve yönetici şablonları), `hr.surveys.manage` (İK uzmanı), `hr.surveys.answers` (tek tek cevaplar ve denetim kaydındaki cevap değerleri; **hiçbir rol şablonunda yok**).
+- **Durum komutla değişir:** `POST /api/hr/surveys/{id}/actions` (`open`: sorusu olmalı, kapanış günü geçmemiş olmalı; `close`: yalnızca açık anket; kapalı anket yeniden açılabilir). Soru yalnızca taslakta eklenir, değişir, silinir (yanıt toplanırken soru değişirse sonuç karşılaştırılamaz). Yanıtı olan anket silinmez, kapatılır; taslak anket sorularıyla silinir.
+- **Yanıt:** `POST /api/hr/surveys/{id}/responses` anket yanıta açıksa, kapanış günü geçmemişse ve kullanıcı hedef kitledeyse (departmanı boş ya da çalışan kartındaki departmanı) kabul edilir. Zorunlu soru, puan 1–5, seçeneğin listede olması ve metin uzunluğu denetlenir (alan adı `answers.{soruId}`, 422); tekrar yanıt 409. Katılım ve cevaplar kayıt boru hattından **tek işlemde** yazılır. Okur (yönetim izni yok) yalnızca yanıt verebileceği anketleri ve sorularını görür; diğerleri 404. Yönetici bütün anketleri görür ama yanıt için o da hedef kitlede olmalıdır.
+- **Sonuç:** `GET /api/hr/surveys/{id}/results` (yalnızca yönetim izni): soru başına cevap sayısı, puan ortalaması ve 1–5 dağılımı, seçenek dağılımı, metin cevapları (yanıtlayan bilgisi olmadan, alfabetik).
+- **Kimliği gizli anket (sınırıyla birlikte):** seçim yalnızca oluştururken yapılır. Sonuçlarda ve kayıt uçlarında yanıtlayan gösterilmez (katılım listesinde `respondentUserId` boş), cevaplar tek tek listelenmez (`hr.surveys.answers` izniyle de), sonuç en az **3 yanıt** gelince gösterilir. **Sınır:** platform kuralı gereği her yazma denetim kaydına yazan kullanıcıyla düşer (Y5: her önemli yazma denetim kaydına yazılır); bu yüzden cevap kaydı ile kullanıcı denetim kaydında ilişkilidir. Cevap değerleri denetim kaydında yalnızca `hr.surveys.answers` izniyle görünür, ama tenant'ın sistem yöneticisi rolü bütün izinlere sahiptir. Yani "kimliği gizli", İK yöneticisinden ve sonuç ekranından gizlidir; tenant yöneticisinden ve veritabanından tam anonimlik **değildir**. Arayüz metni de buna göre yazıldı ("sonuçlarda kimin ne yanıtladığı gösterilmez"; "anonim" denmez). Tam anonimlik (yazanı kaydetmeyen yazma) Core'da kayıt boru hattının sistem kimliğiyle yazabilmesini gerektirir; ayrı bir karar konusudur.
+- **Arayüz:** Anketler (`/ik/anketler`: açık anketler, "Yanıt bekliyor/Yanıtlandı", yanıt formu) ve Anket yönetimi (`/ik/anket-yonetimi`: Taslak / Yanıta açık / Kapalı / Tümü görünümleri, sıralanabilir başlıklar, sekmeli anket ve soru formları, yanıta aç/kapat eylemleri, sonuç özeti). Yeni CSS sınıfı yok.
+- Migration `HrSurveys`: dört tablo + `TenantIsolationSql.AddTable`. `Field.Flag` yardımcısına `createOnly` eklendi.
+
+**Bilerek yapılmadı:** tam anonim yazma (yukarıda), çoklu seçim ve matris soru, koşullu soru, anket şablonları ve tekrarlayan nabız anketi, hatırlatma e-postası, sonuçların dışa aktarımı ve departman kırılımı (kimliği gizli ankette küçük grupları açığa çıkarır; eşik kuralıyla birlikte tasarlanmalı).
+
+### Test sonuçları (Dilim 7)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 30/30 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
+| `dotnet test tests/Modulix.Core.Tests` | 971/971 geçti |
+| `HrSurveyTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |

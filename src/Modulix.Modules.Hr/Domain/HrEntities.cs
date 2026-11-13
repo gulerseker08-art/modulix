@@ -673,3 +673,108 @@ public sealed class AnnouncementRead : HrEntity
 
     public DateTimeOffset ReadAt { get; internal set; }
 }
+
+/// <summary>
+/// Çalışan anketi (ADR-0042 dilim 7, K8). Taslakken soruları düzenlenir; "yanıta aç" ile hedef kitleye görünür, "kapat" ile yanıt almaz. Kimliği gizli
+/// ankette sonuçlar ve kayıt uçları yanıtlayanı göstermez (denetim kaydı yazanı tutar; bkz. ADR). Durum yalnızca komutla değişir.
+/// </summary>
+public sealed class Survey : HrEntity
+{
+    public const int TitleMaxLength = 200;
+    public const int DescriptionMaxLength = 2000;
+
+    /// <summary>Kimliği gizli ankette sonuçların gösterilmesi için gereken en az yanıt (tek kişinin yanıtı sonuçtan okunamasın).</summary>
+    public const int MinAnonymousResponses = 3;
+
+    public static class Statuses
+    {
+        public const string Draft = "draft";
+        public const string Open = "open";
+        public const string Closed = "closed";
+
+        public static IReadOnlyList<string> All { get; } = [Draft, Open, Closed];
+    }
+
+    public string Title { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    public string Status { get; internal set; } = Statuses.Draft;
+
+    /// <summary>Yalnızca oluştururken seçilir; yanıt toplandıktan sonra değişmesi verilen sözü bozar.</summary>
+    public bool IsAnonymous { get; internal set; }
+
+    /// <summary>Hedef departman (Y9b <c>hr.department</c>); boşsa bütün çalışanlar.</summary>
+    public string? AudienceDepartmentKey { get; internal set; }
+
+    /// <summary>Bu günden sonra yanıt alınmaz; boşsa elle kapatılana kadar açık.</summary>
+    public DateOnly? ClosesOn { get; internal set; }
+
+    public Guid? AuthorUserId { get; internal set; }
+
+    /// <summary>İlk kez yanıta açıldığı an.</summary>
+    public DateTimeOffset? OpenedAt { get; internal set; }
+}
+
+/// <summary>Anket sorusu: 1–5 puan, tek seçim (satır başına bir seçenek) ya da serbest metin. Yalnızca taslak ankette eklenir, değişir, silinir.</summary>
+public sealed class SurveyQuestion : HrEntity
+{
+    public const int TextMaxLength = 500;
+    public const int OptionsMaxLength = 2000;
+    public const int OptionMaxLength = 200;
+    public const int MaxOptions = 20;
+
+    public static class Types
+    {
+        public const string Rating = "rating";
+        public const string Choice = "choice";
+        public const string Text = "text";
+
+        public static IReadOnlyList<string> All { get; } = [Rating, Choice, Text];
+    }
+
+    public Guid SurveyId { get; internal set; }
+
+    public int Sequence { get; internal set; }
+
+    public string Text { get; internal set; } = string.Empty;
+
+    public string QuestionType { get; internal set; } = Types.Rating;
+
+    /// <summary>Tek seçim sorusunun seçenekleri, satır başına bir tane; diğer türlerde boş.</summary>
+    public string? Options { get; internal set; }
+
+    public bool IsRequired { get; internal set; } = true;
+
+    public IReadOnlyList<string> OptionList() =>
+        Options is null ? [] : [.. Options.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+}
+
+/// <summary>Bir kullanıcının ankete katılımı (anket başına kullanıcı tekil). Yalnızca yanıt gönderme komutu yazar; değişmez.</summary>
+public sealed class SurveyResponse : HrEntity
+{
+    public Guid SurveyId { get; internal set; }
+
+    /// <summary>Tekrar yanıtı engellemek için tutulur; kimliği gizli ankette hiçbir uçta gösterilmez.</summary>
+    public Guid RespondentUserId { get; internal set; }
+
+    public DateTimeOffset SubmittedAt { get; internal set; }
+}
+
+/// <summary>Yanıttaki tek bir sorunun cevabı. Yalnızca yanıt gönderme komutu yazar; değişmez.</summary>
+public sealed class SurveyAnswer : HrEntity
+{
+    public const int TextMaxLength = 2000;
+
+    public Guid ResponseId { get; internal set; }
+
+    public Guid SurveyId { get; internal set; }
+
+    public Guid QuestionId { get; internal set; }
+
+    public int? Rating { get; internal set; }
+
+    public string? Choice { get; internal set; }
+
+    public string? TextValue { get; internal set; }
+}

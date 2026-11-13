@@ -118,4 +118,15 @@ public static class HrLabels
     public static string Responsible(string? key) => HrAccess.ChecklistResponsibles.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     public static string TaskType(string? key) => HrAccess.ChecklistTaskTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    public static string SurveyStatus(string? key) => HrAccess.SurveyStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    public static string SurveyStatusBadge(string? key) => key switch
+    {
+        "open" => "stage-qualified",
+        "draft" => "stage-negotiation",
+        _ => "status-inactive",
+    };
+
+    public static string QuestionType(string? key) => HrAccess.QuestionTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 }

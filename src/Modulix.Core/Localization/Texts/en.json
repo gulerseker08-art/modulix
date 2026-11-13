@@ -215,6 +215,8 @@
   "nav.app.hr.checklist-templates": "Process templates",
   "nav.app.hr.announcements": "Announcements",
   "nav.app.hr.announcement-admin": "Announcement management",
+  "nav.app.hr.surveys": "Surveys",
+  "nav.app.hr.survey-admin": "Survey management",
   "nav.app.reports": "Reports",
   "nav.app.admin": "Administration",
   "nav.app.admin.home": "Overview",

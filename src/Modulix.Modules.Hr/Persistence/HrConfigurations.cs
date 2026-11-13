@@ -276,3 +276,55 @@ internal sealed class AnnouncementReadConfiguration : IEntityTypeConfiguration<A
         builder.HasIndex(r => new { r.TenantId, r.AnnouncementId, r.UserId }).IsUnique().HasDatabaseName("UX_AnnouncementReads_User");
     }
 }
+
+internal sealed class SurveyConfiguration : IEntityTypeConfiguration<Survey>
+{
+    public void Configure(EntityTypeBuilder<Survey> builder)
+    {
+        HrTables.ConfigureCommon(builder, "Surveys");
+        builder.Property(s => s.Title).HasMaxLength(Survey.TitleMaxLength).IsRequired();
+        builder.Property(s => s.Description).HasMaxLength(Survey.DescriptionMaxLength);
+        builder.Property(s => s.Status).HasMaxLength(20).IsRequired();
+        builder.Property(s => s.AudienceDepartmentKey).HasMaxLength(100);
+        builder.HasIndex(s => new { s.TenantId, s.Status }).HasDatabaseName("IX_Surveys_Status");
+    }
+}
+
+internal sealed class SurveyQuestionConfiguration : IEntityTypeConfiguration<SurveyQuestion>
+{
+    public void Configure(EntityTypeBuilder<SurveyQuestion> builder)
+    {
+        HrTables.ConfigureCommon(builder, "SurveyQuestions");
+        builder.Property(q => q.Text).HasMaxLength(SurveyQuestion.TextMaxLength).IsRequired();
+        builder.Property(q => q.QuestionType).HasMaxLength(20).IsRequired();
+        builder.Property(q => q.Options).HasMaxLength(SurveyQuestion.OptionsMaxLength);
+        builder.HasOne<Survey>().WithMany().HasForeignKey(q => new { q.TenantId, q.SurveyId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class SurveyResponseConfiguration : IEntityTypeConfiguration<SurveyResponse>
+{
+    public void Configure(EntityTypeBuilder<SurveyResponse> builder)
+    {
+        HrTables.ConfigureCommon(builder, "SurveyResponses");
+        builder.HasOne<Survey>().WithMany().HasForeignKey(r => new { r.TenantId, r.SurveyId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(r => new { r.TenantId, r.SurveyId, r.RespondentUserId }).IsUnique().HasDatabaseName("UX_SurveyResponses_Respondent");
+    }
+}
+
+internal sealed class SurveyAnswerConfiguration : IEntityTypeConfiguration<SurveyAnswer>
+{
+    public void Configure(EntityTypeBuilder<SurveyAnswer> builder)
+    {
+        HrTables.ConfigureCommon(builder, "SurveyAnswers");
+        builder.Property(a => a.Choice).HasMaxLength(SurveyQuestion.OptionMaxLength);
+        builder.Property(a => a.TextValue).HasMaxLength(SurveyAnswer.TextMaxLength);
+        builder.HasOne<SurveyResponse>().WithMany().HasForeignKey(a => new { a.TenantId, a.ResponseId })
+            .HasPrincipalKey(r => new { r.TenantId, r.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<SurveyQuestion>().WithMany().HasForeignKey(a => new { a.TenantId, a.QuestionId })
+            .HasPrincipalKey(q => new { q.TenantId, q.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(a => new { a.TenantId, a.SurveyId, a.QuestionId }).HasDatabaseName("IX_SurveyAnswers_Question");
+    }
+}

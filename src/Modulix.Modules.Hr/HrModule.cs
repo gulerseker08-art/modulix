@@ -39,6 +39,11 @@ public sealed class HrModule : IModule
         public const string ChecklistsManage = "hr.checklists.manage";
         public const string AnnouncementsRead = "hr.announcements.read";
         public const string AnnouncementsManage = "hr.announcements.manage";
+        public const string SurveysRespond = "hr.surveys.respond";
+        public const string SurveysManage = "hr.surveys.manage";
+
+        /// <summary>Tek tek cevap kayıtları ve denetim kaydındaki cevap değerleri; hiçbir rol şablonunda yoktur (sonuçlar özetten görülür).</summary>
+        public const string SurveysAnswers = "hr.surveys.answers";
     }
 
     public static class Entities
@@ -57,6 +62,10 @@ public sealed class HrModule : IModule
         public const string ChecklistTask = "hr.checklist-task";
         public const string Announcement = "hr.announcement";
         public const string AnnouncementRead = "hr.announcement-read";
+        public const string Survey = "hr.survey";
+        public const string SurveyQuestion = "hr.survey-question";
+        public const string SurveyResponse = "hr.survey-response";
+        public const string SurveyAnswer = "hr.survey-answer";
     }
 
     public static class Lists
@@ -125,6 +134,9 @@ public sealed class HrModule : IModule
         new(Permissions.ChecklistsManage, "Süreç şablonlarını yönetir, süreç başlatır, her görevi tamamlar, atlar ve süreci iptal eder", "İşe giriş ve çıkış"),
         new(Permissions.AnnouncementsRead, "Kendisine hedeflenen yayındaki duyuruları okur", "Duyurular"),
         new(Permissions.AnnouncementsManage, "Duyuru yazar, yayınlar, sabitler ve kimin okuduğunu görür", "Duyurular"),
+        new(Permissions.SurveysRespond, "Kendisine yönelik açık anketleri yanıtlar", "Anketler"),
+        new(Permissions.SurveysManage, "Anket hazırlar, yanıta açar, kapatır ve özet sonuçları görür", "Anketler"),
+        new(Permissions.SurveysAnswers, "Tek tek cevap kayıtlarını görür (kimliği gizli anketler hariç); varsayılan rollerde yoktur", "Anketler"),
     ];
 
     /// <summary>Denetim kaydında görünen kayıt türleri (Y5); hassas alanların değeri denetim kaydında gizlenir.</summary>
@@ -250,6 +262,27 @@ public sealed class HrModule : IModule
         {
             UserFields = ["authorUserId"],
         },
+        new(Entities.Survey, "Anket", Permissions.SurveysManage, new Dictionary<string, string>
+        {
+            ["title"] = "Başlık", ["description"] = "Açıklama", ["isAnonymous"] = "Kimliği gizli", ["audienceDepartmentKey"] = "Hedef departman",
+            ["closesOn"] = "Kapanış", ["status"] = "Durum",
+        }, "title")
+        {
+            UserFields = ["authorUserId"],
+        },
+        new(Entities.SurveyQuestion, "Anket sorusu", Permissions.SurveysManage, new Dictionary<string, string>
+        {
+            ["surveyId"] = "Anket", ["text"] = "Soru", ["questionType"] = "Tür", ["options"] = "Seçenekler", ["isRequired"] = "Zorunlu",
+        }, "text")
+        {
+            References = new Dictionary<string, string> { ["surveyId"] = Entities.Survey },
+        },
+        // Cevap değerleri denetim kaydında yalnızca bu izinle görünür (kimliği gizli anket; ADR-0042 dilim 7). Hassas alan yapılmaz: hassas alanı
+        // izni olmayan yazamaz, cevabı ise her yanıtlayan yazar.
+        new(Entities.SurveyAnswer, "Anket cevabı", Permissions.SurveysAnswers, new Dictionary<string, string>
+        {
+            ["questionId"] = "Soru", ["rating"] = "Puan", ["choice"] = "Seçim", ["text"] = "Metin",
+        }, "questionId"),
         new(Entities.Holiday, "Resmî tatil", Permissions.LeavesRead, new Dictionary<string, string>
         {
             ["date"] = "Tarih", ["name"] = "Ad", ["halfDay"] = "Yarım gün",
@@ -273,6 +306,8 @@ public sealed class HrModule : IModule
         new(Entities.ChecklistTemplate, "Süreç şablonu"),
         new(Entities.ChecklistTemplateItem, "Şablon adımı"),
         new(Entities.Announcement, "Duyuru"),
+        new(Entities.Survey, "Anket"),
+        new(Entities.SurveyQuestion, "Anket sorusu"),
     ];
 
     /// <summary>Departman (Y9b): hazır değerler örnektir; firma kendi departmanlarını ekler. Kod departmanın adına bakmaz.</summary>
@@ -415,6 +450,7 @@ public sealed class HrModule : IModule
             new(Entities.AssetAssignment, "Zimmet", Permissions.AssetsRead) { LabelField = "assetTag" },
             new(Entities.ChecklistTask, "Süreç görevi", Permissions.ChecklistsRead) { LabelField = "title" },
             new(Entities.Announcement, "Duyuru", Permissions.AnnouncementsManage) { LabelField = "title" },
+            new(Entities.Survey, "Anket", Permissions.SurveysManage) { LabelField = "title" },
         ],
         Events =
         [
@@ -430,6 +466,8 @@ public sealed class HrModule : IModule
             new("hr.checklist-task.updated", Entities.ChecklistTask, DomainEventTypes.RecordUpdated, "Süreç görevi tamamlandı ya da değişti"),
             new("hr.announcement.created", Entities.Announcement, DomainEventTypes.RecordCreated, "Duyuru yazıldı"),
             new("hr.announcement.updated", Entities.Announcement, DomainEventTypes.RecordUpdated, "Duyuru güncellendi ya da yayınlandı"),
+            new("hr.survey.created", Entities.Survey, DomainEventTypes.RecordCreated, "Anket hazırlandı"),
+            new("hr.survey.updated", Entities.Survey, DomainEventTypes.RecordUpdated, "Anket güncellendi, yanıta açıldı ya da kapandı"),
         ],
         Fields =
         [
@@ -489,6 +527,11 @@ public sealed class HrModule : IModule
             new(Entities.ChecklistTask, "dueDate", "Son tarih", AutomationFieldType.Date),
             new(Entities.Announcement, "title", "Başlık", AutomationFieldType.Text),
             new(Entities.Announcement, "isPublished", "Yayında", AutomationFieldType.Boolean),
+            new(Entities.Survey, "title", "Başlık", AutomationFieldType.Text),
+            new(Entities.Survey, "status", "Durum", AutomationFieldType.Choice)
+            {
+                Options = [new(Domain.Survey.Statuses.Draft, "Taslak"), new(Domain.Survey.Statuses.Open, "Yanıta açık"), new(Domain.Survey.Statuses.Closed, "Kapalı")],
+            },
         ],
     };
 
@@ -503,7 +546,7 @@ public sealed class HrModule : IModule
                 Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove, Permissions.LeavesManage,
                 Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.ExpensesManage,
                 Permissions.AssetsRead, Permissions.AssetsManage, Permissions.ChecklistsRead, Permissions.ChecklistsManage,
-                Permissions.AnnouncementsRead, Permissions.AnnouncementsManage,
+                Permissions.AnnouncementsRead, Permissions.AnnouncementsManage, Permissions.SurveysRespond, Permissions.SurveysManage,
             ]),
         new(
             "hr.asset-keeper",
@@ -520,7 +563,7 @@ public sealed class HrModule : IModule
             "Çalışan (rehber)",
             "Rehberi ve organizasyon şemasını görüntüler, kendi izin hakkını görür ve kendi adına izin talebi açar; özlük bilgilerini göremez.",
             [Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.AssetsRead,
-                Permissions.ChecklistsRead, Permissions.AnnouncementsRead])
+                Permissions.ChecklistsRead, Permissions.AnnouncementsRead, Permissions.SurveysRespond])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
         },
@@ -531,7 +574,7 @@ public sealed class HrModule : IModule
             [
                 Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove,
                 Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.AssetsRead,
-                Permissions.ChecklistsRead, Permissions.AnnouncementsRead,
+                Permissions.ChecklistsRead, Permissions.AnnouncementsRead, Permissions.SurveysRespond,
             ])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
@@ -561,5 +604,10 @@ public sealed class HrModule : IModule
         services.AddScoped<IRecordStore, AnnouncementRecordStore>();
         services.AddScoped<IRecordStore, AnnouncementReadRecordStore>();
         services.AddScoped<IAnnouncementService, AnnouncementService>();
+        services.AddScoped<IRecordStore, SurveyRecordStore>();
+        services.AddScoped<IRecordStore, SurveyQuestionRecordStore>();
+        services.AddScoped<IRecordStore, SurveyResponseRecordStore>();
+        services.AddScoped<IRecordStore, SurveyAnswerRecordStore>();
+        services.AddScoped<ISurveyService, SurveyService>();
     }
 }

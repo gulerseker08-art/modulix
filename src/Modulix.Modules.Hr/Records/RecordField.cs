@@ -85,13 +85,16 @@ internal static class Field
         };
 
     /// <summary>Evet/hayır alanı; boş gönderilirse hayır.</summary>
-    public static RecordField<T> Flag<T>(string name, Func<T, bool> get, Action<T, bool> set) =>
+    public static RecordField<T> Flag<T>(string name, Func<T, bool> get, Action<T, bool> set, bool createOnly = false) =>
         new(name, required: false, nullable: true, node =>
                 node.GetValueKind() is JsonValueKind.True or JsonValueKind.False
                     ? ParsedValue.Of(node.GetValue<bool>())
                     : ParsedValue.Fail("true veya false olmalıdır."),
             e => JsonValue.Create(get(e)),
-            (e, v) => set(e, v is true));
+            (e, v) => set(e, v is true))
+        {
+            CreateOnly = createOnly,
+        };
 
     /// <summary>Sınırlı aralıkta tam sayı. Zorunlu değilse boş bırakılabilir (verilmezse mevcut/varsayılan değer kalır).</summary>
     public static RecordField<T> Integer<T>(string name, Func<T, int?> get, Action<T, int?> set, int min, int max, bool required = false, bool createOnly = false) =>
