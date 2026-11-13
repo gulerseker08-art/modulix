@@ -50,6 +50,12 @@ internal sealed class StockBalanceRecordStore : WarehouseRecordStore<StockBalanc
 
     protected override IOrderedQueryable<StockBalance> Order(IQueryable<StockBalance> source) => source.OrderBy(b => b.LotId).ThenBy(b => b.LocationId);
 
+    // Miktara göre sıralama (en çok/en az stok); eşit satırlar varsayılan sırada kalır.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } = WithDescending("quantity");
+
+    protected override IOrderedQueryable<StockBalance> Order(IQueryable<StockBalance> source, string? sort) =>
+        sort?.TrimStart('-') == "quantity" ? By(source, b => b.Quantity, sort.StartsWith('-')).ThenBy(b => b.LotId).ThenBy(b => b.LocationId) : Order(source);
+
     // Bakiyede metin alanı yok; arama kimlikle yapılmaz.
     protected override IQueryable<StockBalance> Search(IQueryable<StockBalance> source, string term) => source.Where(_ => false);
 }

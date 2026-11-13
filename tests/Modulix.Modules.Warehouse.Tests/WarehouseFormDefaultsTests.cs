@@ -61,7 +61,7 @@ public class WarehouseFormDefaultsTests
         {
             WarehouseModule.Entities.Facility, WarehouseModule.Entities.Zone, WarehouseModule.Entities.LocationLevel, WarehouseModule.Entities.Location,
             WarehouseModule.Entities.PowerOfAttorney, WarehouseModule.Entities.StockItem, WarehouseModule.Entities.CustomsDeclaration,
-            WarehouseModule.Entities.CustomsDeclarationLine,
+            WarehouseModule.Entities.CustomsDeclarationLine, WarehouseModule.Entities.Lot, WarehouseModule.Entities.StockMovement,
         };
 
         Assert.All(Module.Lookups, lookup =>
@@ -135,6 +135,8 @@ public class WarehouseFormDefaultsTests
                 WarehouseAccess.LocationParentLookup, WarehouseAccess.LocationZoneLookup,
                 WarehouseAccess.AttorneyImporterLookup, WarehouseAccess.AttorneyBrokerLookup,
                 WarehouseAccess.DeclarationImporterLookup, WarehouseAccess.DeclarationBrokerLookup,
+                WarehouseAccess.LotStockItemLookup, WarehouseAccess.LotOwnerLookup, WarehouseAccess.LotBillToLookup,
+                WarehouseAccess.MovementLotLookup, WarehouseAccess.MovementFromLocationLookup, WarehouseAccess.MovementToLocationLookup,
             }.Order());
         Assert.Equal(WarehouseModule.Lists.ZoneKind, WarehouseAccess.ZoneKindList);
         Assert.Equal(WarehouseModule.Lists.StockUnit, WarehouseAccess.StockUnitList);
