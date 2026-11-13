@@ -230,6 +230,7 @@ public static class AppCatalog
 
         // Depo ve antrepo (ADR-0032): şimdilik yapı tanımı (tesis, alan, lokasyon seviyesi, lokasyon); stok ve gümrük ekranları sonraki dilimlerle gelir.
         new(Warehouse, null, "Depo ve Antrepo", "warehouse", null, 40, ModuleKey: WarehouseAccess.ModuleKey, Group: OperationsGroup),
+        new("warehouse.dashboard", Warehouse, "Pano", "dashboard", "depo", 5, WarehouseAccess.ModuleKey, WarehouseAccess.FacilitiesRead, ExactMatch: true),
         new("warehouse.facilities", Warehouse, "Tesisler", "building", "depo/tesisler", 10, WarehouseAccess.ModuleKey, WarehouseAccess.FacilitiesRead),
         new("warehouse.zones", Warehouse, "Alanlar", "layers", "depo/alanlar", 20, WarehouseAccess.ModuleKey, WarehouseAccess.ZonesRead, Tone: AppTone.Teal),
         new("warehouse.location-levels", Warehouse, "Lokasyon seviyeleri", "sliders", "depo/lokasyon-seviyeleri", 30, WarehouseAccess.ModuleKey, WarehouseAccess.LocationLevelsRead),
