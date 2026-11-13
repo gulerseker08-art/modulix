@@ -20,7 +20,7 @@
 
     <section aria-labelledby="cal-title">
         <h2 id="cal-title">İş takvimleri</h2>
-        @if (calendars is null) { <p class="text-muted" role="status">Yükleniyor…</p> }
+        @if (calendars is null) { <LoadingState Kind="LoadingKind.Table" /> }
         else if (calendars.Count == 0) { <p class="text-muted">Takvim yok: politikalar takvimsiz 7/24 hesaplanır.</p> }
         else
         {
@@ -107,7 +107,7 @@
 
     <section aria-labelledby="pol-title">
         <h2 id="pol-title">SLA politikaları</h2>
-        @if (policies is null) { <p class="text-muted" role="status">Yükleniyor…</p> }
+        @if (policies is null) { <LoadingState Kind="LoadingKind.Table" /> }
         else if (policies.Count == 0) { <p class="text-muted">Politika yok: talepler hedefsiz açılır.</p> }
         else
         {

@@ -32,7 +32,7 @@
     {
         @if (message is null)
         {
-            <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+            <LoadingState />
         }
     }
     else
@@ -76,7 +76,7 @@
             <div class="section-header"><h2 id="qr-owner">@Texts.Get("crm.sales.byOwner")</h2></div>
             @if (report.ByOwner.Count == 0)
             {
-                <p class="text-muted">@Texts.Get("crm.quoteReport.noOwnerRows")</p>
+                <EmptyState Title="@Texts.Get("crm.quoteReport.noOwnerRows")" />
             }
             else
             {

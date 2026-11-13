@@ -43,7 +43,7 @@
     {
         @if (message is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <LoadingState />
         }
     }
     else if (rulePage.Items.Count == 0)

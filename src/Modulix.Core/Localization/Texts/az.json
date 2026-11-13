@@ -1,9 +1,11 @@
 {
   "common.save": "Yadda saxla",
   "common.saved": "Yadda saxlanıldı.",
+  "common.deleted": "Silindi.",
   "common.email": "E-poçt",
   "common.password": "Şifrə",
   "common.loading": "Yüklənir…",
+  "common.toast.close": "Bildirişi bağla",
 
   "account.language.title": "Dil",
   "account.language.label": "İnterfeys dili",

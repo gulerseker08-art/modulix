@@ -13,7 +13,7 @@
 
     @if (loading && detail is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
 
     @if (loadError is not null)
@@ -407,7 +407,7 @@
             <div class="section-header"><h2 id="sfd-history">Düzeltme geçmişi (@d.Adjustments.Count)</h2></div>
             @if (d.Adjustments.Count == 0)
             {
-                <p class="text-muted">Bu sürümde düzeltme yapılmadı.</p>
+                <EmptyState Title="Bu sürümde düzeltme yapılmadı." />
             }
             else
             {

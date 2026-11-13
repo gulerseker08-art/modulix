@@ -21,7 +21,7 @@
 
     @if (data is null && error is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (data is not null)
     {
@@ -64,7 +64,7 @@
                 }
                 else if (data.Money.Count == 0)
                 {
-                    <p class="text-muted">Yürürlükte sözleşme yok.</p>
+                    <EmptyState Title="Yürürlükte sözleşme yok." />
                 }
                 else
                 {
@@ -92,7 +92,7 @@
             <h2 id="upcoming-title">Yaklaşan kritik tarihler (90 gün)</h2>
             @if (data.Upcoming.Count == 0)
             {
-                <p class="text-muted">Önümüzdeki 90 günde son bildirim ya da bitiş tarihi gelen yürürlükteki sözleşme yok.</p>
+                <EmptyState Title="Önümüzdeki 90 günde son bildirim ya da bitiş tarihi gelen yürürlükteki sözleşme yok." />
             }
             else
             {

@@ -103,11 +103,11 @@
 
     @if (page is null)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("crm.leads.none")</p>
+        <EmptyState Title="@Texts.Get("crm.leads.none")" />
     }
     else
     {

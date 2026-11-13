@@ -88,11 +88,11 @@
 
     @if (rules is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (rules.Count == 0)
     {
-        <p class="text-muted">Kural yok; yalnızca genel eşik ayarları uygulanır.</p>
+        <EmptyState Title="Kural yok; yalnızca genel eşik ayarları uygulanır." />
     }
     else
     {

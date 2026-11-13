@@ -12,7 +12,7 @@
     }
     else if (order is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else
     {
@@ -85,11 +85,11 @@
             <h2 id="lines-title">Kalemler</h2>
             @if (lines is null)
             {
-                <p class="text-muted" role="status">Yükleniyor…</p>
+                <LoadingState Kind="LoadingKind.Table" />
             }
             else if (lines.Count == 0)
             {
-                <p class="text-muted">Bu siparişte kalem yok.</p>
+                <EmptyState Title="Bu siparişte kalem yok." />
             }
             else
             {
@@ -254,7 +254,7 @@
                 <h2 id="activities-title">Aktiviteler</h2>
                 @if (activities is null)
                 {
-                    <p class="text-muted" role="status">Yükleniyor…</p>
+                    <LoadingState />
                 }
                 else if (activities.Count == 0)
                 {
@@ -279,7 +279,7 @@
             <h2 id="history-title">İşlem geçmişi</h2>
             @if (history is null)
             {
-                <p class="text-muted" role="status">Yükleniyor…</p>
+                <LoadingState />
             }
             else if (history.Count == 0)
             {

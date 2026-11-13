@@ -18,7 +18,7 @@
     }
     else if (Id is not null && contract is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else
     {
@@ -320,7 +320,7 @@
                     }
                     @if (parties.Count == 0)
                     {
-                        <p class="text-muted">Henüz ek taraf yok.</p>
+                        <EmptyState Title="Henüz ek taraf yok." />
                     }
                     else
                     {
@@ -430,7 +430,7 @@
                     }
                     @if (lines.Count == 0)
                     {
-                        <p class="text-muted">Henüz kalem yok.</p>
+                        <EmptyState Title="Henüz kalem yok." />
                     }
                     else
                     {
@@ -523,7 +523,7 @@
                     <p class="text-muted">Onaya gönderilen içerik dondurulur ve SHA-256 özetiyle saklanır; güncel taslak V@(contract.CurrentVersionNo)@(contract.EffectiveVersionNo is { } ev2 ? $", yürürlükteki sürüm V{ev2}" : "").</p>
                     @if (versions.Count == 0)
                     {
-                        <p class="text-muted">Henüz dondurulmuş sürüm yok; ilk sürüm onaya gönderildiğinde oluşur.</p>
+                        <EmptyState Title="Henüz dondurulmuş sürüm yok; ilk sürüm onaya gönderildiğinde oluşur." />
                     }
                     else
                     {
@@ -641,7 +641,7 @@
                     <RenderedDocumentView Preview="documentPreview" />
                     @if (documents.Count == 0)
                     {
-                        <p class="text-muted">Henüz üretilmiş belge yok.</p>
+                        <EmptyState Title="Henüz üretilmiş belge yok." />
                     }
                     else
                     {

@@ -74,11 +74,11 @@
 
         @if (taxes is null)
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (taxes.Count == 0)
         {
-            <p class="text-muted">Vergi oranı yok.</p>
+            <EmptyState Title="Vergi oranı yok." />
         }
         else
         {
@@ -168,11 +168,11 @@
 
         @if (rates is null)
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (rates.Count == 0)
         {
-            <p class="text-muted">Kur yok.</p>
+            <EmptyState Title="Kur yok." />
         }
         else
         {

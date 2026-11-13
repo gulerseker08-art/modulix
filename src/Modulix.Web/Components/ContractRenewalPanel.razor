@@ -15,7 +15,7 @@
 
     @if (loading)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (overview is null)
     {
@@ -162,7 +162,7 @@
         <h3>Karar geçmişi</h3>
         @if (overview.History.Count == 0)
         {
-            <p class="text-muted">Bu sözleşmede henüz yenileme kararı yok.</p>
+            <EmptyState Title="Bu sözleşmede henüz yenileme kararı yok." />
         }
         else
         {
@@ -195,7 +195,7 @@
         <h3>Hatırlatmalar</h3>
         @if (overview.Reminders.Count == 0)
         {
-            <p class="text-muted">Henüz hatırlatma üretilmedi. Zamanlanmış iş, son bildirim tarihine eşik günleri kala sorumluya takip aktivitesi açar.</p>
+            <EmptyState Title="Henüz hatırlatma üretilmedi. Zamanlanmış iş, son bildirim tarihine eşik günleri kala sorumluya takip aktivitesi açar." />
         }
         else
         {

@@ -1,7 +1,7 @@
 @* Satış analizi ekranlarının ortak yükleme / hata / yetkisiz durumu. 403 yeniden denenmez; diğer hatalarda "Tekrar dene" çıkar. *@
 @if (Loading)
 {
-    <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+    <LoadingState />
 }
 
 @if (Forbidden)

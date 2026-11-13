@@ -169,11 +169,11 @@
         <h2 id="rules-title">Kurallar</h2>
         @if (rules is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (rules.Count == 0)
         {
-            <p class="text-muted">Kural yok; onaya gönderilen sözleşmeyi onay izni olan herhangi biri onaylar.</p>
+            <EmptyState Title="Kural yok; onaya gönderilen sözleşmeyi onay izni olan herhangi biri onaylar." />
         }
         else
         {
@@ -202,11 +202,11 @@
         <h2 id="delegations-title">Vekâletler</h2>
         @if (delegations is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (delegations.Count == 0)
         {
-            <p class="text-muted">Vekâlet yok.</p>
+            <EmptyState Title="Vekâlet yok." />
         }
         else
         {

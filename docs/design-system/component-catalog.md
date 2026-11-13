@@ -103,3 +103,14 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 ## Bildirim kutusu
 
 - `NotificationBell`: üst çubukta zil; `notification-count` okunmamış sayısı, `notification-panel` açılır liste, `notification-item.is-unread` okunmamış satır. Bildirim metni kaydın hassas ayrıntısını taşımaz; bağlantı kaydı açar ve yetki orada denetlenir.
+
+## Bekleme, boş durum ve geri bildirim (13.11.2026)
+
+Üçü de ortak bileşendir; sayfaya düz "Yükleniyor…" ya da gri "… yok." metni yazılmaz.
+
+| Bileşen | Kullanım |
+|---|---|
+| `LoadingState` | Veri gelene kadar içeriğin biçimini gösteren iskelet. `Kind`: `Lines` (ayrıntı, panel; varsayılan), `Table` (liste; `record-table` ile aynı çerçeve ve 44 px satır), `Cards` (özet kutuları); `Rows` satır sayısı. `role="status"` taşır, ekran okuyucuya yalnızca "Yükleniyor…" okunur. 150 ms gecikmeyle belirir (kısa yüklemede titremez); `prefers-reduced-motion` altında parıltı durur. Sınıflar: `loading-state`, `skeleton`, `skeleton-bar`, `skeleton-table`, `skeleton-row`, `skeleton-cards`. |
+| `EmptyState` | Boş listede tablo yerine çizilir: ikon (`Icon`, varsayılan `inbox`), başlık (`Title`, varsayılan "Kayıt yok."), isteğe bağlı tek cümle (`Text`) ve eylem (`ChildContent`; ör. "Yeni …" düğmesi, yalnızca yazma yetkisi olana). Kart ya da panel içindeki küçük listede `Compact` (çerçevesiz, tek satır). Sınıflar: `empty-state`, `empty-state-compact`. |
+| Toast (`ToastService` + `ToastHost`) | İşlem sonucu ("Kaydedildi.", "Silindi.") sağ altta kısa süreli bildirimle verilir; sayfa düzeni kaymaz. `Toasts.Success/Info/Error(metin)`; 4 sn (hata 8 sn) sonra kapanır, en çok dört bildirim durur. Kayıt editörleri `Saved`/`Deleted` geri çağrısından önce kendisi gösterir; sayfa ayrıca başarı kutusu çizmez. **Doğrulama hatası toast ile verilmez**: alanın yanında (`FieldError`) ve formun üstünde (`ErrorSummary`) kalır. `ToastHost` kabukta (`MainLayout`) bir kez çizilir; hata `role="alert"`, diğerleri `role="status"`. Sınıflar: `toast-stack`, `app-toast`, `app-toast-success/info/error` (Bootstrap `.toast` kullanılmaz). |
+

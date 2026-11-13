@@ -36,7 +36,7 @@
 
     @if (templates is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (templates.Count == 0)
     {
@@ -224,7 +224,7 @@
                     <h3 id="versions-title">Yayımlanan sürümler</h3>
                     @if (versions.Count == 0)
                     {
-                        <p class="text-muted">Henüz yayımlanmış sürüm yok.</p>
+                        <EmptyState Title="Henüz yayımlanmış sürüm yok." />
                     }
                     else
                     {

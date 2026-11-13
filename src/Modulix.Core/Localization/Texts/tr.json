@@ -1,9 +1,11 @@
 {
   "common.save": "Kaydet",
   "common.saved": "Kaydedildi.",
+  "common.deleted": "Silindi.",
   "common.email": "E-posta",
   "common.password": "Şifre",
   "common.loading": "Yükleniyor…",
+  "common.toast.close": "Bildirimi kapat",
 
   "account.language.title": "Dil",
   "account.language.label": "Arayüz dili",

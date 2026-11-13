@@ -36,11 +36,11 @@
 
     @if (items is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (items.Count == 0)
     {
-        <p class="text-muted">Bu süzgeçte gerçekleşme yok.</p>
+        <EmptyState Title="Bu süzgeçte gerçekleşme yok." />
     }
     else
     {
