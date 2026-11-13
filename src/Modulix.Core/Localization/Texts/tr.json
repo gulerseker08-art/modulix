@@ -100,16 +100,10 @@
   "shell.license.expiring": "lisansı {0} tarihinde sona erecek.",
 
   "home.title": "Hoş geldiniz",
+  "home.greeting": "Hoş geldiniz, {0}",
   "home.noModule": "Kuruluşunuz için açık bir modül yok.",
-  "home.stages.title": "Fırsatlar · aşamaya göre dağılım",
-  "home.stages.chart": "Fırsatların aşamaya göre dağılımı",
-  "home.stages.caption": "fırsat",
   "home.funnel.title": "Satış hunisi",
   "home.funnel.chart": "Aşamalardaki fırsat sayıları",
-  "home.tile.companies": "Müşteri ve tedarikçi kartları",
-  "home.tile.contacts": "Firmalardaki kişiler",
-  "home.tile.opportunities": "Satış süreci ve tutarlar",
-  "home.tile.activities": "Arama, toplantı, görev",
 
   "nav.app.crm": "CRM",
   "nav.app.crm.activities": "Aktiviteler",

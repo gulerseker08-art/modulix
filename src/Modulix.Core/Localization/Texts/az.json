@@ -100,16 +100,10 @@
   "shell.license.expiring": "lisenziyası {0} tarixində başa çatacaq.",
 
   "home.title": "Xoş gəlmisiniz",
+  "home.greeting": "Xoş gəlmisiniz, {0}",
   "home.noModule": "Qurumunuz üçün aktiv modul yoxdur.",
-  "home.stages.title": "Fürsətlər · mərhələyə görə bölgü",
-  "home.stages.chart": "Fürsətlərin mərhələyə görə bölgüsü",
-  "home.stages.caption": "fürsət",
   "home.funnel.title": "Satış qıfı",
   "home.funnel.chart": "Mərhələlərdəki fürsət sayları",
-  "home.tile.companies": "Müştəri və təchizatçı kartları",
-  "home.tile.contacts": "Şirkətlərdəki şəxslər",
-  "home.tile.opportunities": "Satış prosesi və məbləğlər",
-  "home.tile.activities": "Zəng, görüş, tapşırıq",
 
   "nav.app.crm": "CRM",
   "nav.app.crm.activities": "Fəaliyyətlər",

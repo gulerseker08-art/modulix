@@ -2,16 +2,21 @@
 @inject SessionState Session
 @inject ApiClient Api
 @inject CrmLookups Lookups
+@inject NavigationManager Navigation
 
 <PageTitle>Modulix</PageTitle>
 
 <AuthGate>
-    <h1>@Texts.Get("home.title")</h1>
-    <p class="text-muted">@Session.ActiveTenantName</p>
+    <PageHeader Title="@Greeting" Icon="home" Subtitle="@Session.ActiveTenantName" />
 
     @if (Session.IsModuleEnabled(CrmAccess.ModuleKey))
     {
-        @if (counts.Count > 0)
+        @* Özet kutuları ilgili listeye bağlantıdır; ayrıca kısayol kartı çizilmez. *@
+        @if (!loaded)
+        {
+            <LoadingState Kind="LoadingKind.Cards" />
+        }
+        else if (counts.Count > 0)
         {
             <div class="stat-grid">
                 @foreach (var (label, href, total) in counts)
@@ -25,38 +30,23 @@
             </div>
         }
 
-        @if (stages.Count > 0)
+        @* Solda satış hunisi, sağda kullanıcının bugünkü işleri: aynı veri iki grafikle yinelenmez. *@
+        @if (stages.Count > 0 || showToday)
         {
             <div class="chart-grid">
-                <section class="chart-card">
-                    <h2>@Texts.Get("home.stages.title")</h2>
-                    <DonutChart Slices="stages" Title="@Texts.Get("home.stages.chart")" Caption="@Texts.Get("home.stages.caption")" />
-                </section>
-                <section class="chart-card">
-                    <h2>@Texts.Get("home.funnel.title")</h2>
-                    <BarChart Slices="stages" Title="@Texts.Get("home.funnel.chart")" />
-                </section>
+                @if (stages.Count > 0)
+                {
+                    <section class="chart-card">
+                        <h2>@Texts.Get("home.funnel.title")</h2>
+                        <BarChart Slices="stages" Title="@Texts.Get("home.funnel.chart")" />
+                    </section>
+                }
+                @if (showToday)
+                {
+                    <TodayActivities Items="todayItems" Error="@todayError" Lookups="Lookups" OnSelect="OpenActivities" />
+                }
             </div>
         }
-
-        <div class="tiles">
-            @if (Session.Can(CrmAccess.CompaniesRead))
-            {
-                <a class="tile" href="crm/firmalar"><strong>@Texts.Get("crm.companies.title")</strong><span>@Texts.Get("home.tile.companies")</span></a>
-            }
-            @if (Session.Can(CrmAccess.ContactsRead))
-            {
-                <a class="tile" href="crm/kisiler"><strong>@Texts.Get("crm.contacts.title")</strong><span>@Texts.Get("home.tile.contacts")</span></a>
-            }
-            @if (Session.Can(CrmAccess.OpportunitiesRead))
-            {
-                <a class="tile" href="crm/firsatlar"><strong>@Texts.Get("crm.opportunities.title")</strong><span>@Texts.Get("home.tile.opportunities")</span></a>
-            }
-            @if (Session.Can(CrmAccess.ActivitiesRead))
-            {
-                <a class="tile" href="crm/aktiviteler"><strong>@Texts.Get("crm.activities.title")</strong><span>@Texts.Get("home.tile.activities")</span></a>
-            }
-        </div>
     }
     else
     {
@@ -67,6 +57,17 @@
 @code {
     private readonly List<(string Label, string Href, int Total)> counts = [];
     private IReadOnlyList<ChartSlice> stages = [];
+    private IReadOnlyList<ActivityDto>? todayItems;
+    private string? todayError;
+    private bool showToday;
+    private bool loaded;
+
+    private string Greeting => Session.User?.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() is { } name
+        ? Texts.Get("home.greeting", name)
+        : Texts.Get("home.title");
+
+
+    private void OpenActivities(ActivityDto activity) => Navigation.NavigateTo("crm/aktiviteler");
 
     private static string IconFor(string href) => href switch
     {
@@ -83,6 +84,10 @@
         {
             return;
         }
+
+        // Bugünün işleri özet sayılarını beklemeden istenir (yalnızca kullanıcıya atananlar; kapsam sunucuda).
+        showToday = Session.Can(CrmAccess.ActivitiesRead);
+        Task todayTask = showToday ? LoadTodayAsync() : Task.CompletedTask;
 
         var entries = new List<(string Label, string Href, string Url, bool Allowed)>
         {
@@ -113,5 +118,19 @@
                 stages = [];
             }
         }
+
+        loaded = true;
+        await todayTask;
+    }
+
+    private async Task LoadTodayAsync()
+    {
+        await Lookups.LoadAsync();
+        DateOnly today = DateOnly.FromDateTime(Regional.Now.DateTime);
+        var list = await Api.GetAsync<CrmPage<ActivityDto>>(
+            $"/api/crm/activities?page=1&pageSize=50&range={Uri.EscapeDataString(ActivityLabels.Range(today, today))}&ownerId=me");
+        todayItems = list.Value?.Items.OrderBy(a => a.IsAllDay ? 0 : 1).ThenBy(a => a.StartAt ?? a.DueAt).ToList() ?? [];
+        todayError = list.Error;
+        StateHasChanged();
     }
 }

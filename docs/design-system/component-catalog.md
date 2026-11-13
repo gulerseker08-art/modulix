@@ -119,3 +119,8 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 - Kart içindeki liste satırlarında (`ul.item-list`: adres, telefon/e-posta) "Düzenle / Sil" metin bağlantısı yazılmaz; eylemler `RowMenu` ("⋯") içinde toplanır. Yıkıcı öğe `view-menu-item is-danger` (kırmızı metin + `trash` ikonu) ve menünün son öğesidir.
 - Bölüm kartının (`FormSection` → `section-card-body`) içindeki alt bölüm (`sub-section`) ikinci bir kart çizmez: çerçeve ve gölge ortak CSS'te kalkar, kardeş alt bölümler ince çizgiyle ayrılır. Kart içine kart konmaz.
 
+## Ana sayfa ve telefonda sekmeler (13.11.2026)
+
+- Ana sayfa (`Pages/Home.razor`): `PageHeader` ("Hoş geldiniz, {ad}"), ilgili listeye bağlanan özet kutuları (`stat-grid`), solda satış hunisi (`BarChart`), sağda kullanıcının bugünkü işleri (`TodayActivities`). Aynı veri iki grafikle yinelenmez; özet kutuları zaten bağlantı olduğu için ayrıca kısayol kartı (`tiles`) çizilmez.
+- `ViewTabs` çubuğu içerik panelini genişletmez (`contain: inline-size`): sekmeler sığmayınca çubuk kendi içinde yatay kayar. Telefonda sayfa yatay taşmamalıdır; yeni ekranın görsel denetiminde 390 px genişlikte `scrollWidth` kontrol edilir.
+

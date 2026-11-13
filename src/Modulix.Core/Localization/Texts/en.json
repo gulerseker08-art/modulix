@@ -100,16 +100,10 @@
   "shell.license.expiring": "license will expire on {0}.",
 
   "home.title": "Welcome",
+  "home.greeting": "Welcome, {0}",
   "home.noModule": "No modules are enabled for your organization.",
-  "home.stages.title": "Opportunities · distribution by stage",
-  "home.stages.chart": "Opportunities by stage",
-  "home.stages.caption": "opportunities",
   "home.funnel.title": "Sales funnel",
   "home.funnel.chart": "Number of opportunities in each stage",
-  "home.tile.companies": "Customer and supplier cards",
-  "home.tile.contacts": "People at companies",
-  "home.tile.opportunities": "Sales process and amounts",
-  "home.tile.activities": "Calls, meetings, tasks",
 
   "nav.app.crm": "CRM",
   "nav.app.crm.activities": "Activities",

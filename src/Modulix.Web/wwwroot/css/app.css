@@ -3158,6 +3158,10 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
     margin-top: 1rem;
 }
 
+.chart-grid > .today-panel {
+    margin: 0;
+}
+
 .chart-card {
     padding: 1.25rem;
     border: 1px solid var(--mx-border);
@@ -4818,6 +4822,9 @@ button.pipeline-label {
 /* Liste görünümleri (ViewTabs, 12.11.2026 görsel kararı): etkin sekme açık marka zeminli, üstü yuvarlak, altında turkuaz→mavi çizgi. */
 .view-tabs {
     gap: var(--mx-space-2);
+    /* İçerik paneli içeriğine göre genişler (fit-content); sekme çubuğu paneli genişletmez, sığmayınca kendi içinde kayar
+       (telefonda sayfa yatay taşmaz). */
+    contain: inline-size;
 }
 
     .view-tabs .record-tab {
