@@ -269,7 +269,7 @@
                                         </fieldset>
                                         @if (formError is not null) { <div class="invalid-feedback d-block" role="alert">@formError</div> }
                                         <div class="form-actions">
-                                            <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
+                                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
                                             <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelForm">@Texts.Get("common.dismiss")</button>
                                         </div>
                                     </form>

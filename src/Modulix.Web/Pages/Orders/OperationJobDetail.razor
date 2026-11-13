@@ -3,16 +3,16 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>@(detail?.Job.Number ?? "Operasyon işi") · Modulix</PageTitle>
+<PageTitle>@(detail?.Job.Number ?? Texts.Get("orders.jobdetail.title")) · Modulix</PageTitle>
 
 <AuthGate Module="@OrdersAccess.ModuleKey" Permission="@OrdersAccess.OrdersRead">
     @if (notFound)
     {
-        <div class="alert alert-warning" role="alert">İş bulunamadı ya da erişim yetkiniz yok. <a href="siparisler/isler">İşlere dön</a></div>
+        <div class="alert alert-warning" role="alert">@Texts.Get("orders.jobdetail.not-found") <a href="siparisler/isler">@Texts.Get("orders.jobdetail.back-to-jobs")</a></div>
     }
     else if (detail is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
     }
     else
     {
@@ -21,26 +21,26 @@
             <div>
                 <h1>@job.Title</h1>
                 <p class="mb-0">
-                    <span class="text-muted">@job.Number · <a href="siparisler/@job.OrderId">Sipariş @detail.OrderNumber</a></span>
+                    <span class="text-muted">@job.Number · <a href="siparisler/@job.OrderId">@Texts.Get("orders.fulfillment-page.order-link", detail.OrderNumber)</a></span>
                     <span class="badge stage-@OrderLabels.JobBadge(job.Status)">@OrderLabels.Label(OrderLabels.JobStatuses, job.Status)</span>
                     <span class="badge stage-open">@OrderLabels.Label(OrderLabels.JobKinds, job.Kind)</span>
-                    <span class="text-muted">· İlerleme %@detail.ProgressPercent</span>
+                    <span class="text-muted">@Texts.Get("orders.jobdetail.progress", detail.ProgressPercent)</span>
                 </p>
             </div>
-            <div class="header-actions"><a class="btn btn-outline-secondary" href="siparisler/isler">İş kuyruğu</a></div>
+            <div class="header-actions"><a class="btn btn-outline-secondary" href="siparisler/isler">@Texts.Get("orders.jobdetail.queue")</a></div>
         </div>
 
         <Notice Text="@notice" Failed="@failed" />
 
         <section aria-labelledby="job-actions-title">
-            <h2 id="job-actions-title">İşlemler</h2>
+            <h2 id="job-actions-title">@Texts.Get("orders.handover-page.actions")</h2>
             @if (detail.Actions.Count == 0)
             {
-                <p class="text-muted">Bu iş için yapabileceğiniz işlem yok.</p>
+                <p class="text-muted">@Texts.Get("orders.jobdetail.no-actions")</p>
             }
             else
             {
-                <div class="header-actions" role="group" aria-label="İş işlemleri">
+                <div class="header-actions" role="group" aria-label="@Texts.Get("orders.jobdetail.actions-group")">
                     @foreach (var action in detail.Actions)
                     {
                         <button type="button" class="btn @(action.Action == "cancel" ? "btn-outline-danger" : action.Action is "start" or "complete" ? "btn-primary" : "btn-outline-secondary")"
@@ -60,24 +60,24 @@
                         {
                             <div class="form-grid">
                                 <div class="span-6">
-                                    <label class="form-label" for="assign-user">Sorumlu kullanıcı</label>
+                                    <label class="form-label" for="assign-user">@Texts.Get("orders.jobs.field.user")</label>
                                     <LookupPicker Id="assign-user" LookupKey="orders.operation-job.responsible" @bind-Value="assignUser" Placeholder="@(Lookups.MemberName(job.ResponsibleUserId) is { Length: > 0 } cur ? cur : "—")" />
                                 </div>
                                 <div class="span-6">
-                                    <label class="form-label" for="assign-team">Ekip</label>
+                                    <label class="form-label" for="assign-team">@Texts.Get("orders.jobs.field.team")</label>
                                     <input id="assign-team" class="form-control" maxlength="300" placeholder="@(job.TeamName ?? "—")" @bind="assignTeam" />
                                 </div>
                             </div>
                         }
                         else
                         {
-                            <label class="form-label" for="job-reason">İptal gerekçesi (zorunlu)</label>
+                            <label class="form-label" for="job-reason">@Texts.Get("orders.jobdetail.cancel-reason-label")</label>
                             <textarea id="job-reason" class="form-control" rows="2" maxlength="500" @bind="reason"></textarea>
                         }
                         @if (formError is not null) { <div class="invalid-feedback d-block" role="alert">@formError</div> }
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">Onayla: @OrderLabels.JobAction(chosen.Action)</button>
-                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => selected = null">Vazgeç</button>
+                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("orders.actions.confirm", OrderLabels.JobAction(chosen.Action))</button>
+                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => selected = null">@Texts.Get("common.dismiss")</button>
                         </div>
                     </form>
                 }
@@ -85,47 +85,47 @@
         </section>
 
         <section aria-labelledby="job-summary-title">
-            <h2 id="job-summary-title">Özet</h2>
+            <h2 id="job-summary-title">@Texts.Get("orders.detail.summary")</h2>
             <dl class="detail-list">
-                <dt>Sorumlu</dt><dd>@(Lookups.MemberName(job.ResponsibleUserId) is { Length: > 0 } who ? who : "Atanmadı")@(string.IsNullOrEmpty(job.TeamName) ? null : " · " + job.TeamName)</dd>
-                <dt>Öncelik</dt><dd>@OrderLabels.Label(OrderLabels.Priorities, job.Priority)</dd>
-                <dt>Planlanan</dt><dd>@OrderLabels.Date(job.PlannedStartDate) – @OrderLabels.Date(job.PlannedEndDate)</dd>
-                <dt>Gerçekleşen</dt><dd>@(job.ActualStartAt is { } start ? CrmLabels.Time(start) : "—") – @(job.ActualEndAt is { } end ? CrmLabels.Time(end) : "—")</dd>
-                <dt>Lokasyon</dt><dd>@(job.Location ?? "—")</dd>
-                <dt>Not</dt><dd>@(job.Notes ?? "—")</dd>
-                @if (!string.IsNullOrEmpty(job.CancelReason)) { <dt>İptal gerekçesi</dt><dd>@job.CancelReason</dd> }
-                <dt>Kaynak</dt><dd>@(job.Source == "Handover" ? "Satış devri kabulünden üretildi" : "Elle açıldı")</dd>
+                <dt>@Texts.Get("orders.jobdetail.f.responsible")</dt><dd>@(Lookups.MemberName(job.ResponsibleUserId) is { Length: > 0 } who ? who : Texts.Get("orders.jobs.unassigned"))@(string.IsNullOrEmpty(job.TeamName) ? null : " · " + job.TeamName)</dd>
+                <dt>@Texts.Get("orders.opjobs.col.priority")</dt><dd>@OrderLabels.Label(OrderLabels.Priorities, job.Priority)</dd>
+                <dt>@Texts.Get("orders.fulfillment-page.planned")</dt><dd>@OrderLabels.Date(job.PlannedStartDate) – @OrderLabels.Date(job.PlannedEndDate)</dd>
+                <dt>@Texts.Get("orders.fulfillment-page.actual")</dt><dd>@(job.ActualStartAt is { } start ? CrmLabels.Time(start) : "—") – @(job.ActualEndAt is { } end ? CrmLabels.Time(end) : "—")</dd>
+                <dt>@Texts.Get("orders.header-field.location")</dt><dd>@(job.Location ?? "—")</dd>
+                <dt>@Texts.Get("orders.fulfillment-page.note")</dt><dd>@(job.Notes ?? "—")</dd>
+                @if (!string.IsNullOrEmpty(job.CancelReason)) { <dt>@Texts.Get("orders.fulfillment-page.cancel-reason")</dt><dd>@job.CancelReason</dd> }
+                <dt>@Texts.Get("orders.jobdetail.source")</dt><dd>@Texts.Get(job.Source == "Handover" ? "orders.job-history.generated" : "orders.job-history.createdmanually")</dd>
             </dl>
             @if (CanEdit)
             {
                 @if (!editing)
                 {
-                    <button type="button" class="btn btn-outline-primary" @onclick="StartEdit">Planlama bilgilerini düzenle</button>
+                    <button type="button" class="btn btn-outline-primary" @onclick="StartEdit">@Texts.Get("orders.jobdetail.edit")</button>
                 }
                 else
                 {
                     <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
                         <fieldset disabled="@busy">
-                            <legend class="visually-hidden">İş bilgileri</legend>
-                            <FormTabs Title="İş bilgileri" Label="Operasyon işi formu bölümleri">
+                            <legend class="visually-hidden">@Texts.Get("orders.jobdetail.edit-legend")</legend>
+                            <FormTabs Title="@Texts.Get("orders.jobdetail.edit-legend")" Label="@Texts.Get("orders.jobdetail.tabs-label")">
                             <div class="form-grid">
-                                <div class="span-12"><label class="form-label" for="e-title">Başlık</label><input id="e-title" class="form-control" maxlength="200" @bind="form.Title" /><FieldError Field="title" Errors="errors" /></div>
+                                <div class="span-12"><label class="form-label" for="e-title">@Texts.Get("orders.detail.field.title")</label><input id="e-title" class="form-control" maxlength="200" @bind="form.Title" /><FieldError Field="title" Errors="errors" /></div>
                                 <div class="span-4">
-                                    <label class="form-label" for="e-priority">Öncelik</label>
+                                    <label class="form-label" for="e-priority">@Texts.Get("orders.opjobs.col.priority")</label>
                                     <select id="e-priority" class="form-select" @bind="form.Priority">
                                         @foreach (var p in OrderLabels.Priorities) { <option value="@p.Key">@p.Label</option> }
                                     </select>
                                 </div>
-                                <div class="span-4"><label class="form-label" for="e-start">Planlanan başlangıç</label><input id="e-start" type="date" class="form-control" @bind="form.PlannedStartDate" /></div>
-                                <div class="span-4"><label class="form-label" for="e-end">Planlanan bitiş</label><input id="e-end" type="date" class="form-control" @bind="form.PlannedEndDate" /><FieldError Field="plannedEndDate" Errors="errors" /></div>
-                                <div class="span-12"><label class="form-label" for="e-location">Lokasyon</label><input id="e-location" class="form-control" maxlength="1000" @bind="form.Location" /></div>
-                                <div class="span-12"><label class="form-label" for="e-notes">Not</label><textarea id="e-notes" class="form-control" rows="2" maxlength="4000" @bind="form.Notes"></textarea></div>
+                                <div class="span-4"><label class="form-label" for="e-start">@Texts.Get("orders.jobs.field.start")</label><input id="e-start" type="date" class="form-control" @bind="form.PlannedStartDate" /></div>
+                                <div class="span-4"><label class="form-label" for="e-end">@Texts.Get("orders.jobs.field.end")</label><input id="e-end" type="date" class="form-control" @bind="form.PlannedEndDate" /><FieldError Field="plannedEndDate" Errors="errors" /></div>
+                                <div class="span-12"><label class="form-label" for="e-location">@Texts.Get("orders.header-field.location")</label><input id="e-location" class="form-control" maxlength="1000" @bind="form.Location" /></div>
+                                <div class="span-12"><label class="form-label" for="e-notes">@Texts.Get("orders.fulfillment-page.note")</label><textarea id="e-notes" class="form-control" rows="2" maxlength="4000" @bind="form.Notes"></textarea></div>
                             </div>
                             </FormTabs>
                         </fieldset>
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => editing = false">Vazgeç</button>
+                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => editing = false">@Texts.Get("common.dismiss")</button>
                         </div>
                     </form>
                 }
@@ -133,82 +133,82 @@
         </section>
 
         <section aria-labelledby="job-lines-title">
-            <h2 id="job-lines-title">Bağlı sipariş kalemleri</h2>
+            <h2 id="job-lines-title">@Texts.Get("orders.jobdetail.lines")</h2>
             <ul>
                 @foreach (var line in detail.Lines) { <li>@line.Name <span class="text-muted">· @OrderLabels.Quantity(line.Quantity, line.Unit) · @OrderLabels.Label(OrderLabels.LineKinds, line.Kind)</span></li> }
             </ul>
         </section>
 
         <section aria-labelledby="job-tasks-title">
-            <h2 id="job-tasks-title">Görevler ve kontrol listesi</h2>
+            <h2 id="job-tasks-title">@Texts.Get("orders.jobdetail.tasks")</h2>
             <ul class="list-unstyled">
                 @foreach (var task in detail.Tasks)
                 {
                     <li class="form-check">
                         <input class="form-check-input" type="checkbox" id="task-@task.Id" checked="@task.IsDone" disabled="@(!CanManageTasks || busy)" @onchange="e => ToggleAsync(task, (bool)e.Value!)" />
-                        <label class="form-check-label" for="task-@task.Id">@task.Title@(task.IsRequired ? null : " (isteğe bağlı)")</label>
+                        <label class="form-check-label" for="task-@task.Id">@task.Title@(task.IsRequired ? null : Texts.Get("orders.handover-page.optional"))</label>
                         @if (task.IsDone && task.DoneAt is { } doneAt) { <small class="text-muted"> · @Lookups.MemberName(task.DoneBy), @CrmLabels.Time(doneAt)</small> }
-                        @if (CanManageTasks && !task.IsDefault) { <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteTaskAsync(task)">Sil</button> }
+                        @if (CanManageTasks && !task.IsDefault) { <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteTaskAsync(task)">@Texts.Get("common.delete")</button> }
                     </li>
                 }
             </ul>
             @if (CanManageTasks)
             {
                 <form class="search" novalidate @onsubmit="AddTaskAsync" @onsubmit:preventDefault>
-                    <label class="visually-hidden" for="new-task">Yeni görev</label>
-                    <input id="new-task" class="form-control" maxlength="300" placeholder="Kendi görevinizi ekleyin (zorunlu sayılır)" @bind="newTask" />
-                    <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(newTask))">Görev ekle</button>
+                    <label class="visually-hidden" for="new-task">@Texts.Get("orders.jobdetail.new-task")</label>
+                    <input id="new-task" class="form-control" maxlength="300" placeholder="@Texts.Get("orders.jobdetail.new-task-placeholder")" @bind="newTask" />
+                    <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(newTask))">@Texts.Get("orders.jobdetail.add-task")</button>
                 </form>
             }
         </section>
 
         <section aria-labelledby="job-deps-title">
-            <h2 id="job-deps-title">Bağımlılıklar</h2>
+            <h2 id="job-deps-title">@Texts.Get("orders.jobdetail.dependencies")</h2>
             @if (detail.DependsOn.Count == 0 && detail.Dependents.Count == 0)
             {
-                <p class="text-muted">Bu işin bağımlılığı yok.</p>
+                <p class="text-muted">@Texts.Get("orders.jobdetail.no-dependencies")</p>
             }
             @if (detail.DependsOn.Count > 0)
             {
-                <p class="mb-1">Başlamak için şu işlerin tamamlanmasını bekler:</p>
+                <p class="mb-1">@Texts.Get("orders.jobdetail.waits-for")</p>
                 <ul>
                     @foreach (var d in detail.DependsOn)
                     {
                         <li>
                             <a href="siparisler/isler/@d.JobId">@d.Number · @d.Title</a>
                             <span class="badge stage-@OrderLabels.JobBadge(d.Status)">@OrderLabels.Label(OrderLabels.JobStatuses, d.Status)</span>
-                            @if (CanManageTasks && !job.Status.StartsWith("C")) { <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => RemoveDependencyAsync(d)">Kaldır</button> }
+                            @if (CanManageTasks && !job.Status.StartsWith("C")) { <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => RemoveDependencyAsync(d)">@Texts.Get("orders.jobdetail.remove")</button> }
                         </li>
                     }
                 </ul>
             }
             @if (detail.Dependents.Count > 0)
             {
-                <p class="mb-1">Bu işi bekleyen işler:</p>
+                <p class="mb-1">@Texts.Get("orders.jobdetail.waited-by")</p>
                 <ul>@foreach (var d in detail.Dependents) { <li><a href="siparisler/isler/@d.JobId">@d.Number · @d.Title</a> <span class="badge stage-@OrderLabels.JobBadge(d.Status)">@OrderLabels.Label(OrderLabels.JobStatuses, d.Status)</span></li> }</ul>
             }
             @if (CanManageTasks && candidates.Count > 0)
             {
                 <form class="search" novalidate @onsubmit="AddDependencyAsync" @onsubmit:preventDefault>
-                    <label class="visually-hidden" for="dep-select">Bağımlı olunacak iş</label>
+                    <label class="visually-hidden" for="dep-select">@Texts.Get("orders.jobdetail.dependency-label")</label>
                     <select id="dep-select" class="form-select" @bind="dependencyChoice">
-                        <option value="">Bu iş şunu beklesin…</option>
+                        <option value="">@Texts.Get("orders.jobdetail.dependency-placeholder")</option>
                         @foreach (var c in candidates) { <option value="@c.Id">@c.Number · @c.Title</option> }
                     </select>
-                    <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrEmpty(dependencyChoice))">Bağımlılık ekle</button>
+                    <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrEmpty(dependencyChoice))">@Texts.Get("orders.jobdetail.add-dependency")</button>
                 </form>
             }
         </section>
 
         <section aria-labelledby="job-history-title">
-            <h2 id="job-history-title">İş geçmişi</h2>
+            <h2 id="job-history-title">@Texts.Get("orders.jobdetail.history")</h2>
             <ol class="history-list">
                 @foreach (var e in detail.History)
                 {
                     <li>
                         <strong>@OrderLabels.JobHistory(e.Kind)</strong>
                         @if (e.FromStatus is not null && e.FromStatus != e.ToStatus && e.ToStatus is not null) { <span> · @OrderLabels.Label(OrderLabels.JobStatuses, e.FromStatus) → @OrderLabels.Label(OrderLabels.JobStatuses, e.ToStatus)</span> }
-                        <span class="text-muted"> · @CrmLabels.Time(e.At) · @(Lookups.MemberName(e.ActorId) is { Length: > 0 } actor ? actor : "sistem")</span>
+                        <span class="text-muted"> · @CrmLabels.Time(e.At) · @(Lookups.MemberName(e.ActorId) is { Length: > 0 } actor ? actor : Texts.Get("orders.change.system"))</span>
                         @if (!string.IsNullOrEmpty(e.Note)) { <div>@e.Note</div> }
                     </li>
                 }
@@ -293,7 +293,7 @@
         busy = false;
         failed = !result.IsSuccess;
         errors = result.FieldErrors;
-        notice = result.IsSuccess ? "İş bilgileri kaydedildi." : result.Error;
+        notice = result.IsSuccess ? Texts.Get("orders.jobdetail.saved") : result.Error;
         if (result.IsSuccess) { editing = false; }
         await LoadAsync();
     }
@@ -317,15 +317,15 @@
     private async Task RunAsync()
     {
         if (busy || detail is null || selected is not { } action) { return; }
-        if (action.Action == "cancel" && string.IsNullOrWhiteSpace(reason)) { formError = "İptal için gerekçe zorunludur."; return; }
-        if (action.Action == "assign" && assignUser is null && string.IsNullOrWhiteSpace(assignTeam)) { formError = "Sorumlu kullanıcı ya da ekip girin."; return; }
+        if (action.Action == "cancel" && string.IsNullOrWhiteSpace(reason)) { formError = Texts.Get("orders.jobdetail.cancel-required"); return; }
+        if (action.Action == "assign" && assignUser is null && string.IsNullOrWhiteSpace(assignTeam)) { formError = Texts.Get("orders.jobdetail.assign-required"); return; }
 
         busy = true;
         var request = new OperationJobActionRequest(detail.Job.Version, string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(), assignUser, string.IsNullOrWhiteSpace(assignTeam) ? null : assignTeam.Trim());
         var result = await Api.PostAsync<OperationJobDetailDto>($"/api/orders/operation-jobs/{Id}/{action.Action}", request);
         busy = false;
         failed = !result.IsSuccess;
-        notice = result.IsSuccess ? $"{OrderLabels.JobAction(action.Action)}: işlem tamamlandı." : result.Error;
+        notice = result.IsSuccess ? Texts.Get("orders.jobdetail.action-done", OrderLabels.JobAction(action.Action)) : result.Error;
         selected = null;
         await LoadAsync();
     }
@@ -348,7 +348,7 @@
         var result = await Api.PostAsync<OperationTaskDto>("/api/orders/operation-tasks", new SaveOperationTaskRequest(Id, newTask.Trim()));
         busy = false;
         failed = !result.IsSuccess;
-        notice = result.IsSuccess ? "Görev eklendi." : result.Error;
+        notice = result.IsSuccess ? Texts.Get("orders.jobdetail.task-added") : result.Error;
         if (result.IsSuccess) { newTask = string.Empty; }
         await LoadAsync();
     }
@@ -360,7 +360,7 @@
         var result = await Api.DeleteAsync($"/api/orders/operation-tasks/{task.Id}?version={task.Version}");
         busy = false;
         failed = !result.IsSuccess;
-        notice = result.IsSuccess ? "Görev silindi." : result.Error;
+        notice = result.IsSuccess ? Texts.Get("orders.jobdetail.task-deleted") : result.Error;
         await LoadAsync();
     }
 
@@ -371,7 +371,7 @@
         var result = await Api.PostAsync<OperationJobDetailDto>($"/api/orders/operation-jobs/{Id}/dependencies", new AddJobDependencyRequest(other));
         busy = false;
         failed = !result.IsSuccess;
-        notice = result.IsSuccess ? "Bağımlılık eklendi." : result.Error;
+        notice = result.IsSuccess ? Texts.Get("orders.jobdetail.dependency-added") : result.Error;
         dependencyChoice = null;
         await LoadAsync();
     }
@@ -383,7 +383,7 @@
         var result = await Api.DeleteAsync($"/api/orders/operation-jobs/{Id}/dependencies/{dependency.JobId}");
         busy = false;
         failed = !result.IsSuccess;
-        notice = result.IsSuccess ? "Bağımlılık kaldırıldı." : result.Error;
+        notice = result.IsSuccess ? Texts.Get("orders.jobdetail.dependency-removed") : result.Error;
         await LoadAsync();
     }
 }
