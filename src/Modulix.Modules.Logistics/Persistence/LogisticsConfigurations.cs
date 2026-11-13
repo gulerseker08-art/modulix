@@ -68,6 +68,8 @@ internal static class CargoTables
         LogisticsTables.ConfigureCommon(builder, table);
         builder.Property(e => e.TransportModeKey).HasMaxLength(50).IsRequired();
         builder.Property(e => e.PickupCity).HasMaxLength(CargoEntity.CityMaxLength).IsRequired();
+        builder.Property(e => e.PickupCountry).HasMaxLength(CargoEntity.CountryLength).IsUnicode(false).IsFixedLength().IsRequired().HasDefaultValue(CargoEntity.DefaultCountry);
+        builder.Property(e => e.DeliveryCountry).HasMaxLength(CargoEntity.CountryLength).IsUnicode(false).IsFixedLength().IsRequired().HasDefaultValue(CargoEntity.DefaultCountry);
         builder.Property(e => e.PickupAddress).HasMaxLength(CargoEntity.AddressMaxLength);
         builder.Property(e => e.DeliveryCity).HasMaxLength(CargoEntity.CityMaxLength).IsRequired();
         builder.Property(e => e.DeliveryAddress).HasMaxLength(CargoEntity.AddressMaxLength);
