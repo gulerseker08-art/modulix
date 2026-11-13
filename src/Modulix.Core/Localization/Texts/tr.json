@@ -202,6 +202,7 @@
   "nav.app.admin.roles": "Roller",
   "nav.app.admin.companies": "Şirketler",
   "nav.app.admin.settings": "Kuruluş ayarları",
+  "nav.app.admin.ai-access": "Yapay zekâ erişimi",
   "nav.app.admin.audit": "Denetim kaydı",
   "nav.app.admin.import-log": "İşlem günlüğü",
   "nav.app.admin.automation": "Otomasyon",

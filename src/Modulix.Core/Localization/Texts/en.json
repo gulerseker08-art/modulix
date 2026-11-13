@@ -202,6 +202,7 @@
   "nav.app.admin.roles": "Roles",
   "nav.app.admin.companies": "Companies",
   "nav.app.admin.settings": "Organization settings",
+  "nav.app.admin.ai-access": "AI access",
   "nav.app.admin.audit": "Audit log",
   "nav.app.admin.import-log": "Operations log",
   "nav.app.admin.automation": "Automation",
