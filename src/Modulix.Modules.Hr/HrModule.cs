@@ -35,6 +35,8 @@ public sealed class HrModule : IModule
         public const string ExpensesPay = "hr.expenses.pay";
         public const string AssetsRead = "hr.assets.read";
         public const string AssetsManage = "hr.assets.manage";
+        public const string ChecklistsRead = "hr.checklists.read";
+        public const string ChecklistsManage = "hr.checklists.manage";
     }
 
     public static class Entities
@@ -47,6 +49,10 @@ public sealed class HrModule : IModule
         public const string ExpenseLine = "hr.expense-line";
         public const string Asset = "hr.asset";
         public const string AssetAssignment = "hr.asset-assignment";
+        public const string ChecklistTemplate = "hr.checklist-template";
+        public const string ChecklistTemplateItem = "hr.checklist-template-item";
+        public const string EmployeeChecklist = "hr.employee-checklist";
+        public const string ChecklistTask = "hr.checklist-task";
     }
 
     public static class Lists
@@ -111,6 +117,8 @@ public sealed class HrModule : IModule
         new(Permissions.ExpensesPay, "Onaylanmış masraf beyanlarını ödendi olarak işaretler", "Masraf ödemesi"),
         new(Permissions.AssetsRead, "Demirbaşları ve zimmetleri görüntüler (kayıt kapsamına göre: çalışan kendi zimmetlerini)", "Zimmet"),
         new(Permissions.AssetsManage, "Demirbaş ekler ve düzenler, zimmetler, iade alır", "Zimmet"),
+        new(Permissions.ChecklistsRead, "İşe giriş/çıkış süreçlerini ve görevlerini görüntüler, kendisine atanan görevi tamamlar (kayıt kapsamına göre)", "İşe giriş ve çıkış"),
+        new(Permissions.ChecklistsManage, "Süreç şablonlarını yönetir, süreç başlatır, her görevi tamamlar, atlar ve süreci iptal eder", "İşe giriş ve çıkış"),
     ];
 
     /// <summary>Denetim kaydında görünen kayıt türleri (Y5); hassas alanların değeri denetim kaydında gizlenir.</summary>
@@ -199,6 +207,35 @@ public sealed class HrModule : IModule
             References = new Dictionary<string, string> { ["assetId"] = Entities.Asset, ["employeeId"] = Entities.Employee },
             UserFields = ["assignedByUserId", "closedByUserId", "employeeUserId"],
         },
+        new(Entities.ChecklistTemplate, "Süreç şablonu", Permissions.ChecklistsRead, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["kind"] = "Tür", ["description"] = "Açıklama", ["isActive"] = "Etkin",
+        }, "name"),
+        new(Entities.ChecklistTemplateItem, "Şablon adımı", Permissions.ChecklistsRead, new Dictionary<string, string>
+        {
+            ["templateId"] = "Şablon", ["sequence"] = "Sıra", ["title"] = "Başlık", ["description"] = "Açıklama", ["responsibleRole"] = "Sorumlu",
+            ["dueOffsetDays"] = "Gün farkı", ["taskType"] = "Görev türü",
+        }, "title")
+        {
+            References = new Dictionary<string, string> { ["templateId"] = Entities.ChecklistTemplate },
+        },
+        new(Entities.EmployeeChecklist, "İşe giriş/çıkış süreci", Permissions.ChecklistsRead, new Dictionary<string, string>
+        {
+            ["employeeId"] = "Çalışan", ["templateId"] = "Şablon", ["startDate"] = "Başlangıç", ["status"] = "Durum", ["cancelReason"] = "İptal gerekçesi",
+        }, "name")
+        {
+            References = new Dictionary<string, string> { ["employeeId"] = Entities.Employee, ["templateId"] = Entities.ChecklistTemplate },
+            UserFields = ["employeeUserId", "startedByUserId"],
+        },
+        new(Entities.ChecklistTask, "Süreç görevi", Permissions.ChecklistsRead, new Dictionary<string, string>
+        {
+            ["checklistId"] = "Süreç", ["title"] = "Başlık", ["dueDate"] = "Son tarih", ["status"] = "Durum", ["note"] = "Not",
+            ["assigneeUserId"] = "Sorumlu", ["completedByUserId"] = "Tamamlayan",
+        }, "title")
+        {
+            References = new Dictionary<string, string> { ["checklistId"] = Entities.EmployeeChecklist },
+            UserFields = ["assigneeUserId", "completedByUserId", "employeeUserId"],
+        },
         new(Entities.Holiday, "Resmî tatil", Permissions.LeavesRead, new Dictionary<string, string>
         {
             ["date"] = "Tarih", ["name"] = "Ad", ["halfDay"] = "Yarım gün",
@@ -219,6 +256,8 @@ public sealed class HrModule : IModule
         new(Entities.ExpenseLine, "Masraf satırı"),
         new(Entities.Asset, "Demirbaş"),
         new(Entities.AssetAssignment, "Zimmet"),
+        new(Entities.ChecklistTemplate, "Süreç şablonu"),
+        new(Entities.ChecklistTemplateItem, "Şablon adımı"),
     ];
 
     /// <summary>Departman (Y9b): hazır değerler örnektir; firma kendi departmanlarını ekler. Kod departmanın adına bakmaz.</summary>
@@ -359,6 +398,7 @@ public sealed class HrModule : IModule
             new(Entities.LeaveRequest, "İzin talebi", Permissions.LeavesRead) { LabelField = "employeeName" },
             new(Entities.ExpenseClaim, "Masraf beyanı", Permissions.ExpensesRead) { LabelField = "title" },
             new(Entities.AssetAssignment, "Zimmet", Permissions.AssetsRead) { LabelField = "assetTag" },
+            new(Entities.ChecklistTask, "Süreç görevi", Permissions.ChecklistsRead) { LabelField = "title" },
         ],
         Events =
         [
@@ -370,6 +410,8 @@ public sealed class HrModule : IModule
             new("hr.expense-claim.updated", Entities.ExpenseClaim, DomainEventTypes.RecordUpdated, "Masraf beyanı güncellendi"),
             new("hr.asset-assignment.created", Entities.AssetAssignment, DomainEventTypes.RecordCreated, "Demirbaş zimmetlendi"),
             new("hr.asset-assignment.updated", Entities.AssetAssignment, DomainEventTypes.RecordUpdated, "Zimmet onaylandı ya da kapandı"),
+            new("hr.checklist-task.created", Entities.ChecklistTask, DomainEventTypes.RecordCreated, "Süreç görevi açıldı"),
+            new("hr.checklist-task.updated", Entities.ChecklistTask, DomainEventTypes.RecordUpdated, "Süreç görevi tamamlandı ya da değişti"),
         ],
         Fields =
         [
@@ -421,6 +463,12 @@ public sealed class HrModule : IModule
                 ],
             },
             new(Entities.AssetAssignment, "expectedReturnOn", "Beklenen iade", AutomationFieldType.Date),
+            new(Entities.ChecklistTask, "title", "Başlık", AutomationFieldType.Text),
+            new(Entities.ChecklistTask, "status", "Durum", AutomationFieldType.Choice)
+            {
+                Options = [new(Domain.ChecklistTask.Statuses.Open, "Açık"), new(Domain.ChecklistTask.Statuses.Done, "Tamamlandı"), new(Domain.ChecklistTask.Statuses.Skipped, "Atlandı")],
+            },
+            new(Entities.ChecklistTask, "dueDate", "Son tarih", AutomationFieldType.Date),
         ],
     };
 
@@ -434,13 +482,13 @@ public sealed class HrModule : IModule
                 Permissions.EmployeesRead, Permissions.EmployeesWrite, Permissions.EmployeesPersonal,
                 Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove, Permissions.LeavesManage,
                 Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.ExpensesManage,
-                Permissions.AssetsRead, Permissions.AssetsManage,
+                Permissions.AssetsRead, Permissions.AssetsManage, Permissions.ChecklistsRead, Permissions.ChecklistsManage,
             ]),
         new(
             "hr.asset-keeper",
             "Demirbaş sorumlusu",
             "Demirbaşları ve bütün zimmetleri yönetir: demirbaş ekler, zimmetler, iade alır; izin, masraf ve özlük verisine erişmez.",
-            [Permissions.EmployeesRead, Permissions.AssetsRead, Permissions.AssetsManage]),
+            [Permissions.EmployeesRead, Permissions.AssetsRead, Permissions.AssetsManage, Permissions.ChecklistsRead]),
         new(
             "hr.finance",
             "Finans (masraf ödemesi)",
@@ -450,7 +498,8 @@ public sealed class HrModule : IModule
             "hr.staff",
             "Çalışan (rehber)",
             "Rehberi ve organizasyon şemasını görüntüler, kendi izin hakkını görür ve kendi adına izin talebi açar; özlük bilgilerini göremez.",
-            [Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.AssetsRead])
+            [Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.AssetsRead,
+                Permissions.ChecklistsRead])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
         },
@@ -461,6 +510,7 @@ public sealed class HrModule : IModule
             [
                 Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove,
                 Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.AssetsRead,
+                Permissions.ChecklistsRead,
             ])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
@@ -482,5 +532,10 @@ public sealed class HrModule : IModule
         services.AddScoped<IRecordStore, AssetRecordStore>();
         services.AddScoped<IRecordStore, AssetAssignmentRecordStore>();
         services.AddScoped<IAssetWorkflow, AssetWorkflow>();
+        services.AddScoped<IRecordStore, ChecklistTemplateRecordStore>();
+        services.AddScoped<IRecordStore, ChecklistTemplateItemRecordStore>();
+        services.AddScoped<IRecordStore, EmployeeChecklistRecordStore>();
+        services.AddScoped<IRecordStore, ChecklistTaskRecordStore>();
+        services.AddScoped<IChecklistWorkflow, ChecklistWorkflow>();
     }
 }

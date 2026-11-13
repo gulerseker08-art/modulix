@@ -105,7 +105,7 @@ Her dilim dört testle teslim edilir (mutlu yol, doğrulama, tenant izolasyonu, 
 | 2 | İzin türleri, hak/bakiye, talep, onay (**yapıldı**, bölüm 10); takvim, Ç6a bağlantısı, işveren şirket bağı (2b) | 1, Ç6a (var) |
 | 3 | Masraf beyanı, belge, onay, ödeme durumu (**yapıldı**, bölüm 11); Ç6a tutar onayı (3b) | 1, ADR-0040 (var), Ç6a |
 | 4 | Demirbaş ve zimmet, tutanak çıktısı (**yapıldı**, bölüm 12) | 1 |
-| 5 | İşe giriş/çıkış kontrol listeleri | 1, 4 |
+| 5 | İşe giriş/çıkış kontrol listeleri (**yapıldı**, bölüm 13) | 1, 4 |
 | 6 | Duyurular | 1 |
 | 7 | Anket (K8) | 1 |
 | 8 | Blog ve galeri | 1, ADR-0040 |
@@ -217,4 +217,26 @@ Bölüm 5'teki masraf akışı izin dilimindeki kalıpla (iş akışı kapısı,
 | `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
 | `dotnet test tests/Modulix.Core.Tests` | 964/964 geçti |
 | `HrAssetTests` (entegrasyon, 4 test; PDF dahil) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |
+
+## 13. Dilim 5: işe giriş ve çıkış (13 Kasım 2026)
+
+- **Şablon** `hr.ChecklistTemplates` (ad tür içinde tekil; tür işe giriş/işten çıkış, yalnızca oluştururken; etkin) ve **adımları** `hr.ChecklistTemplateItems` (sıra, başlık, açıklama, sorumlu: çalışan / yönetici / İK, başlangıca göre gün farkı, görev türü: elle / zimmet iadesi). "Zimmet iadesi" yalnızca çıkış şablonunda olur. Şablon değişikliği başlatılmış süreçleri etkilemez; kullanılmış şablon silinmez, pasife alınır.
+- **Süreç** `hr.EmployeeChecklists` yalnızca başlatma komutuyla açılır; şablonun adımları aynı işlemde **görevlere** `hr.ChecklistTasks` dönüşür (kayıt boru hattından; her biri audit ve olay üretir). Son tarih = başlangıç günü + gün farkı; sorumlu kullanıcı o anda çözülür (çalışanın ve yöneticisinin kullanıcısı; İK görevi "süreç yönetimi" izni olan herkese açık). Ayrılmış çalışana işe giriş başlatılmaz; aynı türde açık süreç tekildir.
+- **İlerleme:** görev kapandıkça sürecin ilerlemesi aynı işlemde güncellenir; bütün görevler tamamlanınca ya da atlanınca süreç tamamlanır, biri yeniden açılınca açılır; iptal edilmiş süreç ve görevleri değişmez.
+- **Açık zimmet kuralı (dilim 4 bağı):** çıkış sürecindeki "zimmet iadesi" görevi çalışanın açık zimmeti varken tamamlanamaz (409, neden ekranda); bu yüzden açık zimmetle çıkış süreci kapanmaz. Modül içi okumadır (aynı modülün tablosu).
+- **Görünürlük:** veri kapsamı alanı `employeeUserId`; ek olarak kullanıcıya atanmış görevler ve onların süreçleri görünür (yönetici astının sürecini "kendi" kapsamıyla görür).
+- **Arayüz:** İşe giriş ve çıkış (süreç başlat, görünümler, süreç kartında görevler ve iptal), Süreç şablonları (şablon + adımlar, sekmeli formlar), Görevlerim (bana atanan açık görevler, İK'ya ayrıca İK görevleri; gecikenler işaretli). Yeni CSS sınıfı yok.
+- Migration `HrChecklists`: dört tablo + `TenantIsolationSql.AddTable`.
+
+**Bilerek yapılmadı:** işe giriş tarihi girilince/çalışan "Ayrıldı" yapılınca sürecin kendiliğinden başlaması (ADR-0027 kuralıyla bağlanabilir; "Süreç başlat" aksiyonu sonra), görev atandığında bildirim, kullanıcı hesabının çıkışta kapatılması (Core üyelik işlemi; görev olarak elle), görev başına dosya.
+
+### Test sonuçları (Dilim 5)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 29/29 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
+| `dotnet test tests/Modulix.Core.Tests` | 964/964 geçti |
+| `HrChecklistTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |
