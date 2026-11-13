@@ -16,6 +16,11 @@ public static class HrAccess
     public const string LeavesRequest = "hr.leaves.request";
     public const string LeavesApprove = "hr.leaves.approve";
     public const string LeavesManage = "hr.leaves.manage";
+    public const string ExpensesRead = "hr.expenses.read";
+    public const string ExpensesRequest = "hr.expenses.request";
+    public const string ExpensesApprove = "hr.expenses.approve";
+    public const string ExpensesManage = "hr.expenses.manage";
+    public const string ExpensesPay = "hr.expenses.pay";
 
     public const string EmployeeEntityKey = "hr.employee";
     public const string LeaveRequestEntityKey = "hr.leave-request";
@@ -24,6 +29,10 @@ public static class HrAccess
     public const string LeaveTypeList = "hr.leave-type";
     public const string LeaveRequestEmployeeLookup = "hr.leave-request.employee";
     public const string LeaveBalanceEmployeeLookup = "hr.leave-balance.employee";
+    public const string ExpenseClaimEntityKey = "hr.expense-claim";
+    public const string ExpenseLineEntityKey = "hr.expense-line";
+    public const string ExpenseTypeList = "hr.expense-type";
+    public const string ExpenseClaimEmployeeLookup = "hr.expense-claim.employee";
 
     /// <summary>Yalnızca bu kategorideki izin türü yıllık haktan düşer.</summary>
     public const string AnnualCategory = "annual";
@@ -58,6 +67,17 @@ public static class HrAccess
     [
         ("pending", "Onay bekliyor"),
         ("approved", "Onaylandı"),
+        ("rejected", "Reddedildi"),
+        ("cancelled", "İptal edildi"),
+    ];
+
+    /// <summary>Masraf beyanı durumları (sabit; sunucudaki <c>ExpenseClaim.Statuses</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> ExpenseStatuses { get; } =
+    [
+        ("draft", "Taslak"),
+        ("submitted", "Onay bekliyor"),
+        ("approved", "Onaylandı"),
+        ("paid", "Ödendi"),
         ("rejected", "Reddedildi"),
         ("cancelled", "İptal edildi"),
     ];

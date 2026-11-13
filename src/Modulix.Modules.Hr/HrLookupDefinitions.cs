@@ -15,6 +15,7 @@ public static class HrLookupDefinitions
     public const string EmployeeUser = "hr.employee.user";
     public const string LeaveRequestEmployee = "hr.leave-request.employee";
     public const string LeaveBalanceEmployee = "hr.leave-balance.employee";
+    public const string ExpenseClaimEmployee = "hr.expense-claim.employee";
 
     private static readonly string[] PersonLabel = ["firstName", "lastName"];
     private static readonly string[] PersonSecondary = ["email", "phone"];
@@ -38,6 +39,7 @@ public static class HrLookupDefinitions
         new(EmployeeUser, HrModule.Entities.Employee, "userId", "Kullanıcı hesabı", LookupTargetKind.Member),
         Employee(LeaveRequestEmployee, HrModule.Entities.LeaveRequest),
         Employee(LeaveBalanceEmployee, HrModule.Entities.LeaveBalance),
+        Employee(ExpenseClaimEmployee, HrModule.Entities.ExpenseClaim),
     ];
 
     private static LookupDefinition Employee(string key, string sourceEntity) =>

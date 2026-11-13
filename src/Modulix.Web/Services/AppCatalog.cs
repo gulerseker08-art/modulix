@@ -258,6 +258,8 @@ public static class AppCatalog
         new("hr.leave-requests", Hr, "İzin talepleri", "check-circle", "ik/izin-talepleri", 50, HrAccess.ModuleKey, AnyPermission: [HrAccess.LeavesApprove, HrAccess.LeavesManage]),
         new("hr.leave-balances", Hr, "İzin hakları", "star", "ik/izin-haklari", 60, HrAccess.ModuleKey, HrAccess.LeavesManage, Tone: AppTone.Teal),
         new("hr.holidays", Hr, "Resmî tatiller", "sun", "ik/resmi-tatiller", 70, HrAccess.ModuleKey, HrAccess.LeavesManage),
+        new("hr.my-expenses", Hr, "Masraflarım", "wallet", "ik/masraflarim", 80, HrAccess.ModuleKey, HrAccess.ExpensesRequest, Tone: AppTone.Teal),
+        new("hr.expense-claims", Hr, "Masraf beyanları", "coins", "ik/masraf-beyanlari", 90, HrAccess.ModuleKey, AnyPermission: [HrAccess.ExpensesApprove, HrAccess.ExpensesManage, HrAccess.ExpensesPay]),
 
         new(Fleet, null, "Filo", "truck", null, 45, ModuleKey: FleetAccess.ModuleKey, Group: OperationsGroup),
         new("fleet.vehicles", Fleet, "Araçlar", "truck", "filo/araclar", 10, FleetAccess.ModuleKey, FleetAccess.VehiclesRead),

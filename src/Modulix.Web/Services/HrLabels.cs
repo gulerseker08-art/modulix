@@ -56,4 +56,20 @@ public static class HrLabels
         var half = WarehouseLabels.Flag(request, "halfDay") ? " (yarım gün)" : string.Empty;
         return (start == end ? start : $"{start} – {end}") + half;
     }
+
+    public static string ExpenseStatus(string? key) => HrAccess.ExpenseStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    /// <summary>Taslak nötr, onay bekleyen dikkat, onaylanan marka, ödenen başarı, reddedilen kayıp, iptal nötr ton.</summary>
+    public static string ExpenseStatusBadge(string? key) => key switch
+    {
+        "submitted" => "stage-negotiation",
+        "approved" => "stage-qualified",
+        "paid" => "status-customer",
+        "rejected" => "stage-lost",
+        _ => "status-inactive",
+    };
+
+    /// <summary>Tutar ve para birimi: "1.250,50 TRY".</summary>
+    public static string Money(decimal? amount, string? currency) =>
+        amount is { } value ? $"{value.ToString("#,##0.00", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))} {currency}".Trim() : "—";
 }

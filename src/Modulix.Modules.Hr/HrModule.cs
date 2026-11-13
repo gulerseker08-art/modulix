@@ -28,6 +28,11 @@ public sealed class HrModule : IModule
         public const string LeavesRequest = "hr.leaves.request";
         public const string LeavesApprove = "hr.leaves.approve";
         public const string LeavesManage = "hr.leaves.manage";
+        public const string ExpensesRead = "hr.expenses.read";
+        public const string ExpensesRequest = "hr.expenses.request";
+        public const string ExpensesApprove = "hr.expenses.approve";
+        public const string ExpensesManage = "hr.expenses.manage";
+        public const string ExpensesPay = "hr.expenses.pay";
     }
 
     public static class Entities
@@ -36,12 +41,24 @@ public sealed class HrModule : IModule
         public const string LeaveRequest = "hr.leave-request";
         public const string LeaveBalance = "hr.leave-balance";
         public const string Holiday = "hr.holiday";
+        public const string ExpenseClaim = "hr.expense-claim";
+        public const string ExpenseLine = "hr.expense-line";
     }
 
     public static class Lists
     {
         public const string Department = "hr.department";
         public const string LeaveType = "hr.leave-type";
+        public const string ExpenseType = "hr.expense-type";
+    }
+
+    /// <summary>Masraf türü kategorileri (dilim 3): raporlar kategoriye bakar; vergi ve harcırah sınırları koda yazılmaz (ADR-0042 bölüm 8).</summary>
+    public static class ExpenseCategories
+    {
+        public const string Transport = "transport";
+        public const string Accommodation = "accommodation";
+        public const string Meal = "meal";
+        public const string Other = "other";
     }
 
     /// <summary>
@@ -73,6 +90,11 @@ public sealed class HrModule : IModule
         new(Permissions.LeavesRequest, "Kendi adına izin talebi açar ve bekleyen talebini iptal eder", "İzinler"),
         new(Permissions.LeavesApprove, "Onaylayanı olduğu izin taleplerini onaylar ve reddeder", "İzin onayı"),
         new(Permissions.LeavesManage, "Herkes adına talep açar, her talebi onaylar ve iptal eder; izin haklarını ve resmî tatilleri yönetir", "İzin yönetimi"),
+        new(Permissions.ExpensesRead, "Masraf beyanlarını görüntüler (kayıt kapsamına göre)", "Masraflar"),
+        new(Permissions.ExpensesRequest, "Kendi adına masraf beyanı açar, satır ve fiş ekler, onaya gönderir", "Masraflar"),
+        new(Permissions.ExpensesApprove, "Onaylayanı olduğu masraf beyanlarını onaylar, iade eder ve reddeder", "Masraf onayı"),
+        new(Permissions.ExpensesManage, "Herkes adına beyan açar ve düzenler, her beyana karar verir ve iptal eder", "Masraf yönetimi"),
+        new(Permissions.ExpensesPay, "Onaylanmış masraf beyanlarını ödendi olarak işaretler", "Masraf ödemesi"),
     ];
 
     /// <summary>Denetim kaydında görünen kayıt türleri (Y5); hassas alanların değeri denetim kaydında gizlenir.</summary>
@@ -115,6 +137,33 @@ public sealed class HrModule : IModule
         {
             References = new Dictionary<string, string> { ["employeeId"] = Entities.Employee },
         },
+        new(Entities.ExpenseClaim, "Masraf beyanı", Permissions.ExpensesRead, new Dictionary<string, string>
+        {
+            ["employeeId"] = "Çalışan", ["title"] = "Başlık", ["currency"] = "Para birimi", ["description"] = "Açıklama", ["totalAmount"] = "Toplam",
+            ["lineCount"] = "Satır sayısı", ["status"] = "Durum", ["approverUserId"] = "Onaylayan", ["decidedByUserId"] = "Karar veren",
+            ["decisionReason"] = "Gerekçe", ["paidByUserId"] = "Ödemeyi işaretleyen", ["paymentReference"] = "Ödeme referansı",
+        }, "title")
+        {
+            References = new Dictionary<string, string> { ["employeeId"] = Entities.Employee },
+            UserFields = ["approverUserId", "decidedByUserId", "paidByUserId", "employeeUserId"],
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string>
+                {
+                    [Domain.ExpenseClaim.Statuses.Draft] = "Taslak", [Domain.ExpenseClaim.Statuses.Submitted] = "Onay bekliyor",
+                    [Domain.ExpenseClaim.Statuses.Approved] = "Onaylandı", [Domain.ExpenseClaim.Statuses.Paid] = "Ödendi",
+                    [Domain.ExpenseClaim.Statuses.Rejected] = "Reddedildi", [Domain.ExpenseClaim.Statuses.Cancelled] = "İptal edildi",
+                },
+            },
+        },
+        new(Entities.ExpenseLine, "Masraf satırı", Permissions.ExpensesRead, new Dictionary<string, string>
+        {
+            ["claimId"] = "Masraf beyanı", ["expenseDate"] = "Tarih", ["expenseTypeKey"] = "Masraf türü", ["description"] = "Açıklama",
+            ["amount"] = "Tutar (KDV dahil)", ["vatAmount"] = "KDV",
+        }, "description")
+        {
+            References = new Dictionary<string, string> { ["claimId"] = Entities.ExpenseClaim },
+        },
         new(Entities.Holiday, "Resmî tatil", Permissions.LeavesRead, new Dictionary<string, string>
         {
             ["date"] = "Tarih", ["name"] = "Ad", ["halfDay"] = "Yarım gün",
@@ -131,6 +180,8 @@ public sealed class HrModule : IModule
         new(Entities.Employee, "Çalışan"),
         new(Entities.LeaveRequest, "İzin talebi"),
         new(Entities.LeaveBalance, "İzin hakkı"),
+        new(Entities.ExpenseClaim, "Masraf beyanı"),
+        new(Entities.ExpenseLine, "Masraf satırı"),
     ];
 
     /// <summary>Departman (Y9b): hazır değerler örnektir; firma kendi departmanlarını ekler. Kod departmanın adına bakmaz.</summary>
@@ -179,6 +230,35 @@ public sealed class HrModule : IModule
         {
             Default = "Annual",
         },
+
+        // Masraf türü (Y9b): hazır değerler örnektir; firma ekler. Kategori raporlama içindir; vergi/harcırah kuralı koda yazılmaz.
+        new(
+            Lists.ExpenseType,
+            "Masraf türü",
+            Entities.ExpenseLine,
+            "expenseTypeKey",
+            Required: true,
+            [
+                new(ExpenseCategories.Transport, "Ulaşım"),
+                new(ExpenseCategories.Accommodation, "Konaklama"),
+                new(ExpenseCategories.Meal, "Yemek ve ağırlama"),
+                new(ExpenseCategories.Other, "Diğer"),
+            ],
+            [
+                new("Taxi", "Taksi", ExpenseCategories.Transport),
+                new("PublicTransport", "Toplu taşıma", ExpenseCategories.Transport),
+                new("Flight", "Uçak", ExpenseCategories.Transport),
+                new("Fuel", "Yakıt", ExpenseCategories.Transport),
+                new("Parking", "Otopark ve köprü/otoyol", ExpenseCategories.Transport),
+                new("Hotel", "Otel", ExpenseCategories.Accommodation),
+                new("Meal", "Yemek", ExpenseCategories.Meal),
+                new("Hospitality", "Müşteri ağırlama", ExpenseCategories.Meal),
+                new("Office", "Kırtasiye ve ofis", ExpenseCategories.Other),
+                new("Other", "Diğer", ExpenseCategories.Other),
+            ])
+        {
+            Default = "Taxi",
+        },
     ];
 
     IReadOnlyList<LookupDefinition> IModule.Lookups => HrLookupDefinitions.All;
@@ -211,6 +291,7 @@ public sealed class HrModule : IModule
         [
             new(Entities.Employee, "Çalışan", Permissions.EmployeesRead) { LabelField = "fullName" },
             new(Entities.LeaveRequest, "İzin talebi", Permissions.LeavesRead) { LabelField = "employeeName" },
+            new(Entities.ExpenseClaim, "Masraf beyanı", Permissions.ExpensesRead) { LabelField = "title" },
         ],
         Events =
         [
@@ -218,6 +299,8 @@ public sealed class HrModule : IModule
             new("hr.employee.updated", Entities.Employee, DomainEventTypes.RecordUpdated, "Çalışan güncellendi"),
             new("hr.leave-request.created", Entities.LeaveRequest, DomainEventTypes.RecordCreated, "İzin talebi açıldı"),
             new("hr.leave-request.updated", Entities.LeaveRequest, DomainEventTypes.RecordUpdated, "İzin talebinin durumu değişti"),
+            new("hr.expense-claim.created", Entities.ExpenseClaim, DomainEventTypes.RecordCreated, "Masraf beyanı açıldı"),
+            new("hr.expense-claim.updated", Entities.ExpenseClaim, DomainEventTypes.RecordUpdated, "Masraf beyanı güncellendi"),
         ],
         Fields =
         [
@@ -248,6 +331,17 @@ public sealed class HrModule : IModule
             },
             new(Entities.LeaveRequest, "startDate", "Başlangıç", AutomationFieldType.Date),
             new(Entities.LeaveRequest, "days", "Gün", AutomationFieldType.Number),
+            new(Entities.ExpenseClaim, "title", "Başlık", AutomationFieldType.Text),
+            new(Entities.ExpenseClaim, "status", "Durum", AutomationFieldType.Choice)
+            {
+                Options =
+                [
+                    new(Domain.ExpenseClaim.Statuses.Draft, "Taslak"), new(Domain.ExpenseClaim.Statuses.Submitted, "Onay bekliyor"),
+                    new(Domain.ExpenseClaim.Statuses.Approved, "Onaylandı"), new(Domain.ExpenseClaim.Statuses.Paid, "Ödendi"),
+                    new(Domain.ExpenseClaim.Statuses.Rejected, "Reddedildi"), new(Domain.ExpenseClaim.Statuses.Cancelled, "İptal edildi"),
+                ],
+            },
+            new(Entities.ExpenseClaim, "totalAmount", "Toplam", AutomationFieldType.Number),
         ],
     };
 
@@ -260,12 +354,18 @@ public sealed class HrModule : IModule
             [
                 Permissions.EmployeesRead, Permissions.EmployeesWrite, Permissions.EmployeesPersonal,
                 Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove, Permissions.LeavesManage,
+                Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.ExpensesManage,
             ]),
+        new(
+            "hr.finance",
+            "Finans (masraf ödemesi)",
+            "Bütün masraf beyanlarını görür ve onaylanmış beyanları ödendi olarak işaretler; beyana karar vermez.",
+            [Permissions.EmployeesRead, Permissions.ExpensesRead, Permissions.ExpensesPay]),
         new(
             "hr.staff",
             "Çalışan (rehber)",
             "Rehberi ve organizasyon şemasını görüntüler, kendi izin hakkını görür ve kendi adına izin talebi açar; özlük bilgilerini göremez.",
-            [Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest])
+            [Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.ExpensesRead, Permissions.ExpensesRequest])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
         },
@@ -273,7 +373,10 @@ public sealed class HrModule : IModule
             "hr.manager",
             "Yönetici (izin onayı)",
             "Çalışan izinlerine ek olarak onaylayanı olduğu (astlarının) izin taleplerini görür, onaylar ve reddeder.",
-            [Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove])
+            [
+                Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove,
+                Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove,
+            ])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
         },
@@ -288,5 +391,8 @@ public sealed class HrModule : IModule
         services.AddScoped<IRecordStore, LeaveBalanceRecordStore>();
         services.AddScoped<IRecordStore, HolidayRecordStore>();
         services.AddScoped<ILeaveWorkflow, LeaveWorkflow>();
+        services.AddScoped<IRecordStore, ExpenseClaimRecordStore>();
+        services.AddScoped<IRecordStore, ExpenseLineRecordStore>();
+        services.AddScoped<IExpenseWorkflow, ExpenseWorkflow>();
     }
 }

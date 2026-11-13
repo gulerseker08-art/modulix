@@ -67,7 +67,8 @@ public class HrModuleTests
     public void Default_form_has_several_tabs_keeps_identity_first_and_groups_personal_data_on_its_own_tab()
     {
         Assert.Equal(
-            [HrModule.Entities.Employee, HrModule.Entities.LeaveRequest, HrModule.Entities.LeaveBalance], HrForms.All.Select(f => f.EntityKey));
+            [HrModule.Entities.Employee, HrModule.Entities.LeaveRequest, HrModule.Entities.LeaveBalance, HrModule.Entities.ExpenseClaim, HrModule.Entities.ExpenseLine],
+            HrForms.All.Select(f => f.EntityKey));
         foreach (var definition in HrForms.All)
         {
             Assert.True(definition.Tabs.Count >= 2, definition.EntityKey);
@@ -123,6 +124,26 @@ public class HrModuleTests
         Assert.All(list.Values, v => Assert.Contains(v.Category, list.Categories.Select(c => c.Key)));
         Assert.All(list.Categories, c => Assert.Contains(list.Values, v => v.Category == c.Key)); // her kategoride en az bir değer
         Assert.Equal(HrModule.LeaveCategories.Annual, list.Values.Single(v => v.Key == list.Default).Category);
+    }
+
+    [Fact]
+    public void Expense_types_are_categorised_and_finance_only_pays()
+    {
+        var list = Assert.Single(Module.ChoiceLists, l => l.Key == HrModule.Lists.ExpenseType);
+        Assert.Equal(
+            [HrModule.ExpenseCategories.Transport, HrModule.ExpenseCategories.Accommodation, HrModule.ExpenseCategories.Meal, HrModule.ExpenseCategories.Other],
+            list.Categories.Select(c => c.Key));
+        Assert.All(list.Categories, c => Assert.Contains(list.Values, v => v.Category == c.Key));
+        Assert.Contains(list.Values, v => v.Key == list.Default);
+
+        var finance = Module.RoleTemplates.Single(t => t.Key == "hr.finance");
+        Assert.Contains(HrModule.Permissions.ExpensesPay, finance.Permissions);
+        Assert.DoesNotContain(HrModule.Permissions.ExpensesApprove, finance.Permissions);
+        Assert.Equal(Core.Contracts.Authorization.RecordScope.All, finance.Scope);
+        Assert.Contains(HrModule.Permissions.ExpensesRequest, Module.RoleTemplates.Single(t => t.Key == "hr.staff").Permissions);
+        Assert.Contains(HrModule.Permissions.ExpensesApprove, Module.RoleTemplates.Single(t => t.Key == "hr.manager").Permissions);
+        Assert.DoesNotContain(HrModule.Permissions.ExpensesPay, Module.RoleTemplates.Single(t => t.Key == "hr.specialist").Permissions);
+        Assert.Equal(HrModule.Entities.Employee, Module.Lookups.Single(l => l.Key == HrLookupDefinitions.ExpenseClaimEmployee).TargetEntityKey);
     }
 
     [Fact]
@@ -203,5 +224,15 @@ public class HrModuleTests
         Assert.Equal(HrLookupDefinitions.LeaveBalanceEmployee, HrAccess.LeaveBalanceEmployeeLookup);
         Assert.Equal(HrModule.LeaveCategories.Annual, HrAccess.AnnualCategory);
         Assert.Equal(LeaveRequest.Statuses.All, HrAccess.LeaveStatuses.Select(s => s.Key));
+        Assert.Equal(HrModule.Permissions.ExpensesRead, HrAccess.ExpensesRead);
+        Assert.Equal(HrModule.Permissions.ExpensesRequest, HrAccess.ExpensesRequest);
+        Assert.Equal(HrModule.Permissions.ExpensesApprove, HrAccess.ExpensesApprove);
+        Assert.Equal(HrModule.Permissions.ExpensesManage, HrAccess.ExpensesManage);
+        Assert.Equal(HrModule.Permissions.ExpensesPay, HrAccess.ExpensesPay);
+        Assert.Equal(HrModule.Entities.ExpenseClaim, HrAccess.ExpenseClaimEntityKey);
+        Assert.Equal(HrModule.Entities.ExpenseLine, HrAccess.ExpenseLineEntityKey);
+        Assert.Equal(HrModule.Lists.ExpenseType, HrAccess.ExpenseTypeList);
+        Assert.Equal(HrLookupDefinitions.ExpenseClaimEmployee, HrAccess.ExpenseClaimEmployeeLookup);
+        Assert.Equal(ExpenseClaim.Statuses.All, HrAccess.ExpenseStatuses.Select(s => s.Key));
     }
 }
