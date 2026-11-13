@@ -21,8 +21,9 @@ public static class CredentialCategories
     public const string Driver = "driver";
     public const string Party = "party";
     public const string Facility = "facility";
+    public const string Employee = "employee";
 
-    public static IReadOnlyList<string> All { get; } = [Vehicle, Driver, Party, Facility];
+    public static IReadOnlyList<string> All { get; } = [Vehicle, Driver, Party, Facility, Employee];
 }
 
 /// <summary>Belge durumu: iptal edilen belge geçerlilik tarihinden bağımsız olarak geçersizdir. Süresi dolmuşluk tarihten hesaplanır, saklanmaz.</summary>

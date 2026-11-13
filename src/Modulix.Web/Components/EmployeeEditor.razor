@@ -1,0 +1,472 @@
+@* Çalışan kartı (özlük) ekleme/düzenleme formu; Çalışanlar ekranı kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir. Çalışan bir
+   kişidir (ADR-0042 K2): yeni çalışanda kayıtlı kişi seçilir ya da ad, soyad, iş telefonu ve iş e-postasıyla yeni kişi açılır (ortak kişi kaydı,
+   çalışan yazma izniyle). Özlük alanları hassastır (K4): "Özlük bilgileri" izni olmayan kullanıcıya sunucu bu alanları göndermez; form onları
+   çizmez ve kaydederken göndermez. Benzersizlik, T.C. kimlik no / IBAN denetimi ve yönetici döngüsü sunucuda denetlenir; ileti alanın altında
+   gösterilir. Yazma izni olmayan kullanıcı kartı salt okunur görür. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Employee is null ? "Yeni çalışan" : "Çalışan kartı")</h2>
+            @if (Employee is not null)
+            {
+                <p>@personName@(string.IsNullOrWhiteSpace(form.JobTitle) ? "" : $" · {form.JobTitle}")</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@(CanWrite ? "İptal" : "Kapat")</button>
+            @if (CanWrite)
+            {
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">
+                    @if (busy)
+                    {
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                    }
+                    Kaydet
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Çalışan özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true"><AppIcon Name="user" Size="24" /></span>
+                    <strong class="summary-name">@(SummaryName ?? "Çalışan")</strong>
+                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.JobTitle) ? "Unvan girilmedi" : form.JobTitle)</span>
+                </div>
+                <h3 class="summary-heading">Çalışan özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Departman</dt><dd>@(string.IsNullOrEmpty(form.DepartmentKey) ? "—" : Lookups.Label(HrAccess.DepartmentList, form.DepartmentKey))</dd></div>
+                    <div><dt>İşe giriş</dt><dd>@(form.HireDate is { } hired ? FleetLabels.Date(hired) : "—")</dd></div>
+                    <div><dt>Kıdem</dt><dd>@Seniority</dd></div>
+                    <div><dt>Durum</dt><dd>@HrLabels.Status(form.Status)</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <fieldset disabled="@(!CanWrite)">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Çalışan formu bölümleri">
+                <Field Context="f">
+                    @if (HrAccess.PersonalFields.Contains(f.Key) && !CanSeePersonal)
+                    {
+                        @if (f.Key == HrAccess.PersonalFields[0])
+                        {
+                            <p class="text-muted mb-0">Özlük bilgilerini görme izniniz yok (T.C. kimlik no, doğum tarihi, adres, acil durum kişisi, IBAN).</p>
+                        }
+                    }
+                    else
+                    {
+                    @switch (f.Key)
+                    {
+                        case "personId":
+                            @if (form.Id is not null)
+                            {
+                                <span class="@f.LabelClass()">@f.Label</span>
+                                <p class="mb-0"><strong>@personName</strong></p>
+                                <small class="text-muted">Ad, iş e-postası ve iş telefonu kişi kaydındadır; çalışanın kişisi değiştirilemez.</small>
+                            }
+                            else
+                            {
+                                <SegmentedChoice Id="employee-person-mode" Label="@f.Label" LabelClass="@f.LabelClass()" Options="PersonModes" @bind-Value="newPerson" />
+                                @if (newPerson)
+                                {
+                                    <div class="form-grid mt-2">
+                                        <div class="span-6">
+                                            <label class="form-label required" for="employee-first">Ad</label>
+                                            <input id="employee-first" class="form-control" maxlength="100" aria-required="true" @bind="form.FirstName" />
+                                            <FieldError Field="firstName" Errors="personErrors" />
+                                        </div>
+                                        <div class="span-6">
+                                            <label class="form-label required" for="employee-last">Soyad</label>
+                                            <input id="employee-last" class="form-control" maxlength="100" aria-required="true" @bind="form.LastName" />
+                                            <FieldError Field="lastName" Errors="personErrors" />
+                                        </div>
+                                        <div class="span-6">
+                                            <label class="form-label" for="employee-phone">İş telefonu</label>
+                                            <input id="employee-phone" class="form-control" type="tel" maxlength="50" @bind="form.Phone" />
+                                            <FieldError Field="phone" Errors="personErrors" />
+                                        </div>
+                                        <div class="span-6">
+                                            <label class="form-label" for="employee-email">İş e-postası</label>
+                                            <input id="employee-email" class="form-control" type="email" maxlength="200" @bind="form.Email" />
+                                            <FieldError Field="email" Errors="personErrors" />
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <LookupPicker Id="employee-person" LookupKey="@HrAccess.EmployeePersonLookup" @bind-Value="form.PersonId" Required="true" Placeholder="Kayıtlı kişiyi seçin…" Invalid="@(errors?.ContainsKey("personId") == true)" />
+                                }
+                                <FieldError Field="personId" Errors="errors" />
+                            }
+                            break;
+                        case "employeeNumber":
+                            <label class="@f.LabelClass()" for="employee-number">@f.Label</label>
+                            <input id="employee-number" class="form-control" maxlength="30" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.EmployeeNumber" />
+                            <FieldError Field="employeeNumber" Errors="errors" />
+                            break;
+                        case "hireDate":
+                            <label class="@f.LabelClass()" for="employee-hire">@f.Label</label>
+                            <input id="employee-hire" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.HireDate" />
+                            <FieldError Field="hireDate" Errors="errors" />
+                            break;
+                        case "status":
+                            <label class="@f.LabelClass()" for="employee-status">@f.Label</label>
+                            <select id="employee-status" class="form-select" @bind="form.Status">
+                                @foreach (var (key, label) in HrAccess.Statuses)
+                                {
+                                    <option value="@key">@label</option>
+                                }
+                            </select>
+                            <FieldError Field="status" Errors="errors" />
+                            <small class="text-muted">Kart silinmez; ayrılan çalışanı "Ayrıldı" yapıp ayrılış tarihini girin.</small>
+                            break;
+                        case "userId":
+                            <label class="@f.LabelClass()" for="employee-user">@f.Label</label>
+                            <LookupPicker Id="employee-user" LookupKey="@HrAccess.EmployeeUserLookup" @bind-Value="form.UserId" Placeholder="@(form.UserId is null ? "Hesabı yok" : Lookups.MemberName(form.UserId))" Invalid="@(errors?.ContainsKey("userId") == true)" />
+                            <FieldError Field="userId" Errors="errors" />
+                            <small class="text-muted">İzin ve masraf gibi self servis işlemler için; kullanıcısı olmayan çalışan da kaydedilebilir.</small>
+                            break;
+                        case "jobTitle":
+                            <label class="@f.LabelClass()" for="employee-title">@f.Label</label>
+                            <input id="employee-title" class="form-control" maxlength="150" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.JobTitle" />
+                            <FieldError Field="jobTitle" Errors="errors" />
+                            break;
+                        case "departmentKey":
+                            <label class="@f.LabelClass()" for="employee-department">@f.Label</label>
+                            <select id="employee-department" class="form-select" @bind="form.DepartmentKey">
+                                <option value="">Seçilmedi</option>
+                                @foreach (var department in Lookups.Choices(HrAccess.DepartmentList, form.DepartmentKey))
+                                {
+                                    <option value="@department.Key">@department.Label</option>
+                                }
+                            </select>
+                            <FieldError Field="departmentKey" Errors="errors" />
+                            break;
+                        case "managerEmployeeId":
+                            <label class="@f.LabelClass()" for="employee-manager">@f.Label</label>
+                            <LookupPicker Id="employee-manager" LookupKey="@HrAccess.EmployeeManagerLookup" @bind-Value="form.ManagerEmployeeId" Placeholder="Yöneticiyi seçin…" Invalid="@(errors?.ContainsKey("managerEmployeeId") == true)" />
+                            <FieldError Field="managerEmployeeId" Errors="errors" />
+                            <small class="text-muted">Organizasyon şeması bu bağdan çizilir.</small>
+                            break;
+                        case "workLocation":
+                            <label class="@f.LabelClass()" for="employee-location">@f.Label</label>
+                            <input id="employee-location" class="form-control" maxlength="150" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.WorkLocation" />
+                            <FieldError Field="workLocation" Errors="errors" />
+                            break;
+                        case "employmentType":
+                            <label class="@f.LabelClass()" for="employee-type">@f.Label</label>
+                            <select id="employee-type" class="form-select" @bind="form.EmploymentType">
+                                @foreach (var (key, label) in HrAccess.EmploymentTypes)
+                                {
+                                    <option value="@key">@label</option>
+                                }
+                            </select>
+                            <FieldError Field="employmentType" Errors="errors" />
+                            break;
+                        case "terminationDate":
+                            <label class="@f.LabelClass()" for="employee-left">@f.Label</label>
+                            <input id="employee-left" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.TerminationDate" />
+                            <FieldError Field="terminationDate" Errors="errors" />
+                            <small class="text-muted">İleri tarih girilebilir (planlanan çıkış).</small>
+                            break;
+                        case "nationalId":
+                            <label class="@f.LabelClass()" for="employee-national">@f.Label</label>
+                            <input id="employee-national" class="form-control" inputmode="numeric" maxlength="11" autocomplete="off" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.NationalId" />
+                            <FieldError Field="nationalId" Errors="errors" />
+                            break;
+                        case "birthDate":
+                            <label class="@f.LabelClass()" for="employee-birth">@f.Label</label>
+                            <input id="employee-birth" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.BirthDate" />
+                            <FieldError Field="birthDate" Errors="errors" />
+                            break;
+                        case "iban":
+                            <label class="@f.LabelClass()" for="employee-iban">@f.Label</label>
+                            <input id="employee-iban" class="form-control" maxlength="34" autocomplete="off" placeholder="TR00 0000 0000 0000 0000 0000 00" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Iban" />
+                            <FieldError Field="iban" Errors="errors" />
+                            break;
+                        case "homeAddress":
+                            <label class="@f.LabelClass()" for="employee-address">@f.Label</label>
+                            <textarea id="employee-address" class="form-control" rows="2" maxlength="500" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.HomeAddress"></textarea>
+                            <FieldError Field="homeAddress" Errors="errors" />
+                            break;
+                        case "emergencyContactName":
+                            <label class="@f.LabelClass()" for="employee-emergency-name">@f.Label</label>
+                            <input id="employee-emergency-name" class="form-control" maxlength="150" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.EmergencyContactName" />
+                            <FieldError Field="emergencyContactName" Errors="errors" />
+                            break;
+                        case "emergencyContactPhone":
+                            <label class="@f.LabelClass()" for="employee-emergency-phone">@f.Label</label>
+                            <input id="employee-emergency-phone" class="form-control" type="tel" maxlength="50" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.EmergencyContactPhone" />
+                            <FieldError Field="emergencyContactPhone" Errors="errors" />
+                            break;
+                        case "notes":
+                            <label class="@f.LabelClass()" for="employee-notes">@f.Label</label>
+                            <textarea id="employee-notes" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
+                            <FieldError Field="notes" Errors="errors" />
+                            break;
+                    }
+                    }
+                </Field>
+            </LayoutForm>
+            </fieldset>
+
+            @if (CanWrite)
+            {
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
+                    <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+                </div>
+            }
+        </div>
+    </div>
+</form>
+
+@code {
+    private bool dirty;
+    private const string EntityKey = HrAccess.EmployeeEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+    private static readonly IReadOnlyList<SegmentOption<bool>> PersonModes = [new(false, "Kayıtlı kişi"), new(true, "Yeni kişi")];
+
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private EmployeeForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private IReadOnlyDictionary<string, string[]>? personErrors;
+    private string? message;
+    private bool busy;
+    private bool newPerson = true;
+    private string personName = "—";
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek çalışan; null ise yeni çalışan.</summary>
+    [Parameter] public RecordResponse? Employee { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    private bool CanWrite => Session.Can(HrAccess.EmployeesWrite);
+
+    private bool CanSeePersonal => Session.Can(HrAccess.EmployeesPersonal);
+
+    private string? SummaryName => form.Id is not null
+        ? personName
+        : newPerson ? $"{form.FirstName} {form.LastName}".Trim() is { Length: > 0 } typed ? typed : null : null;
+
+    /// <summary>İşe girişten bugüne (ya da ayrılışa) geçen süre: "3 yıl 2 ay".</summary>
+    private string Seniority
+    {
+        get
+        {
+            if (form.HireDate is not { } hired)
+            {
+                return "—";
+            }
+
+            var end = form.TerminationDate is { } left && left < DateOnly.FromDateTime(DateTime.Today) ? left : DateOnly.FromDateTime(DateTime.Today);
+            var months = ((end.Year - hired.Year) * 12) + end.Month - hired.Month - (end.Day < hired.Day ? 1 : 0);
+            return months < 0 ? "Henüz başlamadı" : months < 1 ? "1 aydan az" : $"{(months / 12 > 0 ? $"{months / 12} yıl " : "")}{(months % 12 > 0 ? $"{months % 12} ay" : "")}".Trim();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir çalışan verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Employee))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Employee;
+        form = Employee is { } r
+            ? new EmployeeForm
+            {
+                Id = r.Id, Version = r.Version, PersonId = WarehouseLabels.Id(r, "personId"),
+                EmployeeNumber = WarehouseLabels.Text(r, "employeeNumber"), UserId = WarehouseLabels.Id(r, "userId"),
+                JobTitle = WarehouseLabels.Text(r, "jobTitle"), DepartmentKey = WarehouseLabels.Text(r, "departmentKey"),
+                ManagerEmployeeId = WarehouseLabels.Id(r, "managerEmployeeId"), EmploymentType = WarehouseLabels.Text(r, "employmentType"),
+                WorkLocation = WarehouseLabels.Text(r, "workLocation"), HireDate = FleetLabels.Day(WarehouseLabels.Text(r, "hireDate")),
+                TerminationDate = FleetLabels.Day(WarehouseLabels.Text(r, "terminationDate")), Status = WarehouseLabels.Text(r, "status"),
+                NationalId = WarehouseLabels.Text(r, "nationalId"), BirthDate = FleetLabels.Day(WarehouseLabels.Text(r, "birthDate")),
+                HomeAddress = WarehouseLabels.Text(r, "homeAddress"), EmergencyContactName = WarehouseLabels.Text(r, "emergencyContactName"),
+                EmergencyContactPhone = WarehouseLabels.Text(r, "emergencyContactPhone"), Iban = WarehouseLabels.Text(r, "iban"),
+                Notes = WarehouseLabels.Text(r, "notes"), Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new EmployeeForm { HireDate = DateOnly.FromDateTime(DateTime.Today) };
+        errors = personErrors = null;
+        message = null;
+
+        // Çalışanın adı kayıttaki hesaplanan alandan gelir (kişi kaydından okunur).
+        personName = Employee is { } e ? HrLabels.Name(e) : "—";
+    }
+
+    private async Task SaveAsync()
+    {
+        if (!CanWrite)
+        {
+            return;
+        }
+
+        busy = true;
+        message = null;
+        errors = personErrors = null;
+
+        // Yeni kişi: önce ortak kişi kaydı açılır; çalışan kaydı başarısız olursa tekrar denemede aynı kişi kullanılır (çift kişi açılmaz).
+        if (form.Id is null && newPerson && form.CreatedPersonId is null)
+        {
+            var person = await Api.PostAsync<RecordResponse>("/api/records/core.person", new RecordWriteRequest(new JsonObject
+            {
+                ["firstName"] = form.FirstName.Trim(),
+                ["lastName"] = form.LastName.Trim(),
+                ["phone"] = Optional(form.Phone),
+                ["email"] = Optional(form.Email),
+            }));
+            if (!person.IsSuccess)
+            {
+                busy = false;
+                personErrors = person.FieldErrors;
+                message = person.FieldErrors is { Count: > 0 } ? "Kişi bilgilerini kontrol edin." : person.Error;
+                return;
+            }
+
+            form.CreatedPersonId = person.Value!.Id;
+        }
+
+        var values = new JsonObject
+        {
+            ["employeeNumber"] = Optional(form.EmployeeNumber),
+            ["userId"] = form.UserId?.ToString(),
+            ["jobTitle"] = Optional(form.JobTitle),
+            ["departmentKey"] = Optional(form.DepartmentKey),
+            ["managerEmployeeId"] = form.ManagerEmployeeId?.ToString(),
+            ["employmentType"] = form.EmploymentType,
+            ["workLocation"] = Optional(form.WorkLocation),
+            ["hireDate"] = form.HireDate?.ToString("yyyy-MM-dd"),
+            ["terminationDate"] = form.TerminationDate?.ToString("yyyy-MM-dd"),
+            ["status"] = form.Status,
+            ["notes"] = Optional(form.Notes),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+
+        // Özlük alanları yalnızca izni olan kullanıcı tarafından gönderilir (izinsiz gönderim sunucuda reddedilir).
+        if (CanSeePersonal)
+        {
+            values["nationalId"] = Optional(form.NationalId);
+            values["birthDate"] = form.BirthDate?.ToString("yyyy-MM-dd");
+            values["homeAddress"] = Optional(form.HomeAddress);
+            values["emergencyContactName"] = Optional(form.EmergencyContactName);
+            values["emergencyContactPhone"] = Optional(form.EmergencyContactPhone);
+            values["iban"] = Optional(form.Iban);
+        }
+
+        if (form.Id is null)
+        {
+            values["personId"] = (newPerson ? form.CreatedPersonId : form.PersonId)?.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private static string? Optional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class EmployeeForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public Guid? PersonId { get; set; }
+
+        /// <summary>Bu formda açılan yeni kişi (çalışan kaydı başarısız olursa tekrar denemede kullanılır).</summary>
+        public Guid? CreatedPersonId { get; set; }
+
+        public string FirstName { get; set; } = string.Empty;
+
+        public string LastName { get; set; } = string.Empty;
+
+        public string? Phone { get; set; }
+
+        public string? Email { get; set; }
+
+        public string? EmployeeNumber { get; set; }
+
+        public Guid? UserId { get; set; }
+
+        public string? JobTitle { get; set; }
+
+        public string? DepartmentKey { get; set; }
+
+        public Guid? ManagerEmployeeId { get; set; }
+
+        public string EmploymentType { get; set; } = "fullTime";
+
+        public string? WorkLocation { get; set; }
+
+        public DateOnly? HireDate { get; set; }
+
+        public DateOnly? TerminationDate { get; set; }
+
+        public string Status { get; set; } = "active";
+
+        public string? NationalId { get; set; }
+
+        public DateOnly? BirthDate { get; set; }
+
+        public string? HomeAddress { get; set; }
+
+        public string? EmergencyContactName { get; set; }
+
+        public string? EmergencyContactPhone { get; set; }
+
+        public string? Iban { get; set; }
+
+        public string? Notes { get; set; }
+    }
+}

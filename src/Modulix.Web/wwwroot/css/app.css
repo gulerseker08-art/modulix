@@ -2659,6 +2659,45 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
         color: var(--mx-ink);
     }
 
+/* Organizasyon ağacı (İK organizasyon şeması): girintili iç içe liste, alt düzeyler sol çizgiyle bağlanır. */
+.org-tree,
+.org-tree ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+    .org-tree ul {
+        margin-left: 1.25rem;
+        padding-left: 1rem;
+        border-left: 1px solid var(--mx-border);
+    }
+
+    .org-tree li {
+        padding-top: 0.5rem;
+    }
+
+.org-node {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    color: var(--mx-ink);
+}
+
+    .org-node small {
+        display: block;
+        color: var(--mx-muted);
+    }
+
+    .org-node.active {
+        background: var(--mx-tone-brand-bg);
+        border-color: var(--mx-tone-brand-fg);
+    }
+
 .profile-plan {
     padding-left: 1.25rem;
     margin-bottom: 0.75rem;

@@ -1,0 +1,47 @@
+@* Açılmış izin talebinin özeti ve eylemleri (ADR-0042 dilim 2). Talep değiştirilmez; durum yalnızca eylemlerle değişir (onay, ret, iptal). *@
+@inject CrmLookups Lookups
+
+<section class="record-form sectioned" aria-label="İzin talebi">
+    <div class="form-toolbar">
+        <div>
+            <h2>İzin talebi</h2>
+            <p>@WarehouseLabels.Text(Request, "employeeName") · @Lookups.Label(HrAccess.LeaveTypeList, WarehouseLabels.Text(Request, "leaveTypeKey"))</p>
+        </div>
+        <div class="form-toolbar-actions">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Closed">Kapat</button>
+        </div>
+    </div>
+
+    <LeaveActionsBar Record="Request" Changed="Changed" />
+
+    <div class="summary-card">
+        <dl class="summary-facts">
+            <div><dt>Tarih</dt><dd>@HrLabels.Range(Request)</dd></div>
+            <div><dt>Süre</dt><dd>@HrLabels.Days(HrLabels.Decimal(Request, "days"))</dd></div>
+            <div><dt>Durum</dt><dd><span class="badge @HrLabels.LeaveStatusBadge(Status)">@HrLabels.LeaveStatus(Status)</span></dd></div>
+            <div><dt>Onaylayan</dt><dd>@(WarehouseLabels.Id(Request, "approverUserId") is { } approver ? Lookups.MemberName(approver) : "İK")</dd></div>
+            @if (WarehouseLabels.Id(Request, "decidedByUserId") is { } decidedBy)
+            {
+                <div><dt>Karar veren</dt><dd>@Lookups.MemberName(decidedBy)</dd></div>
+            }
+            @if (WarehouseLabels.Text(Request, "decisionReason") is { Length: > 0 } decisionReason)
+            {
+                <div><dt>Gerekçe</dt><dd>@decisionReason</dd></div>
+            }
+            @if (WarehouseLabels.Text(Request, "description") is { Length: > 0 } description)
+            {
+                <div><dt>Açıklama</dt><dd>@description</dd></div>
+            }
+        </dl>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public RecordResponse Request { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Changed { get; set; }
+
+    [Parameter] public EventCallback Closed { get; set; }
+
+    private string Status => WarehouseLabels.Text(Request, "status");
+}

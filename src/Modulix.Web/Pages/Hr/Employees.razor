@@ -1,0 +1,313 @@
+@page "/ik/calisanlar"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Çalışanlar · Modulix</PageTitle>
+
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.EmployeesRead">
+    <PageHeader Title="Çalışanlar" Icon="users" Subtitle="@(page is null ? "Çalışan kartlarını, görev ve istihdam bilgilerini ve özlük dosyasını yönetin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <EmployeeEditor Employee="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
+        @if (selected is not null)
+        {
+            <CredentialsPanel OwnerEntityKey="@HrAccess.EmployeeEntityKey" OwnerId="selected.Id" Category="@CredentialAccess.Employee" Lookups="Lookups"
+                              CanWrite="@Session.Can(HrAccess.EmployeesWrite)" Title="Özlük belgeleri"
+                              EmptyText="Bu çalışana henüz belge eklenmedi (iş sözleşmesi, sağlık raporu, diploma, sertifika…)." />
+        }
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Çalışan görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Çalışan ara" placeholder="Ad, soyad, e-posta, telefon, sicil no veya unvan ara" @bind="search" />
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(HrAccess.EmployeesWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni çalışan</button>
+        }
+    </div>
+
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <select class="form-select" aria-label="Departman" @bind="departmentKey" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm departmanlar</option>
+                @foreach (var department in Lookups.ValuesOf(HrAccess.DepartmentList))
+                {
+                    <option value="@department.Key">@department.Label</option>
+                }
+            </select>
+            <select class="form-select" aria-label="Çalışma şekli" @bind="employmentType" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm çalışma şekilleri</option>
+                @foreach (var (key, label) in HrAccess.EmploymentTypes)
+                {
+                    <option value="@key">@label</option>
+                }
+            </select>
+        </div>
+    }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan çalışan yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) çalışan listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Çalışan listesi</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var employee in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, employee)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{HrLabels.Name(employee)} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(employee)">
+                                    <AppIcon Name="@(Session.Can(HrAccess.EmployeesWrite) ? "pencil" : "eye")" Size="16" /> <span>@(Session.Can(HrAccess.EmployeesWrite) ? "Düzenle" : "Kartı aç")</span>
+                                </button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + HrAccess.EmployeeEntityKey;
+
+    private const string CurrentView = "current";
+    private const string AllViews = "all";
+    private const string OnLeaveView = "onLeave";
+    private const string TerminatedView = "terminated";
+
+    // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (EmployeeRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("name", "Ad soyad", "user", "name", "-name", Locked: true),
+        new("employeeNumber", "Sicil no", "hash", "employeeNumber", "-employeeNumber"),
+        new("jobTitle", "Unvan", "briefcase", "jobTitle", "-jobTitle"),
+        new("department", "Departman", "building", "departmentKey", "-departmentKey"),
+        new("manager", "Yönetici", "user-check"),
+        new("email", "E-posta", "mail", DefaultVisible: false),
+        new("phone", "Telefon", "phone", DefaultVisible: false),
+        new("employmentType", "Çalışma şekli", "clock", DefaultVisible: false),
+        new("hireDate", "İşe giriş", "calendar", "hireDate", "-hireDate"),
+        new("status", "Durum", "tag", "status", "-status"),
+    ];
+
+    private readonly GridViewState grid = new("hr.employees", "name");
+    private readonly Dictionary<Guid, string> managerNames = [];
+    private PersonalGridViews views = default!;
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private bool filtersOpen;
+    private string? message;
+    private string? search;
+    private string view = CurrentView;
+    private string? status;
+    private bool currentOnly = true;
+    private string? departmentKey;
+    private string? employmentType;
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, "hr.employees");
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.EmployeesRead))
+        {
+            await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(HrAccess.EmployeeEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private GridViewDto? Active => views.Find(view);
+
+    private int ActiveFilters => (string.IsNullOrEmpty(departmentKey) ? 0 : 1) + (string.IsNullOrEmpty(employmentType) ? 0 : 1);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(CurrentView, "Çalışanlar", Icon: "users"),
+        new(OnLeaveView, "İzinde", Icon: "calendar"),
+        new(TerminatedView, "Ayrılanlar", Icon: "log-out"),
+        new(AllViews, "Tüm kartlar", Icon: "list"),
+        .. views.Options,
+    ];
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            status = filters.GetValueOrDefault("status");
+            currentOnly = filters.GetValueOrDefault("current") == "true";
+            departmentKey = filters.GetValueOrDefault("departmentKey");
+            employmentType = filters.GetValueOrDefault("employmentType");
+        }
+        else
+        {
+            grid.Reset();
+            status = key switch { OnLeaveView => "onLeave", TerminatedView => HrAccess.Terminated, _ => null };
+            currentOnly = key == CurrentView;
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(
+        status is { } s ? ("status", s) : null,
+        currentOnly ? ("current", "true") : null,
+        string.IsNullOrEmpty(departmentKey) ? null : ("departmentKey", departmentKey),
+        string.IsNullOrEmpty(employmentType) ? null : ("employmentType", employmentType));
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(CurrentView);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (status is { } s)
+        {
+            url += $"&status={s}";
+        }
+
+        if (currentOnly)
+        {
+            url += "&current=true";
+        }
+
+        if (!string.IsNullOrEmpty(departmentKey))
+        {
+            url += $"&departmentKey={Uri.EscapeDataString(departmentKey)}";
+        }
+
+        if (!string.IsNullOrEmpty(employmentType))
+        {
+            url += $"&employmentType={employmentType}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+        if (page is not null)
+        {
+            // Yöneticinin adı seçim kutusunun çözümleme ucuyla gelir (izin yoksa "—").
+            await WarehouseLabels.ResolveNamesAsync(Api, HrAccess.EmployeeManagerLookup, page.Items.Select(e => WarehouseLabels.Id(e, "managerEmployeeId")).OfType<Guid>(), managerNames);
+        }
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse employee) => @<td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, employee)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse employee) => key switch
+    {
+        "name" => @<span class="owner-cell"><span class="avatar avatar-tone-@(Math.Abs(employee.Id.GetHashCode()) % 5)" aria-hidden="true">@HrLabels.Initials(employee)</span>@HrLabels.Name(employee)</span>,
+        "employeeNumber" => @<text>@Dash(WarehouseLabels.Text(employee, "employeeNumber"))</text>,
+        "jobTitle" => @<text>@Dash(WarehouseLabels.Text(employee, "jobTitle"))</text>,
+        "department" => @<text>@(WarehouseLabels.Text(employee, "departmentKey") is { Length: > 0 } d ? Lookups.Label(HrAccess.DepartmentList, d) : "—")</text>,
+        "manager" => @<text>@(WarehouseLabels.Id(employee, "managerEmployeeId") is { } manager ? WarehouseLabels.NameOf(managerNames, manager) : "—")</text>,
+        "email" => @<text>@Dash(WarehouseLabels.Text(employee, "email"))</text>,
+        "phone" => @<text>@Dash(WarehouseLabels.Text(employee, "phone"))</text>,
+        "employmentType" => @<text>@HrLabels.EmploymentType(WarehouseLabels.Text(employee, "employmentType"))</text>,
+        "hireDate" => @<text>@HrLabels.Date(WarehouseLabels.Text(employee, "hireDate"))</text>,
+        "status" => @<span class="badge @HrLabels.StatusBadge(WarehouseLabels.Text(employee, "status"))">@HrLabels.Status(WarehouseLabels.Text(employee, "status"))</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.EmployeeEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, employee.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private static string Dash(string value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    private void Open(RecordResponse? employee)
+    {
+        selected = employee;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}
