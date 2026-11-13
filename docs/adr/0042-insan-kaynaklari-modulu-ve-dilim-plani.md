@@ -303,3 +303,7 @@ Bölüm 5'teki masraf akışı izin dilimindeki kalıpla (iş akışı kapısı,
 | `dotnet test tests/Modulix.Core.Tests` | 971/971 geçti |
 | `HrBlogGalleryTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |
+
+## 17. Liste şablonu borcu kapatıldı (13 Kasım 2026)
+
+Dilim 5–8'de grid şablonunun bir kısmıyla açılan altı İK listesi tam şablona taşındı: İşe giriş ve çıkış, Süreç şablonları, Duyuru yönetimi, Anket yönetimi, Blog yönetimi, Galeri yönetimi. Hepsinde artık `ViewTabs` + "+ Görünüm" ile kişisel görünüm (`PersonalViewBar`, sütunlar, sıralama ve görünüm süzgeci birlikte saklanır), `GridHeader` ile sunucu `sort` anahtarlarına bağlı sıralanabilir başlıklar, `GridColumnPicker` (özel alanlar da sütun olarak seçilebilir), `RowMenu` ve `Pager` (sayfa boyutu seçimiyle) vardır. İşe giriş ve çıkış listesine tür süzgeci (`FilterToggle`) eklendi; Süreç şablonları arama, sayfalama ve "Pasif" görünümü kazandı. Sunucu ve API değişmedi; yeni CSS sınıfı yok. Okur ekranları (Duyurular, Anketler, Blog, Galeri, Görevlerim) liste değil akış/kart ekranıdır ve şablonun dışındadır.
