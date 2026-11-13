@@ -1,23 +1,21 @@
-# Modulix API imaji: main'deki CI basariyla bitince imaji derler ve GitHub Container Registry'ye (ghcr.io) iter.
-# CI kirmizi ise imaj yayinlanmaz; test ortami bozuk bir main'i almaz.
-# Test ortami guncel imaji su komutlarla ceker:
+# Modulix API imaji: YALNIZCA ELLE calisir. GitHub'da Actions > "Docker imaji" > "Run workflow" ile baslatilir;
+# secilen daldaki kodu derler ve GitHub Container Registry'ye (ghcr.io) iter. Otomatik tetikleyici yoktur.
+# (Test sirasinda her main birlestirmesinde imaj uretmek yerine, istendiginde uretilir; Actions dakikasi ve
+# kayit alani harcanmaz. Otomatige donmek icin `on:` altina workflow_run veya push tetikleyicisi eklenir.)
+# Test ortami imaji su komutlarla ceker:
 #   docker pull ghcr.io/gulerseker08-art/modulix-api:main
 #   (compose ile: image satirini bu etikete cevirip `docker compose pull api && docker compose up -d api`)
 #   Test ortami Development ile calistirilmaz: ASPNETCORE_ENVIRONMENT=Staging ve App__PublicUrl verilmelidir
 #   (Development e-posta baglantilarini istek basligindaki Host ile kurar ve OpenAPI/hata sayfasini acar).
-# Etiketler: main (hep en son main), sha-<kisa commit> (geri donus icin degismez).
+# Etiketler: <dal adi> (main secilirse "main"; hep o dalin en son imaji) ve sha-<kisa commit> (geri donus icin degismez).
 # Gizli bilgi imaja girmez; yapilandirma calisma aninda ortam degiskenleriyle verilir (tek imaj ilkesi).
 
 name: Docker imaji
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
 
-# Ust uste birlestirmede eski derleme iptal edilir; en son main her zaman kazanir.
+# Ayni dal icin ust uste elle baslatilirsa eski derleme iptal edilir.
 concurrency:
   group: docker-image-${{ github.ref }}
   cancel-in-progress: true
@@ -31,27 +29,13 @@ env:
 
 jobs:
   publish:
-    # Yalnizca main'e push ile gelen ve basarili biten CI calismasi. 'event == push' sart: depo herkese acik
-    # oldugundan, dali 'main' adli bir fork pull request'i de branches suzgecine uyar; onun imaji yayinlanmamali.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-24.04  # sabit: runner imaji degisince derleme sessizce bozulmasin
     timeout-minutes: 30
 
     steps:
-      # workflow_run varsayilan dalin ucunu gosterir; imaj tam olarak CI'in test ettigi commit'ten derlenir.
+      # "Use workflow from" ile secilen dalin ucundan derlenir (varsayilan: main).
       - name: Kodu al
         uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-
-      - name: Commit bilgisi
-        id: commit
-        run: |
-          sha="${{ github.event.workflow_run.head_sha || github.sha }}"
-          echo "full=$sha" >> "$GITHUB_OUTPUT"
-          echo "short=${sha:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Buildx kurulumu
         uses: docker/setup-buildx-action@v3
@@ -70,11 +54,10 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=main
-            type=raw,value=sha-${{ steps.commit.outputs.short }}
+            type=ref,event=branch
+            type=sha,prefix=sha-,format=short
           labels: |
             org.opencontainers.image.title=Modulix API
-            org.opencontainers.image.revision=${{ steps.commit.outputs.full }}
 
       - name: Derle ve it
         uses: docker/build-push-action@v6

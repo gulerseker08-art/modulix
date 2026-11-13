@@ -9,9 +9,9 @@
     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
         <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => RunExportAsync("csv")'>
             @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
-            CSV olarak dışa aktar
+            @Texts.Get("crm.sales.export.csv")
         </button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => RunExportAsync("xlsx")'>Excel olarak dışa aktar</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => RunExportAsync("xlsx")'>@Texts.Get("crm.sales.export.xlsx")</button>
 
         <div aria-live="polite">
             @if (error is not null)
@@ -20,9 +20,9 @@
             }
             else if (export is not null)
             {
-                <span role="status"><strong>Dosya hazır:</strong> @export.FileName (@export.RowCount.ToString("N0", Regional.Numbers) satır).</span>
-                <button type="button" class="btn btn-primary btn-sm ms-2" disabled="@busy" @onclick="DownloadAsync">İndir</button>
-                <a class="ms-2" href="raporlar/disa-aktarimlar">Dışa aktarımlarım</a>
+                <span role="status"><strong>@Texts.Get("crm.sales.export.ready")</strong> @Texts.Get("crm.sales.export.file", export.FileName, export.RowCount.ToString("N0", Regional.Numbers))</span>
+                <button type="button" class="btn btn-primary btn-sm ms-2" disabled="@busy" @onclick="DownloadAsync">@Texts.Get("crm.sales.export.download")</button>
+                <a class="ms-2" href="raporlar/disa-aktarimlar">@Texts.Get("crm.sales.export.mine")</a>
             }
 
             @if (downloadError is not null)
@@ -74,7 +74,7 @@
         }
 
         error = result.Status == System.Net.HttpStatusCode.Forbidden
-            ? $"Dışa aktarma yetkiniz yok ya da modül salt okunur. {result.Error}"
+            ? Texts.Get("crm.sales.export.forbidden", result.Error)
             : result.Error;
     }
 

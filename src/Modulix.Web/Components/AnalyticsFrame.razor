@@ -2,29 +2,29 @@
 @* Satış analizi zarfı: dönem satırı, kapsam / tutar izni / kısaltma notları, kısmi veri uyarıları, içerik ve hesap açıklamaları.
    Renk tek başına bilgi taşımaz; her not metinle yazılır. *@
 <p class="small text-muted" role="status">
-    <strong>@Report.PeriodLabel</strong> (@SalesLabels.Period(Report.PeriodStart, Report.PeriodEnd)) · bugün @CrmLabels.Date(Report.Today) · para birimi <strong>@Report.Currency</strong>
+    @SalesLabels.PeriodLine(Report.PeriodLabel, Report.PeriodStart, Report.PeriodEnd, Report.Today, Report.Currency)
     @if (Report.ScopeLimited)
     {
-        <span class="badge tag">Veri kapsamınız kısıtlı</span>
+        <span class="badge tag">@Texts.Get("crm.sales.scopeLimitedBadge")</span>
     }
 </p>
 
 @if (Report.ScopeLimited)
 {
-    <div class="alert alert-info" role="status">Veri kapsamınız kısıtlı: yalnızca yetkili olduğunuz fırsatlar hesaba katıldı.</div>
+    <div class="alert alert-info" role="status">@Texts.Get("crm.sales.scopeLimited")</div>
 }
 @if (!Report.AmountsVisible)
 {
-    <div class="alert alert-info" role="status">Tutarları görme yetkiniz yok; tutarlar gösterilmiyor, yalnızca adetler ve oranlar vardır.</div>
+    <div class="alert alert-info" role="status">@Texts.Get("crm.sales.analyticsNoAmounts")</div>
 }
 @if (Report.Truncated)
 {
-    <div class="alert alert-warning" role="status">Okuma sınırına ulaşıldı; sonuçlar eksik olabilir. Kullanıcı ya da dönem seçerek daraltın.</div>
+    <div class="alert alert-warning" role="status">@Texts.Get("crm.sales.analyticsTruncated")</div>
 }
 @if (Report.Warnings.Count > 0)
 {
     <div class="alert alert-warning" role="status">
-        <strong>Verilerle ilgili uyarılar</strong>
+        <strong>@Texts.Get("crm.sales.warnings")</strong>
         <ul class="mb-0">
             @foreach (var warning in Report.Warnings)
             {
@@ -39,7 +39,7 @@
 @if (Report.Definitions.Count > 0)
 {
     <details class="detail-section">
-        <summary><strong>Hesap açıklaması</strong></summary>
+        <summary><strong>@Texts.Get("crm.sales.definitions")</strong></summary>
         <ul class="small text-muted mt-2">
             @foreach (var definition in Report.Definitions)
             {
