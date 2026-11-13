@@ -68,3 +68,10 @@ Müşteri lokasyonları (firma–kişi ilişkisi [ADR-0011](0011-firma-kisi-ilis
 
 - `crm.contacts.read` tek başına tüm kişileri görmek anlamına gelmez; Own/Team kapsamlı roller yalnızca kapsamlarındaki kişileri görür. Mevcut kişilerin sorumlusu migration'da oluşturan kullanıcıdan doldurulur (audit kaydı yoksa boş kalır ve yalnızca "tüm kayıtlar" kapsamı görür).
 - Ortak kayıt uçlarında iletişim alanlarını görmek, o kaydı CRM'de görebilmeye bağlandı.
+
+## Güncel durum notu (13 Kasım 2026)
+
+Yukarıdaki "Planlanan sonraki aşamalar" listesi yazıldığı günün durumudur. O tarihten sonra ayrı ADR'lerle uygulananlar: firma–kişi
+ilişkisi ve lokasyonlar ([ADR-0011](0011-firma-kisi-iliskisi.md)), çoklu iletişim/adres, kişi ayrıntı ekranı, mükerrer önerileri ve
+güvenli birleştirme (`MergeEndpoints`; firma ve kişi birleştirme ekranları). Bu ADR'nin kararları değişmedi; yalnızca "henüz
+uygulanmadı" ifadesi artık geçerli değildir. Veritabanı modeli için güncel karar [ADR-0020](0020-tek-veritabanina-donus.md)'dir.

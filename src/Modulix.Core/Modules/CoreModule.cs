@@ -208,6 +208,9 @@ public sealed class CoreModule : IModule
         /// <summary>Tenant'ın alan kuralı uyarlaması (ADR-0029 K8); kaydın kimliği tenant'ın kimliğidir. Kural anahtarları yazılır.</summary>
         public const string RuleAdaptation = "core.rule-adaptation";
 
+        /// <summary>Firma alt profili (ADR-0041); seçenekleri aynı kaydın "options" alanında listelenir.</summary>
+        public const string SubProfile = "core.sub-profile";
+
         public const string Tenant = "core.tenant";
         public const string TenantSetting = "core.tenant-setting";
         public const string Audit = "core.audit";
@@ -251,6 +254,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>Acil durdurma (ADR-0027): "Hayır" ise firmanın hiçbir kuralı çalışmaz; kuyruktaki çalışmalar iptal edilir.</summary>
         public const string AutomationEnabled = "core.automation.enabled";
+
+        /// <summary>Yapay zekâ erişimi: "Hayır" ise firmada yapay zekâ özellikleri kapalıdır (varsayılan kapalı; açık rıza).</summary>
+        public const string AiEnabled = "core.ai.enabled";
     }
 
     /// <summary>Evet/Hayır ayarlarının değerleri.</summary>
@@ -267,6 +273,7 @@ public sealed class CoreModule : IModule
     private const string RegionalGroup = "Bölgesel ayarlar";
     private const string SecurityGroup = "Güvenlik";
     private const string AutomationGroup = "Otomasyon";
+    private const string AiGroup = "Yapay zekâ";
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
     [
@@ -320,11 +327,18 @@ public sealed class CoreModule : IModule
                 + "Beklenmedik bir davranışta hızlıca durdurmak içindir.",
             Options = [new(SettingValues.No, "Hayır"), new(SettingValues.Yes, "Evet")],
         },
+
+        new(SettingKeys.AiEnabled, "Yapay zekâ özellikleri açık", AiGroup, SettingType.Choice, SettingValues.No)
+        {
+            Description = "Açıksa firmanın yapay zekâ özellikleri kullanılabilir. Yapay zekâ yalnızca kullanıcının kendi yetkisi kadar veriye erişir "
+                + "ve yaptığı her işlem denetim kaydına yazılır. Kapalıyken hiçbir veri yapay zekâya gönderilmez.",
+            Options = [new(SettingValues.No, "Hayır"), new(SettingValues.Yes, "Evet")],
+        },
     ];
 
     /// <summary>
     /// Süreli belge türü (ADR-0038 K3, Y9b): hazır değerler örnektir; tenant kendi türlerini ekler, yeni türde kategori seçilir. Kategori
-    /// belgenin hangi kayda eklenebileceğini belirler (araç, sürücü, firma, tesis; sahip türünü modül bildirir).
+    /// belgenin hangi kayda eklenebileceğini belirler (araç, sürücü, firma, tesis, çalışan; sahip türünü modül bildirir).
     /// </summary>
     IReadOnlyList<ChoiceListDefinition> IModule.ChoiceLists { get; } =
     [
@@ -339,6 +353,7 @@ public sealed class CoreModule : IModule
                 new(CredentialCategories.Driver, "Sürücü belgesi"),
                 new(CredentialCategories.Party, "Firma belgesi"),
                 new(CredentialCategories.Facility, "Tesis belgesi"),
+                new(CredentialCategories.Employee, "Özlük belgesi"),
             ],
             [
                 new("Inspection", "Araç muayenesi", CredentialCategories.Vehicle),
@@ -354,6 +369,12 @@ public sealed class CoreModule : IModule
                 new("AuthorizationCertificate", "Yetki belgesi", CredentialCategories.Party),
                 new("PowerOfAttorney", "Vekâletname", CredentialCategories.Party),
                 new("OperatingPermit", "Faaliyet izni", CredentialCategories.Facility),
+                new("EmploymentContract", "İş sözleşmesi", CredentialCategories.Employee),
+                new("HealthReport", "Sağlık raporu", CredentialCategories.Employee),
+                new("Diploma", "Diploma", CredentialCategories.Employee),
+                new("TrainingCertificate", "Eğitim sertifikası", CredentialCategories.Employee),
+                new("OhsTraining", "İş sağlığı ve güvenliği eğitimi", CredentialCategories.Employee),
+                new("WorkPermit", "Çalışma izni", CredentialCategories.Employee),
             ]),
     ];
 
@@ -612,6 +633,16 @@ public sealed class CoreModule : IModule
         {
             ["rules"] = "Firmanın kuralları", ["disabled"] = "Kapatılan kurallar",
         }, "rules"),
+        new(AuditedEntityKeys.SubProfile, "Alt profil", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["code"] = "Kod", ["description"] = "Açıklama", ["activity"] = "Bağlı faaliyet", ["status"] = "Durum", ["options"] = "Seçenekler",
+        }, "name")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string> { ["Draft"] = "Taslak", ["Active"] = "Etkin", ["Inactive"] = "Pasif" },
+            },
+        },
         new(AuditedEntityKeys.TenantSetting, "Firma ayarı", null, new Dictionary<string, string>
         {
             ["key"] = "Ayar", ["value"] = "Değer",

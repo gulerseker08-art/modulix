@@ -200,6 +200,40 @@ public class ImportCrmTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
         Assert.Equal(HttpStatusCode.Forbidden, (await PutAsync(client, Company, new SaveImportDesignRequest(true, false, [], [], 1))).StatusCode);
     }
 
+    // ADR-0033 Dilim 4c: kayıtlı sütun eşlemesi firmanın tasarımındadır; aynı başlıklı dosya başka firmada tanınmaz.
+    [Fact]
+    public async Task Saved_column_mapping_binds_the_firms_own_headers_only_in_that_firm()
+    {
+        var (client, tenant, _) = await ImporterAsync();
+        using var _c = client;
+        using var admin = await AdminAsync(tenant);
+        var (otherClient, _, _) = await ImporterAsync();
+        using var _o = otherClient;
+        var file = "Müşteri talebi;Soyad\r\nEşlenen;Kaya\r\n";
+
+        // Eşleme yokken zorunlu "Konu" sütunu bulunamaz.
+        Assert.Equal("Failed", (await RunAsync(client, LeadKey, file)).Run.Status);
+
+        // Başka sütunun adı ve iki sütuna aynı ad reddedilir; geçerli eşleme kaydedilir ve geri okunur.
+        var design = await DesignAsync(admin, LeadKey);
+        var taken = new SaveImportDesignRequest(true, false, [], [], design.Version, new Dictionary<string, IReadOnlyList<string>> { ["subject"] = ["Soyad"] });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await PutAsync(admin, LeadKey, taken)).StatusCode);
+        var saved = await SaveAsync(admin, design, new SaveImportDesignRequest(true, false, [], [], design.Version,
+            new Dictionary<string, IReadOnlyList<string>> { ["subject"] = [" Müşteri talebi ", "müşteri TALEBİ", ""] }));
+        Assert.Equal(["Müşteri talebi"], saved.Fields.Single(f => f.Key == "subject").Aliases);
+
+        var run = await RunAsync(client, LeadKey, file);
+        Assert.Equal(("Succeeded", 1), (run.Run.Status, run.Run.CreatedCount));
+        Assert.DoesNotContain(run.Issues.Items, i => i.Code == "file-invalid");
+
+        // Başka firmanın tasarımı etkilenmez.
+        Assert.Equal("Failed", (await RunAsync(otherClient, LeadKey, file)).Run.Status);
+
+        // Eşlemeyi yalnızca özelleştirme izni olan kaydeder.
+        Assert.Equal(HttpStatusCode.Forbidden, (await PutAsync(client, LeadKey, new SaveImportDesignRequest(true, false, [], [], saved.Version,
+            new Dictionary<string, IReadOnlyList<string>> { ["subject"] = ["Başka"] }))).StatusCode);
+    }
+
     [Fact]
     public async Task Imported_records_stay_silent_unless_the_design_opens_automation()
     {

@@ -99,3 +99,10 @@ Kayıt aramaları `SQL_Latin1_General_CP1_CI_AS` kolasyonunda `LIKE` ile çalı�
 1. `dotnet run --project src/Modulix.Api -- migrate-tenants`: her tenant veritabanına `meta.LookupSettings` (RLS ile) eklenir. Veri dönüşümü yok; mevcut ilişkiler ve kayıtlar değişmez, varsayılan "aranabilir açık" davranışı eskiyle uyumludur.
 2. Yönetici gerekirse Yönetim → Alan ve Lookup Ayarları'ndan aramayı kapatır.
 3. Geri dönüş: migration `Down` politikayı ve tabloyu kaldırır; formlar ayarsız çalışmaya devam eder.
+
+## Güncel durum notu (13 Kasım 2026)
+
+Lookup altyapısı bütün modüllerde kullanılıyor (CRM, Sözleşme, Sipariş, Destek, Pazarlama, Depo, Filo, Lojistik); son eklenenler depo
+parti/hareket seçim kutularıdır ([ADR-0032](0032-depo-ve-gumruklu-antrepo-modulu.md) dilim 6b). "Yapılmadı / sınırlar" listesi hâlâ
+geçerlidir: aranacak alanların yönetici seçimi yok; iş birimine göre kullanıcı lookup'ı için modüllere açık bir iş birimi sözleşmesi
+yok (departman hiyerarşisi [ADR-0026](0026-departman-hiyerarsisi-ve-departman-bazli-gorunurluk.md) Core içindedir; öncelik listesi A-12).

@@ -1,0 +1,148 @@
+@page "/ik/resmi-tatiller"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Resmî tatiller · Modulix</PageTitle>
+
+@* Resmî tatil ve idari izin günleri (ADR-0042 dilim 2; ayar ekranı, sekmeli form kuralının dışındadır). İzin gün sayısından düşülür; tarihler
+   koda yazılmaz (dinî bayramlar her yıl değişir). Listedeki değişiklik açılmış taleplerin gün sayısını değiştirmez. *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.LeavesRead">
+    <PageHeader Title="Resmî tatiller" Icon="calendar" Subtitle="İzin gün sayısından düşülen resmî tatil ve idari izin günleri." />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <ViewTabs Items="YearOptions" Value="@year.ToString(System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="ChooseYearAsync" Label="Yıl" />
+
+    @if (Session.Can(HrAccess.LeavesManage))
+    {
+        <form class="list-toolbar" novalidate @onsubmit="AddAsync" @onsubmit:preventDefault aria-label="Tatil günü ekle">
+            <label class="visually-hidden" for="holiday-date">Tarih</label>
+            <input id="holiday-date" class="form-control w-auto" type="date" required aria-required="true" @bind="newDate" />
+            <label class="visually-hidden" for="holiday-name">Ad</label>
+            <input id="holiday-name" class="form-control" maxlength="150" placeholder="Ad (ör. Cumhuriyet Bayramı)" required aria-required="true" @bind="newName" />
+            <div class="form-check">
+                <input id="holiday-half" class="form-check-input" type="checkbox" @bind="newHalfDay" />
+                <label class="form-check-label" for="holiday-half">Yarım gün (arife)</label>
+            </div>
+            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : null)"><AppIcon Name="plus" Size="16" /> Ekle</button>
+        </form>
+        <FieldError Field="date" Errors="errors" />
+        <FieldError Field="name" Errors="errors" />
+    }
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">@year yılı için tatil günü girilmedi. Hafta sonları her zaman düşülür.</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">@year yılı tatil günleri</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><AppIcon Name="calendar" Size="14" /> Tarih</th>
+                    <th scope="col"><AppIcon Name="tag" Size="14" /> Ad</th>
+                    <th scope="col"><AppIcon Name="clock" Size="14" /> Süre</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var holiday in page.Items)
+                {
+                    <tr>
+                        <td data-label="Tarih" class="primary">@HrLabels.Date(WarehouseLabels.Text(holiday, "date"))</td>
+                        <td data-label="Ad">@WarehouseLabels.Text(holiday, "name")</td>
+                        <td data-label="Süre">@(WarehouseLabels.Flag(holiday, "halfDay") ? "Yarım gün" : "Tam gün")</td>
+                        <td class="row-menu-cell">
+                            @if (Session.Can(HrAccess.LeavesManage))
+                            {
+                                <RowMenu Label="@($"{WarehouseLabels.Text(holiday, "name")} eylemleri")">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteAsync(holiday)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                </RowMenu>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + HrAccess.HolidayEntityKey;
+    private static readonly int ThisYear = DateTime.Today.Year;
+
+    private static IReadOnlyList<ViewOption> YearOptions { get; } =
+        [.. Enumerable.Range(ThisYear - 1, 3).Select(y => new ViewOption(y.ToString(System.Globalization.CultureInfo.InvariantCulture), y.ToString(System.Globalization.CultureInfo.InvariantCulture), Icon: "calendar"))];
+
+    private RecordPageResponse? page;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private int year = ThisYear;
+    private DateOnly? newDate;
+    private string? newName;
+    private bool newHalfDay;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.LeavesRead))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task ChooseYearAsync(string key)
+    {
+        year = int.Parse(key, System.Globalization.CultureInfo.InvariantCulture);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<RecordPageResponse>($"{Url}?year={year}&pageSize=100");
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private async Task AddAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await Api.PostAsync<RecordResponse>(Url, new RecordWriteRequest(new JsonObject
+        {
+            ["date"] = newDate?.ToString("yyyy-MM-dd"),
+            ["name"] = string.IsNullOrWhiteSpace(newName) ? null : newName.Trim(),
+            ["halfDay"] = newHalfDay,
+        }));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            message = result.FieldErrors is { Count: > 0 } ? null : result.Error;
+            return;
+        }
+
+        newDate = null;
+        newName = null;
+        newHalfDay = false;
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(RecordResponse holiday)
+    {
+        var result = await Api.DeleteAsync($"{Url}/{holiday.Id}?version={holiday.Version}");
+        message = result.IsSuccess ? null : result.Error;
+        await LoadAsync();
+    }
+}

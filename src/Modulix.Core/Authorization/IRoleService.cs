@@ -119,6 +119,12 @@ public interface IRoleService
     Task<bool> SetMembershipRolesAsync(
         Guid membershipId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken, Guid? actingMembershipId = null);
 
+    /// <summary>
+    /// Yetki yükseltmeye karşı: yönetici olmayan kişi, izinleri, kapsamı ve kayıt türü istisnaları kendisinde olmayan bir
+    /// rolü kimseye veremez ve kimseden alamaz (davet dahil); değilse <see cref="Platform.UserAdministrationException"/>.
+    /// </summary>
+    Task EnsureActorMayAssignRolesAsync(Guid actingMembershipId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken);
+
     /// <summary>Üyeliğin <b>doğrudan</b> rolleri; üyelik aktif tenant'a ait değilse <c>null</c>. Departmandan gelenler dahil değildir.</summary>
     Task<IReadOnlyList<RoleSummary>?> GetMembershipRolesAsync(Guid membershipId, CancellationToken cancellationToken);
 

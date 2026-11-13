@@ -167,6 +167,11 @@ public class ModulixDbContext(
 
     public DbSet<TenantChoiceList> ChoiceLists => Set<TenantChoiceList>();
 
+    /// <summary>Firma alt profilleri ve seçenekleri (ADR-0041).</summary>
+    public DbSet<SubProfile> SubProfiles => Set<SubProfile>();
+
+    public DbSet<SubProfileOption> SubProfileOptions => Set<SubProfileOption>();
+
     public DbSet<TenantLookupSetting> LookupSettings => Set<TenantLookupSetting>();
 
     public DbSet<TenantFormLayout> FormLayouts => Set<TenantFormLayout>();

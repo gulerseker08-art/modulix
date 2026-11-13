@@ -99,6 +99,24 @@ public sealed class ImportRunner(
 
             var fields = await services.GetRequiredService<ImportSchema>().FieldsAsync(tenant, definition, stopping);
             var issues = new IssueList(tenant.TenantId, run.Id, time);
+
+            // Aynı dosya uyarısı (Dilim 4b): bu dosya aynı türe daha önce uygulanıp kayıt aldıysa ikinci yükleme mükerrer kayıt üretebilir.
+            // Engel değildir (düzeltilmiş dosya ya da bilerek tekrar yükleme olabilir); kuru çalışmada da gösterilir ki uygulamadan önce görülsün.
+            // Firma içinde bakılır (sorgu tenant süzgecindedir); önceki koşuyu kimin yaptığı iletiye yazılmaz.
+            var previous = await db.ImportRuns.AsNoTracking()
+                .Where(r => r.EntityKey == definition.EntityKey && r.FileHash == run.FileHash && r.Id != run.Id && r.Mode == ImportRunMode.Apply
+                    && (r.Status == ImportRunStatus.Succeeded || r.Status == ImportRunStatus.PartiallySucceeded))
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => (DateTimeOffset?)r.CreatedAt)
+                .FirstOrDefaultAsync(stopping);
+            if (previous is { } at)
+            {
+                issues.Add(0, new ImportRowProblem(
+                    null,
+                    ImportIssueCodes.FileRepeated,
+                    ImportIssueSeverity.Warning,
+                    $"Bu dosyanın aynısı {at.UtcDateTime:dd.MM.yyyy HH:mm} (UTC) tarihinde bu kayıt türüne uygulandı; yeniden uygulamak mükerrer kayıt üretebilir."));
+            }
             ImportFileContent file;
             try
             {

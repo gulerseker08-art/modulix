@@ -99,6 +99,23 @@ public static class WarehouseForms
             new("description", "Açıklama", "aciklama", 12),
         ]),
 
+        new(WarehouseModule.Entities.Lot, "Parti",
+        [new(General, "Genel bilgiler"), new("ayrintilar", "Açıklama ve ek bilgiler")],
+        [
+            new("kimlik", "Parti", "package"),
+            new("taraflar", "Malik ve fatura", "users"),
+            new("aciklama", "Açıklama", "message-square", Tab: "ayrintilar"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ayrintilar"),
+        ],
+        [
+            new("lotNo", "Parti no", "kimlik", 4, Required: true, Fixed: true),
+            new("stockItemId", "Stok kartı", "kimlik", 8, Required: true, Fixed: true),
+            new("isActive", "Etkin", "kimlik", 4, Fixed: true),
+            new("ownerPartyId", "Malik", "taraflar", 6, Required: true, Fixed: true),
+            new("billToPartyId", "Faturalanan taraf", "taraflar", 6),
+            new("description", "Açıklama", "aciklama", 12),
+        ]),
+
         new(WarehouseModule.Entities.CustomsDeclaration, "Gümrük beyannamesi",
         [new(General, "Genel bilgiler"), new("ayrintilar", "Açıklama ve ek bilgiler")],
         [

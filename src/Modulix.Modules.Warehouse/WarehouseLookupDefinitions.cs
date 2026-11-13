@@ -19,8 +19,17 @@ public static class WarehouseLookupDefinitions
     public const string AttorneyBroker = "warehouse.power-of-attorney.broker";
     public const string DeclarationImporter = "warehouse.customs-declaration.importer";
     public const string DeclarationBroker = "warehouse.customs-declaration.broker";
+    public const string LotStockItem = "warehouse.lot.stock-item";
+    public const string LotOwner = "warehouse.lot.owner";
+    public const string LotBillTo = "warehouse.lot.bill-to";
+    public const string MovementLot = "warehouse.stock-movement.lot";
+    public const string MovementFromLocation = "warehouse.stock-movement.from-location";
+    public const string MovementToLocation = "warehouse.stock-movement.to-location";
 
     private static readonly string[] FacilityLabel = ["code", "name"];
+    private static readonly string[] StockItemLabel = ["code", "name"];
+    private static readonly string[] LotLabel = ["lotNo"];
+    private static readonly string[] LotSecondary = ["description"];
     private static readonly string[] ZoneLabel = ["code", "name"];
     private static readonly string[] LocationLabel = ["code"];
     private static readonly string[] LocationSecondary = ["name"];
@@ -88,6 +97,43 @@ public static class WarehouseLookupDefinitions
             SearchDescription = "Ünvan, vergi numarası, e-posta, telefon ve şehir (yalnızca \"Gümrük müşaviri\" rolündeki firmalar)",
             FixedFilterName = "relationshipRole",
             FixedFilterValue = WarehouseModule.RelationshipRoles.Broker,
+        },
+        // Parti (dilim 6b ekranları): stok kartı, malik ve faturalanan taraf. Malik herhangi bir firma olabilir (rol denetimi yok, LotRecordStore).
+        new(LotStockItem, WarehouseModule.Entities.Lot, "stockItemId", "Stok kartı", LookupTargetKind.Record, WarehouseModule.Entities.StockItem)
+        {
+            LabelFields = StockItemLabel,
+            SearchDescription = "Stok kodu, adı ve GTİP",
+        },
+        new(LotOwner, WarehouseModule.Entities.Lot, "ownerPartyId", "Malik", LookupTargetKind.Record, SharedEntities.Party)
+        {
+            LabelFields = PartyLabel,
+            SecondaryFields = PartySecondary,
+            SearchDescription = "Ünvan, vergi numarası, e-posta, telefon ve şehir",
+        },
+        new(LotBillTo, WarehouseModule.Entities.Lot, "billToPartyId", "Faturalanan taraf", LookupTargetKind.Record, SharedEntities.Party)
+        {
+            LabelFields = PartyLabel,
+            SecondaryFields = PartySecondary,
+            SearchDescription = "Ünvan, vergi numarası, e-posta, telefon ve şehir",
+        },
+        // Stok hareketi: parti ve kaynak/hedef lokasyon. Hareketin tesisi yoktur; lokasyon seçimi tesise bağlanmaz.
+        new(MovementLot, WarehouseModule.Entities.StockMovement, "lotId", "Parti", LookupTargetKind.Record, WarehouseModule.Entities.Lot)
+        {
+            LabelFields = LotLabel,
+            SecondaryFields = LotSecondary,
+            SearchDescription = "Parti numarası ve açıklaması",
+        },
+        new(MovementFromLocation, WarehouseModule.Entities.StockMovement, "fromLocationId", "Kaynak lokasyon", LookupTargetKind.Record, WarehouseModule.Entities.Location)
+        {
+            LabelFields = LocationLabel,
+            SecondaryFields = LocationSecondary,
+            SearchDescription = "Lokasyon kodu ve adı",
+        },
+        new(MovementToLocation, WarehouseModule.Entities.StockMovement, "toLocationId", "Hedef lokasyon", LookupTargetKind.Record, WarehouseModule.Entities.Location)
+        {
+            LabelFields = LocationLabel,
+            SecondaryFields = LocationSecondary,
+            SearchDescription = "Lokasyon kodu ve adı",
         },
     ];
 }

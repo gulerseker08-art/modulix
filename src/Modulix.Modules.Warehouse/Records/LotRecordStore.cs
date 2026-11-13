@@ -41,6 +41,22 @@ internal sealed partial class LotRecordStore(WarehouseStoreContext context) : Wa
 
     protected override IOrderedQueryable<Lot> Order(IQueryable<Lot> source) => source.OrderBy(l => l.LotNo);
 
+    // Liste başlıklarına göre sıralama (sort=lotNo, sort=-lotNo ...); eşit kayıtlar parti numarasına göre sıralanır. Firma adına göre sıralama yok
+    // (firma görünürlüğü sıralamayla dolanılmasın).
+    protected override IReadOnlyCollection<string>? SortKeys { get; } = WithDescending("lotNo", "isActive", "createdAt");
+
+    protected override IOrderedQueryable<Lot> Order(IQueryable<Lot> source, string? sort)
+    {
+        var desc = sort?.StartsWith('-') == true;
+        return sort?.TrimStart('-') switch
+        {
+            "lotNo" => By(source, l => l.LotNo, desc),
+            "isActive" => By(source, l => l.IsActive, desc).ThenBy(l => l.LotNo),
+            "createdAt" => By(source, l => l.CreatedAt, desc).ThenBy(l => l.LotNo),
+            _ => Order(source),
+        };
+    }
+
     // Firma adıyla arama yok: firma görünürlüğü (CRM kapsamı) bu ekrandan dolanılmasın.
     protected override IQueryable<Lot> Search(IQueryable<Lot> source, string term) =>
         source.Where(l => l.LotNo.Contains(term) || (l.Description != null && l.Description.Contains(term)));

@@ -313,6 +313,103 @@ public class ImportRunTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
         Assert.Equal("Failed", detail!.Run.Status);
     }
 
+    // ADR-0033 Dilim 4b: aynı dosya uyarısı. Uyarıdır (yükleme sürer), yalnızca kayıt almış uygulamaya bakar, firma sınırını aşmaz ve önceki yükleyeni söylemez.
+    [Fact]
+    public async Task Reuploading_an_applied_file_warns_without_blocking_and_only_within_the_tenant()
+    {
+        var (client, tenant, user) = await ImporterAsync();
+        using var _c = client;
+        var file = "Konu;Soyad\r\nTekrar;Kaya\r\n";
+
+        // Önceki uygulama yokken uyarı yok; kayıt almayan (bütün satırları hatalı) uygulama da sayılmaz.
+        Assert.DoesNotContain((await PreviewAsync(client, file)).Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+        Assert.Equal("Failed", (await ApplyAsync(client, "Konu;Soyad\r\n;Kaya\r\n")).Run.Status);
+        Assert.DoesNotContain((await PreviewAsync(client, "Konu;Soyad\r\n;Kaya\r\n")).Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+
+        var first = await ApplyAsync(client, file);
+        Assert.Equal(("Succeeded", 1), (first.Run.Status, first.Run.CreatedCount));
+        Assert.DoesNotContain(first.Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+
+        // Kuru çalışma ve ikinci uygulama uyarır; uyarı yüklemeyi durdurmaz.
+        var preview = await PreviewAsync(client, file);
+        var warning = Assert.Single(preview.Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+        Assert.Equal((0, "Warning"), (warning.RowNo, warning.Severity));
+        var second = await ApplyAsync(client, file);
+        Assert.Equal(("Succeeded", 1), (second.Run.Status, second.Run.CreatedCount));
+        Assert.Contains(second.Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+
+        // Aynı firmadaki başka yükleyen de uyarıyı görür ama ileti önceki yükleyenin adını taşımaz.
+        var colleague = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, Importer, colleague);
+        using var colleagueClient = await LoginAsync(colleague);
+        var seen = Assert.Single((await PreviewAsync(colleagueClient, file)).Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+        Assert.DoesNotContain(user.Email!, seen.Message, StringComparison.OrdinalIgnoreCase);
+
+        // Başka firma aynı dosyayı ilk kez yüklüyor sayılır.
+        var (other, _, _) = await ImporterAsync();
+        using var _o = other;
+        Assert.DoesNotContain((await ApplyAsync(other, file)).Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+    }
+
+    // ADR-0033 Dilim 4d: geri alma. Dokunulmamış kayıtlar silinir, sonradan değişen korunur; gerekçe zorunlu; tek sefer; firma sınırı; izin.
+    [Fact]
+    public async Task Rollback_removes_untouched_imported_records_keeps_changed_ones_and_needs_its_permission()
+    {
+        var (client, tenant, _) = await ImporterAsync();
+        using var _c = client;
+        var applied = await ApplyAsync(client, "Konu;Soyad\r\nBir;Kaya\r\nİki;Demir\r\nÜç;Ak\r\n");
+        Assert.Equal(3, applied.Run.CreatedCount);
+        var rollbackUrl = $"/api/imports/{applied.Run.Id}/rollback";
+
+        // İçe aktarma izni geri alma izni değildir.
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync(rollbackUrl, new ImportRollbackRequest("Yanlış dosya"))).StatusCode);
+
+        var manager = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [RunImports, ReadImports, RollbackImports, LeadsRead, LeadsUpdate, LeadsDelete], manager);
+        using var managerClient = await LoginAsync(manager);
+
+        // Bir kayıt içe aktarmadan sonra değiştirilir: geri almada korunmalı.
+        Guid changedId;
+        using (var scope = factory.OpenScope(tenant.Id))
+        {
+            changedId = await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Set<Lead>().Where(l => l.Subject == "İki").Select(l => l.Id).SingleAsync();
+        }
+
+        var current = (await managerClient.GetFromJsonAsync<Modulix.Shared.Records.RecordResponse>($"/api/records/{Lead}/{changedId}"))!;
+        var update = await managerClient.PutAsJsonAsync($"/api/records/{Lead}/{changedId}",
+            new Modulix.Shared.Records.RecordWriteRequest(new System.Text.Json.Nodes.JsonObject { ["subject"] = "İki (düzeltildi)" }, current.Version));
+        Assert.True(update.IsSuccessStatusCode, await update.Content.ReadAsStringAsync());
+
+        // Gerekçe zorunlu; başka firmanın yöneticisi bu koşuyu bulamaz.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await managerClient.PostAsJsonAsync(rollbackUrl, new ImportRollbackRequest(" "))).StatusCode);
+        var (otherClient, otherTenant, _) = await ImporterAsync();
+        otherClient.Dispose();
+        var otherManager = await factory.CreateUserAsync(otherTenant);
+        await factory.CreateRoleAsync(otherTenant.Id, [ReadImports, RollbackImports, LeadsRead, LeadsDelete], otherManager);
+        using (var otherManagerClient = await LoginAsync(otherManager))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, (await otherManagerClient.PostAsJsonAsync(rollbackUrl, new ImportRollbackRequest("Deneme"))).StatusCode);
+        }
+
+        var response = await managerClient.PostAsJsonAsync(rollbackUrl, new ImportRollbackRequest("Yanlış dosya yüklendi"));
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var outcome = (await response.Content.ReadFromJsonAsync<ImportRollbackDto>())!;
+        Assert.Equal((2, 0, "RolledBack"), (outcome.Removed, outcome.AlreadyRemoved, outcome.Run.Status));
+        Assert.Equal(changedId, Assert.Single(outcome.Kept).RecordId);
+
+        using (var scope = factory.OpenScope(tenant.Id))
+        {
+            var subjects = await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Set<Lead>().AsNoTracking().Select(l => l.Subject).ToListAsync();
+            Assert.Equal(["İki (düzeltildi)"], subjects);
+        }
+
+        // İkinci geri alma ve kuru çalışmanın geri alınması reddedilir.
+        Assert.Equal(HttpStatusCode.Conflict, (await managerClient.PostAsJsonAsync(rollbackUrl, new ImportRollbackRequest("Tekrar"))).StatusCode);
+        var preview = await PreviewAsync(client, "Konu;Soyad\r\nKuru;Kaya\r\n");
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await managerClient.PostAsJsonAsync($"/api/imports/{preview.Run.Id}/rollback", new ImportRollbackRequest("Kuru"))).StatusCode);
+    }
+
     private async Task AddCustomFieldAsync(Tenant tenant, string label)
     {
         var admin = await factory.CreateUserAsync(tenant);

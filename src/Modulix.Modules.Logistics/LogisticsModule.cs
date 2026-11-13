@@ -32,6 +32,7 @@ public sealed class LogisticsModule : IModule
         public const string RequestsApprove = "logistics.requests.approve";
         public const string TripsRead = "logistics.trips.read";
         public const string TripsWrite = "logistics.trips.write";
+        public const string FreightRead = "logistics.freight.read";
     }
 
     /// <summary>Seçim listeleri (Y9b).</summary>
@@ -66,6 +67,18 @@ public sealed class LogisticsModule : IModule
         new(Permissions.RequestsApprove, "Taşıma talebini onaylar (sevkiyat açılır) ya da reddeder", "Taşıma talepleri"),
         new(Permissions.TripsRead, "Seferleri ve duraklarını görüntüler", "Seferler"),
         new(Permissions.TripsWrite, "Sefer planlar, araç ve sürücü atar, sevkiyat ekler, seferi yürütür ve iptal eder", "Seferler"),
+        new(Permissions.FreightRead, "Navlun ve taşıyıcı hakedişi tutarlarını görür ve girer (sevkiyat ve sefer yazma izniyle birlikte)", "Navlun ve hakediş"),
+    ];
+
+    /// <summary>
+    /// Hassas alanlar (ADR-0038 K11, dilim 7a): navlun ve hakediş tutarı ile para birimi. İzni olmayan kişiye alan gönderilmez, o alanı yazamaz ve ona
+    /// göre süzemez; denetim kaydında değeri gizlenir. Para birimi tutarsız tek başına anlamsız olduğu için tutarla birlikte korunur (yetkisiz kişi
+    /// mevcut tutarın para birimini değiştirmesin).
+    /// </summary>
+    IReadOnlyList<SensitiveFields> IModule.SensitiveFields { get; } =
+    [
+        new(Entities.Shipment, Permissions.FreightRead, ["freightAmount", "freightCurrency"]),
+        new(Entities.Trip, Permissions.FreightRead, ["settlementAmount", "settlementCurrency"]),
     ];
 
     /// <summary>Kural altyapısında kullanılan kayıt türleri (ADR-0027).</summary>
@@ -222,6 +235,7 @@ public sealed class LogisticsModule : IModule
                 Permissions.CarriersRead, Permissions.CarriersWrite,
                 Permissions.CostsRead, Permissions.CostsWrite,
                 Permissions.DriversRead, Permissions.DriversWrite,
+                Permissions.FreightRead,
             ]),
     ];
 
@@ -320,11 +334,15 @@ public sealed class LogisticsModule : IModule
         CargoAudit(Entities.TransportRequest, "Taşıma talebi", Permissions.RequestsRead, RequestStatusLabels,
             new Dictionary<string, string> { ["source"] = "Kaynak", ["externalRef"] = "Dış referans", ["shipmentId"] = "Sevkiyat" }),
         CargoAudit(Entities.Shipment, "Sevkiyat", Permissions.ShipmentsRead, ShipmentStatusLabels,
-            new Dictionary<string, string> { ["requestId"] = "Taşıma talebi", ["tripId"] = "Sefer" }),
+            new Dictionary<string, string>
+            {
+                ["requestId"] = "Taşıma talebi", ["tripId"] = "Sefer", ["freightAmount"] = "Navlun", ["freightCurrency"] = "Navlun para birimi",
+            }),
         new(Entities.Trip, "Sefer", Permissions.TripsRead, new Dictionary<string, string>
         {
             ["number"] = "Sefer no", ["plannedStart"] = "Planlanan başlangıç", ["plannedEnd"] = "Planlanan bitiş", ["vehicleId"] = "Araç",
             ["trailerId"] = "Dorse", ["driverId"] = "Sürücü", ["coDriverId"] = "İkinci sürücü", ["carrierPartyId"] = "Taşıyıcı firma",
+            ["settlementAmount"] = "Hakediş", ["settlementCurrency"] = "Hakediş para birimi",
             ["notes"] = "Notlar", ["status"] = "Durum", ["statusReason"] = "Not / gerekçe",
         }, "number")
         {
@@ -437,6 +455,7 @@ public sealed class LogisticsModule : IModule
         services.AddScoped<Lifecycle.IShipmentDelivery, Lifecycle.ShipmentDelivery>();
         services.AddScoped<Lifecycle.ITripPlanner, Lifecycle.TripPlanner>();
         services.AddScoped<Lifecycle.ILogisticsWorkflow, Lifecycle.LogisticsWorkflow>();
+        services.AddScoped<Dashboard.ILogisticsDashboard, Dashboard.LogisticsDashboardService>();
         services.AddScoped<LogisticsAutomationRecordSource>();
     }
 }

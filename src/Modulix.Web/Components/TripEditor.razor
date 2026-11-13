@@ -53,7 +53,7 @@
     }
 
     <fieldset disabled="@ReadOnly">
-        <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Sefer formu bölümleri">
+        <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Sefer formu bölümleri">
             <Field Context="f">
                 @switch (f.Key)
                 {
@@ -94,6 +94,17 @@
                         <LookupPicker Id="trip-carrier" LookupKey="@LogisticsAccess.TripCarrierLookup" @bind-Value="form.CarrierPartyId" Required="f.Required" Placeholder="Taşeron seferde taşıyıcı firma…" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
                         <FieldError Field="carrierPartyId" Errors="errors" />
                         <small class="text-muted">Taşeron seferde araç ve sürücü isteğe bağlıdır; firma "Taşıyıcı" ilişki rolünde olmalıdır.</small>
+                        break;
+                    case "settlementAmount":
+                        <label class="@f.LabelClass()" for="trip-settlement">@f.Label</label>
+                        <input id="trip-settlement" class="form-control" type="number" min="0" step="0.01" inputmode="decimal" disabled="@(form.CarrierPartyId is null)" @bind="form.SettlementAmount" />
+                        <FieldError Field="settlementAmount" Errors="errors" />
+                        break;
+                    case "settlementCurrency":
+                        <label class="@f.LabelClass()" for="trip-settlement-currency">@f.Label</label>
+                        <input id="trip-settlement-currency" class="form-control" maxlength="3" list="trip-currencies" autocomplete="off" disabled="@(form.CarrierPartyId is null)" @bind="form.SettlementCurrency" />
+                        <datalist id="trip-currencies"><option value="TRY"></option><option value="EUR"></option><option value="USD"></option><option value="GBP"></option></datalist>
+                        <FieldError Field="settlementCurrency" Errors="errors" />
                         break;
                     case "notes":
                         <label class="@f.LabelClass()" for="trip-notes">@f.Label</label>
@@ -144,6 +155,11 @@
     private string Status => Record is null ? string.Empty : WarehouseLabels.Text(Record, "status");
 
     /// <summary>Yalnızca planlanan sefer düzenlenir.</summary>
+    private bool CanSeeFreight => Session.Can(LogisticsAccess.FreightRead);
+
+    // Hakediş alanları yalnızca navlun/hakediş iznine sahip kullanıcıya çizilir (Y8b hassas alan).
+    private bool Shows(FormFieldDto field) => field.Key is not ("settlementAmount" or "settlementCurrency") || CanSeeFreight;
+
     private bool ReadOnly => Record is not null && Status != "planning";
 
     private string LockedText => Status == "ready"
@@ -175,9 +191,10 @@
                 PlannedEnd = FleetLabels.Day(WarehouseLabels.Text(r, "plannedEnd")), VehicleId = WarehouseLabels.Id(r, "vehicleId"),
                 TrailerId = WarehouseLabels.Id(r, "trailerId"), DriverId = WarehouseLabels.Id(r, "driverId"), CoDriverId = WarehouseLabels.Id(r, "coDriverId"),
                 CarrierPartyId = WarehouseLabels.Id(r, "carrierPartyId"), Notes = r.Values["notes"]?.GetValue<string>(),
+                SettlementAmount = r.Values["settlementAmount"]?.GetValue<decimal>(), SettlementCurrency = r.Values["settlementCurrency"]?.GetValue<string>() ?? "TRY",
                 Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
             }
-            : new TripForm { PlannedStart = DateOnly.FromDateTime(DateTime.Now).AddDays(1) };
+            : new TripForm { PlannedStart = DateOnly.FromDateTime(DateTime.Now).AddDays(1), SettlementCurrency = "TRY" };
         errors = null;
         message = null;
         refresh++;
@@ -213,6 +230,14 @@
             ["notes"] = string.IsNullOrWhiteSpace(form.Notes) ? null : form.Notes.Trim(),
             ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
         };
+        if (CanSeeFreight)
+        {
+            // Hakediş hassas alandır (logistics.freight.read): izni olmayan kullanıcının isteğinde hiç yer almaz; taşıyıcı yoksa tutar gönderilmez.
+            var settle = form.CarrierPartyId is not null ? form.SettlementAmount : null;
+            values["settlementAmount"] = settle;
+            values["settlementCurrency"] = settle is null ? null : (string.IsNullOrWhiteSpace(form.SettlementCurrency) ? null : form.SettlementCurrency.Trim());
+        }
+
 
         var request = new RecordWriteRequest(values, form.Version);
         var result = form.Id is { } id
@@ -258,6 +283,10 @@
         public Guid? CoDriverId { get; set; }
 
         public Guid? CarrierPartyId { get; set; }
+
+        public decimal? SettlementAmount { get; set; }
+
+        public string SettlementCurrency { get; set; } = "TRY";
 
         public string? Notes { get; set; }
     }

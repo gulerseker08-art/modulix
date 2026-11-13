@@ -1,0 +1,233 @@
+@* Parti ekleme/düzenleme formu; Partiler ekranı kullanır (ADR-0032 dilim 6b). Düzen firmanın form düzenine (ADR-0021) göre çizilir. Kayıt genel kayıt
+   uçlarından (/api/records/warehouse.lot) yapılır. Stok kartı ve malik oluştururken seçilir, sonra değişmez (aynı mal başka malikte başka partidir);
+   parti numarası biçimi ve benzersizliği, hareketi olan partinin silinemeyeceği sunucudadır. İleti alanın altında gösterilir. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Lot is null ? "Yeni parti" : "Parti kartı")</h2>
+            @if (Lot is not null)
+            {
+                <p>@form.LotNo</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : "false")">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                Kaydet
+            </button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <div class="record-layout">
+        <aside class="record-summary" aria-label="Parti özeti">
+            <div class="summary-card">
+                <div class="summary-identity">
+                    <span class="summary-avatar" aria-hidden="true"><AppIcon Name="package" Size="24" /></span>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.LotNo) ? "Parti no" : form.LotNo)</strong>
+                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.Description) ? "Parti" : form.Description)</span>
+                </div>
+                <h3 class="summary-heading">Parti özeti</h3>
+                <dl class="summary-facts">
+                    <div><dt>Durum</dt><dd>@(form.IsActive ? "Etkin" : "Pasif")</dd></div>
+                </dl>
+            </div>
+        </aside>
+
+        <div class="record-main">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Parti formu bölümleri">
+                <Field Context="f">
+                    @switch (f.Key)
+                    {
+                        case "lotNo":
+                            <label class="@f.LabelClass()" for="lot-no">@f.Label</label>
+                            <input id="lot-no" class="form-control" maxlength="50" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.LotNo" />
+                            <FieldError Field="lotNo" Errors="errors" />
+                            <small class="text-muted">Harf, rakam ve - _ . / karakterleri; büyük harfe çevrilir, firma içinde benzersizdir.</small>
+                            break;
+                        case "stockItemId":
+                            <label class="@f.LabelClass()" for="lot-stock-item">@f.Label</label>
+                            <LookupPicker Id="lot-stock-item" LookupKey="@WarehouseAccess.LotStockItemLookup" @bind-Value="form.StockItemId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="Stok kartı seçin…" Invalid="@(errors?.ContainsKey("stockItemId") == true)" />
+                            <FieldError Field="stockItemId" Errors="errors" />
+                            break;
+                        case "ownerPartyId":
+                            <label class="@f.LabelClass()" for="lot-owner">@f.Label</label>
+                            <LookupPicker Id="lot-owner" LookupKey="@WarehouseAccess.LotOwnerLookup" @bind-Value="form.OwnerPartyId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="Malik seçin…" Invalid="@(errors?.ContainsKey("ownerPartyId") == true)" />
+                            <FieldError Field="ownerPartyId" Errors="errors" />
+                            break;
+                        case "billToPartyId":
+                            <label class="@f.LabelClass()" for="lot-bill-to">@f.Label</label>
+                            <LookupPicker Id="lot-bill-to" LookupKey="@WarehouseAccess.LotBillToLookup" @bind-Value="form.BillToPartyId" Required="f.Required" Placeholder="Malikle aynı" Invalid="@(errors?.ContainsKey("billToPartyId") == true)" />
+                            <FieldError Field="billToPartyId" Errors="errors" />
+                            break;
+                        case "isActive":
+                            <SegmentedChoice Id="lot-active" Label="@f.Label" LabelClass="@f.LabelClass()" Options="SegmentOptions.Active" @bind-Value="form.IsActive" />
+                            <FieldError Field="isActive" Errors="errors" />
+                            break;
+                        case "description":
+                            <label class="@f.LabelClass()" for="lot-description">@f.Label</label>
+                            <textarea id="lot-description" class="form-control" rows="3" maxlength="500" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                            <FieldError Field="description" Errors="errors" />
+                            break;
+                    }
+                </Field>
+            </LayoutForm>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                @if (form.Id is not null)
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                }
+            </div>
+        </div>
+    </div>
+</form>
+
+@code {
+    private bool dirty;
+    private const string EntityKey = WarehouseAccess.LotEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private LotForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek parti; null ise yeni parti.</summary>
+    [Parameter] public RecordResponse? Lot { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    /// <summary>Form yalnızca başka bir parti verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Lot))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Lot;
+        form = Lot is { } r
+            ? new LotForm
+            {
+                Id = r.Id, Version = r.Version, LotNo = WarehouseLabels.Text(r, "lotNo"), StockItemId = WarehouseLabels.Id(r, "stockItemId"),
+                OwnerPartyId = WarehouseLabels.Id(r, "ownerPartyId"), BillToPartyId = WarehouseLabels.Id(r, "billToPartyId"),
+                Description = WarehouseLabels.Text(r, "description"), IsActive = WarehouseLabels.Flag(r, "isActive", true),
+                Custom = r.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new LotForm();
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new JsonObject
+        {
+            ["lotNo"] = form.LotNo,
+            ["billToPartyId"] = form.BillToPartyId?.ToString(),
+            ["description"] = form.Description,
+            ["isActive"] = form.IsActive,
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+
+        // Stok kartı ve malik yalnızca oluştururken gönderilir (sunucuda createOnly).
+        if (form.Id is null)
+        {
+            values["stockItemId"] = form.StockItemId?.ToString();
+            values["ownerPartyId"] = form.OwnerPartyId?.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private sealed class LotForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string LotNo { get; set; } = string.Empty;
+
+        public Guid? StockItemId { get; set; }
+
+        public Guid? OwnerPartyId { get; set; }
+
+        public Guid? BillToPartyId { get; set; }
+
+        public string? Description { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}

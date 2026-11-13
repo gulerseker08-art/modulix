@@ -1,0 +1,282 @@
+@page "/ik/masraf-beyanlari"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Masraf beyanları · Modulix</PageTitle>
+
+@* Masraf beyanları (ADR-0042 dilim 3): yönetici onaylayanı olduğu beyanları, İK ve finans bütün beyanları görür (görünürlük sunucuda, veri kapsamı +
+   onaylayan). "Onayımı bekleyenler" onaylayanı kullanıcının kendisi olan gönderilmiş beyanlardır; "Ödenecek" onaylanmış beyanlardır. Satır açılınca
+   beyan kartı (satırlar, fişler, eylemler) gelir. *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.ExpensesRead">
+    <PageHeader Title="Masraf beyanları" Icon="wallet" Subtitle="@(page is null ? "Masraf beyanlarını onaylayın, iade edin ve ödemesini işaretleyin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (creating)
+    {
+        <ExpenseClaimEditor Lookups="Lookups" Saved="SavedAsync" Cancelled="() => creating = false" />
+    }
+    else if (selected is not null)
+    {
+        <ExpenseClaimCard Claim="selected" Lookups="Lookups" Changed="ChangedAsync" Closed="() => selected = null" />
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Masraf beyanı görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Masraf beyanı ara" placeholder="Çalışan adı ya da başlık ara" @bind="search" />
+        </form>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(HrAccess.ExpensesManage) && !creating)
+        {
+            <button type="button" class="btn btn-primary" @onclick="Create"><AppIcon Name="plus" Size="16" /> Yeni masraf beyanı</button>
+        }
+    </div>
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan masraf beyanı yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) masraf beyanı listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Masraf beyanları</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var claim in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, claim)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(claim, "title")} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(claim)"><AppIcon Name="eye" Size="16" /> <span>Aç</span></button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + HrAccess.ExpenseClaimEntityKey;
+
+    private const string MineToApprove = "toApprove";
+    private const string SubmittedView = "submitted";
+    private const string ToPayView = "approved";
+    private const string PaidView = "paid";
+    private const string RejectedView = "rejected";
+    private const string AllViews = "all";
+
+    // Sıralama anahtarları kayıt deposunun beyanıdır (ExpenseClaimRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("employee", "Çalışan", "user", "employee", "-employee", Locked: true),
+        new("title", "Başlık", "type", "title", "-title"),
+        new("total", "Toplam", "coins", "totalAmount", "-totalAmount"),
+        new("submittedAt", "Gönderim", "calendar", "submittedAt", "-submittedAt"),
+        new("approver", "Onaylayan", "user-check"),
+        new("status", "Durum", "check-circle", "status", "-status"),
+    ];
+
+    private readonly GridViewState grid = new("hr.expense-claims", "-createdAt");
+    private PersonalGridViews views = default!;
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool creating;
+    private string? message;
+    private string? search;
+    private string view = SubmittedView;
+    private string? status = "submitted";
+    private bool toApprove;
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, "hr.expense-claims");
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.ExpensesRead))
+        {
+            await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(HrAccess.ExpenseClaimEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
+            if (Session.Can(HrAccess.ExpensesPay) && !Session.Can(HrAccess.ExpensesApprove))
+            {
+                view = ToPayView;
+                status = "approved";
+            }
+            else if (Session.Can(HrAccess.ExpensesApprove) && !Session.Can(HrAccess.ExpensesManage))
+            {
+                view = MineToApprove;
+                toApprove = true;
+            }
+
+            await LoadAsync(1);
+        }
+    }
+
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        .. Session.Can(HrAccess.ExpensesApprove) ? new[] { new ViewOption(MineToApprove, "Onayımı bekleyenler", Icon: "user-check") } : Array.Empty<ViewOption>(),
+        new(SubmittedView, "Onay bekleyen", Icon: "hourglass"),
+        new(ToPayView, "Ödenecek", Icon: "wallet"),
+        new(PaidView, "Ödenen", Icon: "check-circle"),
+        new(RejectedView, "Reddedilen", Icon: "x"),
+        new(AllViews, "Tüm beyanlar", Icon: "list"),
+        .. views.Options,
+    ];
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            status = filters.GetValueOrDefault("status");
+            toApprove = filters.GetValueOrDefault("approverUserId") is not null;
+        }
+        else
+        {
+            grid.Reset();
+            status = key switch { MineToApprove or SubmittedView => "submitted", ToPayView => "approved", PaidView => "paid", RejectedView => "rejected", _ => null };
+            toApprove = key == MineToApprove;
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private Guid? Me => Session.User?.UserId;
+
+    private string? CurrentFilters => GridFilters.Build(
+        status is { } s ? ("status", s) : null,
+        toApprove && Me is { } me ? ("approverUserId", me.ToString()) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(SubmittedView);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (status is { } s)
+        {
+            url += $"&status={s}";
+        }
+
+        if (toApprove && Me is { } me)
+        {
+            url += $"&approverUserId={me}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse claim) => @<td data-label="@column.Label" class="@(column.Key == "employee" ? "primary" : null)">@CellContent(column.Key, claim)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse claim) => key switch
+    {
+        "employee" => @<text>@(WarehouseLabels.Text(claim, "employeeName") is { Length: > 0 } name ? name : "—")</text>,
+        "title" => @<text>@WarehouseLabels.Text(claim, "title")</text>,
+        "total" => @<text>@HrLabels.Money(HrLabels.Decimal(claim, "totalAmount"), WarehouseLabels.Text(claim, "currency"))</text>,
+        "submittedAt" => @<text>@(DateTimeOffset.TryParse(WarehouseLabels.Text(claim, "submittedAt"), out var at) ? FleetLabels.Date(DateOnly.FromDateTime(at.LocalDateTime)) : "—")</text>,
+        "approver" => @<text>@(WarehouseLabels.Id(claim, "approverUserId") is { } approver ? Lookups.MemberName(approver) : "—")</text>,
+        "status" => @<span class="badge @HrLabels.ExpenseStatusBadge(WarehouseLabels.Text(claim, "status"))">@HrLabels.ExpenseStatus(WarehouseLabels.Text(claim, "status"))</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.ExpenseClaimEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, claim.Values["custom"] as System.Text.Json.Nodes.JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private void Create()
+    {
+        selected = null;
+        creating = true;
+    }
+
+    private void Open(RecordResponse claim)
+    {
+        creating = false;
+        selected = claim;
+    }
+
+    private async Task SavedAsync(RecordResponse created)
+    {
+        creating = false;
+        selected = created;
+        await LoadAsync(1);
+    }
+
+    private async Task ChangedAsync(RecordResponse changed)
+    {
+        selected = changed;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

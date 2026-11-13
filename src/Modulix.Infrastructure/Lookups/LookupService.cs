@@ -136,7 +136,7 @@ internal sealed class LookupService(
             }
         }
 
-        var page = Math.Max(1, request.Page);
+        var page = Math.Clamp(request.Page, 1, 100_000);
         var size = request.PageSize <= 0 ? definition.PageSize : Math.Min(request.PageSize, RecordLookupLimits.MaxPageSize);
         return definition.IsMember
             ? await SearchMembersAsync(info, text, page, size, cancellationToken)

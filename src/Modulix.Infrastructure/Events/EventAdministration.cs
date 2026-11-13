@@ -49,7 +49,7 @@ internal sealed class EventAdministration(
     public async Task<EventDeliveryPage> ListAsync(EventDeliveryQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var page = Math.Max(1, query.Page);
+        var page = Math.Clamp(query.Page, 1, 100_000);
         var pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
 
         var rows = Filter(Rows(), query);

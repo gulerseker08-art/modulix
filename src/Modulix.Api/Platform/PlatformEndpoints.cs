@@ -136,9 +136,18 @@ public static class PlatformEndpoints
         // Y7b: hesap düzeyinde; kişinin hangi firmalarda olduğu fark etmez. İşlem kişinin firmalarının denetim kaydına yazılır.
         platform.MapPost("/users/reset-two-factor", async (
                 ResetTwoFactorRequest request, ClaimsPrincipal user, HttpContext http, TwoFactorAccounts twoFactor, CancellationToken ct) =>
-            await twoFactor.ResetAsync(request.Email, UserId(user), Auth.AuthEndpoints.Client(http), ct)
-                ? Results.NoContent()
-                : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Bu e-postayla kayıtlı hesap yok."));
+        {
+            try
+            {
+                return await twoFactor.ResetAsync(request.Email, UserId(user), Auth.AuthEndpoints.Client(http), ct)
+                    ? Results.NoContent()
+                    : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Bu e-postayla kayıtlı hesap yok.");
+            }
+            catch (Exception ex) when (ToProblem(ex) is { } problem)
+            {
+                return problem;
+            }
+        });
 
         return app;
     }

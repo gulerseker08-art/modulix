@@ -3,6 +3,7 @@
 <div class="view-selector" @onkeydown="OnKeyDown">
     <button type="button" class="btn btn-ghost" aria-haspopup="true" aria-expanded="@(open ? "true" : "false")" @onclick="Toggle">
         <AppIcon Name="columns" Size="16" /> @Texts.Get("common.columns")
+        <span class="toolbar-chevron" aria-hidden="true"><AppIcon Name="chevron-down" Size="16" /></span>
     </button>
     @if (open)
     {

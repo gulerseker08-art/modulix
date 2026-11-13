@@ -9,6 +9,10 @@ namespace Modulix.Modules.Logistics.Domain;
 /// </summary>
 public abstract class LogisticsEntity : ITenantEntity, ICompanyShared
 {
+    /// <summary>Para birimi kodu uzunluğu (ISO 4217).</summary>
+    public const int CurrencyLength = 3;
+    public const decimal MaxAmount = 9_999_999_999_999_999.99m;
+
     protected LogisticsEntity()
     {
         Id = Guid.CreateVersion7();
@@ -240,6 +244,15 @@ public sealed class Shipment : CargoEntity
 
     public Shipment() => Status = Statuses.Pending;
 
+    /// <summary>
+    /// Müşteriye uygulanan navlun (taşıma bedeli; ADR-0038 K11, dilim 7a). Operasyon değeridir, gelir ya da fatura değildir; talepte tutulmaz
+    /// (onayda kopyalanırsa yetkisiz onaylayanda kaybolurdu), sevkiyatta girilir. Hassas alandır (<c>logistics.freight.read</c>).
+    /// </summary>
+    public decimal? FreightAmount { get; internal set; }
+
+    /// <summary>Navlunun para birimi (ISO 4217, üç harf); tutar varsa zorunludur.</summary>
+    public string? FreightCurrency { get; internal set; }
+
     /// <summary>Kaynak taşıma talebi; her talepten en çok bir sevkiyat.</summary>
     public Guid RequestId { get; internal set; }
 
@@ -293,6 +306,15 @@ public sealed class Trip : LogisticsEntity
 
     /// <summary>Taşeron seferde taşıyıcı firma ("Taşıyıcı" ilişki rolü).</summary>
     public Guid? CarrierPartyId { get; internal set; }
+
+    /// <summary>
+    /// Taşeron seferde taşıyıcıya ödenecek hakediş (ADR-0038 K11, dilim 7a): anlaşmalı tutar, tarife hesabı değil. Yalnızca taşıyıcı seçiliyken
+    /// girilir. Hassas alandır (<c>logistics.freight.read</c>).
+    /// </summary>
+    public decimal? SettlementAmount { get; internal set; }
+
+    /// <summary>Hakedişin para birimi (ISO 4217, üç harf); tutar varsa zorunludur.</summary>
+    public string? SettlementCurrency { get; internal set; }
 
     public string? Notes { get; internal set; }
 

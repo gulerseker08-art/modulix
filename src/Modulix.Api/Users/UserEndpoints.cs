@@ -231,11 +231,18 @@ public static class PublicUrl
             return configured.TrimEnd('/');
         }
 
-        if (http.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment())
+        // Host başlığı istemciden gelir: yalnızca geliştirmede ve yerel adreste kullanılır. Aksi halde saldırgan
+        // "şifremi unuttum" isteğine kendi alan adını yazıp gerçek sıfırlama bağlantısını kendine yönlendirebilir.
+        if (http.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment() && IsLoopbackHost(http.Request.Host.Host))
         {
             return $"{http.Request.Scheme}://{http.Request.Host}";
         }
 
         throw new InvalidOperationException($"{ConfigurationKey} ayarı gerekli: e-postadaki bağlantılar bu adresle oluşturulur.");
     }
+
+    private static bool IsLoopbackHost(string host) =>
+        string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+        || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
+        || (System.Net.IPAddress.TryParse(host, out System.Net.IPAddress? address) && System.Net.IPAddress.IsLoopback(address));
 }

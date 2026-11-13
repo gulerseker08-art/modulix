@@ -220,6 +220,12 @@ public sealed class AccountSecurity(
             throw new ArgumentException("Mevcut şifrenizi girin.", "currentPassword");
         }
 
+        // Kilitli hesapta doğru şifre de kabul edilmez; yoksa kilit açık oturumdan sınırsız denemeyi durdurmaz.
+        if (await users.IsLockedOutAsync(user))
+        {
+            throw new ArgumentException("Çok fazla hatalı deneme yapıldı; bir süre sonra yeniden deneyin.", "currentPassword");
+        }
+
         if (!await users.CheckPasswordAsync(user, currentPassword))
         {
             // Açık oturumdan şifre denenmesin: hatalı denemeler girişteki gibi sayılır ve hesabı kilitler.

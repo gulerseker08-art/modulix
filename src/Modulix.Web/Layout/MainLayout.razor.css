@@ -19,9 +19,10 @@
     border-right: 1px solid var(--mx-border);
 }
 
+/* Üst çubuk (12.11.2026 görsel kararı): sayfa zeminine karışır, çizgi yok; arama ve araçlar zeminde yüzer. */
 .top-row {
-    background-color: var(--mx-surface);
-    border-bottom: 1px solid var(--mx-border);
+    background-color: var(--mx-background);
+    border-bottom: 0;
     height: var(--mx-header-height);
     display: flex;
     align-items: center;
@@ -210,6 +211,27 @@
     .top-row, .content {
         padding-left: var(--mx-space-8) !important;
         padding-right: var(--mx-space-6) !important;
+    }
+}
+
+/* İçerik paneli (12.11.2026 görsel kararı): sayfa zemininde yüzen, büyük köşeli açık yüzey. Kartlar ve tablolar bu panelin içindedir. */
+.content {
+    margin: 0 var(--mx-space-4) var(--mx-space-4);
+    border: 1px solid var(--mx-panel-border);
+    border-radius: var(--mx-radius-panel);
+    background: var(--mx-panel-bg);
+    box-shadow: var(--mx-shadow-panel);
+    /* Çok sütunlu tablo gibi daralmayan içerik varsa panel onunla birlikte genişler (tablo panelden taşmaz, sayfa yatay kayar).
+       Panelin kendisini kaydırılabilir yapmak satır menüsünü keser ve yapışkan (sticky) çubukları bozar. */
+    width: fit-content;
+    min-width: calc(100% - 2 * var(--mx-space-4));
+}
+
+@media (max-width: 640.98px) {
+    .content {
+        margin: 0 var(--mx-space-2) var(--mx-space-2);
+        border-radius: var(--mx-radius-drawer);
+        min-width: calc(100% - 2 * var(--mx-space-2));
     }
 }
 

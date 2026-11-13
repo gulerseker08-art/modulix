@@ -1,0 +1,500 @@
+@inject ApiClient Api
+
+@* Firma alt profilleri (ADR-0041): sektör profilinin altında firmanın kendi tanımladığı alan ve liste değeri paketleri. Tek seviyedir;
+   etkinleştirince seçenekler firmaya yalnızca eklenir. Uygulanmış seçenek bu ekrandan değişmez (Özel alanlar ve Listeler sayfasından). *@
+<section class="settings-group" aria-labelledby="subProfilesTitle">
+    <h2 id="subProfilesTitle">Alt profiller</h2>
+    <p class="text-muted">
+        Firmanıza özgü alt profiller tanımlayın (ör. Kara taşımacılığı, Gümrüklü antrepo, Deniz taşımacılığı). Her alt profil istediğiniz kadar
+        alan ve liste değeri içerebilir; etkinleştirince firmaya eklenir. Pasife aldığınızda eklenen alanlar ve değerler kalır.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (profiles is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else
+    {
+        <div class="list-toolbar">
+            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="NewProfile">Yeni alt profil</button>
+        </div>
+
+        @if (profileForm is not null)
+        {
+            <form class="record-form" novalidate @onsubmit="SaveProfileAsync" @onsubmit:preventDefault>
+                <h3>@(profileForm.Id is null ? "Yeni alt profil" : "Alt profili düzenle")</h3>
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="subProfileName">Ad *</label>
+                        <input id="subProfileName" class="form-control" maxlength="100" placeholder="ör. Kara taşımacılığı" @bind="profileForm.Name" @bind:event="oninput" />
+                        <FieldError Field="name" Errors="errors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="subProfileActivity">Bağlı faaliyet</label>
+                        <select id="subProfileActivity" class="form-select" @bind="profileForm.ActivityCode">
+                            <option value="">Bağlı faaliyet yok</option>
+                            @foreach (var activity in activities)
+                            {
+                                <option value="@activity.Code">@activity.Name</option>
+                            }
+                        </select>
+                        <div class="form-text">İsteğe bağlı; yalnızca sınıflandırma içindir.</div>
+                        <FieldError Field="activityCode" Errors="errors" />
+                    </div>
+                    <div class="span-all">
+                        <label class="form-label" for="subProfileDescription">Açıklama</label>
+                        <input id="subProfileDescription" class="form-control" maxlength="500" @bind="profileForm.Description" />
+                        <FieldError Field="description" Errors="errors" />
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelProfileForm">Vazgeç</button>
+                    <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")" disabled="@(busy || string.IsNullOrWhiteSpace(profileForm.Name))">
+                        @(profileForm.Id is null ? "Alt profili ekle" : "Kaydet")
+                    </button>
+                </div>
+            </form>
+        }
+
+        @if (profiles.Count == 0)
+        {
+            <p class="text-muted">Henüz alt profil yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <thead>
+                    <tr><th>Alt profil</th><th>Bağlı faaliyet</th><th>Seçenekler</th><th>Durum</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var profile in profiles)
+                    {
+                        <tr class="@(current?.Id == profile.Id ? "is-selected" : null)">
+                            <td data-label="Alt profil" class="primary">@profile.Name</td>
+                            <td data-label="Bağlı faaliyet">@(profile.ActivityName ?? "—")</td>
+                            <td data-label="Seçenekler">
+                                @profile.OptionCount
+                                @if (profile.PendingCount > 0)
+                                {
+                                    <span class="badge category">@profile.PendingCount bekliyor</span>
+                                }
+                            </td>
+                            <td data-label="Durum"><span class="badge @StatusTone(profile.Status)">@SubProfileStatuses.Label(profile.Status)</span></td>
+                            <td class="actions">
+                                <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick="() => OpenAsync(profile.Id)">Seçenekler</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => EditProfile(profile)">Düzenle</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (current is not null)
+        {
+            <div class="record-form" aria-live="polite">
+                <h3>@current.Name <span class="badge @StatusTone(current.Status)">@SubProfileStatuses.Label(current.Status)</span></h3>
+
+                <div class="list-toolbar">
+                    @if (current.Status == SubProfileStatuses.Active)
+                    {
+                        if (current.PendingCount > 0)
+                        {
+                            <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="ApplyPendingAsync">Bekleyenleri uygula</button>
+                        }
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => SetStatusAsync(SubProfileStatuses.Inactive)">Pasife al</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-primary" disabled="@busy" @onclick="PreviewActivationAsync">
+                            @(current.Status == SubProfileStatuses.Inactive ? "Yeniden etkinleştir" : "Etkinleştir")
+                        </button>
+                    }
+                </div>
+
+                @if (plan is not null)
+                {
+                    <section class="settings-group">
+                        <h4>Etkinleştirince firmaya eklenecekler</h4>
+                        <ProfilePreview Plan="plan" Applied="false" />
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => plan = null">Vazgeç</button>
+                            <button type="button" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")" disabled="@busy" @onclick="() => SetStatusAsync(SubProfileStatuses.Active)">Etkinleştir ve uygula</button>
+                        </div>
+                    </section>
+                }
+
+                <h4>Seçenekler</h4>
+                @if (current.Options.Count == 0)
+                {
+                    <p class="text-muted">Bu alt profilde henüz seçenek yok.</p>
+                }
+                else
+                {
+                    <table class="table record-table">
+                        <thead>
+                            <tr><th>Seçenek</th><th>Tür</th><th>Hedef</th><th>Ayrıntı</th><th>Durum</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var option in current.Options)
+                            {
+                                <tr>
+                                    <td data-label="Seçenek" class="primary">@option.Label</td>
+                                    <td data-label="Tür">@SubProfileOptionKinds.Label(option.Kind)</td>
+                                    <td data-label="Hedef">@option.TargetName</td>
+                                    <td data-label="Ayrıntı">@Detail(option)</td>
+                                    <td data-label="Durum">
+                                        @if (option.AppliedAt is not null)
+                                        {
+                                            <span class="badge category">Uygulandı</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge">Bekliyor</span>
+                                        }
+                                    </td>
+                                    <td class="actions">
+                                        @if (option.AppliedAt is null)
+                                        {
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => EditOption(option)">Düzenle</button>
+                                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveOptionAsync(option)">Kaldır</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+
+                @if (optionForm is null)
+                {
+                    <div class="list-toolbar">
+                        <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="NewOption">Seçenek ekle</button>
+                    </div>
+                }
+                else
+                {
+                    <form novalidate @onsubmit="SaveOptionAsync" @onsubmit:preventDefault>
+                        <h4>@(optionForm.Id is null ? "Yeni seçenek" : "Seçeneği düzenle")</h4>
+                        <div class="form-grid">
+                            <div>
+                                <label class="form-label" for="optionKind">Tür</label>
+                                <select id="optionKind" class="form-select" value="@optionForm.Kind" @onchange="OnKindChanged" disabled="@(optionForm.Id is not null)">
+                                    <option value="@SubProfileOptionKinds.Field">Alan (kayda özel alan ekler)</option>
+                                    <option value="@SubProfileOptionKinds.ListValue">Liste değeri (listeye değer ekler)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" for="optionTarget">@(optionForm.Kind == SubProfileOptionKinds.Field ? "Kayıt türü" : "Liste")</label>
+                                <select id="optionTarget" class="form-select" @bind="optionForm.TargetKey">
+                                    @if (optionForm.Kind == SubProfileOptionKinds.Field)
+                                    {
+                                        foreach (var entity in entities)
+                                        {
+                                            <option value="@entity.Key">@entity.Name</option>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        foreach (var list in lists)
+                                        {
+                                            <option value="@list.Key">@list.Name</option>
+                                        }
+                                    }
+                                </select>
+                                <FieldError Field="targetKey" Errors="errors" />
+                            </div>
+                            <div>
+                                <label class="form-label" for="optionLabel">@(optionForm.Kind == SubProfileOptionKinds.Field ? "Alan adı *" : "Değer adı *")</label>
+                                <input id="optionLabel" class="form-control" maxlength="100" @bind="optionForm.Label" @bind:event="oninput" />
+                                <FieldError Field="label" Errors="errors" />
+                            </div>
+                            @if (optionForm.Kind == SubProfileOptionKinds.Field)
+                            {
+                                <div>
+                                    <label class="form-label" for="optionType">Alan tipi</label>
+                                    <select id="optionType" class="form-select" @bind="optionForm.Type">
+                                        @foreach (var type in Enum.GetValues<CustomFieldType>())
+                                        {
+                                            <option value="@type">@CustomFieldTypeLabels.Of(type)</option>
+                                        }
+                                    </select>
+                                    <FieldError Field="fieldType" Errors="errors" />
+                                </div>
+                                <div class="span-all check-list">
+                                    <label class="form-check">
+                                        <input class="form-check-input" type="checkbox" @bind="optionForm.Required" />
+                                        <span class="form-check-label">Zorunlu</span>
+                                    </label>
+                                    <label class="form-check">
+                                        <input class="form-check-input" type="checkbox" @bind="optionForm.ShowInList" />
+                                        <span class="form-check-label">Listede göster</span>
+                                    </label>
+                                </div>
+                                @if (CustomFieldTypeLabels.HasOptions(optionForm.Type))
+                                {
+                                    <div class="span-all">
+                                        <label class="form-label" for="optionChoices">Seçenekler (her satıra bir tane)</label>
+                                        <textarea id="optionChoices" class="form-control" rows="4" @bind="optionForm.ChoicesText" @bind:event="oninput"></textarea>
+                                        <FieldError Field="choices" Errors="errors" />
+                                    </div>
+                                }
+                            }
+                            else if (ListCategories.Count > 0)
+                            {
+                                <div>
+                                    <label class="form-label" for="optionCategory">Kategori</label>
+                                    <select id="optionCategory" class="form-select" @bind="optionForm.Category">
+                                        @foreach (var category in ListCategories)
+                                        {
+                                            <option value="@category.Key">@category.Name</option>
+                                        }
+                                    </select>
+                                    <FieldError Field="category" Errors="errors" />
+                                </div>
+                            }
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CancelOptionForm">Vazgeç</button>
+                            <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")" disabled="@(busy || string.IsNullOrWhiteSpace(optionForm.Label))">
+                                @(optionForm.Id is null ? "Seçeneği ekle" : "Kaydet")
+                            </button>
+                        </div>
+                    </form>
+                }
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private List<SubProfileDto>? profiles;
+    private SubProfileDto? current;
+    private ProfilePlanDto? plan;
+    private List<ActivityOptionDto> activities = [];
+    private List<CustomizableEntityDto> entities = [];
+    private List<ChoiceListDto> lists = [];
+    private ProfileForm? profileForm;
+    private OptionForm? optionForm;
+    private string? message;
+    private bool busy;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    private IReadOnlyList<ChoiceCategoryDto> ListCategories =>
+        lists.FirstOrDefault(l => l.Key == optionForm?.TargetKey)?.Categories ?? [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var all = await Api.GetAsync<List<SubProfileDto>>("/api/customization/sub-profiles");
+        profiles = all.Value;
+        message = all.Error;
+        activities = (await Api.GetAsync<List<ActivityOptionDto>>("/api/activity-options")).Value?
+            .Where(a => a.Kind == "Activity").OrderBy(a => a.Name).ToList() ?? [];
+        entities = (await Api.GetAsync<List<CustomizableEntityDto>>("/api/customization/entities")).Value ?? [];
+        lists = (await Api.GetAsync<List<ChoiceListDto>>("/api/customization/lists")).Value ?? [];
+    }
+
+    private async Task ReloadAsync()
+    {
+        var all = await Api.GetAsync<List<SubProfileDto>>("/api/customization/sub-profiles");
+        profiles = all.Value ?? profiles;
+        message = all.Error;
+    }
+
+    private async Task OpenAsync(Guid id)
+    {
+        plan = null;
+        optionForm = null;
+        errors = null;
+        var result = await Api.GetAsync<SubProfileDto>($"/api/customization/sub-profiles/{id}");
+        current = result.Value;
+        message = result.Error;
+    }
+
+    private void NewProfile()
+    {
+        profileForm = new ProfileForm();
+        errors = null;
+    }
+
+    private void EditProfile(SubProfileDto profile)
+    {
+        profileForm = new ProfileForm { Id = profile.Id, Name = profile.Name, Description = profile.Description, ActivityCode = profile.ActivityCode ?? string.Empty, Revision = profile.Revision };
+        errors = null;
+    }
+
+    private void CancelProfileForm()
+    {
+        profileForm = null;
+        errors = null;
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        busy = true;
+        var form = profileForm!;
+        var request = new SaveSubProfileRequest(form.Name, form.Description, string.IsNullOrWhiteSpace(form.ActivityCode) ? null : form.ActivityCode, form.Revision);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<SubProfileDto>($"/api/customization/sub-profiles/{id}", request)
+            : await Api.PostAsync<SubProfileDto>("/api/customization/sub-profiles", request);
+        busy = false;
+        errors = result.FieldErrors;
+        message = result.FieldErrors.Count > 0 ? null : result.Error;
+        if (result.IsSuccess)
+        {
+            profileForm = null;
+            await ReloadAsync();
+            if (result.Value is { } saved)
+            {
+                current = saved;
+            }
+        }
+    }
+
+    private async Task PreviewActivationAsync()
+    {
+        busy = true;
+        var result = await Api.GetAsync<ProfilePlanDto>($"/api/customization/sub-profiles/{current!.Id}/apply/preview");
+        busy = false;
+        plan = result.Value;
+        message = result.Error;
+    }
+
+    private async Task SetStatusAsync(string status)
+    {
+        busy = true;
+        var result = await Api.PostAsync<SubProfileDto>($"/api/customization/sub-profiles/{current!.Id}/status", new SetSubProfileStatusRequest(status, current.Revision));
+        busy = false;
+        message = result.Error;
+        plan = null;
+        if (result.IsSuccess)
+        {
+            current = result.Value;
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ApplyPendingAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<SubProfileDto>($"/api/customization/sub-profiles/{current!.Id}/apply", new { });
+        busy = false;
+        message = result.Error;
+        if (result.IsSuccess)
+        {
+            current = result.Value;
+            await ReloadAsync();
+        }
+    }
+
+    private void NewOption()
+    {
+        optionForm = new OptionForm { TargetKey = entities.FirstOrDefault()?.Key ?? string.Empty };
+        errors = null;
+    }
+
+    private void EditOption(SubProfileOptionDto option)
+    {
+        optionForm = new OptionForm
+        {
+            Id = option.Id, Kind = option.Kind, TargetKey = option.TargetKey, Label = option.Label, Type = option.FieldType ?? CustomFieldType.Text,
+            Required = option.Required, ShowInList = option.ShowInList, ChoicesText = string.Join('\n', option.Choices), Category = option.Category,
+        };
+        errors = null;
+    }
+
+    private void CancelOptionForm()
+    {
+        optionForm = null;
+        errors = null;
+    }
+
+    private void OnKindChanged(ChangeEventArgs e)
+    {
+        optionForm!.Kind = e.Value?.ToString() ?? SubProfileOptionKinds.Field;
+        optionForm.TargetKey = optionForm.Kind == SubProfileOptionKinds.Field ? entities.FirstOrDefault()?.Key ?? string.Empty : lists.FirstOrDefault()?.Key ?? string.Empty;
+        optionForm.Category = null;
+    }
+
+    private async Task SaveOptionAsync()
+    {
+        busy = true;
+        var form = optionForm!;
+        var isField = form.Kind == SubProfileOptionKinds.Field;
+        var choices = isField && CustomFieldTypeLabels.HasOptions(form.Type)
+            ? form.ChoicesText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()
+            : null;
+        // Kategorili listede kategori seçilmemişse ilkini gönder; kategorisiz listede hiç gönderme.
+        var category = !isField && ListCategories.Count > 0 ? form.Category ?? ListCategories[0].Key : null;
+        var request = new SaveSubProfileOptionRequest(form.Kind, form.TargetKey, form.Label, isField ? form.Type : null, isField && form.Required, isField && form.ShowInList, choices, category);
+        var url = $"/api/customization/sub-profiles/{current!.Id}/options";
+        var result = form.Id is { } id
+            ? await Api.PutAsync<SubProfileDto>($"{url}/{id}", request)
+            : await Api.PostAsync<SubProfileDto>(url, request);
+        busy = false;
+        errors = result.FieldErrors;
+        message = result.FieldErrors.Count > 0 ? null : result.Error;
+        if (result.IsSuccess)
+        {
+            optionForm = null;
+            current = result.Value;
+            await ReloadAsync();
+        }
+    }
+
+    private async Task RemoveOptionAsync(SubProfileOptionDto option)
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"/api/customization/sub-profiles/{current!.Id}/options/{option.Id}");
+        busy = false;
+        message = result.Error;
+        await OpenAsync(current.Id);
+        await ReloadAsync();
+    }
+
+    private static string StatusTone(string status) => status == SubProfileStatuses.Active ? "category" : string.Empty;
+
+    private static string Detail(SubProfileOptionDto option) =>
+        option.Kind == SubProfileOptionKinds.Field
+            ? $"{CustomFieldTypeLabels.Of(option.FieldType ?? CustomFieldType.Text)}{(option.Choices.Count > 0 ? $" ({option.Choices.Count} seçenek)" : null)}{(option.Required ? ", zorunlu" : null)}"
+            : option.Category ?? "—";
+
+    private sealed class ProfileForm
+    {
+        public Guid? Id { get; init; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public string ActivityCode { get; set; } = string.Empty;
+
+        public long Revision { get; init; }
+    }
+
+    private sealed class OptionForm
+    {
+        public Guid? Id { get; init; }
+
+        public string Kind { get; set; } = SubProfileOptionKinds.Field;
+
+        public string TargetKey { get; set; } = string.Empty;
+
+        public string Label { get; set; } = string.Empty;
+
+        public CustomFieldType Type { get; set; } = CustomFieldType.Text;
+
+        public bool Required { get; set; }
+
+        public bool ShowInList { get; set; }
+
+        public string ChoicesText { get; set; } = string.Empty;
+
+        public string? Category { get; set; }
+    }
+}

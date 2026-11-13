@@ -19,10 +19,11 @@ public class TransactionalFlowsTests(ModulixApiFactory factory) : IClassFixture<
         var admin = await factory.CreateUserAsync(tenant);
         await factory.MakeAdministratorAsync(tenant.Id, admin);
         var role = await factory.CreateRoleAsync(tenant.Id, ["crm.companies.read"]);
+        var adminMembershipId = await factory.GetMembershipIdAsync(admin.Id, tenant.Id);
         var email = $"davet-{Guid.NewGuid():N}@test.modulix";
 
         Guid membershipId;
-        using (var scope = factory.OpenScope(tenant.Id))
+        using (var scope = factory.OpenScope(tenant.Id, (admin.Id, adminMembershipId)))
         {
             var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
             await using var transaction = await db.Database.BeginTransactionAsync();
@@ -48,7 +49,7 @@ public class TransactionalFlowsTests(ModulixApiFactory factory) : IClassFixture<
         // Davette açılan yeni hesap da aynı işlemdedir (Identity aynı bağlamı kullanır): geri alınınca o da kalmaz; yeniden
         // davet hesabı ve üyeliği birlikte oluşturur.
         Assert.Equal(0, await factory.ScalarAsync<int>(null, "SELECT COUNT(*) FROM [platform].[Users] WHERE [Email] = @e", ("@e", email)));
-        using (var scope = factory.OpenScope(tenant.Id))
+        using (var scope = factory.OpenScope(tenant.Id, (admin.Id, adminMembershipId)))
         {
             var again = await scope.ServiceProvider.GetRequiredService<IUserAdministration>()
                 .InviteAsync(new UserInvitation(email, "Davetli Kişi", [role.Id], "https://localhost"), CancellationToken.None);

@@ -107,3 +107,14 @@ Katılımcı üç türdür (tam biri dolu): dahili kullanıcı, CRM kişisi, ser
 | Raporlar (zamanında tamamlama, iş yükü, takip eksik müşteri...) | E3; veri (durum, tamamlanma, sonuç, sayaç, planlanan/gerçekleşen süre) saklanıyor |
 | `view-private`/`assign` dışındaki izin ayrımı (create/update/complete/delete) | Rol yükseltme mekanizması (yukarıya bakın) |
 | Dışa aktarma | Uç nokta ve `crm.activities.export` izni yok; eklenince aynı boru hattı kapsamıyla yapılacak |
+
+## Güncel durum notu (13 Kasım 2026)
+
+"Yapılmadı" tablosundaki **bağımlılık** sütunu yazıldığı günün durumudur; bazı engeller kalktı, işlerin kendisi ise çoğunlukla yapılmadı:
+
+- **Arka plan iş/zamanlayıcı (Ç2) ve bildirim kutusu (Ç5a):** artık var ([ADR-0027](0027-kural-ve-is-akisi-altyapisi.md): zamanlanmış kurallar, `core.Notifications`, onay eskalasyonu). Aktiviteye özel hatırlatma, gecikme bildirimi ve sessiz saat **yapılmadı**; engeli kalktı.
+- **Dosya eki (Ç4):** altyapı var ([ADR-0040](0040-dosya-ve-ekler.md), ortak `AttachmentPanel`); aktivite ekranına bağlanmadı.
+- **Otomasyon:** kural altyapısı ve CRM şablonları var (ADR-0027); tabloda sayılan aktivite senaryoları şablon olarak ayrıca doğrulanmadı.
+- **Raporlar:** [ADR-0035](0035-raporlama-ve-satis-tahmini.md) kapsamında; aktivite iş yükü raporu ayrıca doğrulanmadı.
+- **Kişisel görünümler:** Aktiviteler'in tarayıcıda sakladığı görünümler sunucuya taşındı ([ADR-0036](0036-kisisel-liste-gorunumleri.md)).
+- **Hâlâ geçerli:** tekrar serileri (E2), takip planları, davet/kabul, alt görev, ekip kuyruğu ve iş birimi kapsamı (modüllere iş birimi sözleşmesi yok), harici takvim, kaynak rezervasyonu, AI araçları, dışa aktarma (`crm.activities.export` yok).
