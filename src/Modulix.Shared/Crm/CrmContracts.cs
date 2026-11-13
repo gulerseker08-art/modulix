@@ -148,7 +148,11 @@ public static class CompanySource
     public const string Other = "Other";
 }
 
-/// <summary>CRM firması. Ad, vergi no, iletişim ve adres ortak firma kaydındadır (<see cref="PartyId"/>, ADR-0006).</summary>
+/// <summary>
+/// CRM firması. Ad, vergi no, iletişim, adres ve sektör ortak firma kaydındadır (<see cref="PartyId"/>, ADR-0006). <see cref="Industry"/>
+/// sektör kataloğundaki koddur (ADR-0042), <see cref="IndustryName"/> katalogdaki adıdır; <see cref="LegacyIndustry"/> katalog öncesi
+/// girilmiş, kataloğa eşlenememiş serbest metindir (salt okunur; sektör seçilince temizlenir).
+/// </summary>
 public sealed record CompanyDto(
     Guid Id,
     long Version,
@@ -168,7 +172,9 @@ public sealed record CompanyDto(
     JsonObject? Custom = null,
     Guid? PartyId = null,
     string? Kind = null,
-    string? TaxOffice = null);
+    string? TaxOffice = null,
+    string? IndustryName = null,
+    string? LegacyIndustry = null);
 
 /// <summary>
 /// Sorumlu boş bırakılırsa kaydı oluşturan kullanıcı atanır. Liste alanları (durum, aşama, tip) boş bırakılırsa yeni

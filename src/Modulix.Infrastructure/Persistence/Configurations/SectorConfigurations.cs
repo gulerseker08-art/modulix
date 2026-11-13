@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Sectors;
 
 namespace Modulix.Infrastructure.Persistence.Configurations;
@@ -70,6 +71,22 @@ internal sealed class RelationshipRoleConfiguration : IEntityTypeConfiguration<R
         builder.Property(r => r.Code).HasMaxLength(ActivityTreeRules.CodeMaxLength).IsRequired();
         builder.Property(r => r.Name).HasMaxLength(ActivityTreeRules.NameMaxLength).IsRequired();
         builder.HasIndex(r => r.Code).IsUnique();
+    }
+}
+
+internal sealed class IndustryConfiguration : IEntityTypeConfiguration<Industry>
+{
+    public void Configure(EntityTypeBuilder<Industry> builder)
+    {
+        // Platform kataloğu (ADR-0042): TenantId taşımaz, RLS dışıdır.
+        builder.ToTable("Industries", DatabaseSchemas.Platform);
+        builder.HasKey(i => i.Id);
+        builder.Property(i => i.Id).ValueGeneratedNever();
+        builder.Property(i => i.Code).HasMaxLength(Industry.CodeMaxLength).IsRequired();
+        builder.Property(i => i.Name).HasMaxLength(Industry.NameMaxLength).IsRequired();
+
+        // Firma kaydı koda başvurur (alternatif anahtar); ad değişmez kimlik değildir, kod sabittir.
+        builder.HasAlternateKey(i => i.Code);
     }
 }
 

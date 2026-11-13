@@ -503,6 +503,8 @@
   "crm.company.editor.card": "Firma kartı",
   "crm.company.editor.emailPlaceholder": "E-posta adresi",
   "crm.company.editor.individual": "Gerçek kişi",
+  "crm.company.editor.industryLegacy": "Önceki kayıt: \"{0}\". Listeden bir sektör seçip kaydettiğinizde bu metin kaldırılır.",
+  "crm.company.editor.industryPlaceholder": "Sektör seçin",
   "crm.company.editor.kind": "Tür",
   "crm.company.editor.nameFallback": "Firma adı",
   "crm.company.editor.nationalId": "T.C. kimlik no",

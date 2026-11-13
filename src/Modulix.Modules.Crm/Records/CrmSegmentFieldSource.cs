@@ -34,7 +34,7 @@ internal sealed class CrmSegmentFieldSource(IModuleData data) : ISegmentFieldSou
         new("crm.company.city", "Şehir", "Firma", SegmentTarget.Company, SegmentFieldType.Text, CrmModule.Entities.Company),
         new("crm.company.industry", "Sektör", "Firma", SegmentTarget.Company, SegmentFieldType.Text, CrmModule.Entities.Company)
         {
-            Hint = "Serbest metindir; yazım farkları ayrı değer sayılır (büyük/küçük harf duyarsızdır).",
+            Hint = "Sektör kataloğundaki ad (ör. Gıda ve içecek); katalog öncesi girilmiş serbest metinler de adıyla eşleşir. Büyük/küçük harf duyarsızdır.",
         },
         new("crm.company.status", "Müşteri durumu", "Firma", SegmentTarget.Company, SegmentFieldType.Choice, CrmModule.Entities.Company)
         {
@@ -106,7 +106,7 @@ internal sealed class CrmSegmentFieldSource(IModuleData data) : ISegmentFieldSou
         {
             "crm.company.name" => Predicates.Text(companies, c => c.Party.Name, leaf),
             "crm.company.city" => Predicates.Text(companies, c => c.Party.City, leaf),
-            "crm.company.industry" => Predicates.Text(companies, c => c.Industry, leaf),
+            "crm.company.industry" => Predicates.Text(companies, c => c.Party.Industry!.Name ?? c.Industry, leaf),
             "crm.company.status" => Predicates.Text(companies, c => c.Status, leaf),
             "crm.company.source" => Predicates.Text(companies, c => c.Source, leaf),
             "crm.company.tags" => Predicates.Text(companies, c => c.Tags, leaf),
@@ -136,7 +136,7 @@ internal sealed class CrmSegmentFieldSource(IModuleData data) : ISegmentFieldSou
         IQueryable<Contact> filtered = key switch
         {
             "crm.contact.title" => Predicates.Text(contacts, k => k.Person.Title, leaf),
-            "crm.contact.companyIndustry" => Predicates.Text(contacts, k => data.Set<Company>().Where(c => c.Id == k.CompanyId).Select(c => c.Industry).FirstOrDefault(), leaf),
+            "crm.contact.companyIndustry" => Predicates.Text(contacts, k => data.Set<Company>().Where(c => c.Id == k.CompanyId).Select(c => c.Party.Industry!.Name ?? c.Industry).FirstOrDefault(), leaf),
             "crm.contact.createdAt" => Predicates.Date(contacts, k => (DateTimeOffset?)k.CreatedAt, leaf, context),
             _ => throw new FormatException($"CRM kişi alanı tanınmıyor: {key}."),
         };
@@ -157,7 +157,7 @@ internal sealed class CrmSegmentFieldSource(IModuleData data) : ISegmentFieldSou
             "crm.lead.source" => Predicates.Text(leads, l => l.Source, leaf),
             "crm.lead.country" => Predicates.Text(leads, l => l.Country, leaf),
             "crm.lead.city" => Predicates.Text(leads, l => l.City, leaf),
-            "crm.lead.industry" => Predicates.Text(leads, l => l.Industry, leaf),
+            "crm.lead.industry" => Predicates.Text(leads, l => l.IndustryEntry!.Name ?? l.Industry, leaf),
             "crm.lead.utmCampaign" => Predicates.Text(leads, l => l.UtmCampaign, leaf),
             "crm.lead.createdAt" => Predicates.Date(leads, l => (DateTimeOffset?)l.CreatedAt, leaf, context),
             _ => throw new FormatException($"CRM müşteri adayı alanı tanınmıyor: {key}."),

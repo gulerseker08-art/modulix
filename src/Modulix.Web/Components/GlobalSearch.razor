@@ -146,7 +146,7 @@
         if (crm && Session.Can(CrmAccess.CompaniesRead))
         {
             tasks.Add(FetchAsync<CompanyDto>(Texts.Get("crm.companies.title"), "building", "crm/firmalar", "/api/crm/companies", text, failures,
-                c => new SearchItem(c.Name, Join(c.Industry, c.City), $"crm/firmalar/{c.Id}")));
+                c => new SearchItem(c.Name, Join(c.IndustryName ?? c.LegacyIndustry, c.City), $"crm/firmalar/{c.Id}")));
         }
 
         if (crm && Session.Can(CrmAccess.ContactsRead))

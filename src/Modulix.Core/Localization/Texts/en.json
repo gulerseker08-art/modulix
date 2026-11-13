@@ -503,6 +503,8 @@
   "crm.company.editor.card": "Company card",
   "crm.company.editor.emailPlaceholder": "Email address",
   "crm.company.editor.individual": "Individual",
+  "crm.company.editor.industryLegacy": "Previous entry: \"{0}\". This text is removed when you pick an industry from the list and save.",
+  "crm.company.editor.industryPlaceholder": "Select an industry",
   "crm.company.editor.kind": "Type",
   "crm.company.editor.nameFallback": "Company name",
   "crm.company.editor.nationalId": "National ID no.",

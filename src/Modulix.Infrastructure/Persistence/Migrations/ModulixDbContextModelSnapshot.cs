@@ -1111,6 +1111,29 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Modulix.Core.Contracts.Sectors.Industry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Industries", "platform");
+                });
+
             modelBuilder.Entity("Modulix.Core.Contracts.SharedRecords.Party", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1134,6 +1157,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<string>("Email")
                         .HasMaxLength(254)
                         .HasColumnType("nvarchar(254)");
+
+                    b.Property<string>("IndustryCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -1180,6 +1207,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IndustryCode");
+
+                    b.HasIndex("TenantId", "IndustryCode");
 
                     b.HasIndex("TenantId", "Name");
 
@@ -6769,6 +6800,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("IndustryCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<string>("JobTitle")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -6877,6 +6912,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(300)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IndustryCode");
 
                     b.HasIndex("TenantId", "CompanyId");
 
@@ -14173,6 +14210,17 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Modulix.Core.Contracts.SharedRecords.Party", b =>
+                {
+                    b.HasOne("Modulix.Core.Contracts.Sectors.Industry", "Industry")
+                        .WithMany()
+                        .HasForeignKey("IndustryCode")
+                        .HasPrincipalKey("Code")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Industry");
+                });
+
             modelBuilder.Entity("Modulix.Core.Contracts.SharedRecords.PartyRelationship", b =>
                 {
                     b.HasOne("Modulix.Core.Contracts.SharedRecords.Party", null)
@@ -14899,6 +14947,12 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.Lead", b =>
                 {
+                    b.HasOne("Modulix.Core.Contracts.Sectors.Industry", "IndustryEntry")
+                        .WithMany()
+                        .HasForeignKey("IndustryCode")
+                        .HasPrincipalKey("Code")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Modulix.Modules.Crm.Domain.Company", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "CompanyId")
@@ -14928,6 +14982,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId", "ConvertedOpportunityId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("IndustryEntry");
                 });
 
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.Location", b =>

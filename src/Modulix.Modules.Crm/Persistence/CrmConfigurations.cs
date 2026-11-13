@@ -502,6 +502,10 @@ internal sealed class LeadConfiguration : IEntityTypeConfiguration<Lead>
         builder.Property(l => l.EstimatedBudget).HasPrecision(18, 2);
         builder.Property(l => l.Currency).HasMaxLength(Opportunity.CurrencyLength).IsFixedLength().IsUnicode(false).IsRequired();
         builder.Property(l => l.Industry).HasMaxLength(Company.IndustryMaxLength);
+        builder.Property(l => l.IndustryCode).HasMaxLength(Industry.CodeMaxLength);
+
+        // Sektör (ADR-0042): platform kataloğuna kodla başvurur; katalog satırı silinmez (pasife alınır), bu yüzden Restrict.
+        builder.HasOne(l => l.IndustryEntry).WithMany().HasForeignKey(l => l.IndustryCode).HasPrincipalKey(i => i.Code).OnDelete(DeleteBehavior.Restrict);
         builder.Property(l => l.Source).HasMaxLength(ChoiceValueKeys.MaxLength);
         builder.Property(l => l.SourceDetail).HasMaxLength(Lead.ShortMaxLength);
         builder.Property(l => l.Referrer).HasMaxLength(Lead.UrlMaxLength);

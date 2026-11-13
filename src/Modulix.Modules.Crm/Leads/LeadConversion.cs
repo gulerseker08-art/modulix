@@ -4,6 +4,7 @@ using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Records;
@@ -79,7 +80,8 @@ internal sealed class LeadConversion(
     ITenantContextAccessor tenant,
     IChoiceLists choiceLists,
     IBusinessEventPublisher events,
-    TimeProvider time) : ILeadConversion
+    TimeProvider time,
+    IIndustryCatalog? industries = null) : ILeadConversion
 {
     /// <summary>Dönüşümle açılan fırsatın başlangıç aşaması (firmanın listesinde etkinse); Lead zaten nitelikli olduğu için.</summary>
     private const string QualifiedStage = "Qualified";
@@ -189,7 +191,17 @@ internal sealed class LeadConversion(
         }
         else
         {
-            var created = await pipeline.CreateAsync(new RecordCommand(CrmModule.Entities.Company, null, CompanyValues(lead, request)), cancellationToken);
+            var values = CompanyValues(lead, request);
+
+            // Lead'in sektörü serbest metindir; firmanın sektörü katalogdandır (ADR-0042). Katalogdaki bir ada eşleşirse kod yazılır,
+            // eşleşmezse firmaya sektör yazılmaz (Lead kaydındaki metin yerinde kalır; sektörü firma formundan seçilir).
+            if (values["industry"] is not null)
+            {
+                var industry = industries is null ? null : await industries.ResolveAsync(values["industry"]!.GetValue<string>(), cancellationToken);
+                values["industry"] = industry is { IsActive: true } ? industry.Code : null;
+            }
+
+            var created = await pipeline.CreateAsync(new RecordCommand(CrmModule.Entities.Company, null, values), cancellationToken);
             if (!created.IsSuccess)
             {
                 return Fail<LeadConversionResult>(created.Error!, "company");
@@ -290,7 +302,7 @@ internal sealed class LeadConversion(
             return Fail<LeadConversionResult>(converted.Error!, "lead");
         }
 
-        // 5) İş olayı (ADR-0039): dönüşümle aynı işlemde yazılır (ConvertAsync RunAtomicAsync içindedir).
+        // 5) İş olayı (ADR-0042): dönüşümle aynı işlemde yazılır (ConvertAsync RunAtomicAsync içindedir).
         var ownerId = converted.Value!.Values["ownerId"]?.DeepClone();
         await events.PublishAsync(new BusinessEvent(CrmModule.Events.LeadConverted, lead.Id, new JsonObject
         {

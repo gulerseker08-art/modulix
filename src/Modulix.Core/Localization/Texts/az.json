@@ -503,6 +503,8 @@
   "crm.company.editor.card": "Şirkət kartı",
   "crm.company.editor.emailPlaceholder": "E-poçt ünvanı",
   "crm.company.editor.individual": "Fiziki şəxs",
+  "crm.company.editor.industryLegacy": "Əvvəlki qeyd: \"{0}\". Siyahıdan sektor seçib yadda saxladıqda bu mətn silinir.",
+  "crm.company.editor.industryPlaceholder": "Sektor seçin",
   "crm.company.editor.kind": "Növ",
   "crm.company.editor.nameFallback": "Şirkət adı",
   "crm.company.editor.nationalId": "Şəxsiyyət vəsiqəsi №",

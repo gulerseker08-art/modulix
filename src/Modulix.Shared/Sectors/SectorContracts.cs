@@ -41,6 +41,11 @@ public sealed record RelationshipRoleDto(Guid Id, string Code, string Name, bool
 
 public sealed record CreateRelationshipRoleRequest(string Code, string Name);
 
+/// <summary>Sektör kataloğu öğesi (ADR-0042). Firma kaydındaki sektör bu kodu taşır.</summary>
+public sealed record IndustryDto(Guid Id, string Code, string Name, bool IsActive);
+
+public sealed record CreateIndustryRequest(string Code, string Name);
+
 /// <summary>Firma formunun seçim listesi için aktif faaliyet düğümü; yalnızca ad ve konum bilgisi taşır (ADR-0029).</summary>
 public sealed record ActivityOptionDto(string Code, string Name, string Kind, string? ParentCode, int SortOrder);
 

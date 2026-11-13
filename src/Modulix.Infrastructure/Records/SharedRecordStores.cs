@@ -341,6 +341,7 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
         SharedField.Text<Party>("website", Party.WebsiteMaxLength, p => p.Website, (p, v) => p.Website = v),
         SharedField.Text<Party>("city", Party.CityMaxLength, p => p.City, (p, v) => p.City = v),
         SharedField.Text<Party>("address", Party.AddressMaxLength, p => p.Address, (p, v) => p.Address = v),
+        SharedField.Text<Party>("industryCode", Party.IndustryCodeMaxLength, p => p.IndustryCode, (p, v) => p.IndustryCode = v),
         SharedField.CodeList<Party>("relationshipRoles", p => p.RelationshipRoles, (p, v) => p.RelationshipRoles = v),
         SharedField.CodeList<Party>("customerSectors", p => p.CustomerSectors, (p, v) => p.CustomerSectors = v),
         SharedField.CodeList<Party>("serviceNeeds", p => p.ServiceNeeds, (p, v) => p.ServiceNeeds = v),
@@ -375,6 +376,22 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
         {
             var known = await Db.RelationshipRoles.AsNoTracking().Where(r => roles.Contains(r.Code)).Select(r => r.Code).ToListAsync(cancellationToken);
             AddUnknown(unknown, "relationshipRoles", roles, known, "Katalogda olmayan ilişki rolü");
+        }
+
+        // Sektör (ADR-0042) sektör kataloğundan bir kod olmalı; pasife alınmış kod yalnızca kayıtta zaten varsa kalabilir.
+        if (entity.IndustryCode is { } industryCode)
+        {
+            var industry = await Db.Industries.AsNoTracking().Where(i => i.Code == industryCode).Select(i => new { i.IsActive }).SingleOrDefaultAsync(cancellationToken);
+            var unchanged = industry is not null
+                && await Set.AsNoTracking().AnyAsync(p => p.Id == entity.Id && p.IndustryCode == industryCode, cancellationToken);
+            if (industry is null)
+            {
+                unknown.Add(new RecordFieldError("industryCode", "Katalogda olmayan sektör."));
+            }
+            else if (!industry.IsActive && !unchanged)
+            {
+                unknown.Add(new RecordFieldError("industryCode", "Bu sektör artık kullanılmıyor."));
+            }
         }
 
         foreach (var (field, stored) in new[] { ("customerSectors", entity.CustomerSectors), ("serviceNeeds", entity.ServiceNeeds) })

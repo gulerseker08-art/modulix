@@ -163,6 +163,9 @@ public static class PersistenceSetup
         services.AddScoped<ISectorCatalog, SectorCatalogService>();
         services.AddScoped<IStarterPackages, StarterPackageInstaller>();
         services.AddScoped<IRelationshipRoles, RelationshipRoleService>();
+        services.AddScoped<IndustryService>();
+        services.AddScoped<IIndustries>(sp => sp.GetRequiredService<IndustryService>());
+        services.AddScoped<IIndustryCatalog>(sp => sp.GetRequiredService<IndustryService>());
         services.AddScoped<GtipCatalogService>();
         services.AddScoped<IGtipCatalog>(sp => sp.GetRequiredService<GtipCatalogService>());
         services.AddScoped<IGtipCatalogAdmin>(sp => sp.GetRequiredService<GtipCatalogService>());
