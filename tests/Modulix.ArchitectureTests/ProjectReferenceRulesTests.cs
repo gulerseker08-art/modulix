@@ -3,12 +3,15 @@ namespace Modulix.ArchitectureTests;
 /// <summary>
 /// Talimat Bölüm 3, kural 10 ve 11: modüller yalnızca Core sözleşmelerine bağımlıdır,
 /// birbirlerine ve Core'un iç koduna erişemez; arayüz yalnızca API sözleşmelerini görür.
+/// Bir modül başka bir modüle yalnızca onun sözleşme projesi (<c>Modulix.Modules.&lt;Ad&gt;.Contracts</c>, ADR-0044)
+/// üzerinden bağlanır ve bu bağımlılık aşağıdaki tabloda açıkça yazılır.
 /// Yeni bir proje eklendiğinde önce buradaki kural tablosuna eklenmelidir.
 /// </summary>
 public class ProjectReferenceRulesTests
 {
     private const string CoreContracts = "Modulix.Core.Contracts";
     private const string ModulePrefix = "Modulix.Modules.";
+    private const string FleetContracts = "Modulix.Modules.Fleet.Contracts";
 
     /// <summary>Her src projesinin referans verebileceği projeler.</summary>
     private static readonly Dictionary<string, string[]> AllowedReferences = new()
@@ -18,14 +21,18 @@ public class ProjectReferenceRulesTests
         ["Modulix.Core"] = [CoreContracts],
         ["Modulix.Infrastructure"] = ["Modulix.Core", CoreContracts],
         ["Modulix.Modules.Crm"] = [CoreContracts],
-        ["Modulix.Modules.Logistics"] = [CoreContracts],
+        ["Modulix.Modules.Logistics"] = [CoreContracts, FleetContracts],
         ["Modulix.Modules.Contracts"] = [CoreContracts],
         ["Modulix.Modules.Orders"] = [CoreContracts],
         ["Modulix.Modules.Support"] = [CoreContracts],
         ["Modulix.Modules.Marketing"] = [CoreContracts],
         ["Modulix.Modules.Warehouse"] = [CoreContracts],
-        ["Modulix.Modules.Fleet"] = [CoreContracts],
+        ["Modulix.Modules.Fleet"] = [CoreContracts, FleetContracts],
         ["Modulix.Modules.Hr"] = [CoreContracts],
+
+        // Modül sözleşme projeleri (ADR-0044): yalnızca arayüz ve veri tipleri; başka modüle ya da sözleşmeye bağlanmaz.
+        [FleetContracts] = [CoreContracts],
+
         ["Modulix.AI"] = [CoreContracts],
         ["Modulix.Web"] = ["Modulix.Shared"],
 
@@ -103,9 +110,22 @@ public class ProjectReferenceRulesTests
 
         foreach (var (module, allowed) in modules)
         {
+            if (RepositoryLayout.IsModuleContracts(module))
+            {
+                // Sözleşme projesi başka bir sözleşmeye bağlanamaz; böylece sözleşmeler arasında döngü oluşamaz.
+                Assert.True(
+                    allowed.SequenceEqual(new[] { CoreContracts }),
+                    $"{module} (sözleşme projesi) yalnızca {CoreContracts} projesine referans verebilir.");
+                continue;
+            }
+
+            // Modül: Core sözleşmeleri + (kendi ya da başka modülün) sözleşme projeleri. Başka modülün ana projesi asla.
+            var forbidden = allowed
+                .Where(reference => reference != CoreContracts && !RepositoryLayout.IsModuleContracts(reference))
+                .ToList();
             Assert.True(
-                allowed.SequenceEqual(new[] { CoreContracts }),
-                $"{module} yalnızca {CoreContracts} projesine referans verebilir.");
+                allowed.Contains(CoreContracts) && forbidden.Count == 0,
+                $"{module} yalnızca {CoreContracts} ve modül sözleşme projelerine referans verebilir; izin verilmeyen: {string.Join(", ", forbidden)}.");
         }
 
         Assert.True(

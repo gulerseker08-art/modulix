@@ -1,5 +1,5 @@
 using Modulix.Core.Contracts.Customization;
-using Modulix.Core.Contracts.Fleet;
+using Modulix.Modules.Fleet.Contracts;
 using Modulix.Core.Contracts.Persistence;
 
 namespace Modulix.Modules.Logistics.Records;

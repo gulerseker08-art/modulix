@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Authorization;
-using Modulix.Core.Contracts.Fleet;
+using Modulix.Modules.Fleet.Contracts;
 using Modulix.Infrastructure.Identity;
 using Modulix.Shared.Audit;
 using Modulix.Shared.Auth;

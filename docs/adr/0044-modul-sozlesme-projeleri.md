@@ -1,6 +1,6 @@
 # ADR-0044: Modül sözleşme projeleri (modüller arası sözleşmeler Core'dan çıkar)
 
-- **Durum:** Taslak, 13 Kasım 2026 (karar bekliyor; kod değişikliği yok)
+- **Durum:** Uygulanıyor, 13 Kasım 2026. Dilim 1 (Fleet) teslim edildi; açık sorular 1-4 hâlâ karar bekliyor ve ilgili dilimlerden (4, 5) önce yanıtlanmalı.
 - **Karar (öneri):** Bir modülün başka modüllere açtığı arayüzler ve veri tipleri `Modulix.Core.Contracts` yerine o modülün kendi sözleşme projesinde (`Modulix.Modules.<Ad>.Contracts`) durur. Bir modül başka bir modülün yalnızca sözleşme projesine başvurabilir; bu bağımlılık mimari test tablosunda açıkça yazılır. `Modulix.Core.Contracts` yalnızca bütün modüllerin ortak kullandığı çekirdek sözleşmeleri tutar ve içine modüle özel alan adı eklenmesi testle engellenir.
 
 > Numara notu: 0043 numarası açık dallarda iki ayrı ADR tarafından kullanılıyor (`0043-firma-sektor-katalogu`, `0043-sevkiyatta-ulke-ve-uluslararasi-tasima`). Bu taslak 0044 aldı; birleştirmeden önce numara yeniden kontrol edilmeli.

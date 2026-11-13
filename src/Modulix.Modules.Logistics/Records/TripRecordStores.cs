@@ -8,7 +8,7 @@ using Modulix.Modules.Logistics.Domain;
 namespace Modulix.Modules.Logistics.Records;
 
 /// <summary>
-/// Sefer deposu (ADR-0038 K5, dilim 5). Numara sunucuda verilir (SF-yıl-sıra). Araç ve dorse Filo'dan okunur (<see cref="Core.Contracts.Fleet.IVehicleDirectory"/>):
+/// Sefer deposu (ADR-0038 K5, dilim 5). Numara sunucuda verilir (SF-yıl-sıra). Araç ve dorse Filo'dan okunur (<see cref="Modulix.Modules.Fleet.Contracts.IVehicleDirectory"/>):
 /// araç motorlu, dorse çekilen araç olmalı ve ikisi de pasif olmamalı; Filo kapalıysa araç seçilemez. Sürücüler pasif olamaz ve aynı kişi iki kez
 /// seçilemez; ikinci sürücü birinci sürücüyle birlikte verilir. Taşeron seferin taşıyıcısı "Taşıyıcı" rollü firmadır. Durum ve not yalnızca iş
 /// akışı komutuyla yazılır; sefer yalnızca "Planlanıyor"ken düzenlenir (hazır seferi önce planlamaya geri alın). Silinmez (K12).

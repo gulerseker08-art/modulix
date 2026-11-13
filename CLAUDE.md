@@ -28,7 +28,7 @@ dotnet run --project src/Modulix.Api -- tenant-delete <slug> --confirm <slug>  #
 
 ## Mimari kurallar (testlerle denetlenir)
 
-- Proje referansları `tests/Modulix.ArchitectureTests` (`ProjectReferenceRulesTests.AllowedReferences`) ile sabit. Modüller (`Modulix.Modules.*`, `Modulix.AI`) yalnızca `Modulix.Core.Contracts`'a başvurur; `Modulix.Web` yalnızca `Modulix.Shared`'a. Yeni proje eklemeden önce kural tablosunu güncelle.
+- Proje referansları `tests/Modulix.ArchitectureTests` (`ProjectReferenceRulesTests.AllowedReferences`) ile sabit. Modüller (`Modulix.Modules.*`, `Modulix.AI`) yalnızca `Modulix.Core.Contracts`'a ve modül sözleşme projelerine (`Modulix.Modules.<Ad>.Contracts`, ADR-0044) başvurur, başka bir modülün ana projesine asla; modüller arası yeni sözleşme `Core.Contracts`'a değil sahibi olan modülün sözleşme projesine konur; `Modulix.Web` yalnızca `Modulix.Shared`'a. Yeni proje eklemeden önce kural tablosunu güncelle.
 - Her modül tek bir `IModule` uygulamasıyla kaydolur (`Program.cs` → `ModulixModules.Create()`); izin anahtarları modül anahtarıyla başlar (`crm.companies.read`).
 - Tenant'a ait her entity `ITenantEntity` uygular; tablo şeması = modül anahtarı.  Her tenant entity ayrıca `ICompanyShared` ya da `ICompanyScoped` uygular (ADR-0008; yoksa `TableInventoryTests` kırılır). Her yeni tenant tablosu için migration'da `TenantIsolationSql.AddTable` ekle (yoksa RLS testi kırılır).
 - Kayıt işlemleri kayıt boru hattından geçer (izin, kapsam, hassas alan, özel alan, audit, outbox). Uç noktada boru hattını atlayıp doğrudan `DbContext`'e yazma.
