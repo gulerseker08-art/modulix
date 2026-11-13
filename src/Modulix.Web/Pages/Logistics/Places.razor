@@ -1,0 +1,211 @@
+@page "/lojistik/yerler"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Yerler · Modulix</PageTitle>
+
+@* Yer defteri (ADR-0045): depo, fabrika, liman, sınır kapısı gibi taşıma yerleri. Yer Core ortak kaydıdır (core.place); bu ekran Lojistik'in ona bakışıdır.
+   Okumak için talep, sevkiyat ya da sefer okuma izni yeter; yazmak için "Yer defterine yer ekler" izni gerekir. Yetki sunucuda uygulanır. *@
+<AuthGate Module="@LogisticsAccess.ModuleKey" AnyPermission="@LogisticsAccess.PlacesReadAny">
+    <PageHeader Title="Yerler" Icon="map-pin" Subtitle="@(page is null ? "Depo, fabrika, liman ve sınır kapıları: sevkiyat ve seferlerde seçilen yerler" : $"{page.TotalCount} yer")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <PlaceEditor Place="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Yer görünümleri" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Yer ara" placeholder="Ad, şehir veya adres ara" @bind="search" />
+        </form>
+        <select class="form-select" aria-label="Ülke" @bind="country" @bind:after="() => LoadAsync(1)">
+            <option value="">Tüm ülkeler</option>
+            @foreach (var c in CountryCatalog.All)
+            {
+                <option value="@c.Code">@c.NameTr (@c.Code)</option>
+            }
+        </select>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(LogisticsAccess.PlacesWrite) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni yer</button>
+        }
+    </div>
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan yer yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) yer listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Yerler</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var place in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, place)
+                        }
+                        <td class="row-menu-cell">
+                            @if (Session.Can(LogisticsAccess.PlacesWrite))
+                            {
+                                <RowMenu Label="@($"{WarehouseLabels.Text(place, "name")} eylemleri")">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(place)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                </RowMenu>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + LogisticsAccess.PlaceEntityKey;
+
+    private const string ActiveView = "active";
+    private const string PassiveView = "passive";
+    private const string AllViews = "all";
+
+    // Yer kaydı genel sıralama anahtarı sunmaz (ad ve ülkeye göre sabit sıra); sütunlar sıralanabilir değildir.
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("name", "Ad", "map-pin", Locked: true),
+        new("kind", "Tür", "tag"),
+        new("country", "Ülke", "globe"),
+        new("city", "Şehir", "building"),
+        new("address", "Adres", "file-text", DefaultVisible: false),
+        new("location", "Koordinat", "map-pin", DefaultVisible: false),
+        new("state", "Durum", "check-circle"),
+    ];
+
+    private readonly GridViewState grid = new("core.place", "name");
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private string? message;
+    private string? search;
+    private string? country;
+    private string view = ActiveView;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.CanAny(LogisticsAccess.PlacesReadAny))
+        {
+            await Lookups.LoadAsync();
+            grid.Define(Columns);
+            await LoadAsync(1);
+        }
+    }
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(ActiveView, "Etkin yerler", Icon: "check-circle"),
+        new(PassiveView, "Pasif", Icon: "clock"),
+        new(AllViews, "Tüm yerler", Icon: "map-pin"),
+    ];
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (view == ActiveView)
+        {
+            url += "&isActive=true";
+        }
+        else if (view == PassiveView)
+        {
+            url += "&isActive=false";
+        }
+
+        if (!string.IsNullOrEmpty(country))
+        {
+            url += $"&countryCode={Uri.EscapeDataString(country)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse place) =>
+        @<td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, place)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse place) => key switch
+    {
+        "name" => @<text>@WarehouseLabels.Text(place, "name")</text>,
+        "kind" => @<text>@Lookups.Label(LogisticsAccess.PlaceKindList, WarehouseLabels.Text(place, "kindKey"))</text>,
+        "country" => @<text>@CountryCatalog.NameOf(WarehouseLabels.Text(place, "countryCode"))</text>,
+        "city" => @<text>@(WarehouseLabels.Text(place, "city") is { Length: > 0 } city ? city : "—")</text>,
+        "address" => @<text>@(WarehouseLabels.Text(place, "addressLine") is { Length: > 0 } line ? line : "—")</text>,
+        "location" => @<text>@Coordinates(place)</text>,
+        "state" => State(place),
+        _ => @<text></text>,
+    };
+
+    private static string Coordinates(RecordResponse place) =>
+        place.Values["latitude"] is { } lat && place.Values["longitude"] is { } lon
+            ? $"{lat.GetValue<decimal>().ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)}, {lon.GetValue<decimal>().ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)}"
+            : "—";
+
+    private static RenderFragment State(RecordResponse place)
+    {
+        var active = WarehouseLabels.Flag(place, "isActive", true);
+        return @<span class="badge @(active ? "status-customer" : "status-inactive")">@(active ? "Etkin" : "Pasif")</span>;
+    }
+
+    private void Open(RecordResponse? place)
+    {
+        selected = place;
+        editing = true;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}
