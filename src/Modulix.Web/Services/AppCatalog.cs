@@ -266,6 +266,7 @@ public static class AppCatalog
         new("admin.roles", Admin, "Roller", "key", "yonetim/roller", 40, Permission: CoreAccess.ManageRoles, Tone: AppTone.Teal),
         new("admin.companies", Admin, "Şirketler", "landmark", "yonetim/sirketler", 50, Permission: CoreAccess.ManageCompanies),
         new("admin.settings", Admin, "Kuruluş ayarları", "wrench", "yonetim/ayarlar", 60, Permission: CoreAccess.ManageSettings, Tone: AppTone.Teal),
+        new("admin.ai-access", Admin, "Yapay zekâ erişimi", "zap", "yonetim/yapay-zeka", 65, Permission: CoreAccess.ManageSettings),
         new("admin.audit", Admin, "Denetim kaydı", "history", "yonetim/denetim", 70, Permission: CoreAccess.ReadAudit),
         new("admin.import-log", Admin, "İşlem günlüğü", "history", "yonetim/gunluk", 72, AnyPermission: [CoreAccess.ReadImports, CoreAccess.RunImports]),
         new("admin.automation", Admin, "Otomasyon", "zap", "yonetim/otomasyon", 74, Permission: CoreAccess.ReadAutomation, Tone: AppTone.Teal),

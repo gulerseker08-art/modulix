@@ -205,6 +205,7 @@
   "nav.app.admin.roles": "Rollar",
   "nav.app.admin.companies": "Şirkətlər",
   "nav.app.admin.settings": "Təşkilat parametrləri",
+  "nav.app.admin.ai-access": "Süni intellekt girişi",
   "nav.app.admin.audit": "Audit jurnalı",
   "nav.app.admin.import-log": "Əməliyyat jurnalı",
   "nav.app.admin.automation": "Avtomatlaşdırma",
