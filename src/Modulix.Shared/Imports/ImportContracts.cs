@@ -40,12 +40,13 @@ public sealed record ImportDefinitionDto(string EntityKey, string DisplayName, I
 public sealed record ImportDesignFieldDto(string Key, string Label, bool Included, bool Required, bool Locked, IReadOnlyList<string>? Aliases = null);
 
 /// <summary>Firmanın içe aktarma tasarımı. <c>Locked</c> sütun kodun zorunlu kıldığı sütundur, kapatılamaz.</summary>
-public sealed record ImportDesignDto(string EntityKey, string DisplayName, bool Enabled, bool RunAutomation, IReadOnlyList<ImportDesignFieldDto> Fields, long Version);
+public sealed record ImportDesignDto(
+    string EntityKey, string DisplayName, bool Enabled, bool RunAutomation, IReadOnlyList<ImportDesignFieldDto> Fields, long Version, bool AllOrNothing = false);
 
 /// <param name="Aliases">Kayıtlı sütun eşlemesi: alan anahtarı → dosyadaki başka başlık adları (ADR-0033 Dilim 4c). Verilmezse eşleme silinir.</param>
 public sealed record SaveImportDesignRequest(
     bool Enabled, bool RunAutomation, IReadOnlyList<string>? Excluded, IReadOnlyList<string>? Required, long Version,
-    IReadOnlyDictionary<string, IReadOnlyList<string>>? Aliases = null);
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? Aliases = null, bool AllOrNothing = false);
 
 /// <summary>İstemcinin dosyayı göndermeden önce uyguladığı sınır; sunucu aynı sınırı kendisi de uygular.</summary>
 public static class ImportFileLimits

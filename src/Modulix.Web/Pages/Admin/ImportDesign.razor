@@ -53,6 +53,11 @@
                 <label class="form-check-label" for="design-automation">Kurallar ve atama e-postaları çalışsın</label>
                 <div class="form-text">Kapalıyken içe aktarılan kayıtlar kural çalıştırmaz ve sorumlulara e-posta gitmez. Geçmiş veri taşırken kapalı bırakın.</div>
             </div>
+            <div class="form-check">
+                <input id="design-all-or-nothing" class="form-check-input" type="checkbox" @bind="allOrNothing" />
+                <label class="form-check-label" for="design-all-or-nothing">Hepsi ya da hiç</label>
+                <div class="form-text">Açıkken dosya önce hatasız bir kuru çalışmadan geçmeli (son 24 saat); uygulamada tek hatalı satır olursa hiçbir kayıt yazılmaz. Kapalıyken hatasız satırlar alınır, hatalılar rapora yazılır.</div>
+            </div>
         </div>
 
         <table class="table record-table">
@@ -105,6 +110,7 @@
     private List<Row> rows = [];
     private bool enabled;
     private bool runAutomation;
+    private bool allOrNothing;
     private bool busy;
     private string? message;
     private string? notice;
@@ -123,6 +129,7 @@
         rows = design is null ? [] : [.. design.Fields.Select(f => new Row(f))];
         enabled = design?.Enabled ?? false;
         runAutomation = design?.RunAutomation ?? false;
+        allOrNothing = design?.AllOrNothing ?? false;
     }
 
     private void Choose(ChangeEventArgs e)
@@ -152,7 +159,8 @@
             [.. rows.Where(r => r.Required && !r.Locked).Select(r => r.Key)],
             current!.Version,
             rows.Where(r => r.Included && !string.IsNullOrWhiteSpace(r.Aliases))
-                .ToDictionary(r => r.Key, r => (IReadOnlyList<string>)[.. r.Aliases.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)]));
+                .ToDictionary(r => r.Key, r => (IReadOnlyList<string>)[.. r.Aliases.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)]),
+            allOrNothing);
         var saved = await Api.PutAsync<ImportDesignDto>($"/api/customization/import-designs/{Uri.EscapeDataString(current.EntityKey)}", request);
         busy = false;
         if (saved.Value is not { } design)
