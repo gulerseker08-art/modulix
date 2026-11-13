@@ -2,6 +2,7 @@ using Modulix.Shared.Access;
 using Modulix.Shared.Contracts;
 using Modulix.Shared.Crm;
 using Modulix.Shared.Fleet;
+using Modulix.Shared.Hr;
 using Modulix.Shared.Logistics;
 using Modulix.Shared.Marketing;
 using Modulix.Shared.Orders;
@@ -100,6 +101,8 @@ public static class AppCatalog
 
     public const string Fleet = "fleet";
 
+    public const string Hr = "hr";
+
     public const string Logistics = "logistics";
     public const string Reports = "reports";
     public const string Approvals = "approvals";
@@ -146,7 +149,6 @@ public static class AppCatalog
     /// </summary>
     public static IReadOnlyList<PlannedApp> Planned { get; } =
     [
-        new("planned.hr", "İnsan Kaynakları", "users"),
     ];
 
     public static IReadOnlyList<AppDefinition> All { get; } =
@@ -228,21 +230,37 @@ public static class AppCatalog
 
         // Depo ve antrepo (ADR-0032): şimdilik yapı tanımı (tesis, alan, lokasyon seviyesi, lokasyon); stok ve gümrük ekranları sonraki dilimlerle gelir.
         new(Warehouse, null, "Depo ve Antrepo", "warehouse", null, 40, ModuleKey: WarehouseAccess.ModuleKey, Group: OperationsGroup),
+        new("warehouse.dashboard", Warehouse, "Pano", "dashboard", "depo", 5, WarehouseAccess.ModuleKey, WarehouseAccess.FacilitiesRead, ExactMatch: true),
         new("warehouse.facilities", Warehouse, "Tesisler", "building", "depo/tesisler", 10, WarehouseAccess.ModuleKey, WarehouseAccess.FacilitiesRead),
         new("warehouse.zones", Warehouse, "Alanlar", "layers", "depo/alanlar", 20, WarehouseAccess.ModuleKey, WarehouseAccess.ZonesRead, Tone: AppTone.Teal),
         new("warehouse.location-levels", Warehouse, "Lokasyon seviyeleri", "sliders", "depo/lokasyon-seviyeleri", 30, WarehouseAccess.ModuleKey, WarehouseAccess.LocationLevelsRead),
         new("warehouse.locations", Warehouse, "Lokasyonlar", "map-pin", "depo/lokasyonlar", 40, WarehouseAccess.ModuleKey, WarehouseAccess.LocationsRead, Tone: AppTone.Teal),
         new("warehouse.power-of-attorneys", Warehouse, "Vekâletler", "file-text", "depo/vekaletler", 50, WarehouseAccess.ModuleKey, WarehouseAccess.AttorneysRead),
         new("warehouse.stock-items", Warehouse, "Stok kartları", "package", "depo/stok-kartlari", 60, WarehouseAccess.ModuleKey, WarehouseAccess.StockItemsRead, Tone: AppTone.Teal),
+        new("warehouse.lots", Warehouse, "Partiler", "package", "depo/partiler", 62, WarehouseAccess.ModuleKey, WarehouseAccess.LotsRead),
+        new("warehouse.stock-movements", Warehouse, "Stok hareketleri", "repeat", "depo/hareketler", 64, WarehouseAccess.ModuleKey, WarehouseAccess.MovementsRead, Tone: AppTone.Teal),
+        new("warehouse.stock-balances", Warehouse, "Stok bakiyeleri", "list", "depo/bakiyeler", 66, WarehouseAccess.ModuleKey, WarehouseAccess.MovementsRead),
         new("warehouse.customs-declarations", Warehouse, "Beyannameler", "clipboard-list", "depo/beyannameler", 70, WarehouseAccess.ModuleKey, WarehouseAccess.DeclarationsRead),
         new("warehouse.regime-bindings", Warehouse, "Rejim profilleri", "shield", "depo/rejim-profilleri", 80, WarehouseAccess.ModuleKey, WarehouseAccess.RegimesRead, Tone: AppTone.Teal),
         new(Logistics, null, "Lojistik", "truck", null, 42, ModuleKey: LogisticsAccess.ModuleKey, Group: OperationsGroup),
+        new("logistics.dashboard", Logistics, "Pano", "dashboard", "lojistik/pano", 2, LogisticsAccess.ModuleKey, AnyPermission: LogisticsAccess.DashboardAny, ExactMatch: true),
         new("logistics.requests", Logistics, "Taşıma talepleri", "inbox", "lojistik/talepler", 4, LogisticsAccess.ModuleKey, LogisticsAccess.RequestsRead),
         new("logistics.shipments", Logistics, "Sevkiyatlar", "truck", "lojistik/sevkiyatlar", 6, LogisticsAccess.ModuleKey, LogisticsAccess.ShipmentsRead),
         new("logistics.trips", Logistics, "Seferler", "map-pin", "lojistik/seferler", 8, LogisticsAccess.ModuleKey, LogisticsAccess.TripsRead, Tone: AppTone.Teal),
         new("logistics.drivers", Logistics, "Sürücüler", "user", "lojistik/suruculer", 10, LogisticsAccess.ModuleKey, LogisticsAccess.DriversRead),
         new("logistics.carrier-terms", Logistics, "Taşıyıcı anlaşmaları", "file-text", "lojistik/tasiyici-anlasmalari", 20, LogisticsAccess.ModuleKey, LogisticsAccess.CarriersRead, Tone: AppTone.Teal),
         new("logistics.credentials", Logistics, "Sürücü belgeleri", "calendar", "lojistik/surucu-belgeleri", 30, LogisticsAccess.ModuleKey, LogisticsAccess.DriversRead, Tone: AppTone.Indigo),
+        new(Hr, null, "İnsan Kaynakları", "users", null, 50, ModuleKey: HrAccess.ModuleKey, Tone: AppTone.Teal, Group: ManagementGroup),
+        new("hr.employees", Hr, "Çalışanlar", "users", "ik/calisanlar", 10, HrAccess.ModuleKey, HrAccess.EmployeesRead),
+        new("hr.directory", Hr, "Rehber", "phone", "ik/rehber", 20, HrAccess.ModuleKey, HrAccess.EmployeesRead, Tone: AppTone.Teal),
+        new("hr.org-chart", Hr, "Organizasyon şeması", "layers", "ik/organizasyon-semasi", 30, HrAccess.ModuleKey, HrAccess.EmployeesRead),
+        new("hr.my-leaves", Hr, "İzinlerim", "calendar", "ik/izinlerim", 40, HrAccess.ModuleKey, HrAccess.LeavesRequest, Tone: AppTone.Teal),
+        new("hr.leave-requests", Hr, "İzin talepleri", "check-circle", "ik/izin-talepleri", 50, HrAccess.ModuleKey, AnyPermission: [HrAccess.LeavesApprove, HrAccess.LeavesManage]),
+        new("hr.leave-balances", Hr, "İzin hakları", "star", "ik/izin-haklari", 60, HrAccess.ModuleKey, HrAccess.LeavesManage, Tone: AppTone.Teal),
+        new("hr.holidays", Hr, "Resmî tatiller", "sun", "ik/resmi-tatiller", 70, HrAccess.ModuleKey, HrAccess.LeavesManage),
+        new("hr.my-expenses", Hr, "Masraflarım", "wallet", "ik/masraflarim", 80, HrAccess.ModuleKey, HrAccess.ExpensesRequest, Tone: AppTone.Teal),
+        new("hr.expense-claims", Hr, "Masraf beyanları", "coins", "ik/masraf-beyanlari", 90, HrAccess.ModuleKey, AnyPermission: [HrAccess.ExpensesApprove, HrAccess.ExpensesManage, HrAccess.ExpensesPay]),
+
         new(Fleet, null, "Filo", "truck", null, 45, ModuleKey: FleetAccess.ModuleKey, Group: OperationsGroup),
         new("fleet.vehicles", Fleet, "Araçlar", "truck", "filo/araclar", 10, FleetAccess.ModuleKey, FleetAccess.VehiclesRead),
         new("fleet.maintenance", Fleet, "Bakım kayıtları", "wrench", "filo/bakimlar", 20, FleetAccess.ModuleKey, FleetAccess.MaintenanceRead, Tone: AppTone.Teal),
@@ -263,6 +281,7 @@ public static class AppCatalog
         new("admin.roles", Admin, "Roller", "key", "yonetim/roller", 40, Permission: CoreAccess.ManageRoles, Tone: AppTone.Teal),
         new("admin.companies", Admin, "Şirketler", "landmark", "yonetim/sirketler", 50, Permission: CoreAccess.ManageCompanies),
         new("admin.settings", Admin, "Kuruluş ayarları", "wrench", "yonetim/ayarlar", 60, Permission: CoreAccess.ManageSettings, Tone: AppTone.Teal),
+        new("admin.ai-access", Admin, "Yapay zekâ erişimi", "zap", "yonetim/yapay-zeka", 65, Permission: CoreAccess.ManageSettings),
         new("admin.audit", Admin, "Denetim kaydı", "history", "yonetim/denetim", 70, Permission: CoreAccess.ReadAudit),
         new("admin.import-log", Admin, "İşlem günlüğü", "history", "yonetim/gunluk", 72, AnyPermission: [CoreAccess.ReadImports, CoreAccess.RunImports]),
         new("admin.automation", Admin, "Otomasyon", "zap", "yonetim/otomasyon", 74, Permission: CoreAccess.ReadAutomation, Tone: AppTone.Teal),

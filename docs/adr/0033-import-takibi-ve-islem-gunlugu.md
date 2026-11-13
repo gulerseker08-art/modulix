@@ -38,7 +38,7 @@ Ekran sekmelidir: **İçe aktarmalar**, **Hatalı işlemler**, **Denetim** (mevc
 - `ImportRun`: kullanıcı, kayıt türü (`EntityKey`), dosya adı, boyut, **dosya özeti (SHA-256)**, şablon sürümü, mod (`DryRun` / `Apply`), durum (`Pending`, `Running`, `Succeeded`, `PartiallySucceeded`, `Failed`, `Cancelled`, `RolledBack`), toplam/oluşan/güncellenen/atlanan/hatalı satır sayıları, başlangıç/bitiş, kısmi başarı politikası, `CorrelationId`, kira alanları (işçi).
 - `ImportRowIssue`: koşu, satır no, sütun anahtarı, **hata kodu**, ciddiyet (`Error`/`Warning`), kısa ileti. **Ham hücre değeri saklanmaz** (kişisel veri; `AutomationRun.Note` ilkesi). Koşu başına en çok 5.000 satır hatası saklanır; fazlası yalnızca sayılır.
 
-Hata kodları kapalı bir listedir: `required-missing`, `format-invalid`, `lookup-unresolved`, `duplicate-exact`, `duplicate-possible`, `custom-field-invalid`, `permission-denied`, `business-rule`, `file-invalid`, `system-error`. Liste süzgeç ve "en sık hatalar" özeti için kullanılır.
+Hata kodları kapalı bir listedir: `required-missing`, `format-invalid`, `lookup-unresolved`, `duplicate-exact`, `duplicate-possible`, `custom-field-invalid`, `permission-denied`, `business-rule`, `file-invalid`, `system-error`, `file-repeated`. Liste süzgeç ve "en sık hatalar" özeti için kullanılır.
 
 ### 3. Dinamik tanım: içe aktarılabilir kayıt türleri
 
@@ -169,4 +169,30 @@ Mutlu yol (yükle, uygula, sonuç); hata/doğrulama (her hata kodu, biçim, dosy
 - **Hücre türleri:** Excel hücresi gerçek tiptedir. Sayı Türkçe ondalık metne (`1250,5`), tarih `gg.aa.yyyy`'ye, mantıksal değer `Evet/Hayır`'a çevrilir ve mevcut hücre yorumundan geçer; böylece CSV'deki "12.5 reddedilir" kuralı bozulmaz. Saatli tarih `gg.aa.yyyy SS:dd` olur (tarih sütunu bunu reddeder). **Bilinen sınır:** telefon gibi sayı olarak saklanmış değerin baştaki sıfırı Excel'de zaten yoktur; metin biçimli hücre kullanılmalıdır.
 - **Güvenlik:** yalnızca ilk sayfa okunur; zip imzası ("PK") ve açılmış boyut (200 MB, zip bombası) denetlenir; fiziksel satır okuması 100.000'de, sütun okuması 201'de, dolu satır okuması 2.001'de durur (büyük ama boş biçimli sayfa belleği doldurmaz). Formül hücresinde yalnızca kayıtlı sonuç okunur; makro ve dış bağlantı çalışmaz. Bozuk dosya 400 değil, `file-invalid` hatalı `Failed` koşu olarak günlüğe yazılır; `.xls` uzantısı ise uçta 400 ile reddedilir.
 - Hata raporu ve şablon CSV kalır (ADR'deki "CSV/XLSX" ikinci biçim sonraya bırakıldı): Türkçe Excel UTF-8 BOM'lu CSV'yi doğrudan açar ve rapor düzeltilip yeniden yüklenebilir.
-- **Kalan (Dilim 4):** geri alma, aynı dosya uyarısı, kayıtlı sütun eşlemesi, "hepsi ya da hiç" modu.
+- **Dilim 4 tamamlandı** (4a XLSX, 4b aynı dosya uyarısı, 4c kayıtlı sütun eşlemesi, 4d geri alma, 4e "hepsi ya da hiç").
+
+**Dilim 4b:** uygulandı (aynı dosya uyarısı, 13 Kasım 2026).
+
+- Koşu açılırken dosya özeti (SHA-256) firmanın günlüğünde aranır: aynı özetli dosya aynı kayıt türüne daha önce **uygulanıp kayıt almışsa** (`Succeeded` ya da `PartiallySucceeded`) koşuya dosya düzeyinde (satır 0) `file-repeated` **uyarısı** yazılır. Kuru çalışmada da görünür, böylece uygulamadan önce fark edilir. Uyarı engellemez: düzeltilmiş dosya ya da bilerek tekrar yükleme olabilir; mükerrer satırlar zaten eşleşme kurallarıyla (`duplicate-exact`) yakalanır.
+- Kuru çalışma ve kayıt almamış (`Failed`) uygulama sayılmaz. Sorgu tenant süzgecindedir ve mevcut `(TenantId, FileHash, CreatedAt)` indeksini kullanır; migration yok. İleti önceki yükleyenin adını taşımaz (yalnızca tarih, UTC).
+- **Sonra değerlendirilecek:** uyarının firma ayarıyla engele çevrilmesi (dinamik tasarım ilkesi; "hepsi ya da hiç" ile birlikte ele alınabilir) ve tarihin firmanın saat diliminde gösterilmesi.
+
+**Dilim 4c:** uygulandı (kayıtlı sütun eşlemesi, 13 Kasım 2026).
+
+- Firma yöneticisi İçe aktarma tasarımı ekranında her sütun için "Dosyadaki diğer adlar"ı kaydeder; dosya başlığı alanın adı, anahtarı ya da bu adlardan biriyse sütuna bağlanır. Bağlamada önce bütün alanların adı ve anahtarı, sonra eşlemeler eklenir: bir alanın kendi adı başka alanın eşlemesine kaptırılmaz.
+- Eşleme tasarım JSON'undadır (`ImportDesignInput.Aliases`: alan anahtarı → adlar); **migration yok**, eski satırlar değişmeden okunur. Sunucu kuralları: bilinmeyen sütun, başka sütunun adı/anahtarı, hata raporu sütunu, iki sütuna aynı ad, alan başına en çok 10 ad, ad en çok 100 karakter → 422; adlar kırpılır, büyük/küçük harf duyarsız tekrarlar atılır. Değişiklik denetim kaydına (`aliases`) yazılır.
+- **Karar:** eşleme dosya başına değil firma + kayıt türü başınadır. **Sonra değerlendirilecek:** birden çok eşleme profili (farklı kaynak sistemlerden gelen dosyalar) ve yükleme ekranında tanınmayan sütunu oradan eşlemeye ekleme.
+
+**Dilim 4d:** uygulandı (geri alma, 13 Kasım 2026).
+
+- `POST /api/imports/{runId}/rollback` (`core.imports.rollback`, gerekçe zorunlu). Koşunun oluşturduğu kayıtlar ayrı bir iz tablosundan değil **denetim kaydından** bulunur (koşunun korelasyon kimliği + `ExecutionSource.Import` + "oluşturuldu"); migration yok. Kayıtlar boru hattından tek tek silinir (geri alanın silme yetkisi gerekir).
+- Sonradan değiştirilmiş, başka kayda bağlı ya da yetkinin yetmediği kayıt korunur ve nedeniyle döner; zaten silinmiş olan ayrıca sayılır. En az bir kayıt silinince koşu `RolledBack` olur, not gerekçe ve sayıları taşır. Geri alma hepsi-ya-da-hiç değildir.
+- **Sonra değerlendirilecek:** denetim kaydı saklama süresi koşunun yaşından kısaysa iz kaybolur (bugün denetim kaydı silinmiyor); korunan kayıtların listesi ekranda yalnızca nedenle özetleniyor, kayıt bağlantısı yok; geri almanın kendisi için ayrı denetim satırı yok (silmeler tek tek denetlenir, gerekçe koşunun notundadır).
+
+**Dilim 4e:** uygulandı ("hepsi ya da hiç", 13 Kasım 2026).
+
+- Firma, içe aktarma tasarımında tür başına "Hepsi ya da hiç"i açar (`ImportDesignInput.AllOrNothing`, tasarım JSON'unda; migration yok; varsayılan kapalı, değişiklik denetim kaydına yazılır).
+- Açıkken uygulama (bölüm 5 kural a) aynı firmada, aynı tür ve aynı dosya özetiyle **son 24 saatte hatasız biten** (`Succeeded`) bir kuru çalışma şart koşar; yoksa koşu satır işlemeden `file-invalid` ile düşer. Kuru çalışma her zaman satır satır sınar (hangi satırın hatalı olduğu görünsün); koşunun politikası yalnızca uygulamada `AllOrNothing` yazılır.
+- Uygulama bütün satırları tek kapsamda ve tek `RunAtomicAsync` işleminde yazar; ilk hatalı satırda işlem geri alınır, hiçbir kayıt kalmaz, koşu `Failed` biter ve hata raporu o satırı taşır.
+- **Sapma (bölüm 5 kural b):** 10.000 satır sınırı ayrıca uygulanmadı; genel dosya sınırı (`ImportLimits.MaxRows` = 2.000) zaten daha dar. Sınır yükseltilirse "hepsi ya da hiç" için ayrı sınır eklenmeli.
+- **Sonra değerlendirilecek:** ilk hatada durulduğu için uygulamada yalnızca ilk hatalı satır raporlanır (kuru çalışma hepsini gösterir); tek işlem boyunca ilerleme sayacı güncellenmez; 4b aynı dosya uyarısının bu modda engele çevrilmesi.

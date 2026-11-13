@@ -26,8 +26,6 @@ public sealed class CustomField : ITenantEntity, ICompanyShared
 {
     public const int LabelMaxLength = 100;
     public const int KeyMaxLength = 40;
-    public const int MaxPerEntity = 30;
-    public const int MaxOptions = 100;
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 

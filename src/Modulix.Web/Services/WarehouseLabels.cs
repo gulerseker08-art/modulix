@@ -22,6 +22,15 @@ public static class WarehouseLabels
         _ => "stage-qualified",
     };
 
+    /// <summary>Hareket türü kategorisinin tonu: giriş başarı, çıkış dikkat, düzeltme nötr, transfer marka (kod kategoriye bakar, türün adına değil).</summary>
+    public static string MovementBadge(string? category) => category switch
+    {
+        WarehouseAccess.MovementInbound => "status-customer",
+        WarehouseAccess.MovementOutbound => "stage-negotiation",
+        WarehouseAccess.MovementAdjustment => "status-inactive",
+        _ => "stage-qualified",
+    };
+
     /// <summary>Ondalık sayıyı Türkçe gösterimle yazar (binlik ayraçlı, gereksiz sıfırsız; en çok 3 ondalık).</summary>
     public static string Number(decimal value) => value.ToString("#,##0.###", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"));
 

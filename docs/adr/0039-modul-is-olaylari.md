@@ -90,7 +90,7 @@ public interface IBusinessEventPublisher
 ### Dilim 1 kapsamı (bu PR)
 
 - Sözleşme (`BusinessEventDefinition`, `BusinessEvent`, `IBusinessEventPublisher`, `IModule.BusinessEvents`), katalog (`EventSchemaVersions`, `FindBusinessEvent`, beyan ve abonelik doğrulaması, otomasyon beyanı denetimi, `core.automation` tür genişletmesi), Core yayıncısı ve DI kaydı.
-- CRM olayları: `crm.opportunity.won`, `crm.opportunity.lost` (`WinAsync`/`LoseAsync`, `RunAtomicAsync` içinde), `crm.lead.converted` (`ConvertAsync`, zaten atomik). Otomasyon beyanına üç iş olayı eklendi.
+- CRM olayları: `crm.opportunity.won`, `crm.opportunity.lost` (`WinAsync`/`LoseAsync`, `RunAtomicAsync` içinde), `crm.lead.converted` (`ConvertAsync`, zaten atomik). Otomasyon beyanına üç iş olayı eklendi. **13 Kasım 2026:** `crm.quote.accepted` eklendi: kullanıcının kaydettiği kabul (`RecordAcceptedAsync`) ve müşterinin sayfadan kabulü (`QuoteCustomerPortal.DecideAsync`) olayı durum değişikliğiyle aynı `RunAtomicAsync` içinde yayınlar; payload teklifin kayıt alanları + türetilmiş `acceptanceMethod` (`Manual`/`Portal`); ret, iptal ve süre dolumunun iş olayı yoktur (`QuoteAcceptedEvent`).
 - Otomasyon: `DomainEventTrigger` eşleşmesi, `IsExecutable`, editörde "İş olayı" seçeneği.
 - Platform "Olaylar" ekranı tür listesi iş olaylarını da gösterir.
 

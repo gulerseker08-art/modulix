@@ -23,6 +23,7 @@ using Modulix.Api.Platform;
 using Modulix.Api.Records;
 using Modulix.Api.Settings;
 using Modulix.Api.Customs;
+using Modulix.Api.Warehouse;
 using Modulix.Api.Sectors;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
@@ -42,10 +43,12 @@ using Modulix.Modules.Orders;
 using Modulix.Api.Contracts;
 using Modulix.Api.Orders;
 using Modulix.Api.Logistics;
+using Modulix.Api.Hr;
 using Modulix.Api.Support;
 using Modulix.Modules.Marketing;
 using Modulix.Modules.Warehouse;
 using Modulix.Modules.Fleet;
+using Modulix.Modules.Hr;
 using Modulix.Modules.Support;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -66,6 +69,9 @@ builder.Services.AddProblemDetails();
 builder.Services.AddModulixPersistence(
     RequiredConnectionString(builder.Configuration, PersistenceSetup.AppConnectionName),
     RequiredConnectionString(builder.Configuration, PersistenceSetup.MigrationsConnectionName));
+// Özelleştirme sınırları (ADR-0041 K7): yapılandırma verilmezse sınırsız; sınır gerekirse "Customization:Limits" altına yazılır.
+builder.Services.AddSingleton(builder.Configuration.GetSection("Customization:Limits").Get<Modulix.Core.Customization.CustomizationLimits>()
+    ?? new Modulix.Core.Customization.CustomizationLimits());
 builder.Services.AddModulixAuth();
 builder.Services.AddModulixTenancy();
 
@@ -89,6 +95,7 @@ builder.Services.AddSingleton<Modulix.Api.Imports.ImportErrorReports>();
 builder.Services.AddSingleton<Modulix.Api.Imports.ImportRunner>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Modulix.Api.Imports.ImportRunner>());
 builder.Services.AddScoped<Modulix.Api.Imports.ImportContext>();
+builder.Services.AddScoped<Modulix.Api.Imports.ImportRollback>();
 builder.Services.AddSingleton<Modulix.Api.Communication.CommunicationCleanupRunner>();
 builder.Services.AddHostedService<Modulix.Api.Communication.CommunicationCleanupWorker>();
 builder.Services.Configure<Modulix.Api.Reports.ReportJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Reports.ReportJobsOptions.SectionName));
@@ -243,16 +250,19 @@ app.MapFormLayoutEndpoints();
 app.MapGridViewEndpoints();
 app.MapFileEndpoints();
 app.MapSectorProfileEndpoints();
+app.MapSubProfileEndpoints();
 app.MapSectorEndpoints();
 app.MapGtipEndpoints();
 app.MapRegimeProfileEndpoints();
 app.MapRegimeCheckEndpoints();
+app.MapWarehouseDashboardEndpoints();
 app.MapRuleEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapContractsEndpoints();
 app.MapOrdersEndpoints();
 app.MapLogisticsEndpoints();
+app.MapHrEndpoints();
 app.MapSupportEndpoints();
 app.MapMarketingEndpoints();
 app.MapLeadIntakeEndpoints();
@@ -293,5 +303,5 @@ public partial class Program;
 /// </summary>
 internal static class ModulixModules
 {
-    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule(), new SupportModule(), new MarketingModule(), new WarehouseModule(), new FleetModule()];
+    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule(), new SupportModule(), new MarketingModule(), new WarehouseModule(), new FleetModule(), new HrModule()];
 }

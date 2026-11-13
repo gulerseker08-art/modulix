@@ -1,0 +1,234 @@
+@* Güzergâh haritası (docs/design-system/component-catalog.md → RouteMap). Sınırlar wwwroot/maps altındaki yerel dosyalardan gelir; şehir metni LogisticsGazetteer ile noktaya çevrilir. Renk ve ışıma yalnızca --mx-map-* tokenlarından gelir. *@
+@using System.Globalization
+@using Modulix.Shared.Logistics
+@inject HttpClient Http
+
+<section class="dash-map" aria-labelledby="map-title">
+    <header class="dash-map-head">
+        <div>
+            <h2 id="map-title">Güzergâh haritası</h2>
+            <p>@Subtitle</p>
+        </div>
+        <div class="segmented" role="group" aria-label="Harita görünümü">
+            @foreach (var (key, label) in Views)
+            {
+                <button type="button" class="chip @(ActiveView == key ? "active" : null)" aria-pressed="@(ActiveView == key ? "true" : "false")" @onclick="() => Choose(key)">@label</button>
+            }
+        </div>
+    </header>
+
+    <div class="dash-map-stage">
+        @if (map is null)
+        {
+            <p class="dash-map-note" role="status">@(failed ? "Harita yüklenemedi." : "Harita yükleniyor…")</p>
+        }
+        else
+        {
+            <svg class="dash-map-svg" viewBox="0 0 @F(map.Width) @F(map.Height)" role="img" aria-label="@Description" preserveAspectRatio="xMidYMid meet">
+                <g>
+                    @foreach (var s in map.Shapes)
+                    {
+                        <path class="map-shape @(Heated(s.N) ? "is-hot" : null)" d="@s.D"><title>@s.N</title></path>
+                    }
+                </g>
+                @for (var i = 0; i < drawn.Count; i++)
+                {
+                    var r = drawn[i];
+                    var tone = i % 4;
+                    <path class="map-route tone-@tone @RouteState(i)" d="@r.Path" />
+                    <circle class="map-truck tone-@tone @RouteState(i)" r="4">
+                        <animateMotion dur="@(6 + i)s" repeatCount="indefinite" path="@r.Path" />
+                    </circle>
+                }
+                @foreach (var p in points)
+                {
+                    <circle class="map-pulse" cx="@F(p.X)" cy="@F(p.Y)" r="@F(PointSize * 1.6)" />
+                    <circle class="map-dot" cx="@F(p.X)" cy="@F(p.Y)" r="@F(PointSize)" />
+                    @* Razor'da <text> etiketi özel anlamlıdır; SVG metni işaretlemeyle yazılır (ad katalogdan gelir, yine de kodlanır). *@
+                    @((MarkupString)$"<text class=\"map-label\" x=\"{F(p.X + PointSize * 2)}\" y=\"{F(p.Y - PointSize * 1.4)}\" font-size=\"{F(LabelSize)}\">{System.Net.WebUtility.HtmlEncode(p.Name)}</text>")
+                }
+            </svg>
+        }
+
+        @if (drawn.Count > 0)
+        {
+            <ul class="dash-map-legend" aria-label="Güzergâhlar">
+                @for (var i = 0; i < drawn.Count; i++)
+                {
+                    var index = i;
+                    var r = drawn[i];
+                    <li class="tone-@(i % 4)" tabindex="0" @onmouseenter="() => hover = index" @onmouseleave="() => hover = null" @onfocus="() => hover = index" @onblur="() => hover = null">
+                        <i aria-hidden="true"></i>
+                        <span>@r.From → @r.To</span>
+                        <strong>@r.Count</strong>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+
+    @if (unmapped > 0)
+    {
+        <p class="dash-map-note">Haritada gösterilemeyen güzergâh: @unmapped (şehir adı yer kataloğunda yok).</p>
+    }
+    else if (Routes.Count == 0)
+    {
+        <p class="dash-map-note">Yolda ya da planlı sevkiyat olmadığı için çizilecek güzergâh yok.</p>
+    }
+</section>
+
+@code {
+    private sealed record MapShape(string N, string D);
+
+    private sealed record MapData(string Key, double MinLon, double MaxLon, double MinLat, double MaxLat, double Width, double Height, List<MapShape> Shapes);
+
+    private sealed record Drawn(string From, string To, int Count, string Path);
+
+    private sealed record Point(string Name, double X, double Y);
+
+    private static readonly Dictionary<string, MapData> Cache = [];
+
+    private static readonly (string Key, string Label)[] Views = [("auto", "Otomatik"), ("tr", "Türkiye"), ("europe", "Avrupa"), ("world", "Dünya")];
+
+    [Parameter, EditorRequired] public IReadOnlyList<DashboardRouteDto> Routes { get; set; } = [];
+
+    private string chosen = "auto";
+    private MapData? map;
+    private bool failed;
+    private int? hover;
+    private int unmapped;
+    private List<Drawn> drawn = [];
+    private List<Point> points = [];
+    private HashSet<string> hot = [];
+    private string? lastSignature;
+
+    private string ActiveView => chosen;
+
+    private string Subtitle => drawn.Count == 0 ? "Etkin sevkiyatların yükleme ve teslim şehirleri" : $"{drawn.Sum(d => d.Count)} etkin sevkiyat · {drawn.Count} güzergâh";
+
+    private string Description => drawn.Count == 0
+        ? "Güzergâh haritası, çizilecek güzergâh yok"
+        : "Güzergâh haritası: " + string.Join(", ", drawn.Select(d => $"{d.From} {d.To} {d.Count} sevkiyat"));
+
+    private double PointSize => map is null ? 4 : map.Width / 220;
+
+    private double LabelSize => map is null ? 11 : map.Width / 80;
+
+    private static string F(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    private string RouteState(int i) => hover is null ? string.Empty : hover == i ? "is-hot" : "is-dim";
+
+    private bool Heated(string name) => hot.Contains(LogisticsGazetteer.Normalize(name));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var signature = string.Join('|', Routes.Select(r => $"{r.From}>{r.To}:{r.Count}"));
+        if (signature == lastSignature && map is not null)
+        {
+            return;
+        }
+
+        lastSignature = signature;
+        await RenderViewAsync();
+    }
+
+    private async Task Choose(string key)
+    {
+        chosen = key;
+        await RenderViewAsync();
+    }
+
+    private async Task RenderViewAsync()
+    {
+        var resolved = Resolve();
+        var key = chosen == "auto" ? resolved.Key : chosen;
+        map = await LoadAsync(key);
+        if (map is null)
+        {
+            return;
+        }
+
+        Layout(resolved.Mapped);
+    }
+
+    /// <summary>Şehirleri kataloğa göre çözer; "otomatik" görünüm tüm noktaları kapsayan en dar haritayı seçer.</summary>
+    private (string Key, List<(DashboardRouteDto Route, GeoPlace From, GeoPlace To)> Mapped) Resolve()
+    {
+        var mapped = new List<(DashboardRouteDto, GeoPlace, GeoPlace)>();
+        unmapped = 0;
+        foreach (var r in Routes)
+        {
+            if (LogisticsGazetteer.Find(r.From) is { } a && LogisticsGazetteer.Find(r.To) is { } b)
+            {
+                mapped.Add((r, a, b));
+            }
+            else
+            {
+                unmapped++;
+            }
+        }
+
+        var all = mapped.SelectMany(m => new[] { m.Item2, m.Item3 }).ToList();
+        var key = all.All(p => p.Country == "TR") ? "tr" : all.All(p => p.Lon is >= -12 and <= 48 && p.Lat is >= 34 and <= 71) ? "europe" : "world";
+        return (key, mapped);
+    }
+
+    private void Layout(List<(DashboardRouteDto Route, GeoPlace From, GeoPlace To)> mapped)
+    {
+        drawn = [];
+        var seen = new Dictionary<string, Point>();
+        foreach (var (route, from, to) in mapped)
+        {
+            var a = Project(from);
+            var b = Project(to);
+            var mx = (a.X + b.X) / 2;
+            var my = (a.Y + b.Y) / 2 - Math.Sqrt(Math.Pow(b.X - a.X, 2) + Math.Pow(b.Y - a.Y, 2)) * 0.25;
+            drawn.Add(new Drawn(from.Name, to.Name, route.Count, $"M{F(a.X)},{F(a.Y)}Q{F(mx)},{F(my)} {F(b.X)},{F(b.Y)}"));
+            seen[from.Name] = new Point(from.Name, a.X, a.Y);
+            seen[to.Name] = new Point(to.Name, b.X, b.Y);
+        }
+
+        points = [.. seen.Values];
+        hot = map!.Key == "tr"
+            ? [.. mapped.SelectMany(m => new[] { m.From, m.To }).Where(p => p.Country == "TR").Select(p => LogisticsGazetteer.Normalize(p.Name))]
+            : [];
+        hover = null;
+    }
+
+    private (double X, double Y) Project(GeoPlace p)
+    {
+        static double My(double lat) => Math.Log(Math.Tan(Math.PI / 4 + Math.Clamp(lat, -80, 80) * Math.PI / 360));
+        var m = map!;
+        return ((p.Lon - m.MinLon) / (m.MaxLon - m.MinLon) * m.Width, (My(m.MaxLat) - My(p.Lat)) / (My(m.MaxLat) - My(m.MinLat)) * m.Height);
+    }
+
+    private async Task<MapData?> LoadAsync(string key)
+    {
+        if (Cache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        try
+        {
+            var data = await Http.GetFromJsonAsync<MapFile>($"maps/{key}.json");
+            if (data is null)
+            {
+                failed = true;
+                return null;
+            }
+
+            failed = false;
+            return Cache[key] = new MapData(data.Key, data.MinLon, data.MaxLon, data.MinLat, data.MaxLat, data.Width, data.Height, [.. data.Shapes.Select(s => new MapShape(s.N ?? string.Empty, s.D))]);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or NotSupportedException)
+        {
+            failed = true;
+            return null;
+        }
+    }
+
+    private sealed record MapFile(string Key, double MinLon, double MaxLon, double MinLat, double MaxLat, double Width, double Height, List<MapFileShape> Shapes);
+
+    private sealed record MapFileShape(string? N, string D);
+}

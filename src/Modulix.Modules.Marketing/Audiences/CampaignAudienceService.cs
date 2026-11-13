@@ -138,7 +138,7 @@ internal sealed class CampaignAudienceService(
         var rows = Unpack(await snapshotRecipients.ReadAsync(snapshotId, cancellationToken));
         var filtered = rows.Where(r => (status is null || r.Status == status) && (code is null || r.Code == code)).ToList();
         var size = Math.Clamp(pageSize, 1, 200);
-        var number = Math.Max(page, 1);
+        var number = Math.Clamp(page, 1, 100_000);
         var slice = filtered.Skip((number - 1) * size).Take(size).ToList();
         var target = Enum.Parse<SegmentTarget>(snapshot.Value!.Values["target"]!.GetValue<string>());
         var labels = await snapshotRecipients.LabelsAsync(target, [.. slice.Select(r => r.TargetId)], cancellationToken);

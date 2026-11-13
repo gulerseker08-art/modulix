@@ -70,7 +70,7 @@ public sealed class RecordPipeline(
             Owners = !store!.UsesOwnerScope ? null : await dataScope.GetOwnersAsync(tenant!, store.ScopeEntityKey, cancellationToken),
             // Şirket kapsamı (ADR-0008): şirket kapsamlı depoda yalnızca erişilebilir şirketlerin kayıtları.
             Companies = store.CompanyField is null ? null : CompanyScope(),
-            Page = Math.Max(1, query.Page),
+            Page = Math.Clamp(query.Page, 1, 100_000),
             PageSize = Math.Clamp(query.PageSize, 1, query.Bulk ? RecordQuery.MaxBulkPageSize : RecordQuery.MaxPageSize),
             Search = string.IsNullOrEmpty(search) ? null : search[..Math.Min(search.Length, RecordQuery.MaxSearchLength)],
         };

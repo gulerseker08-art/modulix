@@ -1,0 +1,160 @@
+@* Masraf satırı formu (ADR-0042 dilim 3); beyan kartı kullanır. Düzen firmanın form düzenine (ADR-0021) göre çizilir. Satır yalnızca taslak beyanda
+   eklenir ve değişir (sunucu denetler); kaydedilince beyanın toplamı sunucuda yeniden hesaplanır. Fiş/fatura satır kaydedildikten sonra eklenir. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Line is null ? "Yeni masraf satırı" : "Masraf satırı")</h2>
+            <p>Tutarlar @Currency cinsindendir.</p>
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Masraf satırı bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
+            {
+                case "expenseDate":
+                    <label class="@f.LabelClass()" for="line-date">@f.Label</label>
+                    <input id="line-date" class="form-control" type="date" required aria-required="true" @bind="form.ExpenseDate" />
+                    <FieldError Field="expenseDate" Errors="errors" />
+                    break;
+                case "expenseTypeKey":
+                    <label class="@f.LabelClass()" for="line-type">@f.Label</label>
+                    <select id="line-type" class="form-select" @bind="form.ExpenseTypeKey">
+                        @foreach (var type in Lookups.Choices(HrAccess.ExpenseTypeList, form.ExpenseTypeKey))
+                        {
+                            <option value="@type.Key">@type.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="expenseTypeKey" Errors="errors" />
+                    break;
+                case "amount":
+                    <label class="@f.LabelClass()" for="line-amount">@f.Label</label>
+                    <input id="line-amount" class="form-control" type="number" min="0.01" step="0.01" required aria-required="true" @bind="form.Amount" />
+                    <FieldError Field="amount" Errors="errors" />
+                    break;
+                case "vatAmount":
+                    <label class="@f.LabelClass()" for="line-vat">@f.Label</label>
+                    <input id="line-vat" class="form-control" type="number" min="0" step="0.01" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.VatAmount" />
+                    <FieldError Field="vatAmount" Errors="errors" />
+                    break;
+                case "description":
+                    <label class="@f.LabelClass()" for="line-description">@f.Label</label>
+                    <textarea id="line-description" class="form-control" rows="2" maxlength="500" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                    <FieldError Field="description" Errors="errors" />
+                    break;
+            }
+        </Field>
+    </LayoutForm>
+</form>
+
+@code {
+    private const string EntityKey = HrAccess.ExpenseLineEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private LineForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    [Parameter, EditorRequired] public Guid ClaimId { get; set; }
+
+    [Parameter] public string Currency { get; set; } = "TRY";
+
+    /// <summary>Düzenlenecek satır; null ise yeni satır.</summary>
+    [Parameter] public RecordResponse? Line { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        form = Line is { } l
+            ? new LineForm
+            {
+                Id = l.Id, Version = l.Version, ExpenseDate = FleetLabels.Day(WarehouseLabels.Text(l, "expenseDate")),
+                ExpenseTypeKey = WarehouseLabels.Text(l, "expenseTypeKey"), Amount = HrLabels.Decimal(l, "amount"), VatAmount = HrLabels.Decimal(l, "vatAmount"),
+                Description = WarehouseLabels.Text(l, "description"), Custom = l.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new LineForm { ExpenseDate = DateOnly.FromDateTime(DateTime.Today), ExpenseTypeKey = Lookups.DefaultOf(HrAccess.ExpenseTypeList) ?? string.Empty };
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var values = new JsonObject
+        {
+            ["expenseDate"] = form.ExpenseDate?.ToString("yyyy-MM-dd"),
+            ["expenseTypeKey"] = form.ExpenseTypeKey,
+            ["amount"] = form.Amount,
+            ["vatAmount"] = form.VatAmount,
+            ["description"] = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            values["claimId"] = ClaimId.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request) : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class LineForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public DateOnly? ExpenseDate { get; set; }
+
+        public string ExpenseTypeKey { get; set; } = string.Empty;
+
+        public decimal? Amount { get; set; }
+
+        public decimal? VatAmount { get; set; }
+
+        public string? Description { get; set; }
+    }
+}

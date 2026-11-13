@@ -361,13 +361,14 @@ public sealed class CrmModule : IModule
 
     /// <summary>
     /// CRM'in yayınladığı iş olayları (ADR-0039). Tür adı sürüm taşımaz; sürüm beyandadır. Açık iş komutları yayınlar:
-    /// kazan/kaybet (<c>IOpportunityWorkflow</c>), müşteri adayı dönüşümü (<c>ILeadConversion</c>).
+    /// kazan/kaybet (<c>IOpportunityWorkflow</c>), müşteri adayı dönüşümü (<c>ILeadConversion</c>), teklif kabulü (iç kayıt ve müşteri sayfası).
     /// </summary>
     public static class Events
     {
         public const string OpportunityWon = "crm.opportunity.won";
         public const string OpportunityLost = "crm.opportunity.lost";
         public const string LeadConverted = "crm.lead.converted";
+        public const string QuoteAccepted = "crm.quote.accepted";
 
         /// <summary>Payload alanları kaydın alan adlarıdır; <c>wonAmount</c> fırsatın hassas alanıdır, tutar iznini bildirmeyen aboneye gitmez.</summary>
         public static IReadOnlyList<string> OpportunityWonFields { get; } = ["companyId", "ownerId", "stage", "actualCloseDate", "wonAmount", "wonCurrency"];
@@ -378,6 +379,13 @@ public sealed class CrmModule : IModule
         /// <summary><c>companyCreated</c> / <c>contactCreated</c> dönüşümün türettiği alanlardır (kayıtta karşılığı yok).</summary>
         public static IReadOnlyList<string> LeadConvertedFields { get; } =
             ["ownerId", "convertedCompanyId", "convertedContactId", "convertedOpportunityId", "companyCreated", "contactCreated"];
+
+        /// <summary>
+        /// Teklif kabulü: teklifin kayıt alanları ve türetilmiş <c>acceptanceMethod</c> ("Manual": kullanıcı kaydetti, "Portal": müşteri sayfadan kabul etti).
+        /// Teklif başlığında hassas alan yoktur; maliyet kalemdedir ve olaya girmez.
+        /// </summary>
+        public static IReadOnlyList<string> QuoteAcceptedFields { get; } =
+            ["companyId", "contactId", "opportunityId", "quoteNumber", "revisionNo", "currency", "netTotal", "grossTotal", "decidedAt", "acceptanceMethod"];
     }
 
     /// <summary>İş olayı beyanları (ADR-0039); alanlar <see cref="Events"/> altındadır ve yayıncılar aynı listeyi kullanır.</summary>
@@ -386,6 +394,7 @@ public sealed class CrmModule : IModule
         new(Events.OpportunityWon, 1, Entities.Opportunity, "Fırsat kazanıldı", Events.OpportunityWonFields),
         new(Events.OpportunityLost, 1, Entities.Opportunity, "Fırsat kaybedildi", Events.OpportunityLostFields),
         new(Events.LeadConverted, 1, Entities.Lead, "Müşteri adayı dönüştürüldü", Events.LeadConvertedFields),
+        new(Events.QuoteAccepted, 1, Entities.Quote, "Teklif kabul edildi", Events.QuoteAcceptedFields),
     ];
 
     // Fırsat onaya gönderilebilir (ADR-0027 Dilim 4c): tutar ve para birimi kayıttan okunur, değişirse bekleyen talep ve verilmiş onay geçersizleşir.

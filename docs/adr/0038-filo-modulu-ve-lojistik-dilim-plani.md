@@ -500,3 +500,40 @@ K10 uygulandı. Masraf operasyon kaydıdır; ödeme, kasa, fiş ve sürücü hes
 | `... --filter "Logistics\|ModulesAndRoles\|TableInventory\|TenantDataTransfer\|ApprovalGate\|SharedRecord\|Lookup\|AutomationRule\|FieldRulePackage\|TenantIsolation\|BusinessEvent"` (temiz veritabanı `ModulixTmp`) | 112/112 (yeni tablonun RLS politikasında olduğunu `TableInventoryTests` doğrular) |
 
 Aynı komşu testler paylaşılan yerel veritabanında 7 testte düştü (6'sı yerelde kalmış eski alan-kuralı paketinden "Onay gerekir… weightKg", 1'i başka oturumlardan gelen `platform.Industries` ve `LicensePolicies` tabloları); temiz veritabanında hepsi geçti, masrafla ilgili değildir.
+
+## 21. Dilim 9a: Operasyon panosu (13 Kasım 2026)
+
+Dilim 9 ikiye bölündü. Bu dilim yalnızca operasyon panosunu getirir. Kârlılık görünümü (dilim 9b) masraf (dilim 8) ve faturalanabilir kalem (dilim 7b) gelince eklenecek. Panoda tutar yoktur: navlun hassas alandır (dilim 7a) ve pano bütün operasyon ekibine açıktır.
+
+- **Uç:** `GET /api/logistics/dashboard` (`ILogisticsDashboard`). Modül yalnızca kendi tablolarını okur; sürücü belgeleri Core'un `ICredentialDirectory` sözleşmesiyle okunur. Gün firmanın saat dilimindedir (`ITenantClock`).
+- **Bölümler** her biri kendi okuma iznine bağlıdır; izni olmayan bölüm `null` gelir, hiçbirini okuyamayana 403:
+  - **Talepler** (`logistics.requests.read`): onay bekleyen sayısı ve en eskisinin bekleme süresi (gün).
+  - **Sevkiyatlar** (`logistics.shipments.read`):
+    - Planlama bekleyen; bunlardan yüklemesi yarına kadar (ya da geçmiş) olan.
+    - En geç teslim günü geçmiş açık sevkiyat ve en çok geciken altı kayıt.
+    - Yoldaki sayısı ve açık durumlara göre dağılım.
+  - **Seferler** (`logistics.trips.read`): planlanan, hazır, yolda ve bugün başlayacak sefer sayısı. Öne çıkan sekiz sefer şu sırayla listelenir: yoldakiler, hazırlar, bugün-yarın başlayacak planlananlar. Her birinde durak ilerlemesi (varış girilen durak / bütün duraklar) ve sıradaki durak var.
+  - **Teslimler** (`logistics.shipments.read`): son 30 günün teslim, kısmi, başarısız ve hasar sayıları; başarı oranı (teslim / bütün sonuçlar); son 14 günün günlük dağılımı. Teslim zamanı firma gününe çevrilerek gruplanır.
+  - **Sürücü belgeleri** (`logistics.drivers.read`): etkin sürücülerin her belge türündeki en uzun geçerli belgesinin süresi dolmuş ya da 30 gün içinde doluyorsa sayılır; ilk altısı listelenir.
+- **Arayüz:** Lojistik › Pano (`/lojistik/pano`), menüde ilk sırada.
+  - Üst bant: "N sefer yolda", hazır ve bugün başlayan sefer sayısı; yanında onay bekleyen talep, planlama bekleyen ve teslim günü geçmiş sevkiyat.
+  - Dört KPI kutusu: onay bekleyen talep, planlama bekleyen sevkiyat, yoldaki sefer, teslim başarısı (14 günlük eğilim çizgisiyle).
+  - Kartlar: sefer ilerleme çubukları, açık sevkiyat halka grafiği, günlük teslim sütun grafiği, teslim günü geçenler, sürücü belgeleri.
+  - Ortak pano sınıfları ve grafik bileşenleri kullanılır. Yeni CSS sınıfı ya da token yok.
+- **Sözleşme denetimi:** uç sunucu kaydını doğrudan JSON'a yazar, arayüz Shared DTO'suyla okur. İki tarafın alan adları ve iç içe yapısı birim testle karşılaştırılır.
+
+**Bilerek yapılmadı:**
+- Kârlılık, masraf ve navlun toplamları (dilim 9b).
+- Eşik kuralları (ör. "geciken sevkiyat sayısı 5'i geçince bildir"): bugün ADR-0027 kurallarıyla tek tek kayıt üzerinden kurulabilir; toplam eşiği sonra gelecek.
+- Panodan kayda doğrudan bağlantı: talep, sevkiyat ve seferin kayıt başına adresi yok, bağlantılar listeye gider.
+- Araç belgeleri: araçlar Filo'dadır, lojistik araç listesini okumaz.
+- Tarih aralığı seçimi.
+
+### Test sonuçları (Dilim 9a)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 23 (2 yeni): sunucu kaydı ve Shared DTO aynı yapıda; panoyu açan izin kümesi her bölümün okuma iznini kapsar |
+| `dotnet test tests/Modulix.ArchitectureTests` | 69/69 |
+| `dotnet test tests/Modulix.Web.Tests` | 122/122 (menüde pano ilk sırada, sürücü ya da sefer izniyle görünür) |
+| `... --filter "LogisticsDashboardTests"` | 4 test yazıldı. **Mutlu yol:** talep, sevkiyat, geciken, sefer ilerlemesi, teslim oranı ve günlük dağılım, belge. **Boş firma:** sıfırlar, oran yok. **Tenant izolasyonu:** başka firmanın kayıtları sayılmaz. **Yetki:** yalnızca sefer izni olan yalnızca sefer bölümünü alır, izinsiz 403, modül kapalıyken 403. **Yerelde çalıştırılamadı** (SQL Server 14333 bağlantısı zaman aşımında); CI doğrular. |

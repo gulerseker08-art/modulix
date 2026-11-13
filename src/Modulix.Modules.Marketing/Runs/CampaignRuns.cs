@@ -710,7 +710,7 @@ internal sealed class CampaignRuns(
         }
 
         var size = Math.Clamp(pageSize, 1, 200);
-        var number = Math.Max(page, 1);
+        var number = Math.Clamp(page, 1, 100_000);
         var (items, total) = await deliveries.ListAsync(runId, status, code, number, size, cancellationToken);
         return RecordResult<DeliveryPage>.Ok(new DeliveryPage(
             [.. items.Select(d => new DeliveryItem(d.Id, d.TargetId, d.PersonId, d.Status, d.Code, d.Attempts, d.ProviderMessageId, d.UpdatedAt))], number, size, total));

@@ -1,0 +1,112 @@
+@page "/ik/rehber"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Rehber · Modulix</PageTitle>
+
+@* Rehber (ADR-0042 dilim 1): ayrılmamış çalışanların kartları; ad, unvan, departman, iş e-postası ve iş telefonu kişi kaydından gelir.
+   Özlük bilgileri gösterilmez (hassas alanlar zaten sunucudan gelmez). Arama ve departman süzgeci sunucuda uygulanır. *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.EmployeesRead">
+    <PageHeader Title="Rehber" Icon="phone" Subtitle="@(page is null ? "Çalışma arkadaşlarınızın iletişim bilgilerine ulaşın." : $"{page.TotalCount} kişi")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Rehberde ara" placeholder="Ad, soyad, e-posta, telefon veya unvan ara" @bind="search" />
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="@(string.IsNullOrEmpty(departmentKey) ? 0 : 1)" />
+    </div>
+
+    @if (filtersOpen || !string.IsNullOrEmpty(departmentKey))
+    {
+        <div class="filters">
+            <select class="form-select" aria-label="Departman" @bind="departmentKey" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm departmanlar</option>
+                @foreach (var department in Lookups.ValuesOf(HrAccess.DepartmentList))
+                {
+                    <option value="@department.Key">@department.Label</option>
+                }
+            </select>
+        </div>
+    }
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Aramaya uyan çalışan yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) kişi listelendi.</p>
+        <ul class="profile-cards list-unstyled" aria-label="Çalışanlar">
+            @foreach (var employee in page.Items)
+            {
+                var email = WarehouseLabels.Text(employee, "email");
+                var phone = WarehouseLabels.Text(employee, "phone");
+                var department = WarehouseLabels.Text(employee, "departmentKey");
+                <li class="profile-card">
+                    <span class="owner-cell">
+                        <span class="avatar avatar-tone-@(Math.Abs(employee.Id.GetHashCode()) % 5)" aria-hidden="true">@HrLabels.Initials(employee)</span>
+                        <strong>@HrLabels.Name(employee)</strong>
+                    </span>
+                    <span>@(string.IsNullOrWhiteSpace(WarehouseLabels.Text(employee, "jobTitle")) ? "Unvan girilmedi" : WarehouseLabels.Text(employee, "jobTitle"))@(department.Length > 0 ? $" · {Lookups.Label(HrAccess.DepartmentList, department)}" : "")</span>
+                    @if (email.Length > 0)
+                    {
+                        <a href="mailto:@email" class="owner-cell"><AppIcon Name="mail" Size="16" /> @email</a>
+                    }
+                    @if (phone.Length > 0)
+                    {
+                        <a href="tel:@phone" class="owner-cell"><AppIcon Name="phone" Size="16" /> @phone</a>
+                    }
+                    @if (WarehouseLabels.Text(employee, "status") == "onLeave")
+                    {
+                        <span class="badge @HrLabels.StatusBadge("onLeave")">@HrLabels.Status("onLeave")</span>
+                    }
+                </li>
+            }
+        </ul>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + HrAccess.EmployeeEntityKey;
+
+    private RecordPageResponse? page;
+    private string? message;
+    private string? search;
+    private string? departmentKey;
+    private bool filtersOpen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.EmployeesRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        // Rehber yalnızca ayrılmamış çalışanları ada göre gösterir.
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&current=true&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (!string.IsNullOrEmpty(departmentKey))
+        {
+            url += $"&departmentKey={Uri.EscapeDataString(departmentKey)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+}

@@ -1,0 +1,46 @@
+@using System.Globalization
+@* İki serili dikey sütun grafik (docs/design-system/component-catalog.md → PairColumnChart): her gün/dönem için yan yana iki sütun (ör. giriş ve çıkış).
+   Ölçek iki serinin en büyük değeridir; renkler --chart-c0 ve --chart-c1 tokenlarından gelir. Değerler ipucunda ve ekran okuyucu etiketinde yazılır. *@
+@{
+    var max = Items.Count == 0 ? 0 : Items.Max(i => Math.Max(i.First, i.Second));
+}
+<ul class="chart-legend pair-chart-legend" aria-hidden="true">
+    <li><i class="chart-fill-0"></i>@FirstName</li>
+    <li><i class="chart-fill-1"></i>@SecondName</li>
+</ul>
+<div class="pair-chart" role="img" aria-label="@Title">
+    @foreach (var item in Items)
+    {
+        <div class="pair-chart-col" title="@($"{item.Title}: {FirstName} {item.First}, {SecondName} {item.Second}")">
+            <i class="chart-fill-0" style="height:@Height(item.First, max)%"></i>
+            <i class="chart-fill-1" style="height:@Height(item.Second, max)%"></i>
+        </div>
+    }
+</div>
+<div class="pair-chart-axis" aria-hidden="true">
+    @for (var i = 0; i < Items.Count; i++)
+    {
+        // Eksende yalnızca ilk, orta ve son etiket yazılır (30 günde etiketler sığmaz).
+        if (i == 0 || i == Items.Count - 1 || i == Items.Count / 2)
+        {
+            <span>@Items[i].Label</span>
+        }
+    }
+</div>
+
+@code {
+    /// <summary><paramref name="Label"/> eksende kısa ad, <paramref name="Title"/> ipucundaki tam ad.</summary>
+    public sealed record Item(string Label, string Title, int First, int Second);
+
+    [Parameter, EditorRequired] public IReadOnlyList<Item> Items { get; set; } = [];
+
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public string FirstName { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public string SecondName { get; set; } = string.Empty;
+
+    // Değeri olan sütun görünür kalır (en az %3).
+    private static string Height(int value, int max) =>
+        (max > 0 && value > 0 ? Math.Max(3m, value / (decimal)max * 100m) : 0m).ToString("0.#", CultureInfo.InvariantCulture);
+}

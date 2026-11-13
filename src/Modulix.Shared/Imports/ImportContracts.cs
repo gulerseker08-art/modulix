@@ -37,12 +37,16 @@ public sealed record ImportFieldDto(string Key, string Label, bool Required);
 /// <summary>Kullanıcının içe aktarabildiği kayıt türü ve şablon sütunları (ADR-0033, Dilim 2).</summary>
 public sealed record ImportDefinitionDto(string EntityKey, string DisplayName, IReadOnlyList<ImportFieldDto> Fields);
 
-public sealed record ImportDesignFieldDto(string Key, string Label, bool Included, bool Required, bool Locked);
+public sealed record ImportDesignFieldDto(string Key, string Label, bool Included, bool Required, bool Locked, IReadOnlyList<string>? Aliases = null);
 
 /// <summary>Firmanın içe aktarma tasarımı. <c>Locked</c> sütun kodun zorunlu kıldığı sütundur, kapatılamaz.</summary>
-public sealed record ImportDesignDto(string EntityKey, string DisplayName, bool Enabled, bool RunAutomation, IReadOnlyList<ImportDesignFieldDto> Fields, long Version);
+public sealed record ImportDesignDto(
+    string EntityKey, string DisplayName, bool Enabled, bool RunAutomation, IReadOnlyList<ImportDesignFieldDto> Fields, long Version, bool AllOrNothing = false);
 
-public sealed record SaveImportDesignRequest(bool Enabled, bool RunAutomation, IReadOnlyList<string>? Excluded, IReadOnlyList<string>? Required, long Version);
+/// <param name="Aliases">Kayıtlı sütun eşlemesi: alan anahtarı → dosyadaki başka başlık adları (ADR-0033 Dilim 4c). Verilmezse eşleme silinir.</param>
+public sealed record SaveImportDesignRequest(
+    bool Enabled, bool RunAutomation, IReadOnlyList<string>? Excluded, IReadOnlyList<string>? Required, long Version,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? Aliases = null, bool AllOrNothing = false);
 
 /// <summary>İstemcinin dosyayı göndermeden önce uyguladığı sınır; sunucu aynı sınırı kendisi de uygular.</summary>
 public static class ImportFileLimits
@@ -110,6 +114,7 @@ public static class ImportText
         "business-rule" => "İş kuralı",
         "file-invalid" => "Dosya geçersiz",
         "system-error" => "Sistem hatası",
+        "file-repeated" => "Dosya daha önce yüklendi",
         _ => code,
     };
 
@@ -119,6 +124,15 @@ public static class ImportText
     public static IReadOnlyList<string> Codes { get; } =
     [
         "required-missing", "format-invalid", "lookup-unresolved", "duplicate-exact", "duplicate-possible",
-        "custom-field-invalid", "permission-denied", "business-rule", "file-invalid", "system-error",
+        "custom-field-invalid", "permission-denied", "business-rule", "file-invalid", "system-error", "file-repeated",
     ];
 }
+
+/// <summary>İçe aktarmayı geri alma isteği (ADR-0033 Dilim 4d); gerekçe zorunludur ve koşunun notuna yazılır.</summary>
+public sealed record ImportRollbackRequest(string? Reason);
+
+/// <summary>Geri almada silinmeyen kayıt ve nedeni (değişmiş, bağlı ya da yetki yok).</summary>
+public sealed record ImportRollbackKeptDto(Guid RecordId, string Reason);
+
+/// <summary>Geri almanın sonucu: koşunun güncel hali, silinen, zaten silinmiş ve korunan kayıtlar.</summary>
+public sealed record ImportRollbackDto(ImportRunDto Run, int Removed, int AlreadyRemoved, IReadOnlyList<ImportRollbackKeptDto> Kept);

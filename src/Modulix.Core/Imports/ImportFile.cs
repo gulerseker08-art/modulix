@@ -133,6 +133,15 @@ public static class ImportColumns
             byName.TryAdd(Name(field.Key), field);
         }
 
+        // Kayıtlı eşleme (Dilim 4c) etiket ve anahtardan sonra eklenir: bir alanın adı hiçbir zaman başka alanın takma adına kaptırılmaz.
+        foreach (var field in fields)
+        {
+            foreach (var alias in field.Aliases)
+            {
+                byName.TryAdd(Name(alias), field);
+            }
+        }
+
         var columns = new List<ImportColumn>();
         var unknown = new List<string>();
         var errors = new List<string>();

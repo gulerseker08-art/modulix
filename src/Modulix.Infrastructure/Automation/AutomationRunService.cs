@@ -28,7 +28,7 @@ internal sealed class AutomationRunService(
 {
     public async Task<AutomationRunPage> ListAsync(AutomationRunQuery query, CancellationToken cancellationToken)
     {
-        var page = Math.Max(1, query.Page);
+        var page = Math.Clamp(query.Page, 1, 100_000);
         var pageSize = Math.Clamp(query.PageSize, 1, AutomationRunQuery.MaxPageSize);
         var runs = db.AutomationRuns.AsNoTracking().AsQueryable();
         if (query.RuleId is { } ruleId)

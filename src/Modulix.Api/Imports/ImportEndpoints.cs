@@ -65,6 +65,9 @@ public static class ImportEndpoints
             StartAsync(ImportRunMode.Apply, entityKey, fileName, http, context, ct)).RequirePermission(CoreModule.Permissions.RunImports);
         group.MapGet("/{runId:guid}/error-report", GetErrorReportAsync);
 
+        // Geri alma (Dilim 4d): koşunun oluşturduğu kayıtlar boru hattından silinir; değişmiş, bağlı ya da yetkinin yetmediği kayıt korunur ve raporlanır.
+        group.MapPost("/{runId:guid}/rollback", RollBackAsync).RequirePermission(CoreModule.Permissions.RollbackImports);
+
         // İçe aktarma tasarımı: firma yöneticisi türleri açıp kapatır, sütunları seçer (form tasarımıyla aynı izin).
         var design = app.MapGroup("/api/customization/import-designs")
             .RequireAuthorization()
@@ -74,7 +77,8 @@ public static class ImportEndpoints
         design.MapGet("/", async (IImportDesignService service, CancellationToken ct) => (await service.ListAsync(ct)).Select(ToDto).ToList());
         design.MapPut("/{entityKey}", async (string entityKey, SaveImportDesignRequest request, IImportDesignService service, CancellationToken ct) =>
         {
-            var input = new ImportDesignInput(request.Enabled, request.RunAutomation, request.Excluded ?? [], request.Required ?? []);
+            var input = new ImportDesignInput(
+                request.Enabled, request.RunAutomation, request.Excluded ?? [], request.Required ?? [], ImportDesignRules.NormalizeAliases(request.Aliases), request.AllOrNothing);
             var result = await service.SaveAsync(entityKey, input, request.Version, ct);
             return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
         });
@@ -158,8 +162,9 @@ public static class ImportEndpoints
         info.DisplayName,
         info.Enabled,
         info.RunAutomation,
-        [.. info.Fields.Select(f => new ImportDesignFieldDto(f.Key, f.Label, f.Included, f.Required, f.Locked))],
-        info.Version);
+        [.. info.Fields.Select(f => new ImportDesignFieldDto(f.Key, f.Label, f.Included, f.Required, f.Locked, f.Aliases))],
+        info.Version,
+        info.AllOrNothing);
 
     private static IResult NotImportable() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Bu kayıt türü içe aktarılamıyor.");
@@ -254,6 +259,22 @@ public static class ImportEndpoints
         return detail is null
             ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "İçe aktarma bulunamadı.")
             : Results.Ok(ToDto(detail));
+    }
+
+    private static async Task<IResult> RollBackAsync(
+        Guid runId, ImportRollbackRequest request, ImportRollback rollback, IImportLog log, CancellationToken ct)
+    {
+        var result = await rollback.RollBackAsync(runId, request.Reason, ct);
+        if (!result.IsSuccess)
+        {
+            return RecordEndpoints.ToProblem(result.Error!);
+        }
+
+        // Koşu geri alanın görebildiği bir koşudur (servis denetledi); özet, kullanıcı ve tür adıyla günlükten okunur.
+        var outcome = result.Value!;
+        var detail = await log.GetAsync(runId, new ImportIssueQuery(PageSize: 1), null, ct);
+        return Results.Ok(new ImportRollbackDto(
+            ToDto(detail!.Run), outcome.Removed, outcome.AlreadyRemoved, [.. outcome.Kept.Select(k => new ImportRollbackKeptDto(k.RecordId, k.Reason))]));
     }
 
     /// <summary>Firmanın tamamını görme izni yoksa yalnızca çağıranın kendi koşuları görünür.</summary>

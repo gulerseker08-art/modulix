@@ -13,6 +13,7 @@
     <Project Path="src/Modulix.Modules.Support/Modulix.Modules.Support.csproj" />
     <Project Path="src/Modulix.Modules.Warehouse/Modulix.Modules.Warehouse.csproj" />
     <Project Path="src/Modulix.Modules.Fleet/Modulix.Modules.Fleet.csproj" />
+    <Project Path="src/Modulix.Modules.Hr/Modulix.Modules.Hr.csproj" />
     <Project Path="src/Modulix.Shared/Modulix.Shared.csproj" />
     <Project Path="src/Modulix.Web/Modulix.Web.csproj" />
   </Folder>
@@ -29,6 +30,7 @@
     <Project Path="tests/Modulix.Modules.Support.Tests/Modulix.Modules.Support.Tests.csproj" />
     <Project Path="tests/Modulix.Modules.Warehouse.Tests/Modulix.Modules.Warehouse.Tests.csproj" />
     <Project Path="tests/Modulix.Modules.Fleet.Tests/Modulix.Modules.Fleet.Tests.csproj" />
+    <Project Path="tests/Modulix.Modules.Hr.Tests/Modulix.Modules.Hr.Tests.csproj" />
     <Project Path="tests/Modulix.Web.Tests/Modulix.Web.Tests.csproj" />
   </Folder>
 </Solution>

@@ -235,6 +235,69 @@ public class QuotePostAcceptTests(ModulixApiFactory factory) : IClassFixture<Mod
 
     private static async Task<OpportunityDto> GetOpportunityAsync(HttpClient client, Guid id) => (await client.GetFromJsonAsync<OpportunityDto>($"/api/crm/opportunities/{id}"))!;
 
+    // ADR-0039: teklif kabul iş olayı. İki kabul yolu da tek olay yazar (aynı işlemde); ret olay yazmaz; olay firmanın kendi outbox'ındadır;
+    // karar izni olmayan kabul edemez ve olay oluşmaz.
+    [Fact]
+    public async Task Accepting_a_quote_publishes_one_business_event_from_both_paths_and_nothing_else_does()
+    {
+        var s = await SetUpAsync();
+        using var admin = await LoginAsync(s.Admin);
+
+        var manual = await PresentedQuoteAsync(admin, s.CompanyId);
+        await RecordAcceptedAsync(admin, manual.Id);
+        var manualEvent = Assert.Single(await QuoteEventsAsync(s.TenantId, manual.Id));
+        var payload = System.Text.Json.Nodes.JsonNode.Parse(manualEvent.Payload)!.AsObject();
+        Assert.Equal(("Manual", s.CompanyId.ToString(), "TRY"), (payload["acceptanceMethod"]!.GetValue<string>(), payload["companyId"]!.GetValue<string>(), payload["currency"]!.GetValue<string>()));
+        Assert.Equal(1800m, payload["netTotal"]!.GetValue<decimal>());
+        Assert.Equal((await GetQuoteAsync(admin, manual.Id)).Version, manualEvent.Sequence);
+        Assert.All(payload.Select(p => p.Key), key => Assert.Contains(key, Modulix.Modules.Crm.CrmModule.Events.QuoteAcceptedFields));
+
+        // Müşteri sayfasından kabul: olay "Portal" yöntemiyle; müşteri reddi olay yazmaz.
+        var viaPortal = await PresentedQuoteAsync(admin, s.CompanyId);
+        var rejected = await PresentedQuoteAsync(admin, s.CompanyId);
+        using var anonymous = factory.CreateClient();
+        foreach (var (quote, decision) in new[] { (viaPortal, "accept"), (rejected, "reject") })
+        {
+            var token = (await (await admin.PostAsJsonAsync($"/api/crm/quotes/{quote.Id}/share-links", new CreateQuoteShareLinkRequest())).Content.ReadFromJsonAsync<QuoteShareLinkCreatedDto>())!.Token;
+            var view = (await (await anonymous.PostAsJsonAsync($"/api/public/quotes/{s.Slug}/view", new PublicQuoteTokenRequest(token))).Content.ReadFromJsonAsync<PublicQuoteView>())!;
+            var response = await anonymous.PostAsJsonAsync($"/api/public/quotes/{s.Slug}/decision",
+                new PublicQuoteDecisionRequest(token, decision, "Ali Veli", Reason: decision == "reject" ? "Fiyat yüksek" : null, ConfirmTerms: true, DocumentSha256: view.DocumentSha256));
+            Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        }
+
+        var portalEvent = Assert.Single(await QuoteEventsAsync(s.TenantId, viaPortal.Id));
+        Assert.Equal("Portal", System.Text.Json.Nodes.JsonNode.Parse(portalEvent.Payload)!["acceptanceMethod"]!.GetValue<string>());
+        Assert.Empty(await QuoteEventsAsync(s.TenantId, rejected.Id));
+
+        // Başka firma bu olayları görmez.
+        var other = await SetUpAsync();
+        Assert.Empty(await QuoteEventsAsync(other.TenantId, manual.Id));
+
+        // Karar izni olmayan kullanıcı kabul kaydedemez; olay oluşmaz.
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var writer = await factory.CreateUserAsync(tenant);
+        var owner = await factory.CreateUserAsync(tenant);
+        await factory.MakeAdministratorAsync(tenant.Id, owner);
+        await factory.CreateRoleAsync(tenant.Id,
+            [Modulix.Modules.Crm.CrmModule.Permissions.QuotesRead, Modulix.Modules.Crm.CrmModule.Permissions.QuotesWrite, Modulix.Modules.Crm.CrmModule.Permissions.CompaniesRead], writer);
+        using var ownerClient = await LoginAsync(owner);
+        using var writerClient = await LoginAsync(writer);
+        var company = await PostAsync<CompanyDto>(ownerClient, "/api/crm/companies", new SaveCompanyRequest("Yetki Ltd."));
+        var guarded = await PresentedQuoteAsync(ownerClient, company.Id);
+        var denied = await writerClient.PostAsJsonAsync($"/api/crm/quotes/{guarded.Id}/record-accepted", new QuoteTransitionRequest(guarded.Version));
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        Assert.Empty(await QuoteEventsAsync(tenant.Id, guarded.Id));
+    }
+
+    private async Task<List<Modulix.Infrastructure.Records.OutboxMessage>> QuoteEventsAsync(Guid tenantId, Guid quoteId)
+    {
+        using var scope = factory.OpenScope(tenantId);
+        return await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+            scope.ServiceProvider.GetRequiredService<Modulix.Infrastructure.Persistence.ModulixDbContext>().OutboxMessages
+                .Where(o => o.RecordId == quoteId && o.EventType == Modulix.Modules.Crm.CrmModule.Events.QuoteAccepted));
+    }
+
     private static async Task<QuoteDto> GetQuoteAsync(HttpClient client, Guid id) => (await client.GetFromJsonAsync<QuoteDto>($"/api/crm/quotes/{id}"))!;
 
     private static async Task RecordAcceptedAsync(HttpClient client, Guid id)

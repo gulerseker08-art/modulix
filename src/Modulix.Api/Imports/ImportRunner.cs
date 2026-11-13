@@ -92,13 +92,34 @@ public sealed class ImportRunner(
             }
 
             var correlation = (Activity.Current?.TraceId ?? ActivityTraceId.CreateRandom()).ToString();
+            var design = await services.GetRequiredService<IImportDesignStore>().GetAsync(definition.EntityKey, stopping);
+            // Kuru çalışma her zaman satır satır sınar (hangi satırların hatalı olduğu görünsün); tek işlem kuralı yalnızca uygulamadadır.
+            var policy = design.AllOrNothing && mode == ImportRunMode.Apply ? ImportFailurePolicy.AllOrNothing : ImportFailurePolicy.SkipInvalidRows;
             var run = ImportRun.Create(
                 tenant.TenantId, tenant.UserId, definition.EntityKey, fileName, content.LongLength, Convert.ToHexStringLower(SHA256.HashData(content)),
-                definition.TemplateVersion, mode, ImportFailurePolicy.SkipInvalidRows, correlation, time.GetUtcNow());
+                definition.TemplateVersion, mode, policy, correlation, time.GetUtcNow());
             db.ImportRuns.Add(run);
 
             var fields = await services.GetRequiredService<ImportSchema>().FieldsAsync(tenant, definition, stopping);
             var issues = new IssueList(tenant.TenantId, run.Id, time);
+
+            // Aynı dosya uyarısı (Dilim 4b): bu dosya aynı türe daha önce uygulanıp kayıt aldıysa ikinci yükleme mükerrer kayıt üretebilir.
+            // Engel değildir (düzeltilmiş dosya ya da bilerek tekrar yükleme olabilir); kuru çalışmada da gösterilir ki uygulamadan önce görülsün.
+            // Firma içinde bakılır (sorgu tenant süzgecindedir); önceki koşuyu kimin yaptığı iletiye yazılmaz.
+            var previous = await db.ImportRuns.AsNoTracking()
+                .Where(r => r.EntityKey == definition.EntityKey && r.FileHash == run.FileHash && r.Id != run.Id && r.Mode == ImportRunMode.Apply
+                    && (r.Status == ImportRunStatus.Succeeded || r.Status == ImportRunStatus.PartiallySucceeded))
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => (DateTimeOffset?)r.CreatedAt)
+                .FirstOrDefaultAsync(stopping);
+            if (previous is { } at)
+            {
+                issues.Add(0, new ImportRowProblem(
+                    null,
+                    ImportIssueCodes.FileRepeated,
+                    ImportIssueSeverity.Warning,
+                    $"Bu dosyanın aynısı {at.UtcDateTime:dd.MM.yyyy HH:mm} (UTC) tarihinde bu kayıt türüne uygulandı; yeniden uygulamak mükerrer kayıt üretebilir."));
+            }
             ImportFileContent file;
             try
             {
@@ -133,9 +154,20 @@ public sealed class ImportRunner(
                 return run.Id;
             }
 
+            // "Hepsi ya da hiç" (Dilim 4e): uygulama, aynı dosyanın son 24 saatteki hatasız kuru çalışmasını şart koşar. Kuru çalışma hatasız bitmediyse
+            // tek işlemli uygulama büyük olasılıkla geri dönecek ve uzun kilit tutacaktır; önce hataları görmek ucuzdur.
+            if (mode == ImportRunMode.Apply && policy == ImportFailurePolicy.AllOrNothing
+                && !await HasCleanRehearsalAsync(db, definition.EntityKey, run.FileHash, time.GetUtcNow(), stopping))
+            {
+                const string message = "Bu kayıt türü \"hepsi ya da hiç\" ile içe aktarılıyor: önce aynı dosyayla hatasız bir kuru çalışma yapın (son 24 saat içinde).";
+                issues.Add(0, new ImportRowProblem(null, ImportIssueCodes.FileInvalid, ImportIssueSeverity.Error, message));
+                run.Fail(message, time.GetUtcNow());
+                await issues.SaveAsync(db);
+                return run.Id;
+            }
+
             await db.SaveChangesAsync(stopping);
 
-            var design = await services.GetRequiredService<IImportDesignStore>().GetAsync(definition.EntityKey, stopping);
             var job = new ImportJob(definition, fields, mode, fileName, file, columns, run, issues, db, tenant, company, correlation, design.RunAutomation);
             var owned = scope.Value;
             Task task;
@@ -191,8 +223,89 @@ public sealed class ImportRunner(
         }
     }
 
+    /// <summary>Kuru çalışma süresi: "hepsi ya da hiç" uygulaması bu süre içindeki hatasız kuru çalışmaya dayanır.</summary>
+    public static readonly TimeSpan RehearsalValidity = TimeSpan.FromHours(24);
+
+    private static Task<bool> HasCleanRehearsalAsync(ModulixDbContext db, string entityKey, string fileHash, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var since = now - RehearsalValidity;
+        return db.ImportRuns.AsNoTracking().AnyAsync(
+            r => r.EntityKey == entityKey && r.FileHash == fileHash && r.Mode == ImportRunMode.DryRun && r.Status == ImportRunStatus.Succeeded
+                && r.CreatedAt >= since,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// "Hepsi ya da hiç" uygulaması (Dilim 4e): bütün satırlar tek kapsamda ve tek veritabanı işleminde yazılır. İlk hatalı satırda işlem geri alınır
+    /// (önceki satırlar da yazılmaz) ve koşu başarısız biter; hatanın satırı rapora girer. Ön koşul olan hatasız kuru çalışma sayesinde bu yol
+    /// ancak araya giren bir değişiklikte (ör. başka kullanıcının aynı kaydı açması) düşer. Satır sınırı (<see cref="ImportLimits.MaxRows"/>)
+    /// tek işlemin kilit süresini sınırlar.
+    /// </summary>
+    private async Task ProcessAtomicAsync(ImportJob job)
+    {
+        var stopping = lifetime.ApplicationStopping;
+        var (run, issues, db) = (job.Run, job.Issues, job.Db);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        (ImportFileRow Row, string Error)? failed = null;
+        var created = 0;
+        await using (var scope = Scope(job.Tenant, job.Company))
+        {
+            var pipeline = scope.ServiceProvider.GetRequiredService<IRecordPipeline>();
+            var outcome = await pipeline.RunAtomicAsync<int>(async ct =>
+            {
+                foreach (var row in job.File.Rows)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var (values, problems) = ImportRows.Build(job.Columns.Columns, row);
+                    if (problems.Count == 0)
+                    {
+                        (problems, _) = await ProcessRowAsync(job, scope.ServiceProvider, values, seen, ct);
+                    }
+
+                    var errors = problems.Where(p => p.Severity == ImportIssueSeverity.Error).ToList();
+                    if (errors.Count > 0)
+                    {
+                        issues.AddRange(row.RowNo, problems);
+                        failed = (row, string.Join(" ", errors.Select(e => e.Message)));
+                        return RecordResult<int>.Fail(RecordErrorCode.ValidationFailed, failed.Value.Error);
+                    }
+
+                    // Uyarılar (olası mükerrer) işlem başarılı olursa anlamlıdır; geri alınırsa yalnızca hata satırı kalır.
+                    issues.AddRange(row.RowNo, problems);
+                    created++;
+                }
+
+                return RecordResult<int>.Ok(created);
+            }, stopping);
+
+            if (!outcome.IsSuccess)
+            {
+                created = 0;
+            }
+        }
+
+        if (failed is { } failure)
+        {
+            var name = ReportCsv.FileSlug(Path.GetFileNameWithoutExtension(job.FileName)) + "-hatalar.csv";
+            reports.Put(job.Tenant.TenantId, run.Id, name, ImportErrorReport.Build(job.File, [failure]));
+            run.Complete(0, 0, 0, 1, $"Hepsi ya da hiç: {failure.Row.RowNo}. satır alınamadığı için hiçbir kayıt yazılmadı; satırı düzeltip kuru çalışmayı yineleyin.", time.GetUtcNow());
+        }
+        else
+        {
+            run.Complete(created, 0, 0, 0, $"Hepsi ya da hiç: {created} kayıt tek işlemde oluşturuldu.", time.GetUtcNow());
+        }
+
+        await issues.SaveAsync(db);
+    }
+
     private async Task ProcessAsync(ImportJob job)
     {
+        if (job.Mode == ImportRunMode.Apply && job.Run.Policy == ImportFailurePolicy.AllOrNothing)
+        {
+            await ProcessAtomicAsync(job);
+            return;
+        }
+
         var stopping = lifetime.ApplicationStopping;
         var (run, issues, db) = (job.Run, job.Issues, job.Db);
         var created = 0;
