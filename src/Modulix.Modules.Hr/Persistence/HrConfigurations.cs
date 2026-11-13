@@ -144,3 +144,47 @@ internal sealed class ExpenseLineConfiguration : IEntityTypeConfiguration<Expens
         builder.HasIndex(l => new { l.TenantId, l.OwnerId }).HasDatabaseName("IX_ExpenseLines_Owner");
     }
 }
+
+internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
+{
+    public void Configure(EntityTypeBuilder<Asset> builder)
+    {
+        HrTables.ConfigureCommon(builder, "Assets");
+        builder.Property(a => a.AssetTag).HasMaxLength(Asset.TagMaxLength).IsRequired();
+        builder.Property(a => a.Name).HasMaxLength(Asset.NameMaxLength).IsRequired();
+        builder.Property(a => a.CategoryKey).HasMaxLength(100).IsRequired();
+        builder.Property(a => a.SerialNumber).HasMaxLength(Asset.SerialMaxLength);
+        builder.Property(a => a.Brand).HasMaxLength(Asset.BrandMaxLength);
+        builder.Property(a => a.Model).HasMaxLength(Asset.BrandMaxLength);
+        builder.Property(a => a.PurchaseCost).HasPrecision(18, 2);
+        builder.Property(a => a.Currency).HasMaxLength(3).IsFixedLength().IsUnicode(false);
+        builder.Property(a => a.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(a => a.Notes).HasMaxLength(Asset.NotesMaxLength);
+
+        builder.HasIndex(a => new { a.TenantId, a.AssetTag }).IsUnique().HasDatabaseName("UX_Assets_Tag");
+        builder.HasIndex(a => new { a.TenantId, a.Status }).HasDatabaseName("IX_Assets_Status");
+        builder.HasIndex(a => new { a.TenantId, a.CurrentEmployeeId }).HasDatabaseName("IX_Assets_Employee");
+        builder.HasIndex(a => new { a.TenantId, a.CurrentUserId }).HasDatabaseName("IX_Assets_User");
+    }
+}
+
+internal sealed class AssetAssignmentConfiguration : IEntityTypeConfiguration<AssetAssignment>
+{
+    public void Configure(EntityTypeBuilder<AssetAssignment> builder)
+    {
+        HrTables.ConfigureCommon(builder, "AssetAssignments");
+        builder.Property(a => a.ConditionOut).HasMaxLength(AssetAssignment.TextMaxLength);
+        builder.Property(a => a.ConditionIn).HasMaxLength(AssetAssignment.TextMaxLength);
+        builder.Property(a => a.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
+
+        builder.HasOne<Asset>().WithMany().HasForeignKey(a => new { a.TenantId, a.AssetId })
+            .HasPrincipalKey(a => new { a.TenantId, a.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Employee>().WithMany().HasForeignKey(a => new { a.TenantId, a.EmployeeId })
+            .HasPrincipalKey(e => new { e.TenantId, e.Id }).OnDelete(DeleteBehavior.Restrict);
+
+        // Bir demirbaşın aynı anda tek açık zimmeti olur (veritabanı da korur).
+        builder.HasIndex(a => new { a.TenantId, a.AssetId }).IsUnique().HasFilter("[Status] = 'active'").HasDatabaseName("UX_AssetAssignments_ActiveAsset");
+        builder.HasIndex(a => new { a.TenantId, a.EmployeeId, a.Status }).HasDatabaseName("IX_AssetAssignments_Employee");
+        builder.HasIndex(a => new { a.TenantId, a.OwnerId }).HasDatabaseName("IX_AssetAssignments_Owner");
+    }
+}

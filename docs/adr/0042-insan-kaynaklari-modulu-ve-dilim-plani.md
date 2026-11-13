@@ -104,7 +104,7 @@ Her dilim dört testle teslim edilir (mutlu yol, doğrulama, tenant izolasyonu, 
 | 1 | Modül, çalışan kartı (özlük, hassas alanlar, özlük belgeleri), rehber, organizasyon şeması | — |
 | 2 | İzin türleri, hak/bakiye, talep, onay (**yapıldı**, bölüm 10); takvim, Ç6a bağlantısı, işveren şirket bağı (2b) | 1, Ç6a (var) |
 | 3 | Masraf beyanı, belge, onay, ödeme durumu (**yapıldı**, bölüm 11); Ç6a tutar onayı (3b) | 1, ADR-0040 (var), Ç6a |
-| 4 | Demirbaş ve zimmet, tutanak çıktısı | 1 |
+| 4 | Demirbaş ve zimmet, tutanak çıktısı (**yapıldı**, bölüm 12) | 1 |
 | 5 | İşe giriş/çıkış kontrol listeleri | 1, 4 |
 | 6 | Duyurular | 1 |
 | 7 | Anket (K8) | 1 |
@@ -194,4 +194,27 @@ Bölüm 5'teki masraf akışı izin dilimindeki kalıpla (iş akışı kapısı,
 | `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
 | `dotnet test tests/Modulix.Core.Tests` | 964/964 geçti |
 | `HrExpenseTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |
+
+## 12. Dilim 4: zimmet takibi (13 Kasım 2026)
+
+- **Demirbaş** `hr.Assets`: envanter numarası (tenant içinde tekil, büyük harf), ad, kategori (Y9b `hr.asset-category`; kategori bilişim / giriş ve kimlik / mobilya / ekipman), seri no, marka, model, alış tarihi, tutar ve para birimi, durum, not. Durum elle depoda / bakımda / hurda / kayıp arasında değişir; "zimmetli" ve şu anki zimmetli çalışan yalnızca zimmetten türetilir (zimmetteki demirbaşın durumu elle değişmez). Araçlar Filo modülündedir (ADR-0038), burada tutulmaz. Zimmet geçmişi olan demirbaş silinmez, hurdaya ayrılır.
+- **Zimmet** `hr.AssetAssignments`: demirbaş, çalışan, teslim tarihi, beklenen iade, teslimdeki durum. Açılınca demirbaş aynı işlemde "zimmetli" olur (sürüm alanıyla); bir demirbaşın aynı anda tek açık zimmeti olur (süzgeçli tekil indeks veritabanında da korur). Zimmet değiştirilmez ve silinmez.
+- **İş akışı:** çalışan teslim aldığını ekrandan onaylar (yalnızca kendisi, bir kez); demirbaş sorumlusu iade alır (iadedeki durum) ya da kayıp olarak kapatır (açıklama zorunlu). Demirbaş aynı işlemde depoya ya da kayba döner.
+- **Tutanak:** `GET /api/hr/asset-assignments/{id}/document` zimmet tutanağını PDF olarak üretir (QuestPDF, teklif ve sözleşme PDF'leriyle aynı altyapı); veriler kayıt boru hattından, çağıranın görebildiği kadarıyla okunur. Tutanak metninin yasal biçimi doğrulanmadı (bölüm 8); firmaya özel metin sonra şablonla gelebilir.
+- **Görünürlük:** zimmette veri kapsamı alanı `employeeUserId`, demirbaşta şu anki zimmetli kullanıcı (`currentUserId`): "kendi" kapsamındaki çalışan yalnızca kendi zimmetlerini ve üzerindeki demirbaşları görür; depodaki demirbaşları göremez.
+- **Rol şablonları:** "Çalışan" zimmet okumayı, "İK uzmanı" okuma ve yönetimi, yeni "Demirbaş sorumlusu" yalnızca demirbaş ve zimmeti (özlük, izin, masraf verisi yok) alır.
+- **Arayüz:** Demirbaşlar (grid; görünümler Tüm / Depoda / Zimmetli / Bakımda / Hurda ve kayıp; kartta zimmet geçmişi, Zimmetle, eylemler, tutanak), Zimmetlerim (üzerimdeki ve geçmiş zimmetler, teslim onayı, tutanak), çalışan kartında "Zimmetler" paneli. Yeni CSS sınıfı yok.
+- Migration `HrAssets`: iki tablo + `TenantIsolationSql.AddTable`.
+
+**Sonraya kalanlar:** işe giriş/çıkış listesinde açık zimmet engeli (dilim 5), toplu demirbaş içe aktarma (ADR-0033), bakım geçmişi ve garanti bitiş uyarısı, beklenen iade tarihi geçen zimmet bildirimi (ADR-0027 kuralı yazılabilir: `expectedReturnOn` tarih alanı beyan edildi), tutanağın e-imzası.
+
+### Test sonuçları (Dilim 4)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 28/28 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
+| `dotnet test tests/Modulix.Core.Tests` | 964/964 geçti |
+| `HrAssetTests` (entegrasyon, 4 test; PDF dahil) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |

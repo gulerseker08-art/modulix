@@ -67,7 +67,10 @@ public class HrModuleTests
     public void Default_form_has_several_tabs_keeps_identity_first_and_groups_personal_data_on_its_own_tab()
     {
         Assert.Equal(
-            [HrModule.Entities.Employee, HrModule.Entities.LeaveRequest, HrModule.Entities.LeaveBalance, HrModule.Entities.ExpenseClaim, HrModule.Entities.ExpenseLine],
+            [
+                HrModule.Entities.Employee, HrModule.Entities.LeaveRequest, HrModule.Entities.LeaveBalance, HrModule.Entities.ExpenseClaim,
+                HrModule.Entities.ExpenseLine, HrModule.Entities.Asset, HrModule.Entities.AssetAssignment,
+            ],
             HrForms.All.Select(f => f.EntityKey));
         foreach (var definition in HrForms.All)
         {
@@ -144,6 +147,28 @@ public class HrModuleTests
         Assert.Contains(HrModule.Permissions.ExpensesApprove, Module.RoleTemplates.Single(t => t.Key == "hr.manager").Permissions);
         Assert.DoesNotContain(HrModule.Permissions.ExpensesPay, Module.RoleTemplates.Single(t => t.Key == "hr.specialist").Permissions);
         Assert.Equal(HrModule.Entities.Employee, Module.Lookups.Single(l => l.Key == HrLookupDefinitions.ExpenseClaimEmployee).TargetEntityKey);
+    }
+
+    [Fact]
+    public void Asset_categories_exist_staff_only_read_and_the_asset_lookup_lists_stock()
+    {
+        var list = Assert.Single(Module.ChoiceLists, l => l.Key == HrModule.Lists.AssetCategory);
+        Assert.Equal(
+            [HrModule.AssetCategories.It, HrModule.AssetCategories.Access, HrModule.AssetCategories.Furniture, HrModule.AssetCategories.Equipment],
+            list.Categories.Select(c => c.Key));
+        Assert.All(list.Categories, c => Assert.Contains(list.Values, v => v.Category == c.Key));
+        Assert.Contains(list.Values, v => v.Key == list.Default);
+
+        var staff = Module.RoleTemplates.Single(t => t.Key == "hr.staff");
+        Assert.Contains(HrModule.Permissions.AssetsRead, staff.Permissions);
+        Assert.DoesNotContain(HrModule.Permissions.AssetsManage, staff.Permissions);
+        var keeper = Module.RoleTemplates.Single(t => t.Key == "hr.asset-keeper");
+        Assert.Contains(HrModule.Permissions.AssetsManage, keeper.Permissions);
+        Assert.DoesNotContain(HrModule.Permissions.EmployeesPersonal, keeper.Permissions);
+
+        var asset = Module.Lookups.Single(l => l.Key == HrLookupDefinitions.AssignmentAsset);
+        Assert.Equal((HrModule.Entities.Asset, "status", Asset.Statuses.InStock), (asset.TargetEntityKey, asset.FixedFilterName, asset.FixedFilterValue));
+        Assert.Equal(Asset.Statuses.All.Except([Asset.Statuses.Assigned]), Asset.Statuses.Manual);
     }
 
     [Fact]
@@ -234,5 +259,14 @@ public class HrModuleTests
         Assert.Equal(HrModule.Lists.ExpenseType, HrAccess.ExpenseTypeList);
         Assert.Equal(HrLookupDefinitions.ExpenseClaimEmployee, HrAccess.ExpenseClaimEmployeeLookup);
         Assert.Equal(ExpenseClaim.Statuses.All, HrAccess.ExpenseStatuses.Select(s => s.Key));
+        Assert.Equal(HrModule.Permissions.AssetsRead, HrAccess.AssetsRead);
+        Assert.Equal(HrModule.Permissions.AssetsManage, HrAccess.AssetsManage);
+        Assert.Equal(HrModule.Entities.Asset, HrAccess.AssetEntityKey);
+        Assert.Equal(HrModule.Entities.AssetAssignment, HrAccess.AssetAssignmentEntityKey);
+        Assert.Equal(HrModule.Lists.AssetCategory, HrAccess.AssetCategoryList);
+        Assert.Equal(HrLookupDefinitions.AssignmentEmployee, HrAccess.AssignmentEmployeeLookup);
+        Assert.Equal(HrLookupDefinitions.AssignmentAsset, HrAccess.AssignmentAssetLookup);
+        Assert.Equal(Asset.Statuses.All, HrAccess.AssetStatuses.Select(s => s.Key));
+        Assert.Equal(AssetAssignment.Statuses.All, HrAccess.AssignmentStatuses.Select(s => s.Key));
     }
 }

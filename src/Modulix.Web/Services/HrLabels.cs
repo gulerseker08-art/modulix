@@ -72,4 +72,26 @@ public static class HrLabels
     /// <summary>Tutar ve para birimi: "1.250,50 TRY".</summary>
     public static string Money(decimal? amount, string? currency) =>
         amount is { } value ? $"{value.ToString("#,##0.00", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))} {currency}".Trim() : "—";
+
+    public static string AssetStatus(string? key) => HrAccess.AssetStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    /// <summary>Depoda başarı, zimmetli marka, bakımda dikkat, kayıp kayıp tonu, hurda nötr.</summary>
+    public static string AssetStatusBadge(string? key) => key switch
+    {
+        "inStock" => "status-customer",
+        "assigned" => "stage-qualified",
+        "maintenance" => "stage-negotiation",
+        "lost" => "stage-lost",
+        _ => "status-inactive",
+    };
+
+    public static string AssignmentStatus(string? key) => HrAccess.AssignmentStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    public static string AssignmentStatusBadge(string? key) => key switch
+    {
+        "active" => "stage-qualified",
+        "returned" => "status-customer",
+        "lost" => "stage-lost",
+        _ => "status-inactive",
+    };
 }

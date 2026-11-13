@@ -21,6 +21,8 @@ public static class HrAccess
     public const string ExpensesApprove = "hr.expenses.approve";
     public const string ExpensesManage = "hr.expenses.manage";
     public const string ExpensesPay = "hr.expenses.pay";
+    public const string AssetsRead = "hr.assets.read";
+    public const string AssetsManage = "hr.assets.manage";
 
     public const string EmployeeEntityKey = "hr.employee";
     public const string LeaveRequestEntityKey = "hr.leave-request";
@@ -33,6 +35,11 @@ public static class HrAccess
     public const string ExpenseLineEntityKey = "hr.expense-line";
     public const string ExpenseTypeList = "hr.expense-type";
     public const string ExpenseClaimEmployeeLookup = "hr.expense-claim.employee";
+    public const string AssetEntityKey = "hr.asset";
+    public const string AssetAssignmentEntityKey = "hr.asset-assignment";
+    public const string AssetCategoryList = "hr.asset-category";
+    public const string AssignmentEmployeeLookup = "hr.asset-assignment.employee";
+    public const string AssignmentAssetLookup = "hr.asset-assignment.asset";
 
     /// <summary>Yalnızca bu kategorideki izin türü yıllık haktan düşer.</summary>
     public const string AnnualCategory = "annual";
@@ -80,6 +87,24 @@ public static class HrAccess
         ("paid", "Ödendi"),
         ("rejected", "Reddedildi"),
         ("cancelled", "İptal edildi"),
+    ];
+
+    /// <summary>Demirbaş durumları (sabit; sunucudaki <c>Asset.Statuses</c>); "zimmetli" yalnızca zimmetle gelir.</summary>
+    public static IReadOnlyList<(string Key, string Label)> AssetStatuses { get; } =
+    [
+        ("inStock", "Depoda"),
+        ("assigned", "Zimmetli"),
+        ("maintenance", "Bakımda"),
+        ("retired", "Hurda"),
+        ("lost", "Kayıp"),
+    ];
+
+    /// <summary>Zimmet durumları (sabit; sunucudaki <c>AssetAssignment.Statuses</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> AssignmentStatuses { get; } =
+    [
+        ("active", "Zimmette"),
+        ("returned", "İade alındı"),
+        ("lost", "Kayıp"),
     ];
 
     /// <summary>Özlük alanları (hassas; <see cref="EmployeesPersonal"/> izni olmadan sunucu göndermez).</summary>
