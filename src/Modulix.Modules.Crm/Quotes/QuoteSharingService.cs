@@ -400,7 +400,8 @@ internal sealed class QuoteSharing(
 /// (maliyet, iç not ve canlı katalog verisi sızmaz). Kararlar teklif geçişiyle aynı işlemde ve sürüm denetimiyle yazılır: eşzamanlı
 /// kabul/ret/iptal yarışında yalnızca biri kazanır.
 /// </summary>
-internal sealed class QuoteCustomerPortal(IRecordPipeline pipeline, QuoteWorkflowGate gate, QuoteReader reader, TimeProvider time) : IQuoteCustomerPortal
+internal sealed class QuoteCustomerPortal(
+    IRecordPipeline pipeline, QuoteWorkflowGate gate, QuoteReader reader, TimeProvider time, Modulix.Core.Contracts.Events.IBusinessEventPublisher events) : IQuoteCustomerPortal
 {
     private const string Key = CrmModule.Entities.Quote;
     private const string Unknown = "Bağlantı geçersiz.";
@@ -539,8 +540,20 @@ internal sealed class QuoteCustomerPortal(IRecordPipeline pipeline, QuoteWorkflo
                 return Task.CompletedTask;
             }))
         {
-            result = await pipeline.UpdateAsync(
-                new RecordCommand(Key, context.Quote.Id, values, context.Quote.Version) { Reason = $"quote.{kind}" }, cancellationToken);
+            var command = new RecordCommand(Key, context.Quote.Id, values, context.Quote.Version) { Reason = $"quote.{kind}" };
+            result = request.Accept
+                // Müşterinin kabulü de iş olayını (ADR-0039) durum ve karar kaydıyla aynı işlemde yazar.
+                ? await pipeline.RunAtomicAsync(async ct =>
+                {
+                    var updated = await pipeline.UpdateAsync(command, ct);
+                    if (updated.IsSuccess)
+                    {
+                        await QuoteAcceptedEvent.PublishAsync(events, updated.Value!, QuoteAcceptedEvent.Portal, ct);
+                    }
+
+                    return updated;
+                }, cancellationToken)
+                : await pipeline.UpdateAsync(command, cancellationToken);
         }
 
         if (!result.IsSuccess)
