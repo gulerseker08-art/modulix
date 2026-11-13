@@ -5,21 +5,20 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Satış hedefleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.salesTargets.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.TargetsRead">
-    <a class="back-link" href="crm/satis-gorunumu">← Satış görünümü</a>
+    <a class="back-link" href="crm/satis-gorunumu">← @Texts.Get("crm.salesOverview.title")</a>
     <div class="page-header">
         <div>
-            <h1>Satış hedefleri</h1>
+            <h1>@Texts.Get("crm.salesTargets.title")</h1>
             <p class="text-muted mb-0">
-                Kazanılan tutar ya da adet için dönem hedefleri; firma geneli veya kullanıcı bazında tanımlanır. Satış görünümü bu hedeflere göre ilerlemeyi gösterir.
-                Hedefin türü, kapsamı, para birimi ve dönemi oluşturulduktan sonra değişmez; yalnızca değer ve not güncellenir.
+                @Texts.Get("crm.salesTargets.intro")
             </p>
         </div>
         @if (CanManage && form is null)
         {
-            <div class="header-actions"><button type="button" class="btn btn-primary" @onclick="StartCreate">Yeni hedef</button></div>
+            <div class="header-actions"><button type="button" class="btn btn-primary" @onclick="StartCreate">@Texts.Get("crm.salesTargets.new")</button></div>
         }
     </div>
 
@@ -29,48 +28,48 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault aria-labelledby="st-form-title">
-            <h2 id="st-form-title">@(form.Id is null ? "Yeni hedef" : "Hedefi düzenle")</h2>
+            <h2 id="st-form-title">@(form.Id is null ? Texts.Get("crm.salesTargets.new") : Texts.Get("crm.salesTargets.edit"))</h2>
             <ErrorSummary Errors="errors" />
             @if (formMessage is not null)
             {
                 <div class="alert alert-danger" role="alert">@formMessage</div>
             }
 
-            <FormTabs Title="Hedef bilgileri" Label="Satış hedefi formu bölümleri">
+            <FormTabs Title="@Texts.Get("crm.salesTargets.info")" Label="@Texts.Get("crm.salesTargets.formSections")">
             @if (form.Id is null)
             {
                 <fieldset class="mb-3">
-                    <legend class="h6">Dönemi hızlı doldur</legend>
+                    <legend class="h6">@Texts.Get("crm.salesTargets.quickFill")</legend>
                     <div class="form-grid">
                         <div class="span-3">
-                            <label class="form-label" for="st-fill-kind">Dönem türü</label>
+                            <label class="form-label" for="st-fill-kind">@Texts.Get("crm.sales.periodKind")</label>
                             <select id="st-fill-kind" class="form-select" @bind="fillKind">
                                 @foreach (var (key, label) in SalesLabels.PeriodKinds) { <option value="@key">@label</option> }
                             </select>
                         </div>
                         <div class="span-3">
-                            <label class="form-label" for="st-fill-date">Dönemdeki bir gün</label>
+                            <label class="form-label" for="st-fill-date">@Texts.Get("crm.sales.anchorDay")</label>
                             <input id="st-fill-date" class="form-control" type="date" @bind="fillDate" />
                         </div>
                         <div class="span-3">
                             <label class="form-label" for="st-fill-go">&nbsp;</label>
-                            <button id="st-fill-go" type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="FillPeriodAsync">Dönem başı ve sonunu doldur</button>
+                            <button id="st-fill-go" type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="FillPeriodAsync">@Texts.Get("crm.salesTargets.fillPeriod")</button>
                         </div>
                     </div>
-                    <p class="form-text mb-0">Mali yıl ayarı sunucudan alınır. Tarihleri aşağıdan elle de girebilirsiniz.</p>
+                    <p class="form-text mb-0">@Texts.Get("crm.salesTargets.fillHelp")</p>
                 </fieldset>
             }
 
             <div class="form-grid">
                 <div class="span-3">
-                    <label class="form-label required" for="st-metric">Hedef türü</label>
+                    <label class="form-label required" for="st-metric">@Texts.Get("crm.salesTargets.metric")</label>
                     <select id="st-metric" class="form-select" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.Metric" @bind:after="MetricChanged">
                         @foreach (var (key, label) in SalesLabels.Metrics) { <option value="@key">@label</option> }
                     </select>
                     <FieldError Field="metric" Errors="errors" />
                 </div>
                 <div class="span-3">
-                    <label class="form-label required" for="st-scope">Kapsam</label>
+                    <label class="form-label required" for="st-scope">@Texts.Get("crm.salesForecasts.scope")</label>
                     <select id="st-scope" class="form-select" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.Scope" @bind:after="ScopeChanged">
                         @foreach (var (key, label) in SalesLabels.Scopes) { <option value="@key">@label</option> }
                     </select>
@@ -79,9 +78,9 @@
                 @if (form.Scope == SalesTargetScopes.User)
                 {
                     <div class="span-3">
-                        <label class="form-label required" for="st-user">Kullanıcı</label>
+                        <label class="form-label required" for="st-user">@Texts.Get("crm.sales-scope.user")</label>
                         <select id="st-user" class="form-select" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.UserId">
-                            <option value="">Seçin…</option>
+                            <option value="">@Texts.Get("common.choose")</option>
                             @foreach (var member in Lookups.Members) { <option value="@member.UserId">@member.DisplayName</option> }
                         </select>
                         <FieldError Field="scopeUserId" Errors="errors" />
@@ -90,23 +89,23 @@
                 @if (form.Metric == SalesTargetMetrics.WonAmount)
                 {
                     <div class="span-3">
-                        <label class="form-label required" for="st-currency">Para birimi</label>
+                        <label class="form-label required" for="st-currency">@Texts.Get("crm.sales.currency")</label>
                         <input id="st-currency" class="form-control" maxlength="3" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.Currency" />
                         <FieldError Field="currency" Errors="errors" />
                     </div>
                 }
                 <div class="span-3">
-                    <label class="form-label required" for="st-start">Dönem başı</label>
+                    <label class="form-label required" for="st-start">@Texts.Get("crm.salesTargets.periodStart")</label>
                     <input id="st-start" class="form-control" type="date" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.PeriodStart" />
                     <FieldError Field="periodStart" Errors="errors" />
                 </div>
                 <div class="span-3">
-                    <label class="form-label required" for="st-end">Dönem sonu</label>
+                    <label class="form-label required" for="st-end">@Texts.Get("crm.salesTargets.periodEnd")</label>
                     <input id="st-end" class="form-control" type="date" required aria-required="true" disabled="@(form.Id is not null)" @bind="form.PeriodEnd" />
                     <FieldError Field="periodEnd" Errors="errors" />
                 </div>
                 <div class="span-3">
-                    <label class="form-label required" for="st-value">@(form.Metric == SalesTargetMetrics.WonAmount ? "Hedef tutarı (vergi hariç net)" : "Hedef adedi")</label>
+                    <label class="form-label required" for="st-value">@(form.Metric == SalesTargetMetrics.WonAmount ? Texts.Get("crm.salesTargets.valueAmount") : Texts.Get("crm.salesTargets.valueCount"))</label>
                     <input id="st-value" class="form-control" type="number" min="0" step="@(form.Metric == SalesTargetMetrics.WonCount ? "1" : "any")" inputmode="decimal"
                            required aria-required="true" @bind="form.Value" />
                     <FieldError Field="value" Errors="errors" />
@@ -114,14 +113,14 @@
                 @if (form.Id is not null && ValueEdited)
                 {
                     <div class="span-12">
-                        <label class="form-label required" for="st-reason">Değişiklik gerekçesi</label>
+                        <label class="form-label required" for="st-reason">@Texts.Get("crm.salesTargets.reason")</label>
                         <input id="st-reason" class="form-control" maxlength="500" required aria-required="true" aria-describedby="st-reason-help" @bind="form.Reason" />
-                        <div id="st-reason-help" class="form-text">Hedef değeri değişince gerekçe zorunludur; eski ve yeni değer gerekçeyle birlikte revizyon olarak saklanır.</div>
+                        <div id="st-reason-help" class="form-text">@Texts.Get("crm.salesTargets.reasonHelp")</div>
                         <FieldError Field="changeReason" Errors="errors" />
                     </div>
                 }
                 <div class="span-12">
-                    <label class="form-label" for="st-note">Not</label>
+                    <label class="form-label" for="st-note">@Texts.Get("crm.salesTargets.note")</label>
                     <textarea id="st-note" class="form-control" rows="2" maxlength="1000" @bind="form.Note"></textarea>
                     <FieldError Field="note" Errors="errors" />
                 </div>
@@ -131,54 +130,54 @@
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">
                     @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
-                    Kaydet
+                    @Texts.Get("common.save")
                 </button>
-                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelForm">Vazgeç</button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelForm">@Texts.Get("common.dismiss")</button>
                 @if (form.Id is not null && confirmDelete)
                 {
                     <span class="confirm ms-auto" role="alert">
-                        <span>Bu hedef kalıcı olarak silinsin mi?</span>
-                        <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="DeleteAsync">Evet, sil</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirmDelete = false">Vazgeç</button>
+                        <span>@Texts.Get("crm.salesTargets.deleteConfirm")</span>
+                        <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.view.deleteYes")</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirmDelete = false">@Texts.Get("common.dismiss")</button>
                     </span>
                 }
                 else if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="() => confirmDelete = true">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="() => confirmDelete = true">@Texts.Get("common.delete")</button>
                 }
             </div>
         </form>
     }
 
-    <form class="form-grid mb-3" @onsubmit="ApplyFiltersAsync" @onsubmit:preventDefault aria-label="Hedef süzgeçleri">
+    <form class="form-grid mb-3" @onsubmit="ApplyFiltersAsync" @onsubmit:preventDefault aria-label="@Texts.Get("crm.salesTargets.filters")">
         <div class="span-3">
-            <label class="form-label" for="stf-from">Dönem başlangıcı (en erken)</label>
+            <label class="form-label" for="stf-from">@Texts.Get("crm.salesForecasts.filterFrom")</label>
             <input id="stf-from" class="form-control" type="date" @bind="from" @bind:after="ApplyFiltersAsync" />
         </div>
         <div class="span-3">
-            <label class="form-label" for="stf-to">Dönem bitişi (en geç)</label>
+            <label class="form-label" for="stf-to">@Texts.Get("crm.salesForecasts.filterTo")</label>
             <input id="stf-to" class="form-control" type="date" @bind="to" @bind:after="ApplyFiltersAsync" />
         </div>
         <div class="span-3">
-            <label class="form-label" for="stf-metric">Hedef türü</label>
+            <label class="form-label" for="stf-metric">@Texts.Get("crm.salesTargets.metric")</label>
             <select id="stf-metric" class="form-select" @bind="filterMetric" @bind:after="ApplyFiltersAsync">
-                <option value="">Tümü</option>
+                <option value="">@Texts.Get("crm.salesForecasts.all")</option>
                 @foreach (var (key, label) in SalesLabels.Metrics) { <option value="@key">@label</option> }
             </select>
         </div>
         <div class="span-3">
-            <label class="form-label" for="stf-scope">Kapsam</label>
+            <label class="form-label" for="stf-scope">@Texts.Get("crm.salesForecasts.scope")</label>
             <select id="stf-scope" class="form-select" @bind="filterScope" @bind:after="ApplyFiltersAsync">
-                <option value="">Tümü</option>
+                <option value="">@Texts.Get("crm.salesForecasts.all")</option>
                 @foreach (var (key, label) in SalesLabels.Scopes) { <option value="@key">@label</option> }
             </select>
         </div>
         @if (filterScope == SalesTargetScopes.User)
         {
             <div class="span-3">
-                <label class="form-label" for="stf-user">Kullanıcı</label>
+                <label class="form-label" for="stf-user">@Texts.Get("crm.sales-scope.user")</label>
                 <select id="stf-user" class="form-select" @bind="filterUser" @bind:after="ApplyFiltersAsync">
-                    <option value="">Tüm kullanıcılar</option>
+                    <option value="">@Texts.Get("crm.sales.allUsers")</option>
                     @foreach (var member in Lookups.Members) { <option value="@member.UserId">@member.DisplayName</option> }
                 </select>
             </div>
@@ -189,43 +188,43 @@
     {
         <div class="alert alert-danger" role="alert">
             @listError
-            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="() => LoadAsync(page?.Page ?? 1)">Tekrar dene</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="() => LoadAsync(page?.Page ?? 1)">@Texts.Get("crm.sales.retry")</button>
         </div>
     }
 
     @if (loading && page is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
     }
     else if (page is not null)
     {
         @if (page.Items.Count == 0)
         {
-            <p class="text-muted">Bu süzgeç için hedef tanımlı değil.@(CanManage ? " \"Yeni hedef\" ile ekleyebilirsiniz." : null)</p>
+            <p class="text-muted">@(CanManage ? Texts.Get("crm.salesTargets.noneCanCreate") : Texts.Get("crm.salesTargets.none"))</p>
         }
         else
         {
             <table class="table record-table" aria-busy="@(loading ? "true" : "false")">
-                <caption class="visually-hidden">Satış hedefleri</caption>
+                <caption class="visually-hidden">@Texts.Get("crm.salesTargets.title")</caption>
                 <thead>
                     <tr>
-                        <th scope="col">Dönem</th><th scope="col">Hedef türü</th><th scope="col">Kapsam</th><th scope="col">Hedef</th><th scope="col">Revizyon</th><th scope="col">Not</th>
-                        @if (CanManage) { <th scope="col"><span class="visually-hidden">İşlemler</span></th> }
+                        <th scope="col">@Texts.Get("crm.salesOverview.col.period")</th><th scope="col">@Texts.Get("crm.salesTargets.metric")</th><th scope="col">@Texts.Get("crm.salesForecasts.scope")</th><th scope="col">@Texts.Get("crm.salesTarget.target")</th><th scope="col">@Texts.Get("crm.salesTargets.col.revision")</th><th scope="col">@Texts.Get("crm.salesTargets.note")</th>
+                        @if (CanManage) { <th scope="col"><span class="visually-hidden">@Texts.Get("crm.lead.actions")</span></th> }
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var target in page.Items)
                     {
                         <tr>
-                            <td data-label="Dönem" class="primary">@SalesLabels.Period(target.PeriodStart, target.PeriodEnd)</td>
-                            <td data-label="Hedef türü">@SalesLabels.Metric(target.Metric)</td>
-                            <td data-label="Kapsam">@(target.ScopeType == SalesTargetScopes.User ? $"Kullanıcı: {Lookups.MemberName(target.ScopeUserId)}" : "Tüm firma")</td>
-                            <td data-label="Hedef">@ValueText(target)</td>
-                            <td data-label="Revizyon">@(target.RevisionNo > 0 ? $"{target.RevisionNo}. revizyon" : "İlk değer")</td>
-                            <td data-label="Not">@(target.Note ?? "—")</td>
+                            <td data-label="@Texts.Get("crm.salesOverview.col.period")" class="primary">@SalesLabels.Period(target.PeriodStart, target.PeriodEnd)</td>
+                            <td data-label="@Texts.Get("crm.salesTargets.metric")">@SalesLabels.Metric(target.Metric)</td>
+                            <td data-label="@Texts.Get("crm.salesForecasts.scope")">@(target.ScopeType == SalesTargetScopes.User ? Texts.Get("crm.salesForecasts.userScope", Lookups.MemberName(target.ScopeUserId)) : Texts.Get("crm.sales-scope.tenant"))</td>
+                            <td data-label="@Texts.Get("crm.salesTarget.target")">@ValueText(target)</td>
+                            <td data-label="@Texts.Get("crm.salesTargets.col.revision")">@(target.RevisionNo > 0 ? Texts.Get("crm.salesTargets.revisionNo", target.RevisionNo) : Texts.Get("crm.salesTargets.firstValue"))</td>
+                            <td data-label="@Texts.Get("crm.salesTargets.note")">@(target.Note ?? "—")</td>
                             @if (CanManage)
                             {
-                                <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" aria-label="@($"{SalesLabels.Period(target.PeriodStart, target.PeriodEnd)} hedefini düzenle")" @onclick="() => StartEdit(target)">Düzenle</button></td>
+                                <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" aria-label="@Texts.Get("crm.salesTargets.editAria", SalesLabels.Period(target.PeriodStart, target.PeriodEnd))" @onclick="() => StartEdit(target)">@Texts.Get("common.edit")</button></td>
                             }
                         </tr>
                     }
@@ -430,7 +429,7 @@
             var created = form.Id is null;
             form = null;
             ResetFormState();
-            success = created ? "Hedef eklendi." : "Hedef güncellendi.";
+            success = created ? Texts.Get("crm.salesTargets.added") : Texts.Get("crm.salesTargets.updated");
             await LoadAsync(created ? 1 : page?.Page ?? 1);
             return;
         }
@@ -441,7 +440,7 @@
             form = null;
             ResetFormState();
             await LoadAsync(page?.Page ?? 1);
-            pageNotice = "Hedef başka biri tarafından değiştirildi; liste güncellendi. Düzenlemeyi güncel değerle yeniden açın.";
+            pageNotice = Texts.Get("crm.salesTargets.conflict");
             return;
         }
 
@@ -464,7 +463,7 @@
         {
             form = null;
             ResetFormState();
-            success = "Hedef silindi.";
+            success = Texts.Get("crm.salesTargets.deleted");
             await LoadAsync(1);
             return;
         }
