@@ -3,24 +3,24 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Teklif raporu · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.quoteReport.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.QuotesRead">
-    <a class="back-link" href="crm/teklifler">← Teklifler</a>
+    <a class="back-link" href="crm/teklifler">← @Texts.Get("crm.quotes.title")</a>
     <div class="page-header">
-        <h1>Teklif raporu</h1>
+        <h1>@Texts.Get("crm.quoteReport.title")</h1>
         @if (Session.Can(CrmAccess.QuotesExport))
         {
-            <a class="btn btn-outline-secondary" href="api/crm/quotes/export?latestOnly=true" download="teklifler.csv">CSV dışa aktar (son revizyonlar)</a>
+            <a class="btn btn-outline-secondary" href="api/crm/quotes/export?latestOnly=true" download="teklifler.csv">@Texts.Get("crm.quoteReport.csv")</a>
         }
     </div>
 
     <form class="filters" @onsubmit="LoadAsync" @onsubmit:preventDefault>
-        <label class="form-label" for="qr-from">Başlangıç</label>
+        <label class="form-label" for="qr-from">@Texts.Get("crm.quoteReport.from")</label>
         <input id="qr-from" class="form-control" type="date" @bind="from" />
-        <label class="form-label" for="qr-to">Bitiş</label>
+        <label class="form-label" for="qr-to">@Texts.Get("crm.quoteReport.to")</label>
         <input id="qr-to" class="form-control" type="date" @bind="to" />
-        <button type="submit" class="btn btn-primary" disabled="@busy">Raporu getir</button>
+        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.sales.runReport")</button>
     </form>
 
     @if (message is not null)
@@ -32,66 +32,66 @@
     {
         @if (message is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
         }
     }
     else
     {
         @if (report.Truncated)
         {
-            <div class="alert alert-warning" role="status">Kayıt sayısı sınırı (5000) aşıldı; rapor ilk kayıtlara göredir. Dönemi daraltın.</div>
+            <div class="alert alert-warning" role="status">@Texts.Get("crm.sales.reportTruncated")</div>
         }
 
         <section class="detail-section" aria-labelledby="qr-now">
-            <div class="section-header"><h2 id="qr-now">Şu an</h2></div>
+            <div class="section-header"><h2 id="qr-now">@Texts.Get("crm.quoteReport.now")</h2></div>
             <dl class="detail-grid">
-                <div><dt>Taslak</dt><dd>@report.DraftCount</dd></div>
-                <div><dt>İç onay bekleyen</dt><dd>@report.PendingApprovalCount</dd></div>
-                <div><dt>Müşteride bekleyen</dt><dd>@report.WaitingCount</dd></div>
+                <div><dt>@Texts.Get("crm.forecast-status.draft")</dt><dd>@report.DraftCount</dd></div>
+                <div><dt>@Texts.Get("crm.quoteReport.awaitingApproval")</dt><dd>@report.PendingApprovalCount</dd></div>
+                <div><dt>@Texts.Get("crm.quoteReport.waiting")</dt><dd>@report.WaitingCount</dd></div>
             </dl>
-            <h3 class="h6">Müşteride bekleyen tutar</h3>
+            <h3 class="h6">@Texts.Get("crm.quoteReport.waitingAmount")</h3>
             @Totals(report.WaitingTotals)
         </section>
 
         <section class="detail-section" aria-labelledby="qr-period">
-            <div class="section-header"><h2 id="qr-period">Dönem (@CrmLabels.Date(report.From) – @CrmLabels.Date(report.To))</h2></div>
+            <div class="section-header"><h2 id="qr-period">@Texts.Get("crm.quoteReport.period", CrmLabels.Date(report.From), CrmLabels.Date(report.To))</h2></div>
             <dl class="detail-grid">
-                <div><dt>Sunulan</dt><dd>@report.PresentedCount</dd></div>
-                <div><dt>Kabul</dt><dd>@report.AcceptedCount</dd></div>
-                <div><dt>Ret</dt><dd>@report.RejectedCount</dd></div>
-                <div><dt>İptal</dt><dd>@report.CancelledCount</dd></div>
-                <div><dt>Süresi dolan</dt><dd>@report.ExpiredCount</dd></div>
-                <div><dt>Kabul oranı</dt><dd>@(report.AcceptanceRate is { } rate ? $"%{(rate * 100).ToString("0.#", Regional.Numbers)}" : "—")</dd></div>
-                <div><dt>Ort. karar süresi (gün)</dt><dd>@Number(report.AverageDaysToDecision)</dd></div>
-                <div><dt>Ort. indirim</dt><dd>@(report.AverageDiscountPercent is { } d ? $"%{d.ToString("0.##", Regional.Numbers)}" : "—")</dd></div>
-                <div><dt>Kabulde ort. revizyon</dt><dd>@Number(report.AverageRevisionsToAccept)</dd></div>
+                <div><dt>@Texts.Get("crm.quoteReport.presented")</dt><dd>@report.PresentedCount</dd></div>
+                <div><dt>@Texts.Get("crm.quoteReport.accepted")</dt><dd>@report.AcceptedCount</dd></div>
+                <div><dt>@Texts.Get("crm.quoteReport.rejected")</dt><dd>@report.RejectedCount</dd></div>
+                <div><dt>@Texts.Get("crm.quoteReport.cancelled")</dt><dd>@report.CancelledCount</dd></div>
+                <div><dt>@Texts.Get("crm.salesAnalysis.outcome.expired")</dt><dd>@report.ExpiredCount</dd></div>
+                <div><dt>@Texts.Get("crm.salesAnalysis.q.acceptanceRate")</dt><dd>@(report.AcceptanceRate is { } rate ? $"%{(rate * 100).ToString("0.#", Regional.Numbers)}" : "—")</dd></div>
+                <div><dt>@Texts.Get("crm.quoteReport.avgDecision")</dt><dd>@Number(report.AverageDaysToDecision)</dd></div>
+                <div><dt>@Texts.Get("crm.quoteReport.avgDiscount")</dt><dd>@(report.AverageDiscountPercent is { } d ? $"%{d.ToString("0.##", Regional.Numbers)}" : "—")</dd></div>
+                <div><dt>@Texts.Get("crm.quoteReport.avgRevisions")</dt><dd>@Number(report.AverageRevisionsToAccept)</dd></div>
             </dl>
-            <h3 class="h6">Sunulan tutar</h3>
+            <h3 class="h6">@Texts.Get("crm.quoteReport.presentedAmount")</h3>
             @Totals(report.PresentedTotals)
-            <h3 class="h6">Kabul edilen tutar</h3>
+            <h3 class="h6">@Texts.Get("crm.quoteReport.acceptedAmount")</h3>
             @Totals(report.AcceptedTotals)
         </section>
 
         <section class="detail-section" aria-labelledby="qr-owner">
-            <div class="section-header"><h2 id="qr-owner">Sorumlu bazında</h2></div>
+            <div class="section-header"><h2 id="qr-owner">@Texts.Get("crm.sales.byOwner")</h2></div>
             @if (report.ByOwner.Count == 0)
             {
-                <p class="text-muted">Dönemde sunulan ya da sonuçlanan teklif yok.</p>
+                <p class="text-muted">@Texts.Get("crm.quoteReport.noOwnerRows")</p>
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Sorumlu bazında teklifler</caption>
-                    <thead><tr><th scope="col">Sorumlu</th><th scope="col">Sunulan</th><th scope="col">Kabul</th><th scope="col">Ret</th><th scope="col">Kabul edilen tutar</th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("crm.quoteReport.ownerCaption")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("common.field.owner")</th><th scope="col">@Texts.Get("crm.quoteReport.presented")</th><th scope="col">@Texts.Get("crm.quoteReport.accepted")</th><th scope="col">@Texts.Get("crm.quoteReport.rejected")</th><th scope="col">@Texts.Get("crm.quoteReport.acceptedAmount")</th></tr></thead>
                     <tbody>
                         @foreach (var o in report.ByOwner)
                         {
                             <tr>
-                                <td data-label="Sorumlu" class="primary">@(o.OwnerId is null ? "Atanmadı" : Lookups.MemberName(o.OwnerId))</td>
-                                <td data-label="Sunulan">@o.Presented</td>
-                                <td data-label="Kabul">@o.Accepted</td>
-                                <td data-label="Ret">@o.Rejected</td>
-                                <td data-label="Kabul edilen tutar">@Amounts(o.AcceptedTotals)</td>
+                                <td data-label="@Texts.Get("common.field.owner")" class="primary">@(o.OwnerId is null ? Texts.Get("crm.leads.unassigned") : Lookups.MemberName(o.OwnerId))</td>
+                                <td data-label="@Texts.Get("crm.quoteReport.presented")">@o.Presented</td>
+                                <td data-label="@Texts.Get("crm.quoteReport.accepted")">@o.Accepted</td>
+                                <td data-label="@Texts.Get("crm.quoteReport.rejected")">@o.Rejected</td>
+                                <td data-label="@Texts.Get("crm.quoteReport.acceptedAmount")">@Amounts(o.AcceptedTotals)</td>
                             </tr>
                         }
                     </tbody>
@@ -99,52 +99,52 @@
             }
         </section>
 
-        @Attention("Süresi yaklaşan (7 gün)", "qr-soon", report.ExpiringSoon, "Geçerlilik")
-        @Attention("Süresi geçmiş ama hâlâ sunulmuş", "qr-over", report.Overdue, "Geçerlilik")
-        @Attention("İç onay bekleyen", "qr-appr", report.AwaitingApproval, null)
-        @Attention("Müşteriye gönderilmemiş / gönderimi başarısız", "qr-deliv", report.NotDelivered, "Sunum")
+        @Attention(Texts.Get("crm.quoteReport.expiringSoon"), "qr-soon", report.ExpiringSoon, Texts.Get("crm.quoteReport.validity"))
+        @Attention(Texts.Get("crm.quoteReport.overdue"), "qr-over", report.Overdue, Texts.Get("crm.quoteReport.validity"))
+        @Attention(Texts.Get("crm.quoteReport.awaitingApproval"), "qr-appr", report.AwaitingApproval, null)
+        @Attention(Texts.Get("crm.quoteReport.notDelivered"), "qr-deliv", report.NotDelivered, Texts.Get("crm.quoteReport.delivery"))
 
         @if (Session.Can(CrmAccess.QuoteCostsRead))
         {
             <section class="detail-section" aria-labelledby="qr-margin">
-                <div class="section-header"><h2 id="qr-margin">Marj (yalnızca maliyet izniyle)</h2></div>
+                <div class="section-header"><h2 id="qr-margin">@Texts.Get("crm.quoteReport.margin")</h2></div>
                 @if (margin is null)
                 {
-                    <p class="text-muted">@(marginError ?? "Yükleniyor…")</p>
+                    <p class="text-muted">@(marginError ?? Texts.Get("common.loading"))</p>
                 }
                 else
                 {
-                    <h3 class="h6">Sunulan tekliflerde</h3>
+                    <h3 class="h6">@Texts.Get("crm.quoteReport.marginPresented")</h3>
                     @MarginTable(margin.PresentedTotals)
-                    <h3 class="h6">Kabul edilen tekliflerde</h3>
+                    <h3 class="h6">@Texts.Get("crm.quoteReport.marginAccepted")</h3>
                     @MarginTable(margin.AcceptedTotals)
                     @if (margin.ByOwner.Count > 0)
                     {
-                        <h3 class="h6">Sorumlu bazında (sunulan)</h3>
+                        <h3 class="h6">@Texts.Get("crm.quoteReport.marginByOwner")</h3>
                         <ul>
                             @foreach (var o in margin.ByOwner)
                             {
-                                <li>@(o.OwnerId is null ? "Atanmadı" : Lookups.MemberName(o.OwnerId)): @MarginLine(o.Totals)</li>
+                                <li>@(o.OwnerId is null ? Texts.Get("crm.leads.unassigned") : Lookups.MemberName(o.OwnerId)): @MarginLine(o.Totals)</li>
                             }
                         </ul>
                     }
                     @if (margin.LowestMargin.Count > 0)
                     {
-                        <h3 class="h6">En düşük marjlı teklifler</h3>
+                        <h3 class="h6">@Texts.Get("crm.quoteReport.lowestMargin")</h3>
                         <ul>
                             @foreach (var item in margin.LowestMargin.Take(10))
                             {
-                                <li><a href="crm/teklifler/@item.Id">@item.Title (@item.QuoteNumber · V@(item.RevisionNo))</a> — marj @QuoteLabels.Money(item.Margin, item.Currency) (%@Number(item.MarginPercent))@(item.LinesWithoutCost > 0 ? $" · {item.LinesWithoutCost} kalemin maliyeti yok" : null)</li>
+                                <li><a href="crm/teklifler/@item.Id">@item.Title (@item.QuoteNumber · V@(item.RevisionNo))</a> — @Texts.Get("crm.quoteReport.marginValue", QuoteLabels.Money(item.Margin, item.Currency), Number(item.MarginPercent))@(item.LinesWithoutCost > 0 ? " · " + Texts.Get("crm.quoteReport.linesWithoutCost", item.LinesWithoutCost) : null)</li>
                             }
                         </ul>
                     }
                     @if (margin.MissingCost.Count > 0)
                     {
-                        <h3 class="h6">Maliyeti eksik teklifler (@margin.MissingCost.Count)</h3>
+                        <h3 class="h6">@Texts.Get("crm.quoteReport.missingCost", margin.MissingCost.Count)</h3>
                         <ul>
                             @foreach (var item in margin.MissingCost.Take(10))
                             {
-                                <li><a href="crm/teklifler/@item.Id">@item.Title (@item.QuoteNumber)</a> — @item.LinesWithoutCost kalem</li>
+                                <li><a href="crm/teklifler/@item.Id">@item.Title (@item.QuoteNumber)</a> — @Texts.Get("crm.quoteReport.lineCount", item.LinesWithoutCost)</li>
                             }
                         </ul>
                     }
@@ -156,7 +156,7 @@
         }
 
         <section class="detail-section" aria-labelledby="qr-defs">
-            <div class="section-header"><h2 id="qr-defs">Tanımlar</h2></div>
+            <div class="section-header"><h2 id="qr-defs">@Texts.Get("crm.sales.definitionsTitle")</h2></div>
             <ul class="small text-muted">
                 @foreach (var definition in report.Definitions)
                 {
@@ -213,7 +213,7 @@
     };
 
     private static string Amounts(IReadOnlyList<QuoteCurrencyTotalDto> totals) =>
-        totals.Count == 0 ? "—" : string.Join(" · ", totals.Select(t => $"{QuoteLabels.Money(t.Gross, t.Currency)} ({t.Count} adet)"));
+        totals.Count == 0 ? "—" : string.Join(" · ", totals.Select(t => Texts.Get("crm.quoteReport.amountWithCount", QuoteLabels.Money(t.Gross, t.Currency), t.Count)));
 
     private RenderFragment MarginTable(IReadOnlyList<QuoteMarginTotalDto> totals) => builder =>
     {
@@ -223,7 +223,7 @@
     };
 
     private static string MarginLine(IReadOnlyList<QuoteMarginTotalDto> totals) =>
-        totals.Count == 0 ? "—" : string.Join(" · ", totals.Select(t => $"{t.Currency}: net {t.Net.ToString("N2", Regional.Numbers)}, maliyet {t.Cost.ToString("N2", Regional.Numbers)}, marj {t.Margin.ToString("N2", Regional.Numbers)} (%{Number(t.MarginPercent)}){(t.LinesWithoutCost > 0 ? $", {t.LinesWithoutCost} kalemin maliyeti yok" : string.Empty)} ({t.Count} teklif)"));
+        totals.Count == 0 ? "—" : string.Join(" · ", totals.Select(t => Texts.Get("crm.quoteReport.marginLine", t.Currency, t.Net.ToString("N2", Regional.Numbers), t.Cost.ToString("N2", Regional.Numbers), t.Margin.ToString("N2", Regional.Numbers), Number(t.MarginPercent), t.LinesWithoutCost > 0 ? ", " + Texts.Get("crm.quoteReport.linesWithoutCost", t.LinesWithoutCost) : string.Empty, t.Count)));
 
     private static string Number(double? value) => value is { } v ? v.ToString("0.##", Regional.Numbers) : "—";
 
@@ -235,7 +235,7 @@
         builder.AddMarkupContent(3, $"<div class=\"section-header\"><h2 id=\"{id}\">{System.Net.WebUtility.HtmlEncode(title)} ({items.Count})</h2></div>");
         if (items.Count == 0)
         {
-            builder.AddMarkupContent(4, "<p class=\"text-muted\">Kayıt yok.</p>");
+            builder.AddMarkupContent(4, $"<p class=\"text-muted\">{System.Net.WebUtility.HtmlEncode(Texts.Get("common.noRecords"))}</p>");
         }
         else
         {

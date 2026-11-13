@@ -4,28 +4,28 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Veri kalitesi · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.dataQuality.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.ReportsRead">
-    <a class="back-link" href="crm/satis-analizi">← Satış analizi</a>
+    <a class="back-link" href="crm/satis-analizi">← @Texts.Get("crm.salesAnalysis.title")</a>
     <div class="page-header">
         <div>
-            <h1>Veri kalitesi</h1>
+            <h1>@Texts.Get("crm.dataQuality.title")</h1>
             <p class="text-muted mb-0">
-                Açık fırsatlardaki eksikler, satış raporlarının doğruluğunu doğrudan etkiler: eksik tutar, kur ya da olasılık olan fırsat toplamlara girmez.
-                Her kod için sorunlu fırsatların bir kısmı örnek olarak listelenir.
+                @Texts.Get("crm.dataQuality.intro1")
+                @Texts.Get("crm.dataQuality.intro2")
             </p>
         </div>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="crm/ekip-performansi">Ekip performansı</a>
+            <a class="btn btn-outline-secondary" href="crm/ekip-performansi">@Texts.Get("crm.salesTeam.title")</a>
         </div>
     </div>
 
-    <form class="form-grid mb-3" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="Veri kalitesi süzgeçleri">
+    <form class="form-grid mb-3" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="@Texts.Get("crm.dataQuality.filters")">
         <div class="span-4">
-            <label class="form-label" for="dq-owner">Kullanıcı (sorumlu)</label>
+            <label class="form-label" for="dq-owner">@Texts.Get("crm.sales.ownerFilter")</label>
             <select id="dq-owner" class="form-select" @bind="owner" @bind:after="LoadAsync">
-                <option value="">Tüm kullanıcılar</option>
+                <option value="">@Texts.Get("crm.sales.allUsers")</option>
                 @foreach (var member in Lookups.Members)
                 {
                     <option value="@member.UserId">@member.DisplayName</option>
@@ -33,13 +33,13 @@
             </select>
         </div>
         <div class="span-3">
-            <label class="form-label" for="dq-currency">Para birimi</label>
+            <label class="form-label" for="dq-currency">@Texts.Get("crm.sales.currency")</label>
             <input id="dq-currency" class="form-control" maxlength="3" placeholder="@Regional.Currency" aria-describedby="dq-currency-help" @bind="currency" @bind:after="LoadAsync" />
-            <div id="dq-currency-help" class="form-text">Kur denetimi bu para birimine göre yapılır. Boşsa firmanın raporlama para birimi.</div>
+            <div id="dq-currency-help" class="form-text">@Texts.Get("crm.dataQuality.currencyHelp")</div>
         </div>
         <div class="span-3">
             <label class="form-label" for="dq-refresh">&nbsp;</label>
-            <button id="dq-refresh" type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="LoadAsync">Yenile</button>
+            <button id="dq-refresh" type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="LoadAsync">@Texts.Get("crm.sales.refresh")</button>
         </div>
     </form>
 
@@ -51,87 +51,87 @@
         <AnalyticsFrame T="DataQualityDto" Report="r">
             @if (d.OpenCount == 0)
             {
-                <p class="text-muted">Bu süzgeç için açık fırsat yok; denetlenecek kayıt bulunmuyor.</p>
+                <p class="text-muted">@Texts.Get("crm.dataQuality.empty")</p>
             }
             else
             {
-                <div class="kpi-grid" role="group" aria-label="Veri kalitesi özeti">
-                    <SalesKpiCard Label="Açık fırsat" Icon="target" Tone="info" Value="@SalesLabels.Count(d.OpenCount)" Detail="Denetlenen açık fırsat sayısı" />
-                    <SalesKpiCard Label="Sorunlu kod" Icon="shield" Tone="@(IssueCodeCount(r) > 0 ? "danger" : "success")" Value="@IssueCodeCount(r).ToString()"
-                                  Detail="@(IssueCodeCount(r) > 0 ? "Sorun bulunan denetim sayısı" : "Hiçbir denetimde sorun yok")" />
+                <div class="kpi-grid" role="group" aria-label="@Texts.Get("crm.dataQuality.summary")">
+                    <SalesKpiCard Label="@Texts.Get("crm.dataQuality.open")" Icon="target" Tone="info" Value="@SalesLabels.Count(d.OpenCount)" Detail="@Texts.Get("crm.dataQuality.openDetail")" />
+                    <SalesKpiCard Label="@Texts.Get("crm.dataQuality.issueCodes")" Icon="shield" Tone="@(IssueCodeCount(r) > 0 ? "danger" : "success")" Value="@IssueCodeCount(r).ToString()"
+                                  Detail="@(IssueCodeCount(r) > 0 ? Texts.Get("crm.dataQuality.issueCodesDetail") : Texts.Get("crm.dataQuality.noIssues"))" />
                 </div>
             }
 
             <section class="detail-section" aria-labelledby="dq-issues">
-                <div class="section-header"><h2 id="dq-issues">Denetimler</h2></div>
+                <div class="section-header"><h2 id="dq-issues">@Texts.Get("crm.dataQuality.checks")</h2></div>
                 @foreach (var (issueCode, label, help) in SalesAnalysisLabels.QualityCodes)
                 {
                     var issue = d.Issues.FirstOrDefault(i => i.Code == issueCode);
                     var blocked = !r.AmountsVisible && SalesAnalysisLabels.AmountDependentCodes.Contains(issueCode);
                     var count = issue?.Count ?? 0;
                     var panelId = $"dq-samples-{issueCode}";
-                    var title = issueCode == DataQualityCodes.Stale ? $"{label} (eşik {d.StaleDays} gün)" : label;
-                    var description = issueCode == DataQualityCodes.Stale ? $"{d.StaleDays} günden uzun süredir etkileşim kaydı olmayan açık fırsat." : help;
+                    var title = issueCode == DataQualityCodes.Stale ? Texts.Get("crm.dataQuality.staleTitle", label, d.StaleDays) : label;
+                    var description = issueCode == DataQualityCodes.Stale ? Texts.Get("crm.dataQuality.staleHelp", d.StaleDays) : help;
                     <div class="detail-section" role="group" aria-labelledby="dq-title-@issueCode">
                         <div class="section-header">
                             <h3 id="dq-title-@issueCode" class="h6 mb-0">@title</h3>
                             @if (blocked)
                             {
-                                <span class="badge tag">Yetkiniz yok</span>
+                                <span class="badge tag">@SalesAnalysisLabels.NoAmountPermission</span>
                             }
                             else if (count == 0)
                             {
-                                <span class="badge stage-won">Sorun yok</span>
+                                <span class="badge stage-won">@Texts.Get("crm.dataQuality.noProblem")</span>
                             }
                             else
                             {
-                                <span class="badge stage-lost">@SalesLabels.Count(count) fırsat</span>
+                                <span class="badge stage-lost">@Texts.Get("crm.dataQuality.opportunities", SalesLabels.Count(count))</span>
                             }
                         </div>
                         <p class="small text-muted mb-1">@description</p>
                         @if (blocked)
                         {
-                            <p class="mb-0">Yetkiniz yok — bu denetim tutar iznini ister. Sorun olmadığı anlamına gelmez; denetim sizin için çalıştırılmadı.</p>
+                            <p class="mb-0">@Texts.Get("crm.dataQuality.blocked")</p>
                         }
                         else if (count == 0)
                         {
-                            <p class="mb-0">Sorun yok.</p>
+                            <p class="mb-0">@Texts.Get("crm.dataQuality.noProblemSentence")</p>
                         }
                         else if (issue is not null)
                         {
                             <button type="button" class="btn btn-outline-secondary btn-sm" aria-expanded="@(expanded.Contains(issueCode) ? "true" : "false")" aria-controls="@panelId"
                                     @onclick="() => Toggle(issueCode)">
-                                @(expanded.Contains(issueCode) ? "Örnekleri gizle" : $"Örnekleri göster ({issue.Samples.Count})")
+                                @(expanded.Contains(issueCode) ? Texts.Get("crm.dataQuality.hideSamples") : Texts.Get("crm.dataQuality.showSamples", issue.Samples.Count))
                             </button>
                             @if (expanded.Contains(issueCode))
                             {
                                 <div id="@panelId" class="mt-2">
                                     @if (issue.Samples.Count == 0)
                                     {
-                                        <p class="text-muted">Örnek kayıt yok.</p>
+                                        <p class="text-muted">@Texts.Get("crm.dataQuality.noSamples")</p>
                                     }
                                     else
                                     {
                                         <table class="table record-table">
-                                            <caption class="visually-hidden">@title için örnek fırsatlar</caption>
+                                            <caption class="visually-hidden">@Texts.Get("crm.dataQuality.samplesCaption", title)</caption>
                                             <thead>
-                                                <tr><th scope="col">No</th><th scope="col">Başlık</th><th scope="col">Sorumlu</th><th scope="col">Ayrıntı</th></tr>
+                                                <tr><th scope="col">@Texts.Get("crm.dataQuality.col.number")</th><th scope="col">@Texts.Get("crm.dataQuality.col.title")</th><th scope="col">@Texts.Get("common.field.owner")</th><th scope="col">@Texts.Get("crm.dataQuality.col.detail")</th></tr>
                                             </thead>
                                             <tbody>
                                                 @foreach (var item in issue.Samples)
                                                 {
                                                     <tr>
-                                                        <td data-label="No" class="primary"><a href="crm/firsatlar/@item.Id">@item.Number</a></td>
-                                                        <td data-label="Başlık">@item.Title</td>
-                                                        <td data-label="Sorumlu">@SalesAnalysisLabels.Owner(Lookups, item.OwnerId)</td>
-                                                        <td data-label="Ayrıntı">@(string.IsNullOrWhiteSpace(item.Detail) ? "—" : item.Detail)</td>
+                                                        <td data-label="@Texts.Get("crm.dataQuality.col.number")" class="primary"><a href="crm/firsatlar/@item.Id">@item.Number</a></td>
+                                                        <td data-label="@Texts.Get("crm.dataQuality.col.title")">@item.Title</td>
+                                                        <td data-label="@Texts.Get("common.field.owner")">@SalesAnalysisLabels.Owner(Lookups, item.OwnerId)</td>
+                                                        <td data-label="@Texts.Get("crm.dataQuality.col.detail")">@(string.IsNullOrWhiteSpace(item.Detail) ? "—" : item.Detail)</td>
                                                     </tr>
                                                 }
                                             </tbody>
                                         </table>
                                         @if (count > issue.Samples.Count)
                                         {
-                                            <p class="small text-muted">İlk @issue.Samples.Count örnek gösteriliyor; toplam @SalesLabels.Count(count) fırsat. Kullanıcı seçerek daraltabilirsiniz.</p>
+                                            <p class="small text-muted">@Texts.Get("crm.dataQuality.samplesTruncated", issue.Samples.Count, SalesLabels.Count(count))</p>
                                         }
                                     }
                                 </div>
