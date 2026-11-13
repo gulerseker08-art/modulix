@@ -110,6 +110,7 @@ public static class ImportText
         "business-rule" => "İş kuralı",
         "file-invalid" => "Dosya geçersiz",
         "system-error" => "Sistem hatası",
+        "file-repeated" => "Dosya daha önce yüklendi",
         _ => code,
     };
 
@@ -119,6 +120,6 @@ public static class ImportText
     public static IReadOnlyList<string> Codes { get; } =
     [
         "required-missing", "format-invalid", "lookup-unresolved", "duplicate-exact", "duplicate-possible",
-        "custom-field-invalid", "permission-denied", "business-rule", "file-invalid", "system-error",
+        "custom-field-invalid", "permission-denied", "business-rule", "file-invalid", "system-error", "file-repeated",
     ];
 }

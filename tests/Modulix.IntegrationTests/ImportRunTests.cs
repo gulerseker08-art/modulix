@@ -313,6 +313,44 @@ public class ImportRunTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
         Assert.Equal("Failed", detail!.Run.Status);
     }
 
+    // ADR-0033 Dilim 4b: aynı dosya uyarısı. Uyarıdır (yükleme sürer), yalnızca kayıt almış uygulamaya bakar, firma sınırını aşmaz ve önceki yükleyeni söylemez.
+    [Fact]
+    public async Task Reuploading_an_applied_file_warns_without_blocking_and_only_within_the_tenant()
+    {
+        var (client, tenant, user) = await ImporterAsync();
+        using var _c = client;
+        var file = "Konu;Soyad\r\nTekrar;Kaya\r\n";
+
+        // Önceki uygulama yokken uyarı yok; kayıt almayan (bütün satırları hatalı) uygulama da sayılmaz.
+        Assert.DoesNotContain((await PreviewAsync(client, file)).Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+        Assert.Equal("Failed", (await ApplyAsync(client, "Konu;Soyad\r\n;Kaya\r\n")).Run.Status);
+        Assert.DoesNotContain((await PreviewAsync(client, "Konu;Soyad\r\n;Kaya\r\n")).Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+
+        var first = await ApplyAsync(client, file);
+        Assert.Equal(("Succeeded", 1), (first.Run.Status, first.Run.CreatedCount));
+        Assert.DoesNotContain(first.Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+
+        // Kuru çalışma ve ikinci uygulama uyarır; uyarı yüklemeyi durdurmaz.
+        var preview = await PreviewAsync(client, file);
+        var warning = Assert.Single(preview.Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+        Assert.Equal((0, "Warning"), (warning.RowNo, warning.Severity));
+        var second = await ApplyAsync(client, file);
+        Assert.Equal(("Succeeded", 1), (second.Run.Status, second.Run.CreatedCount));
+        Assert.Contains(second.Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+
+        // Aynı firmadaki başka yükleyen de uyarıyı görür ama ileti önceki yükleyenin adını taşımaz.
+        var colleague = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, Importer, colleague);
+        using var colleagueClient = await LoginAsync(colleague);
+        var seen = Assert.Single((await PreviewAsync(colleagueClient, file)).Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+        Assert.DoesNotContain(user.Email!, seen.Message, StringComparison.OrdinalIgnoreCase);
+
+        // Başka firma aynı dosyayı ilk kez yüklüyor sayılır.
+        var (other, _, _) = await ImporterAsync();
+        using var _o = other;
+        Assert.DoesNotContain((await ApplyAsync(other, file)).Issues.Items, i => i.Code == ImportIssueCodes.FileRepeated);
+    }
+
     private async Task AddCustomFieldAsync(Tenant tenant, string label)
     {
         var admin = await factory.CreateUserAsync(tenant);

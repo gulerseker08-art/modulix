@@ -60,10 +60,13 @@ public static class ImportIssueCodes
     public const string FileInvalid = "file-invalid";
     public const string SystemError = "system-error";
 
+    /// <summary>Aynı dosya (özeti aynı) aynı kayıt türüne daha önce uygulanmış: uyarıdır, yüklemeyi engellemez (ADR-0033 Dilim 4b).</summary>
+    public const string FileRepeated = "file-repeated";
+
     public static IReadOnlyList<string> All { get; } =
     [
         RequiredMissing, FormatInvalid, LookupUnresolved, DuplicateExact, DuplicatePossible,
-        CustomFieldInvalid, PermissionDenied, BusinessRule, FileInvalid, SystemError,
+        CustomFieldInvalid, PermissionDenied, BusinessRule, FileInvalid, SystemError, FileRepeated,
     ];
 
     public static bool IsKnown(string code) => All.Contains(code, StringComparer.Ordinal);
