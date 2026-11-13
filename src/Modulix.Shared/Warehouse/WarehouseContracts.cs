@@ -79,6 +79,12 @@ public static class WarehouseAccess
     public const string AttorneyBrokerLookup = "warehouse.power-of-attorney.broker";
     public const string DeclarationImporterLookup = "warehouse.customs-declaration.importer";
     public const string DeclarationBrokerLookup = "warehouse.customs-declaration.broker";
+    public const string LotStockItemLookup = "warehouse.lot.stock-item";
+    public const string LotOwnerLookup = "warehouse.lot.owner";
+    public const string LotBillToLookup = "warehouse.lot.bill-to";
+    public const string MovementLotLookup = "warehouse.stock-movement.lot";
+    public const string MovementFromLocationLookup = "warehouse.stock-movement.from-location";
+    public const string MovementToLocationLookup = "warehouse.stock-movement.to-location";
 
     public const string ZoneKindControlled = "controlled";
     public const string ZoneKindFree = "free";
