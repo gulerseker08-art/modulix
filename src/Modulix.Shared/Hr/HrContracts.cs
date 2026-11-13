@@ -25,6 +25,8 @@ public static class HrAccess
     public const string AssetsManage = "hr.assets.manage";
     public const string ChecklistsRead = "hr.checklists.read";
     public const string ChecklistsManage = "hr.checklists.manage";
+    public const string AnnouncementsRead = "hr.announcements.read";
+    public const string AnnouncementsManage = "hr.announcements.manage";
 
     public const string EmployeeEntityKey = "hr.employee";
     public const string LeaveRequestEntityKey = "hr.leave-request";
@@ -48,6 +50,8 @@ public static class HrAccess
     public const string ChecklistTaskEntityKey = "hr.checklist-task";
     public const string ChecklistEmployeeLookup = "hr.employee-checklist.employee";
     public const string ChecklistTemplateLookup = "hr.employee-checklist.template";
+    public const string AnnouncementEntityKey = "hr.announcement";
+    public const string AnnouncementReadEntityKey = "hr.announcement-read";
 
     /// <summary>Yalnızca bu kategorideki izin türü yıllık haktan düşer.</summary>
     public const string AnnualCategory = "annual";

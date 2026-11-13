@@ -96,7 +96,7 @@ internal sealed class LogisticsWorkflow(
     /// <summary>Talepten sevkiyata kopyalanan alanlar (yük, güzergâh, taraflar).</summary>
     private static readonly string[] CargoKeys =
     [
-        "customerPartyId", "senderPartyId", "receiverPartyId", "transportModeKey", "pickupCity", "pickupAddress", "deliveryCity", "deliveryAddress",
+        "customerPartyId", "senderPartyId", "receiverPartyId", "transportModeKey", "pickupCity", "pickupCountry", "pickupAddress", "deliveryCity", "deliveryCountry", "deliveryAddress",
         "pickupDate", "deliveryBy", "cargoDescription", "weightKg", "volumeM3", "palletCount", "loadingMeters", "hazardous", "notes",
     ];
 

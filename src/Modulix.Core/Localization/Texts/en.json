@@ -213,6 +213,8 @@
   "nav.app.hr.my-tasks": "My tasks",
   "nav.app.hr.checklists": "Onboarding and offboarding",
   "nav.app.hr.checklist-templates": "Process templates",
+  "nav.app.hr.announcements": "Announcements",
+  "nav.app.hr.announcement-admin": "Announcement management",
   "nav.app.reports": "Reports",
   "nav.app.admin": "Administration",
   "nav.app.admin.home": "Overview",

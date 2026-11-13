@@ -9,7 +9,7 @@ using Modulix.Shared.Records;
 namespace Modulix.Api.Hr;
 
 /// <summary>
-/// İK iş akışı uçları (ADR-0042): izin talebi (dilim 2), masraf beyanı (dilim 3) ve zimmet (dilim 4, tutanak PDF'i dahil) ve işe giriş/çıkış (dilim 5). Talepler, haklar ve tatiller genel kayıt uçlarındadır (<c>/api/records/hr.leave-request</c>,
+/// İK iş akışı uçları (ADR-0042): izin talebi (dilim 2), masraf beyanı (dilim 3) ve zimmet (dilim 4, tutanak PDF'i dahil) işe giriş/çıkış (dilim 5) ve duyuru okundu işareti (dilim 6). Talepler, haklar ve tatiller genel kayıt uçlarındadır (<c>/api/records/hr.leave-request</c>,
 /// <c>hr.leave-balance</c>, <c>hr.holiday</c>); talebin durumu yalnızca buradaki komutlarla değişir. Yetki ve onaylayan kuralı serviste denetlenir;
 /// tenant oturumdan gelir. Önizleme yazmaz (yolu <c>/preview</c> ile biter); salt okunur lisans evresinde eylem POST'u 403'tür.
 /// </summary>
@@ -129,6 +129,10 @@ public static class HrEndpoints
 
         group.MapPost("/checklist-tasks/{id:guid}/actions", async (Guid id, RunHrActionRequest request, IChecklistWorkflow workflow, CancellationToken ct) =>
             Record(await workflow.RunTaskAsync(id, request.Action ?? string.Empty, request.Version, request.Reason, ct)));
+
+        // Duyurular (dilim 6): okundu işareti. Duyuruyu göremeyen için 404; daha önce okunduysa yeniden yazılmaz.
+        group.MapPost("/announcements/{id:guid}/read", async (Guid id, IAnnouncementService announcements, CancellationToken ct) =>
+            Record(await announcements.MarkReadAsync(id, ct)));
 
         return app;
     }

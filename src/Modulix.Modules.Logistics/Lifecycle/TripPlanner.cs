@@ -30,6 +30,9 @@ public interface ILogisticsPolicyProvider
 {
     /// <summary><see cref="LogisticsModule.CredentialCheckModes"/> değerlerinden biri.</summary>
     Task<string> CredentialCheckAsync(CancellationToken cancellationToken);
+
+    /// <summary>Firmanın varsayılan ülkesi (ISO 3166-1 alfa-2; ayar boşsa null). Geçerlilik denetimi çağıran tarafta yapılır.</summary>
+    Task<string?> DefaultCountryAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>

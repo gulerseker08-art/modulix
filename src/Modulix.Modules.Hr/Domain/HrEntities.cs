@@ -633,3 +633,43 @@ public sealed class ChecklistTask : HrEntity
 
     public string? Note { get; internal set; }
 }
+
+/// <summary>
+/// Kurum içi duyuru (ADR-0042 K7, dilim 6). Yayında olan, başlangıç günü gelmiş ve süresi dolmamış duyuruyu hedef kitle görür: hedef departman boşsa
+/// herkes, doluysa yalnızca o departmandaki çalışanlar (kullanıcının çalışan kartından). Sabitlenmiş duyuru listenin başındadır. Metin düz metindir;
+/// ekranda HTML olarak yorumlanmaz. Okundu bilgisi ayrı kayıtta tutulur (<see cref="AnnouncementRead"/>).
+/// </summary>
+public sealed class Announcement : HrEntity
+{
+    public const int TitleMaxLength = 200;
+    public const int BodyMaxLength = 8000;
+
+    public string Title { get; internal set; } = string.Empty;
+
+    public string Body { get; internal set; } = string.Empty;
+
+    /// <summary>Hedef departman (Y9b <c>hr.department</c>); boşsa bütün çalışanlar.</summary>
+    public string? AudienceDepartmentKey { get; internal set; }
+
+    public bool IsPinned { get; internal set; }
+
+    public bool IsPublished { get; internal set; }
+
+    /// <summary>Okurlara görünmeye başladığı gün.</summary>
+    public DateOnly PublishOn { get; internal set; }
+
+    /// <summary>Bu günden sonra okurlara görünmez; boşsa süresiz.</summary>
+    public DateOnly? ExpiresOn { get; internal set; }
+
+    public Guid? AuthorUserId { get; internal set; }
+}
+
+/// <summary>Duyurunun bir kullanıcı tarafından okunduğu an (duyuru başına kullanıcı tekil). Okur duyuruyu açınca yazılır; değişmez.</summary>
+public sealed class AnnouncementRead : HrEntity
+{
+    public Guid AnnouncementId { get; internal set; }
+
+    public Guid UserId { get; internal set; }
+
+    public DateTimeOffset ReadAt { get; internal set; }
+}

@@ -264,6 +264,8 @@ public static class AppCatalog
         new("hr.my-tasks", Hr, "Görevlerim", "check-circle", "ik/gorevlerim", 120, HrAccess.ModuleKey, HrAccess.ChecklistsRead, Tone: AppTone.Teal),
         new("hr.checklists", Hr, "İşe giriş ve çıkış", "user-check", "ik/giris-cikis", 130, HrAccess.ModuleKey, HrAccess.ChecklistsManage),
         new("hr.checklist-templates", Hr, "Süreç şablonları", "clipboard-list", "ik/surec-sablonlari", 140, HrAccess.ModuleKey, HrAccess.ChecklistsManage, Tone: AppTone.Teal),
+        new("hr.announcements", Hr, "Duyurular", "bell", "ik/duyurular", 5, HrAccess.ModuleKey, HrAccess.AnnouncementsRead, Tone: AppTone.Teal),
+        new("hr.announcement-admin", Hr, "Duyuru yönetimi", "bell", "ik/duyuru-yonetimi", 150, HrAccess.ModuleKey, HrAccess.AnnouncementsManage),
         new("hr.expense-claims", Hr, "Masraf beyanları", "coins", "ik/masraf-beyanlari", 90, HrAccess.ModuleKey, AnyPermission: [HrAccess.ExpensesApprove, HrAccess.ExpensesManage, HrAccess.ExpensesPay]),
 
         new(Fleet, null, "Filo", "truck", null, 45, ModuleKey: FleetAccess.ModuleKey, Group: OperationsGroup),
