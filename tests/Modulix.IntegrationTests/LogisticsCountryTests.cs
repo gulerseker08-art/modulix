@@ -174,7 +174,7 @@ public class LogisticsCountryTests(ModulixApiFactory factory) : IClassFixture<Mo
             Assert.True(await roles.SetMembershipRolesAsync(await factory.GetMembershipIdAsync(admin.Id, tenant.Id), [system.Id], CancellationToken.None));
         }
 
-        await factory.CreateRoleAsync(tenant.Id, [RequestsRead, RequestsWrite, RequestsApprove, ShipmentsRead, ShipmentsWrite], Scope.All, manager);
+        await factory.CreateRoleAsync(tenant.Id, [RequestsRead, RequestsWrite, RequestsApprove, ShipmentsRead, ShipmentsWrite, TripsRead, TripsWrite], Scope.All, manager);
         await factory.CreateRoleAsync(tenant.Id, [RequestsRead, ShipmentsRead], Scope.All, reader);
 
         using var adminClient = await LoginAsync(admin);
