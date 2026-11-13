@@ -5,50 +5,49 @@
 @inject CrmLookups Lookups
 @inject NavigationManager Navigation
 
-<PageTitle>Satış tahmini · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.salesForecasts.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.ForecastsRead">
-    <a class="back-link" href="crm/satis-gorunumu">← Satış görünümü</a>
+    <a class="back-link" href="crm/satis-gorunumu">← @Texts.Get("crm.salesOverview.title")</a>
     <div class="page-header">
         <div>
-            <h1>Satış tahmini</h1>
+            <h1>@Texts.Get("crm.salesForecasts.title")</h1>
             <p class="text-muted mb-0">
-                Dönem ve kapsam için açık fırsatların bir anlık görüntüsüdür; yönetici kategori, tutar ve olasılığı gerekçesiyle düzeltir, tahmini sunar ve kilitler.
-                Kilitli tahmin değişmez; yeniden açmak gerekçe ister ve yeni bir sürüm üretir. Dönem bitince kilitli tahminin doğruluğu gerçekleşenle ölçülür.
+                @Texts.Get("crm.salesForecasts.intro")
             </p>
         </div>
         @if (CanWrite && !creating)
         {
-            <div class="header-actions"><button type="button" class="btn btn-primary" @onclick="StartCreate">Yeni taslak</button></div>
+            <div class="header-actions"><button type="button" class="btn btn-primary" @onclick="StartCreate">@Texts.Get("crm.salesForecasts.newDraft")</button></div>
         }
     </div>
 
     @if (creating)
     {
         <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault aria-labelledby="sf-new-title">
-            <h2 id="sf-new-title">Yeni tahmin taslağı</h2>
-            <p class="small text-muted">Taslak, seçilen dönemde kapanması beklenen açık fırsatlardan oluşturulur. Aynı dönem, kapsam ve para birimi için yalnızca bir sürüm zinciri vardır.</p>
+            <h2 id="sf-new-title">@Texts.Get("crm.salesForecasts.newTitle")</h2>
+            <p class="small text-muted">@Texts.Get("crm.salesForecasts.newHelp")</p>
             <ErrorSummary Errors="createErrors" />
             @if (createMessage is not null)
             {
                 <div class="alert alert-danger" role="alert">@createMessage</div>
             }
-            <FormTabs Title="Tahmin bilgileri" Label="Satış tahmini formu bölümleri">
+            <FormTabs Title="@Texts.Get("crm.salesForecasts.info")" Label="@Texts.Get("crm.salesForecasts.formSections")">
             <div class="form-grid">
                 <div class="span-3">
-                    <label class="form-label required" for="sf-kind">Dönem türü</label>
+                    <label class="form-label required" for="sf-kind">@Texts.Get("crm.sales.periodKind")</label>
                     <select id="sf-kind" class="form-select" required aria-required="true" @bind="newKind">
                         @foreach (var (key, label) in SalesLabels.PeriodKinds) { <option value="@key">@label</option> }
                     </select>
                     <FieldError Field="kind" Errors="createErrors" />
                 </div>
                 <div class="span-3">
-                    <label class="form-label" for="sf-anchor">Dönemdeki bir gün</label>
+                    <label class="form-label" for="sf-anchor">@Texts.Get("crm.sales.anchorDay")</label>
                     <input id="sf-anchor" class="form-control" type="date" @bind="newAnchor" />
                     <FieldError Field="anchor" Errors="createErrors" />
                 </div>
                 <div class="span-3">
-                    <label class="form-label required" for="sf-scope">Kapsam</label>
+                    <label class="form-label required" for="sf-scope">@Texts.Get("crm.salesForecasts.scope")</label>
                     <select id="sf-scope" class="form-select" required aria-required="true" @bind="newScope" @bind:after="ScopeChanged">
                         @foreach (var (key, label) in SalesLabels.Scopes) { <option value="@key">@label</option> }
                     </select>
@@ -57,18 +56,18 @@
                 @if (newScope == SalesTargetScopes.User)
                 {
                     <div class="span-3">
-                        <label class="form-label required" for="sf-user">Kullanıcı</label>
+                        <label class="form-label required" for="sf-user">@Texts.Get("crm.sales-scope.user")</label>
                         <select id="sf-user" class="form-select" required aria-required="true" @bind="newUser">
-                            <option value="">Seçin…</option>
+                            <option value="">@Texts.Get("common.choose")</option>
                             @foreach (var member in Lookups.Members) { <option value="@member.UserId">@member.DisplayName</option> }
                         </select>
                         <FieldError Field="scopeUserId" Errors="createErrors" />
                     </div>
                 }
                 <div class="span-3">
-                    <label class="form-label" for="sf-currency">Para birimi</label>
+                    <label class="form-label" for="sf-currency">@Texts.Get("crm.sales.currency")</label>
                     <input id="sf-currency" class="form-control" maxlength="3" placeholder="@Regional.Currency" aria-describedby="sf-currency-help" @bind="newCurrency" />
-                    <div id="sf-currency-help" class="form-text">Boşsa firmanın raporlama para birimi.</div>
+                    <div id="sf-currency-help" class="form-text">@Texts.Get("crm.salesForecasts.currencyHelp")</div>
                     <FieldError Field="currency" Errors="createErrors" />
                 </div>
             </div>
@@ -76,26 +75,26 @@
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">
                     @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
-                    Taslağı oluştur
+                    @Texts.Get("crm.salesForecasts.create")
                 </button>
-                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelCreate">Vazgeç</button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelCreate">@Texts.Get("common.dismiss")</button>
             </div>
         </form>
     }
 
-    <form class="form-grid mb-3" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="Tahmin süzgeçleri">
+    <form class="form-grid mb-3" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="@Texts.Get("crm.salesForecasts.filters")">
         <div class="span-3">
-            <label class="form-label" for="sff-from">Dönem başlangıcı (en erken)</label>
+            <label class="form-label" for="sff-from">@Texts.Get("crm.salesForecasts.filterFrom")</label>
             <input id="sff-from" class="form-control" type="date" @bind="from" @bind:after="LoadAsync" />
         </div>
         <div class="span-3">
-            <label class="form-label" for="sff-to">Dönem bitişi (en geç)</label>
+            <label class="form-label" for="sff-to">@Texts.Get("crm.salesForecasts.filterTo")</label>
             <input id="sff-to" class="form-control" type="date" @bind="to" @bind:after="LoadAsync" />
         </div>
         <div class="span-3">
-            <label class="form-label" for="sff-status">Durum</label>
+            <label class="form-label" for="sff-status">@Texts.Get("common.field.status")</label>
             <select id="sff-status" class="form-select" @bind="status" @bind:after="LoadAsync">
-                <option value="">Tümü</option>
+                <option value="">@Texts.Get("crm.salesForecasts.all")</option>
                 @foreach (var (key, label) in SalesLabels.Statuses) { <option value="@key">@label</option> }
             </select>
         </div>
@@ -105,41 +104,41 @@
     {
         <div class="alert alert-danger" role="alert">
             @error
-            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">Tekrar dene</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">@Texts.Get("crm.sales.retry")</button>
         </div>
     }
 
     @if (loading && items is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
     }
     else if (items is not null)
     {
         @if (items.Count == 0)
         {
-            <p class="text-muted">Bu süzgeçle tahmin yok.@(CanWrite ? " \"Yeni taslak\" ile başlayabilirsiniz." : null)</p>
+            <p class="text-muted">@(CanWrite ? Texts.Get("crm.salesForecasts.noneCanCreate") : Texts.Get("crm.salesForecasts.none"))</p>
         }
         else
         {
             <table class="table record-table" aria-busy="@(loading ? "true" : "false")">
-                <caption class="visually-hidden">Satış tahminleri</caption>
+                <caption class="visually-hidden">@Texts.Get("crm.salesForecasts.caption")</caption>
                 <thead>
                     <tr>
-                        <th scope="col">Dönem</th><th scope="col">Kapsam</th><th scope="col">Para birimi</th><th scope="col">Sürüm</th><th scope="col">Durum</th>
-                        <th scope="col">Son güncelleme</th><th scope="col"><span class="visually-hidden">Aç</span></th>
+                        <th scope="col">@Texts.Get("crm.salesOverview.col.period")</th><th scope="col">@Texts.Get("crm.salesForecasts.scope")</th><th scope="col">@Texts.Get("crm.sales.currency")</th><th scope="col">@Texts.Get("crm.salesForecasts.col.version")</th><th scope="col">@Texts.Get("common.field.status")</th>
+                        <th scope="col">@Texts.Get("crm.salesForecasts.col.changed")</th><th scope="col"><span class="visually-hidden">@Texts.Get("common.open")</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var forecast in items)
                     {
                         <tr>
-                            <td data-label="Dönem" class="primary">@SalesLabels.PeriodKind(forecast.PeriodKind) · @SalesLabels.Period(forecast.PeriodStart, forecast.PeriodEnd)</td>
-                            <td data-label="Kapsam">@(forecast.ScopeType == SalesTargetScopes.User ? $"Kullanıcı: {Lookups.MemberName(forecast.ScopeUserId)}" : "Tüm firma")</td>
-                            <td data-label="Para birimi">@forecast.ReportingCurrency</td>
-                            <td data-label="Sürüm">V@(forecast.VersionNo)</td>
-                            <td data-label="Durum"><span class="badge stage-@SalesLabels.StatusBadge(forecast.Status)">@SalesLabels.Status(forecast.Status)</span></td>
-                            <td data-label="Son güncelleme">@(forecast.ChangedAt is { } changed ? CrmLabels.Time(changed) : "—")</td>
-                            <td class="actions"><a class="btn btn-outline-primary btn-sm" href="crm/satis-tahmini/@forecast.Id" aria-label="@($"{SalesLabels.Period(forecast.PeriodStart, forecast.PeriodEnd)} V{forecast.VersionNo} tahminini aç")">Aç</a></td>
+                            <td data-label="@Texts.Get("crm.salesOverview.col.period")" class="primary">@SalesLabels.PeriodKind(forecast.PeriodKind) · @SalesLabels.Period(forecast.PeriodStart, forecast.PeriodEnd)</td>
+                            <td data-label="@Texts.Get("crm.salesForecasts.scope")">@(forecast.ScopeType == SalesTargetScopes.User ? Texts.Get("crm.salesForecasts.userScope", Lookups.MemberName(forecast.ScopeUserId)) : Texts.Get("crm.sales-scope.tenant"))</td>
+                            <td data-label="@Texts.Get("crm.sales.currency")">@forecast.ReportingCurrency</td>
+                            <td data-label="@Texts.Get("crm.salesForecasts.col.version")">@Texts.Get("crm.salesForecasts.versionNo", forecast.VersionNo)</td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@SalesLabels.StatusBadge(forecast.Status)">@SalesLabels.Status(forecast.Status)</span></td>
+                            <td data-label="@Texts.Get("crm.salesForecasts.col.changed")">@(forecast.ChangedAt is { } changed ? CrmLabels.Time(changed) : "—")</td>
+                            <td class="actions"><a class="btn btn-outline-primary btn-sm" href="crm/satis-tahmini/@forecast.Id" aria-label="@Texts.Get("crm.salesForecasts.openAria", SalesLabels.Period(forecast.PeriodStart, forecast.PeriodEnd), forecast.VersionNo)">@Texts.Get("common.open")</a></td>
                         </tr>
                     }
                 </tbody>

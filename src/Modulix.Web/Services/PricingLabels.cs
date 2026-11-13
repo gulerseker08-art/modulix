@@ -12,6 +12,9 @@ public static class PricingLabels
     private static readonly (string Key, string Label)[] ListStatusSource =
         [("Draft", "Taslak"), ("Published", "Yayımlandı"), ("Archived", "Arşiv")];
 
+    private static readonly (string Key, string Label)[] RateSourceSource =
+        [("Manual", "Elle giriş"), ("CentralBank", "Merkez bankası"), ("Import", "İçe aktarma")];
+
     private static readonly (string Key, string Label)[] ErrorHintSource =
     [
         ("price-not-found", "Bu ürün, tarih, para birimi ve miktar için yayımlanmış bir fiyat yok."),
@@ -25,6 +28,7 @@ public static class PricingLabels
     public const string TierMethodGroup = "crm.pricelist-tier";
     public const string ListStatusGroup = "crm.pricelist-status";
     public const string ErrorHintGroup = "crm.priceCalculator.error";
+    public const string RateSourceGroup = "crm.rate-source";
 
     // Türkçe ad kaynak metindir (ADR-0034); etkin dilin sözlüğünde `{grup}.{anahtar küçük harf}` yoksa o gösterilir.
     // Özellik olarak tanımlıdır: metinler sınıf yüklenirken değil, her okunuşta çözülür (sözlük sonradan yüklenir).
@@ -37,9 +41,8 @@ public static class PricingLabels
     /// <summary>Hesap hatası açıklamaları (anahtar: hata kodu); <see cref="ErrorHint"/> bunlardan okur.</summary>
     public static IReadOnlyList<(string Key, string Label)> ErrorHints => Translate(ErrorHintGroup, ErrorHintSource);
 
-    // Kur kaynakları Vergi ve kur ekranına aittir; o ekranın çeviri diliminde sözlüğe taşınacak.
-    public static IReadOnlyList<(string Key, string Label)> RateSources { get; } =
-        [("Manual", "Elle giriş"), ("CentralBank", "Merkez bankası"), ("Import", "İçe aktarma")];
+    // Kur kaynakları Vergi ve kur ekranındadır (ADR-0034, dilim 9b).
+    public static IReadOnlyList<(string Key, string Label)> RateSources => Translate(RateSourceGroup, RateSourceSource);
 
     private static IReadOnlyList<(string Key, string Label)> Translate(string group, (string Key, string Label)[] source) =>
         [.. source.Select(x => (x.Key, CrmText.Of(group, x.Key, x.Label)))];
