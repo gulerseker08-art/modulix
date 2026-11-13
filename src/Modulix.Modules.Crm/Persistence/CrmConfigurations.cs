@@ -504,7 +504,7 @@ internal sealed class LeadConfiguration : IEntityTypeConfiguration<Lead>
         builder.Property(l => l.Industry).HasMaxLength(Company.IndustryMaxLength);
         builder.Property(l => l.IndustryCode).HasMaxLength(Industry.CodeMaxLength);
 
-        // Sektör (ADR-0042): platform kataloğuna kodla başvurur; katalog satırı silinmez (pasife alınır), bu yüzden Restrict.
+        // Sektör (ADR-0043): platform kataloğuna kodla başvurur; katalog satırı silinmez (pasife alınır), bu yüzden Restrict.
         builder.HasOne(l => l.IndustryEntry).WithMany().HasForeignKey(l => l.IndustryCode).HasPrincipalKey(i => i.Code).OnDelete(DeleteBehavior.Restrict);
         builder.Property(l => l.Source).HasMaxLength(ChoiceValueKeys.MaxLength);
         builder.Property(l => l.SourceDetail).HasMaxLength(Lead.ShortMaxLength);

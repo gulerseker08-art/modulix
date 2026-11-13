@@ -2,7 +2,7 @@ using Modulix.Core.Contracts.Sectors;
 
 namespace Modulix.Core.Tests.Sectors;
 
-/// <summary>ADR-0042: sektör kataloğu öğesinin kod ve ad kuralları.</summary>
+/// <summary>ADR-0043: sektör kataloğu öğesinin kod ve ad kuralları.</summary>
 public class IndustryRulesTests
 {
     [Fact]

@@ -9,7 +9,7 @@ using Modulix.Infrastructure.Persistence;
 namespace Modulix.Infrastructure.Sectors;
 
 /// <summary>
-/// Sektör kataloğu (ADR-0042). Tablo <c>platform</c> şemasındadır, RLS dışıdır ve tenant verisi içermez; her yazma, değiştiren
+/// Sektör kataloğu (ADR-0043). Tablo <c>platform</c> şemasındadır, RLS dışıdır ve tenant verisi içermez; her yazma, değiştiren
 /// yönetici ile birlikte <c>PlatformAuditLog</c>'a aynı işlemde yazılır. Sektör silinmez, pasife alınır. Aynı sınıf modüllerin
 /// okuma sınırını (<see cref="IIndustryCatalog"/>) da sağlar.
 /// </summary>

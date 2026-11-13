@@ -78,7 +78,7 @@ internal sealed class IndustryConfiguration : IEntityTypeConfiguration<Industry>
 {
     public void Configure(EntityTypeBuilder<Industry> builder)
     {
-        // Platform kataloğu (ADR-0042): TenantId taşımaz, RLS dışıdır.
+        // Platform kataloğu (ADR-0043): TenantId taşımaz, RLS dışıdır.
         builder.ToTable("Industries", DatabaseSchemas.Platform);
         builder.HasKey(i => i.Id);
         builder.Property(i => i.Id).ValueGeneratedNever();

@@ -15,7 +15,7 @@ internal sealed class CrmStoreContext(
     ActivityWorkflowGate? activityGate = null, IRecordCommandContext? command = null, OpportunityWorkflowGate? opportunityGate = null,
     IOpportunityPolicyProvider? policy = null, IActivityCodeCatalog? activityCodes = null, IIndustryCatalog? industries = null)
 {
-    /// <summary>Sektör kataloğunu okuma sınırı (ADR-0042); yoksa (ör. birim testi) sektör kodu denetimi atlanır.</summary>
+    /// <summary>Sektör kataloğunu okuma sınırı (ADR-0043); yoksa (ör. birim testi) sektör kodu denetimi atlanır.</summary>
     public IIndustryCatalog? Industries { get; } = industries;
 
     /// <summary>Faaliyet kataloğunu okuma sınırı (hizmet kapsamı doğrulaması); yoksa (ör. birim testi) katalog denetimi atlanır.</summary>

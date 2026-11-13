@@ -77,7 +77,7 @@ public static class SectorEndpoints
             .WithTags("Sectors")
             .MapGet("/", async (IRelationshipRoles service, CancellationToken ct) => (await service.ListAsync(ct)).Select(ToDto).ToList());
 
-        // Sektör kataloğu (ADR-0042): platform yönetir; sektör silinmez, pasife alınır.
+        // Sektör kataloğu (ADR-0043): platform yönetir; sektör silinmez, pasife alınır.
         catalog.MapGet("/industries", async (IIndustries service, CancellationToken ct) => (await service.ListAsync(ct)).Select(ToDto).ToList());
         catalog.MapPost("/industries", (CreateIndustryRequest request, ClaimsPrincipal user, IIndustries service, CancellationToken ct) =>
             Run(async () =>

@@ -57,7 +57,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                 principalColumn: "Code",
                 onDelete: ReferentialAction.Restrict);
 
-            // Başlangıç sektörleri (ürün standardı, ADR-0042). Yoksa eklenir; sonradan platformdan değiştirilen ad ezilmez.
+            // Başlangıç sektörleri (ürün standardı, ADR-0043). Yoksa eklenir; sonradan platformdan değiştirilen ad ezilmez.
             migrationBuilder.Sql(@"
 INSERT INTO [platform].[Industries] ([Id], [Code], [Name], [IsActive])
 SELECT NEWID(), v.[Code], v.[Name], 1

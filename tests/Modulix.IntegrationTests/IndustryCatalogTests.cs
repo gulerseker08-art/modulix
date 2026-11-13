@@ -17,7 +17,7 @@ using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0042: firmanın sektörü platform kataloğundan (<c>platform.Industries</c>) seçilir ve ortak firma kaydında (<c>core.party</c>)
+/// ADR-0043: firmanın sektörü platform kataloğundan (<c>platform.Industries</c>) seçilir ve ortak firma kaydında (<c>core.party</c>)
 /// kodla tutulur. Katalog platform geneli üründür; değerler tenant verisidir.
 /// </summary>
 public class IndustryCatalogTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>

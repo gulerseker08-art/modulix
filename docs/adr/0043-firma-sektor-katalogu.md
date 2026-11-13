@@ -1,4 +1,4 @@
-# ADR-0042: Firma sektörü — Core'da platform sektör kataloğu
+# ADR-0043: Firma sektörü — Core'da platform sektör kataloğu
 
 - **Durum:** Uygulandı (dilim 1). Raporlama/segment/içe aktarma adım adım katalog adına geçirildi; kalanlar "Yapılmadı / sınırlar" başlığında.
 - **Karar:** Firmanın sektör bilgisi serbest metin olmaktan çıkar; **platform sektör kataloğundan** (`platform.Industries`) seçilen bir koddur ve **ortak firma kaydında** (`core.Parties.IndustryCode`) durur. Böylece CRM, Lojistik, Antrepo ve sonraki bütün modüller aynı değeri kullanır.

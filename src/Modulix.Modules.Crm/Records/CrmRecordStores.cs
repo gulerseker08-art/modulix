@@ -37,7 +37,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         Field.Text<Company>("website", Party.WebsiteMaxLength, c => c.Party.Website, (c, v) => c.Party.Website = v),
         Field.Text<Company>("city", Party.CityMaxLength, c => c.Party.City, (c, v) => c.Party.City = v),
         Field.Text<Company>("address", Party.AddressMaxLength, c => c.Party.Address, (c, v) => c.Party.Address = v),
-        // Sektör (ADR-0042) ortak firma kaydındadır (Party.IndustryCode) ve sektör kataloğundan bir koddur. Yazarken kod ya da etkin sektör adı
+        // Sektör (ADR-0043) ortak firma kaydındadır (Party.IndustryCode) ve sektör kataloğundan bir koddur. Yazarken kod ya da etkin sektör adı
         // verilebilir (içe aktarma, Lead dönüşümü); kayda her zaman kod yazılır. "industryName" katalogdaki adı verir; "legacyIndustry" katalog
         // öncesi serbest metindir (eşleşmeyen eski değer korunur, sektör seçilince temizlenir).
         Field.Text<Company>("industry", Company.IndustryMaxLength, c => c.Party.IndustryCode, (c, v) => c.Party.IndustryCode = v),
@@ -69,7 +69,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         // Kod listesi alanları (ADR-0029 Dilim E): "a,b" biçiminde saklanır; tam kod eşleşir (kısmi eşleşme olmaz).
         ["relationshipRole"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => ("," + c.Party.RelationshipRoles + ",").Contains("," + code + ",")) : null,
         ["customerSector"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => ("," + c.Party.CustomerSectors + ",").Contains("," + code + ",")) : null,
-        // Firma sektörü (ADR-0042): sektör kataloğu kodu, tam eşleşme.
+        // Firma sektörü (ADR-0043): sektör kataloğu kodu, tam eşleşme.
         ["industry"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => c.Party.IndustryCode == code) : null,
         ["serviceNeed"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(c => ("," + c.Party.ServiceNeeds + ",").Contains("," + code + ",")) : null,
     };
@@ -194,7 +194,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
     }
 
     /// <summary>
-    /// Sektör alanı kataloğa göre çözülür (ADR-0042): gelen değer kod ya da etkin sektör adı olabilir; kayda kod yazılır ve ad
+    /// Sektör alanı kataloğa göre çözülür (ADR-0043): gelen değer kod ya da etkin sektör adı olabilir; kayda kod yazılır ve ad
     /// navigasyonu doldurulur (yanıt güncel adı taşır). Katalogda olmayan değer alan hatasıdır; pasife alınmış sektör yalnızca
     /// kayıtta zaten varsa kalabilir. Sektör seçilince katalog öncesi serbest metin temizlenir.
     /// </summary>

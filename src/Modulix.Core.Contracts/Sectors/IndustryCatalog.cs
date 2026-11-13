@@ -1,7 +1,7 @@
 namespace Modulix.Core.Contracts.Sectors;
 
 /// <summary>
-/// Sektör kataloğunun öğesi (ADR-0042): "Gıda ve içecek", "Lojistik ve taşımacılık"... Firma (Party) kaydındaki sektör alanı bu
+/// Sektör kataloğunun öğesi (ADR-0043): "Gıda ve içecek", "Lojistik ve taşımacılık"... Firma (Party) kaydındaki sektör alanı bu
 /// listeden seçilir ve <see cref="SharedRecords.Party.IndustryCode"/> ile koda başvurur. Platform geneli üründür (RLS dışı,
 /// <c>TenantId</c> yok); platform yöneticisi yönetir, silinmez, pasife alınır (firma kayıtları kodla başvurduğu için).
 /// Faaliyet ağacından (ADR-0029) bağımsızdır: ağaç tenant'ın ne iş yaptığını, bu liste firmanın hangi sektörde olduğunu söyler.

@@ -64,7 +64,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         Field.Money<Lead>("estimatedBudget", l => l.EstimatedBudget, (l, v) => l.EstimatedBudget = v),
         Field.Currency<Lead>("currency", l => l.Currency, (l, v) => l.Currency = v),
         Field.Date<Lead>("targetPurchaseDate", l => l.TargetPurchaseDate, (l, v) => l.TargetPurchaseDate = v),
-        // Sektör (ADR-0042) sektör kataloğundan bir koddur; yazarken kod ya da etkin sektör adı verilebilir. "legacyIndustry" katalog öncesi metindir.
+        // Sektör (ADR-0043) sektör kataloğundan bir koddur; yazarken kod ya da etkin sektör adı verilebilir. "legacyIndustry" katalog öncesi metindir.
         Field.Text<Lead>("industry", Company.IndustryMaxLength, l => l.IndustryCode, (l, v) => l.IndustryCode = v),
         Field.ReadOnly<Lead>("industryName", l => l.IndustryEntry?.Name),
         Field.ReadOnly<Lead>("legacyIndustry", l => l.Industry),
@@ -101,7 +101,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         ["ownerNot"] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(l => l.OwnerId == null || l.OwnerId != owner) : null,
         ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.CompanyId == id) : null,
         ["contactId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.ContactId == id) : null,
-        // Sektör (ADR-0042): sektör kataloğu kodu, tam eşleşme.
+        // Sektör (ADR-0043): sektör kataloğu kodu, tam eşleşme.
         ["industry"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(l => l.IndustryCode == code) : null,
         ["convertedCompanyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.ConvertedCompanyId == id) : null,
         ["convertedContactId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.ConvertedContactId == id) : null,

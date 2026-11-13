@@ -99,11 +99,11 @@ public sealed class Party : SharedEntity
     /// <summary>Ticari ilişki rolleri (katalog kodları, virgülle; ADR-0029 K9). Bir taraf aynı anda müşteri ve tedarikçi olabilir.</summary>
     public string? RelationshipRoles { get; set; }
 
-    /// <summary>Kod sütununun uzunluğu (sektör kataloğu kodu, ADR-0042).</summary>
+    /// <summary>Kod sütununun uzunluğu (sektör kataloğu kodu, ADR-0043).</summary>
     public const int IndustryCodeMaxLength = 50;
 
     /// <summary>
-    /// Firmanın sektörü: sektör kataloğundaki (<c>platform.Industries</c>, ADR-0042) tek bir kod. Ortak firma kaydında durur;
+    /// Firmanın sektörü: sektör kataloğundaki (<c>platform.Industries</c>, ADR-0043) tek bir kod. Ortak firma kaydında durur;
     /// bütün modüller aynı değeri kullanır. Müşteri sektörü (<see cref="CustomerSectors"/>) farklıdır: o, faaliyet ağacından çoklu seçimdir.
     /// </summary>
     public string? IndustryCode { get; set; }

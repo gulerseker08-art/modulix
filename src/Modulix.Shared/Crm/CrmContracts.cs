@@ -150,7 +150,7 @@ public static class CompanySource
 
 /// <summary>
 /// CRM firması. Ad, vergi no, iletişim, adres ve sektör ortak firma kaydındadır (<see cref="PartyId"/>, ADR-0006). <see cref="Industry"/>
-/// sektör kataloğundaki koddur (ADR-0042), <see cref="IndustryName"/> katalogdaki adıdır; <see cref="LegacyIndustry"/> katalog öncesi
+/// sektör kataloğundaki koddur (ADR-0043), <see cref="IndustryName"/> katalogdaki adıdır; <see cref="LegacyIndustry"/> katalog öncesi
 /// girilmiş, kataloğa eşlenememiş serbest metindir (salt okunur; sektör seçilince temizlenir).
 /// </summary>
 public sealed record CompanyDto(

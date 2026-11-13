@@ -2,7 +2,7 @@ namespace Modulix.Core.Sectors;
 
 public sealed record IndustryView(Guid Id, string Code, string Name, bool IsActive);
 
-/// <summary>Sektör kataloğu yönetimi (platform tarafı, ADR-0042); yazmalar platform denetim kaydına aynı işlemde yazılır.</summary>
+/// <summary>Sektör kataloğu yönetimi (platform tarafı, ADR-0043); yazmalar platform denetim kaydına aynı işlemde yazılır.</summary>
 public interface IIndustries
 {
     Task<IReadOnlyList<IndustryView>> ListAsync(CancellationToken cancellationToken);

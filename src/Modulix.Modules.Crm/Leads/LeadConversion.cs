@@ -193,7 +193,7 @@ internal sealed class LeadConversion(
         {
             var values = CompanyValues(lead, request);
 
-            // Lead'in sektörü serbest metindir; firmanın sektörü katalogdandır (ADR-0042). Katalogdaki bir ada eşleşirse kod yazılır,
+            // Lead'in sektörü serbest metindir; firmanın sektörü katalogdandır (ADR-0043). Katalogdaki bir ada eşleşirse kod yazılır,
             // eşleşmezse firmaya sektör yazılmaz (Lead kaydındaki metin yerinde kalır; sektörü firma formundan seçilir).
             if (values["industry"] is not null)
             {
@@ -302,7 +302,7 @@ internal sealed class LeadConversion(
             return Fail<LeadConversionResult>(converted.Error!, "lead");
         }
 
-        // 5) İş olayı (ADR-0042): dönüşümle aynı işlemde yazılır (ConvertAsync RunAtomicAsync içindedir).
+        // 5) İş olayı (ADR-0043): dönüşümle aynı işlemde yazılır (ConvertAsync RunAtomicAsync içindedir).
         var ownerId = converted.Value!.Values["ownerId"]?.DeepClone();
         await events.PublishAsync(new BusinessEvent(CrmModule.Events.LeadConverted, lead.Id, new JsonObject
         {

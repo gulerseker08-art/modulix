@@ -211,7 +211,7 @@
         layout = await Layouts.ForAsync(CrmEntityKeys.Company);
         layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
 
-        // Sektör listesi platform kataloğundan gelir (ADR-0042); yüklenemezse alan boş kalır, form yine kaydedilebilir.
+        // Sektör listesi platform kataloğundan gelir (ADR-0043); yüklenemezse alan boş kalır, form yine kaydedilebilir.
         industries = (await Api.GetAsync<List<IndustryDto>>("/api/industries")).Value ?? [];
     }
 

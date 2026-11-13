@@ -4,7 +4,7 @@ using Modulix.Core.Contracts.Sectors;
 namespace Modulix.Modules.Crm.Records;
 
 /// <summary>
-/// Sektör alanının kataloğa göre çözümü (ADR-0042): gelen değer kod ya da etkin sektör adı olabilir; sonuç katalogdaki kayıttır.
+/// Sektör alanının kataloğa göre çözümü (ADR-0043): gelen değer kod ya da etkin sektör adı olabilir; sonuç katalogdaki kayıttır.
 /// Katalogda olmayan değer alan hatasıdır; pasife alınmış sektör yalnızca kayıtta zaten varsa (<paramref name="stored"/>) kalabilir.
 /// Firma ve Lead aynı kuralı kullanır.
 /// </summary>

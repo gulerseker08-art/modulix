@@ -39,7 +39,7 @@ internal sealed class PartyConfiguration : IEntityTypeConfiguration<Party>
         builder.Property(p => p.Address).HasMaxLength(Party.AddressMaxLength);
         builder.Property(p => p.IndustryCode).HasMaxLength(Party.IndustryCodeMaxLength);
 
-        // Sektör (ADR-0042): platform kataloğuna kodla başvurur; katalog satırı silinmez (pasife alınır), bu yüzden Restrict.
+        // Sektör (ADR-0043): platform kataloğuna kodla başvurur; katalog satırı silinmez (pasife alınır), bu yüzden Restrict.
         builder.HasOne(p => p.Industry).WithMany().HasForeignKey(p => p.IndustryCode).HasPrincipalKey(i => i.Code).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(p => new { p.TenantId, p.IndustryCode });
         builder.Property(p => p.RelationshipRoles).HasMaxLength(Party.CodeListMaxLength);

@@ -34,7 +34,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                 principalColumn: "Code",
                 onDelete: ReferentialAction.Restrict);
 
-            // Geri doldurma (ADR-0042): Lead'in eski serbest metin sektörü, adına göre (büyük/küçük harf duyarsız, tam eşleşme) kataloğa
+            // Geri doldurma (ADR-0043): Lead'in eski serbest metin sektörü, adına göre (büyük/küçük harf duyarsız, tam eşleşme) kataloğa
             // eşlenir; eşleşmeyen metin silinmez ([crm].[Leads].[Industry] kalır, ekranda salt okunur). Migration oturumunda tenant değeri
             // yoktur; RLS açıkken UPDATE sessizce 0 satır etkiler, bu yüzden politika geçici kapatılır. Yinelenebilir.
             migrationBuilder.Sql("ALTER SECURITY POLICY [core].[TenantIsolationPolicy] WITH (STATE = OFF);");

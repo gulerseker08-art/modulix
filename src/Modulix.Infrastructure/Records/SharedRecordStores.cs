@@ -378,7 +378,7 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
             AddUnknown(unknown, "relationshipRoles", roles, known, "Katalogda olmayan ilişki rolü");
         }
 
-        // Sektör (ADR-0042) sektör kataloğundan bir kod olmalı; pasife alınmış kod yalnızca kayıtta zaten varsa kalabilir.
+        // Sektör (ADR-0043) sektör kataloğundan bir kod olmalı; pasife alınmış kod yalnızca kayıtta zaten varsa kalabilir.
         if (entity.IndustryCode is { } industryCode)
         {
             var industry = await Db.Industries.AsNoTracking().Where(i => i.Code == industryCode).Select(i => new { i.IsActive }).SingleOrDefaultAsync(cancellationToken);
