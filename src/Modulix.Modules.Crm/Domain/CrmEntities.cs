@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Contracts.Tenancy;
 
@@ -778,7 +779,14 @@ public sealed class Lead : CrmEntity, IOwnedEntity
 
     public DateOnly? TargetPurchaseDate { get; internal set; }
 
+    /// <summary>Katalog öncesi serbest metin sektör (ADR-0043): eşlenemeyen eski değer korunur, salt okunurdur; sektör seçilince temizlenir.</summary>
     public string? Industry { get; internal set; }
+
+    /// <summary>Talep eden tarafın sektörü: sektör kataloğundan (<c>platform.Industries</c>, ADR-0043) kod. Firmaya dönüşünce firmaya aynen geçer.</summary>
+    public string? IndustryCode { get; internal set; }
+
+    /// <summary>Sektör kataloğundaki kayıt (adı sorguda okumak için); kayıt deposu <c>Include</c> eder.</summary>
+    public Industry? IndustryEntry { get; internal set; }
 
     // Kaynak
     public string? Source { get; internal set; }

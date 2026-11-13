@@ -13,6 +13,7 @@ using Modulix.Core.Imports;
 using Modulix.Core.Lookups;
 using Modulix.Core.Teams;
 using Modulix.Core.Contracts.Persistence;
+using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Organization;
@@ -197,6 +198,8 @@ public class ModulixDbContext(
     public DbSet<TenantActivitySelection> ActivitySelections => Set<TenantActivitySelection>();
 
     public DbSet<RelationshipRole> RelationshipRoles => Set<RelationshipRole>();
+
+    public DbSet<Industry> Industries => Set<Industry>();
 
     public DbSet<GtipCatalogVersion> GtipCatalogVersions => Set<GtipCatalogVersion>();
 

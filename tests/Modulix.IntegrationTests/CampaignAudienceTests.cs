@@ -78,7 +78,7 @@ public class CampaignAudienceTests(ModulixApiFactory factory) : IClassFixture<Mo
         Assert.Equal(1, limited.Exclusions["per-target-limit"]);
 
         // İzin kaydı olmayan kişi (Hülya) pazarlamaya uygun sayılmaz: "bilinmiyor" nedeniyle elenir.
-        var h = await CompanyAsync(client, "Hülya Tekstil", "Bursa", "Tekstil");
+        var h = await CompanyAsync(client, "Hülya Tekstil", "Bursa", "Tekstil ve hazır giyim");
         await ContactAsync(client, h.Id, "Hülya", "Er", "hulya@h.test", primary: true);
         await PublishRefreshAsync(client, world.SegmentId);
         Assert.Equal(1, (await PreviewAsync(client, campaign.Id)).Summary.Exclusions["unknown"]);
@@ -88,7 +88,7 @@ public class CampaignAudienceTests(ModulixApiFactory factory) : IClassFixture<Mo
     public async Task Role_decision_maker_and_company_point_rules_pick_the_right_people_or_say_why_not()
     {
         var (client, _) = await ManagerAsync();
-        var company = await CompanyAsync(client, "Kural Tekstil", "Bursa", "Tekstil");
+        var company = await CompanyAsync(client, "Kural Tekstil", "Bursa", "Tekstil ve hazır giyim");
         var buyer = await ContactAsync(client, company.Id, "Satın", "Alma", "satinalma@k.test", primary: false, roles: ["Purchasing"]);
         var boss = await ContactAsync(client, company.Id, "Karar", "Verici", "karar@k.test", primary: false, decisionMaker: true);
         await ConsentAsync(client, "satinalma@k.test", "Granted");
@@ -154,7 +154,7 @@ public class CampaignAudienceTests(ModulixApiFactory factory) : IClassFixture<Mo
 
         // İzin sonradan iptal edilir, yeni segment üyesi gelir: yeni önizleme değişir, dondurulmuş kayıt değişmez.
         await ConsentAsync(client, "ayse@a.test", "Denied");
-        await CompanyAsync(client, "Sonradan Tekstil", "Bursa", "Tekstil");
+        await CompanyAsync(client, "Sonradan Tekstil", "Bursa", "Tekstil ve hazır giyim");
         await PublishRefreshAsync(client, world.SegmentId);
         var now = (await PreviewAsync(client, campaign.Id)).Summary;
         Assert.Equal((7, 0), (now.Targets, now.Eligible));
@@ -340,13 +340,13 @@ public class CampaignAudienceTests(ModulixApiFactory factory) : IClassFixture<Mo
     /// </summary>
     private async Task<World> WorldAsync(HttpClient client)
     {
-        var a = await CompanyAsync(client, "Anka A", "Bursa", "Tekstil");
-        var b = await CompanyAsync(client, "Bora B", "İzmir", "Tekstil");
-        await CompanyAsync(client, "Cem C", "Kocaeli", "Tekstil");
-        var d = await CompanyAsync(client, "Deniz D", "Bursa", "Tekstil");
-        await CompanyAsync(client, "Gıda E", "Bursa", "Gıda");
-        var f = await CompanyAsync(client, "Fatma F", "Bursa", "Tekstil");
-        var g = await CompanyAsync(client, "Gül G", "Bursa", "Tekstil");
+        var a = await CompanyAsync(client, "Anka A", "Bursa", "Tekstil ve hazır giyim");
+        var b = await CompanyAsync(client, "Bora B", "İzmir", "Tekstil ve hazır giyim");
+        await CompanyAsync(client, "Cem C", "Kocaeli", "Tekstil ve hazır giyim");
+        var d = await CompanyAsync(client, "Deniz D", "Bursa", "Tekstil ve hazır giyim");
+        await CompanyAsync(client, "Gıda E", "Bursa", "Gıda ve içecek");
+        var f = await CompanyAsync(client, "Fatma F", "Bursa", "Tekstil ve hazır giyim");
+        var g = await CompanyAsync(client, "Gül G", "Bursa", "Tekstil ve hazır giyim");
 
         await ContactAsync(client, a.Id, "Ayşe", "Demir", "ayse@a.test", primary: true);
         await ContactAsync(client, a.Id, "Can", "Kaya", "can@a.test", primary: false);
@@ -360,7 +360,7 @@ public class CampaignAudienceTests(ModulixApiFactory factory) : IClassFixture<Mo
         await ConsentAsync(client, "deniz@b.test", "Denied");
         await ConsentAsync(client, "ortak@f.test", "Granted");
 
-        var segment = await PublishedSegmentAsync(client, "tekstil", Leaf("crm.company.industry", "eq", "Tekstil"));
+        var segment = await PublishedSegmentAsync(client, "tekstil", Leaf("crm.company.industry", "eq", "Tekstil ve hazır giyim"));
         return new World(segment, a, b);
     }
 
