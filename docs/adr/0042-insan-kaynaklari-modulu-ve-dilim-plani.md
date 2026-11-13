@@ -108,7 +108,7 @@ Her dilim dört testle teslim edilir (mutlu yol, doğrulama, tenant izolasyonu, 
 | 5 | İşe giriş/çıkış kontrol listeleri (**yapıldı**, bölüm 13) | 1, 4 |
 | 6 | Duyurular (**yapıldı**, bölüm 14) | 1 |
 | 7 | Anket (K8; **yapıldı**, bölüm 15) | 1 |
-| 8 | Blog ve galeri | 1, ADR-0040 |
+| 8 | Blog ve galeri (**yapıldı**, bölüm 16) | 1, ADR-0040 |
 
 ## 7. Riskler
 
@@ -281,4 +281,25 @@ Bölüm 5'teki masraf akışı izin dilimindeki kalıpla (iş akışı kapısı,
 | `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
 | `dotnet test tests/Modulix.Core.Tests` | 971/971 geçti |
 | `HrSurveyTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |
+
+## 16. Dilim 8: blog ve galeri (13 Kasım 2026)
+
+- **Blog yazısı** `hr.BlogPosts` (başlık, özet, düz metin gövde en çok 20.000 karakter, yayında, ilk yayın anı, yazan) ve **fotoğraf albümü** `hr.PhotoAlbums` (başlık, açıklama, etkinlik günü, yayında, ilk yayın anı, yazan). İzinler: `hr.blog.read`, `hr.gallery.read` (çalışan ve yönetici şablonları), `hr.blog.manage`, `hr.gallery.manage` (İK uzmanı).
+- **Yazar modeli:** yazıyı ve albümü yönetim izni olan iletişim/İK ekibi yazar. Her çalışanın kendi yazısını yazması bilerek yapılmadı: ADR-0040'ta dosya yükleme kayıt *türünün* güncelleme iznine bağlıdır; yazar başına yazma izni verilseydi bir yazar başkasının yazısına dosya ekleyebilirdi. Bu, ADR-0040'ın kayıt düzeyinde dosya yetkisi dilimiyle birlikte açılır.
+- **Görünürlük sunucuda:** yönetim izni olmayan okur yalnızca yayındaki yazı ve albümleri görür; taslak 404'tür ve dosya erişimi bağlı kaydın erişimi olduğundan taslağın ekleri ve fotoğrafları da 404'tür. Yayın anı ilk yayında yazılır; taslağa alınıp yeniden yayınlansa değişmez.
+- **Fotoğraflar ve ekler ADR-0040 dosyalarıdır** (yeni tablo yok): albüm başına en çok 20 dosya, PNG/JPEG/GIF (ve diğer izinli türler), 10 MB. İndirme her zaman `attachment` olarak kalır; galeri görüntüyü oturumla alıp sayfada `data:` adresiyle gösterir (dosya adresi tarayıcıda açılmaz, CSP değişmedi). Görüntü olmayan dosya indirme bağlantısıyla listelenir.
+- **Arayüz:** Blog (`/ik/blog`: yayındaki yazılar, devamını oku, ekler), Galeri (`/ik/galeri`: albüm kartları, fotoğraf ızgarası), Blog yönetimi ve Galeri yönetimi (Tümü / Yayında / Taslak görünümleri, sıralanabilir başlıklar, sekmeli formlar, dosya paneli). Yeni CSS sınıfı yok (`profile-cards` + `img-fluid`); `AppIcon` setine Lucide `image` ikonu eklendi.
+- Migration `HrBlogAndGallery`: iki tablo + `TenantIsolationSql.AddTable`.
+
+**Bilerek yapılmadı:** yorum ve beğeni, kategori/etiket, zengin metin, albüm kapağı ve küçük resim (sunucuda küçültme yok; albüm açılınca fotoğraflar tam boyutuyla yüklenir), albüm başına 20'den fazla fotoğraf, kaydı silinen yazı/albümün dosyalarının temizliği (ADR-0040 dilim 3; galeri yönetimi albüm silinmeden önce fotoğrafların silinmesini ister, bu kural yalnızca arayüzdedir).
+
+### Test sonuçları (Dilim 8)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 31/31 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 geçti |
+| `dotnet test tests/Modulix.Core.Tests` | 971/971 geçti |
+| `HrBlogGalleryTests` (entegrasyon, 4 test) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web.Tests` (menü testi güncellendi) | Yerel SDK nedeniyle **çalıştırılamadı**; yeni Razor dosyaları hatasız derleniyor |

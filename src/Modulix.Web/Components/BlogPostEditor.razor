@@ -1,0 +1,141 @@
+@* Blog yazısı formu (ADR-0042 dilim 8). Düzen firmanın form düzenine (ADR-0021) göre çizilir. Metin düz metindir (satır sonları korunur, HTML
+   yorumlanmaz); "Yayında" işaretlenmeden okurlar görmez. Ekler kayıt kaydedildikten sonra dosya panelinden eklenir. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Post is null ? "Yeni yazı" : "Blog yazısı")</h2>
+            @if (Post is not null && WarehouseLabels.Text(Post, "publishedAt") is { Length: > 0 } published && DateTimeOffset.TryParse(published, out var at))
+            {
+                <p>Yayın: @at.LocalDateTime.ToString("dd.MM.yyyy HH:mm")</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Blog yazısı bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
+            {
+                case "title":
+                    <label class="@f.LabelClass()" for="post-title">@f.Label</label>
+                    <input id="post-title" class="form-control" maxlength="200" required aria-required="true" @bind="form.Title" />
+                    <FieldError Field="title" Errors="errors" />
+                    break;
+                case "summary":
+                    <label class="@f.LabelClass()" for="post-summary">@f.Label</label>
+                    <textarea id="post-summary" class="form-control" rows="2" maxlength="500" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Summary"></textarea>
+                    <FieldError Field="summary" Errors="errors" />
+                    <small class="text-muted">Listede başlığın altında görünür.</small>
+                    break;
+                case "body":
+                    <label class="@f.LabelClass()" for="post-body">@f.Label</label>
+                    <textarea id="post-body" class="form-control" rows="14" maxlength="20000" required aria-required="true" @bind="form.Body"></textarea>
+                    <FieldError Field="body" Errors="errors" />
+                    break;
+                case "isPublished":
+                    <div class="form-check mt-4">
+                        <input id="post-published" class="form-check-input" type="checkbox" @bind="form.IsPublished" />
+                        <label class="form-check-label" for="post-published">@f.Label</label>
+                    </div>
+                    break;
+            }
+        </Field>
+    </LayoutForm>
+</form>
+
+@code {
+    private const string EntityKey = HrAccess.BlogPostEntityKey;
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private PostForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    [Parameter] public RecordResponse? Post { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        form = Post is { } p
+            ? new PostForm
+            {
+                Id = p.Id, Version = p.Version, Title = WarehouseLabels.Text(p, "title"), Summary = WarehouseLabels.Text(p, "summary"),
+                Body = WarehouseLabels.Text(p, "body"), IsPublished = WarehouseLabels.Flag(p, "isPublished"),
+                Custom = p.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new PostForm();
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var request = new RecordWriteRequest(new JsonObject
+        {
+            ["title"] = string.IsNullOrWhiteSpace(form.Title) ? null : form.Title.Trim(),
+            ["summary"] = string.IsNullOrWhiteSpace(form.Summary) ? null : form.Summary.Trim(),
+            ["body"] = string.IsNullOrWhiteSpace(form.Body) ? null : form.Body.Trim(),
+            ["isPublished"] = form.IsPublished,
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        }, form.Version);
+        var url = "/api/records/" + EntityKey;
+        var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{url}/{id}", request) : await Api.PostAsync<RecordResponse>(url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class PostForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string? Title { get; set; }
+
+        public string? Summary { get; set; }
+
+        public string? Body { get; set; }
+
+        public bool IsPublished { get; set; }
+    }
+}

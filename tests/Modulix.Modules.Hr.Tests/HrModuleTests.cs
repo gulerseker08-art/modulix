@@ -70,6 +70,7 @@ public class HrModuleTests
                 HrModule.Entities.Employee, HrModule.Entities.LeaveRequest, HrModule.Entities.LeaveBalance, HrModule.Entities.ExpenseClaim,
                 HrModule.Entities.ExpenseLine, HrModule.Entities.Asset, HrModule.Entities.AssetAssignment, HrModule.Entities.ChecklistTemplate,
                 HrModule.Entities.ChecklistTemplateItem, HrModule.Entities.Announcement, HrModule.Entities.Survey, HrModule.Entities.SurveyQuestion,
+                HrModule.Entities.BlogPost, HrModule.Entities.PhotoAlbum,
             ],
             HrForms.All.Select(f => f.EntityKey));
         foreach (var definition in HrForms.All)
@@ -169,6 +170,24 @@ public class HrModuleTests
         var asset = Module.Lookups.Single(l => l.Key == HrLookupDefinitions.AssignmentAsset);
         Assert.Equal((HrModule.Entities.Asset, "status", Asset.Statuses.InStock), (asset.TargetEntityKey, asset.FixedFilterName, asset.FixedFilterValue));
         Assert.Equal(Asset.Statuses.All.Except([Asset.Statuses.Assigned]), Asset.Statuses.Manual);
+    }
+
+    [Fact]
+    public void Blog_and_gallery_are_read_by_staff_and_managed_by_the_specialist()
+    {
+        foreach (var template in new[] { "hr.staff", "hr.manager" })
+        {
+            var permissions = Module.RoleTemplates.Single(t => t.Key == template).Permissions;
+            Assert.Contains(HrModule.Permissions.BlogRead, permissions);
+            Assert.Contains(HrModule.Permissions.GalleryRead, permissions);
+            Assert.DoesNotContain(HrModule.Permissions.BlogManage, permissions);
+            Assert.DoesNotContain(HrModule.Permissions.GalleryManage, permissions);
+        }
+
+        var specialist = Module.RoleTemplates.Single(t => t.Key == "hr.specialist").Permissions;
+        Assert.Contains(HrModule.Permissions.BlogManage, specialist);
+        Assert.Contains(HrModule.Permissions.GalleryManage, specialist);
+        Assert.Equal(HrModule.Permissions.GalleryRead, Assert.Single(Module.AuditedEntities, a => a.EntityKey == HrModule.Entities.PhotoAlbum).ReadPermission);
     }
 
     [Fact]
@@ -327,6 +346,12 @@ public class HrModuleTests
         Assert.Equal(HrModule.Entities.SurveyResponse, HrAccess.SurveyResponseEntityKey);
         Assert.Equal([.. Survey.Statuses.All], HrAccess.SurveyStatuses.Select(s => s.Key));
         Assert.Equal([.. SurveyQuestion.Types.All], HrAccess.QuestionTypes.Select(s => s.Key));
+        Assert.Equal(HrModule.Permissions.BlogRead, HrAccess.BlogRead);
+        Assert.Equal(HrModule.Permissions.BlogManage, HrAccess.BlogManage);
+        Assert.Equal(HrModule.Permissions.GalleryRead, HrAccess.GalleryRead);
+        Assert.Equal(HrModule.Permissions.GalleryManage, HrAccess.GalleryManage);
+        Assert.Equal(HrModule.Entities.BlogPost, HrAccess.BlogPostEntityKey);
+        Assert.Equal(HrModule.Entities.PhotoAlbum, HrAccess.PhotoAlbumEntityKey);
         Assert.Equal(HrLookupDefinitions.ChecklistEmployee, HrAccess.ChecklistEmployeeLookup);
         Assert.Equal(HrLookupDefinitions.ChecklistTemplate, HrAccess.ChecklistTemplateLookup);
         Assert.Equal(Checklists.Kinds.All, HrAccess.ChecklistKinds.Select(s => s.Key));
