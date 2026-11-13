@@ -31,12 +31,12 @@
                         <tr>
                             <td data-label="İş" class="primary"><a href="siparisler/isler/@j.Id">@j.Title</a><small class="text-muted">@j.Number</small></td>
                             <td data-label="Tür">@OrderLabels.Label(OrderLabels.JobKinds, j.Kind)</td>
-                            <td data-label="Durum"><span class="badge stage-@OrderLabels.JobBadge(j.Status)">@OrderLabels.Label(OrderLabels.JobStatuses, j.Status)</span></td>
-                            <td data-label="Sorumlu / ekip">
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@OrderLabels.JobBadge(j.Status)">@OrderLabels.Label(OrderLabels.JobStatuses, j.Status)</span></td>
+                            <td data-label="@Texts.Get("orders.jobs.col.responsible")">
                                 @(Lookups.MemberName(j.ResponsibleUserId) is { Length: > 0 } who ? who : (string.IsNullOrEmpty(j.TeamName) ? "Atanmadı" : null))
                                 @if (!string.IsNullOrEmpty(j.TeamName)) { <small class="text-muted d-block">@j.TeamName</small> }
                             </td>
-                            <td data-label="Planlanan">@OrderLabels.Date(j.PlannedStartDate) – @OrderLabels.Date(j.PlannedEndDate)</td>
+                            <td data-label="@Texts.Get("orders.jobs.col.planned")">@OrderLabels.Date(j.PlannedStartDate) – @OrderLabels.Date(j.PlannedEndDate)</td>
                         </tr>
                     }
                 </tbody>
@@ -70,8 +70,8 @@
                                     <FieldError Field="lineIds" Errors="errors" />
                                 </fieldset>
                             </div>
-                            <div class="span-6"><label class="form-label" for="mj-user">Sorumlu kullanıcı</label><LookupPicker Id="mj-user" LookupKey="orders.operation-job.responsible" @bind-Value="responsible" Placeholder="Atama bekliyor" /></div>
-                            <div class="span-6"><label class="form-label" for="mj-team">Ekip</label><input id="mj-team" class="form-control" maxlength="300" @bind="team" /></div>
+                            <div class="span-6"><label class="form-label" for="mj-user">Sorumlu kullanıcı</label><LookupPicker Id="mj-user" LookupKey="orders.operation-job.responsible" @bind-Value="responsible" Placeholder="@Texts.Get("orders.job-status.awaitingassignment")" /></div>
+                            <div class="span-6"><label class="form-label" for="mj-team">@Texts.Get("orders.jobs.field.team")</label><input id="mj-team" class="form-control" maxlength="300" @bind="team" /></div>
                             <div class="span-6"><label class="form-label" for="mj-start">Planlanan başlangıç</label><input id="mj-start" type="date" class="form-control" @bind="start" /></div>
                             <div class="span-6"><label class="form-label" for="mj-end">Planlanan bitiş</label><input id="mj-end" type="date" class="form-control" @bind="end" /></div>
                         </div>

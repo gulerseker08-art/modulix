@@ -40,7 +40,7 @@
                     <p class="small text-muted mt-1">İptal siparişin teslim edilmemiş kısmını sonlandırır; teslim edilen kayıtlar korunur. İptal bir iade ya da fatura işlemi değildir.</p>
                 }
                 <div class="form-actions">
-                    <button type="submit" class="btn @(OrderLabels.IsDanger(selectedAction.Action) ? "btn-danger" : "btn-primary")" disabled="@busy">Onayla: @OrderLabels.Action(selectedAction.Action)</button>
+                    <button type="submit" class="btn @(OrderLabels.IsDanger(selectedAction.Action) ? "btn-danger" : "btn-primary")" disabled="@busy">@Texts.Get("orders.actions.confirm", OrderLabels.Action(selectedAction.Action))</button>
                     <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">Vazgeç</button>
                 </div>
             </form>
