@@ -1,0 +1,246 @@
+@* Demirbaş formu (ADR-0042 dilim 4). Düzen firmanın form düzenine (ADR-0021) göre çizilir. Durum elle yalnızca depoda / bakımda / hurda / kayıp
+   arasında seçilir; zimmetteki demirbaşın durumu iade ya da kayıp kaydıyla değişir (sunucu denetler). Envanter numarası tenant içinde tektir. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Asset is null ? "Yeni demirbaş" : "Demirbaş")</h2>
+            @if (Asset is not null)
+            {
+                <p>@form.AssetTag · @HrLabels.AssetStatus(form.Status)@(WarehouseLabels.Text(Asset, "currentEmployeeName") is { Length: > 0 } holder ? $" · {holder}" : "")</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@(CanWrite ? "İptal" : "Kapat")</button>
+            @if (CanWrite)
+            {
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+            }
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <fieldset disabled="@(!CanWrite)">
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Demirbaş bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
+            {
+                case "assetTag":
+                    <label class="@f.LabelClass()" for="asset-tag">@f.Label</label>
+                    <input id="asset-tag" class="form-control" maxlength="50" required aria-required="true" @bind="form.AssetTag" />
+                    <FieldError Field="assetTag" Errors="errors" />
+                    break;
+                case "name":
+                    <label class="@f.LabelClass()" for="asset-name">@f.Label</label>
+                    <input id="asset-name" class="form-control" maxlength="200" required aria-required="true" @bind="form.Name" />
+                    <FieldError Field="name" Errors="errors" />
+                    break;
+                case "categoryKey":
+                    <label class="@f.LabelClass()" for="asset-category">@f.Label</label>
+                    <select id="asset-category" class="form-select" @bind="form.CategoryKey">
+                        @foreach (var category in Lookups.Choices(HrAccess.AssetCategoryList, form.CategoryKey))
+                        {
+                            <option value="@category.Key">@category.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="categoryKey" Errors="errors" />
+                    break;
+                case "status":
+                    <label class="@f.LabelClass()" for="asset-status">@f.Label</label>
+                    @if (form.Status == "assigned")
+                    {
+                        <p class="mb-0"><span class="badge @HrLabels.AssetStatusBadge("assigned")">@HrLabels.AssetStatus("assigned")</span></p>
+                        <small class="text-muted">Zimmetteki demirbaşın durumu iade ya da kayıp kaydıyla değişir.</small>
+                    }
+                    else
+                    {
+                        <select id="asset-status" class="form-select" @bind="form.Status">
+                            @foreach (var (key, label) in HrAccess.AssetStatuses.Where(s => s.Key != "assigned"))
+                            {
+                                <option value="@key">@label</option>
+                            }
+                        </select>
+                    }
+                    <FieldError Field="status" Errors="errors" />
+                    break;
+                case "brand":
+                    <label class="@f.LabelClass()" for="asset-brand">@f.Label</label>
+                    <input id="asset-brand" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Brand" />
+                    <FieldError Field="brand" Errors="errors" />
+                    break;
+                case "model":
+                    <label class="@f.LabelClass()" for="asset-model">@f.Label</label>
+                    <input id="asset-model" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Model" />
+                    <FieldError Field="model" Errors="errors" />
+                    break;
+                case "serialNumber":
+                    <label class="@f.LabelClass()" for="asset-serial">@f.Label</label>
+                    <input id="asset-serial" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.SerialNumber" />
+                    <FieldError Field="serialNumber" Errors="errors" />
+                    break;
+                case "purchaseDate":
+                    <label class="@f.LabelClass()" for="asset-purchased">@f.Label</label>
+                    <input id="asset-purchased" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PurchaseDate" />
+                    <FieldError Field="purchaseDate" Errors="errors" />
+                    break;
+                case "purchaseCost":
+                    <label class="@f.LabelClass()" for="asset-cost">@f.Label</label>
+                    <input id="asset-cost" class="form-control" type="number" min="0" step="0.01" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PurchaseCost" />
+                    <FieldError Field="purchaseCost" Errors="errors" />
+                    break;
+                case "currency":
+                    <label class="@f.LabelClass()" for="asset-currency">@f.Label</label>
+                    <input id="asset-currency" class="form-control" maxlength="3" placeholder="TRY" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Currency" />
+                    <FieldError Field="currency" Errors="errors" />
+                    break;
+                case "notes":
+                    <label class="@f.LabelClass()" for="asset-notes">@f.Label</label>
+                    <textarea id="asset-notes" class="form-control" rows="3" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
+                    <FieldError Field="notes" Errors="errors" />
+                    break;
+            }
+        </Field>
+    </LayoutForm>
+    </fieldset>
+</form>
+
+@code {
+    private const string EntityKey = HrAccess.AssetEntityKey;
+    private static readonly string Url = "/api/records/" + EntityKey;
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private AssetForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek demirbaş; null ise yeni demirbaş.</summary>
+    [Parameter] public RecordResponse? Asset { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private bool CanWrite => Session.Can(HrAccess.AssetsManage);
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Asset))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Asset;
+        form = Asset is { } a
+            ? new AssetForm
+            {
+                Id = a.Id, Version = a.Version, AssetTag = WarehouseLabels.Text(a, "assetTag"), Name = WarehouseLabels.Text(a, "name"),
+                CategoryKey = WarehouseLabels.Text(a, "categoryKey"), Status = WarehouseLabels.Text(a, "status"), Brand = WarehouseLabels.Text(a, "brand"),
+                Model = WarehouseLabels.Text(a, "model"), SerialNumber = WarehouseLabels.Text(a, "serialNumber"),
+                PurchaseDate = FleetLabels.Day(WarehouseLabels.Text(a, "purchaseDate")), PurchaseCost = HrLabels.Decimal(a, "purchaseCost"),
+                Currency = WarehouseLabels.Text(a, "currency"), Notes = WarehouseLabels.Text(a, "notes"), Custom = a.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new AssetForm { CategoryKey = Lookups.DefaultOf(HrAccess.AssetCategoryList) ?? string.Empty };
+        errors = null;
+        message = null;
+    }
+
+    private static string? Optional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var values = new JsonObject
+        {
+            ["assetTag"] = Optional(form.AssetTag),
+            ["name"] = Optional(form.Name),
+            ["categoryKey"] = form.CategoryKey,
+            ["brand"] = Optional(form.Brand),
+            ["model"] = Optional(form.Model),
+            ["serialNumber"] = Optional(form.SerialNumber),
+            ["purchaseDate"] = form.PurchaseDate?.ToString("yyyy-MM-dd"),
+            ["purchaseCost"] = form.PurchaseCost,
+            ["currency"] = Optional(form.Currency),
+            ["notes"] = Optional(form.Notes),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Status != "assigned")
+        {
+            values["status"] = form.Status;
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request) : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class AssetForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string? AssetTag { get; set; }
+
+        public string? Name { get; set; }
+
+        public string CategoryKey { get; set; } = string.Empty;
+
+        public string Status { get; set; } = "inStock";
+
+        public string? Brand { get; set; }
+
+        public string? Model { get; set; }
+
+        public string? SerialNumber { get; set; }
+
+        public DateOnly? PurchaseDate { get; set; }
+
+        public decimal? PurchaseCost { get; set; }
+
+        public string? Currency { get; set; }
+
+        public string? Notes { get; set; }
+    }
+}

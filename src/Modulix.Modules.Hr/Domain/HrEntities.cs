@@ -332,3 +332,127 @@ public sealed class ExpenseLine : HrEntity
     /// <summary>Beyanın sahibi (veri kapsamı; beyandan kopyalanır, değişmez).</summary>
     public Guid? OwnerId { get; internal set; }
 }
+
+/// <summary>
+/// Demirbaş (ADR-0042 dilim 4): çalışana zimmetlenebilen eşya (dizüstü bilgisayar, telefon, giriş kartı, alet...). Envanter numarası tenant içinde
+/// tektir. Durum elle yalnızca depoda / bakımda / hurda / kayıp arasında değişir; "zimmetli" durumu ve şu anki zimmetli çalışan yalnızca zimmet
+/// kaydından türetilir. Araçlar Filo modülündedir, burada tutulmaz. Zimmetlenmiş demirbaş silinmez (geçmiş tutanaklar korunur).
+/// </summary>
+public sealed class Asset : HrEntity
+{
+    public const int TagMaxLength = 50;
+    public const int NameMaxLength = 200;
+    public const int SerialMaxLength = 100;
+    public const int BrandMaxLength = 100;
+    public const int NotesMaxLength = 2000;
+
+    public static class Statuses
+    {
+        public const string InStock = "inStock";
+        public const string Assigned = "assigned";
+        public const string Maintenance = "maintenance";
+        public const string Retired = "retired";
+        public const string Lost = "lost";
+
+        public static IReadOnlyList<string> All { get; } = [InStock, Assigned, Maintenance, Retired, Lost];
+
+        /// <summary>Elle seçilebilen durumlar ("zimmetli" yalnızca zimmetle gelir).</summary>
+        public static IReadOnlyList<string> Manual { get; } = [InStock, Maintenance, Retired, Lost];
+    }
+
+    /// <summary>Envanter (demirbaş) numarası; büyük harf, tenant içinde tekil.</summary>
+    public string AssetTag { get; internal set; } = string.Empty;
+
+    public string Name { get; internal set; } = string.Empty;
+
+    /// <summary>Demirbaş kategorisi (Y9b seçim listesi <c>hr.asset-category</c>).</summary>
+    public string CategoryKey { get; internal set; } = string.Empty;
+
+    public string? SerialNumber { get; internal set; }
+
+    public string? Brand { get; internal set; }
+
+    public string? Model { get; internal set; }
+
+    public DateOnly? PurchaseDate { get; internal set; }
+
+    public decimal? PurchaseCost { get; internal set; }
+
+    public string? Currency { get; internal set; }
+
+    public string Status { get; internal set; } = Statuses.InStock;
+
+    /// <summary>Şu anki zimmet (yalnızca zimmet kaydı yazar).</summary>
+    public Guid? CurrentAssignmentId { get; internal set; }
+
+    public Guid? CurrentEmployeeId { get; internal set; }
+
+    /// <summary>Şu anki zimmetli çalışanın kullanıcısı (veri kapsamı: çalışan üzerindeki demirbaşı görür).</summary>
+    public Guid? CurrentUserId { get; internal set; }
+
+    public string? Notes { get; internal set; }
+
+    internal void AssignTo(Guid assignmentId, Guid employeeId, Guid? userId)
+    {
+        CurrentAssignmentId = assignmentId;
+        CurrentEmployeeId = employeeId;
+        CurrentUserId = userId;
+        Status = Statuses.Assigned;
+        Touch();
+    }
+
+    internal void Release(string status)
+    {
+        CurrentAssignmentId = null;
+        CurrentEmployeeId = null;
+        CurrentUserId = null;
+        Status = status;
+        Touch();
+    }
+}
+
+/// <summary>
+/// Zimmet (ADR-0042 dilim 4): bir demirbaşın bir çalışana teslimi. Açılınca demirbaş aynı işlemde "zimmetli" olur; çalışan teslim aldığını ekrandan
+/// onaylar; iade ya da kayıp komutla kapanır ve demirbaş depoya (ya da kayba) döner. Bir demirbaşın aynı anda tek açık zimmeti olur. Zimmet
+/// değiştirilmez ve silinmez; tutanağı PDF olarak alınır. Kayıt sahibi çalışanın kullanıcısıdır (çalışan kendi zimmetlerini görür).
+/// </summary>
+public sealed class AssetAssignment : HrEntity
+{
+    public const int TextMaxLength = 1000;
+
+    public static class Statuses
+    {
+        public const string Active = "active";
+        public const string Returned = "returned";
+        public const string Lost = "lost";
+
+        public static IReadOnlyList<string> All { get; } = [Active, Returned, Lost];
+    }
+
+    public Guid AssetId { get; internal set; }
+
+    public Guid EmployeeId { get; internal set; }
+
+    public DateOnly AssignedOn { get; internal set; }
+
+    public DateOnly? ExpectedReturnOn { get; internal set; }
+
+    /// <summary>Teslimdeki durum ve aksesuarlar (ör. "Şarj aleti ve çanta ile, çiziksiz").</summary>
+    public string? ConditionOut { get; internal set; }
+
+    public string Status { get; internal set; } = Statuses.Active;
+
+    public Guid? OwnerId { get; internal set; }
+
+    public Guid? AssignedByUserId { get; internal set; }
+
+    /// <summary>Çalışanın teslim aldığını onayladığı an.</summary>
+    public DateTimeOffset? AcknowledgedAt { get; internal set; }
+
+    public DateOnly? ReturnedOn { get; internal set; }
+
+    /// <summary>İadedeki durum ya da kayıp açıklaması.</summary>
+    public string? ConditionIn { get; internal set; }
+
+    public Guid? ClosedByUserId { get; internal set; }
+}
