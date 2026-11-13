@@ -188,3 +188,68 @@ internal sealed class AssetAssignmentConfiguration : IEntityTypeConfiguration<As
         builder.HasIndex(a => new { a.TenantId, a.OwnerId }).HasDatabaseName("IX_AssetAssignments_Owner");
     }
 }
+
+internal sealed class ChecklistTemplateConfiguration : IEntityTypeConfiguration<ChecklistTemplate>
+{
+    public void Configure(EntityTypeBuilder<ChecklistTemplate> builder)
+    {
+        HrTables.ConfigureCommon(builder, "ChecklistTemplates");
+        builder.Property(t => t.Name).HasMaxLength(ChecklistTemplate.NameMaxLength).IsRequired();
+        builder.Property(t => t.Kind).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(t => t.Description).HasMaxLength(ChecklistTemplate.TextMaxLength);
+        builder.HasIndex(t => new { t.TenantId, t.Kind, t.Name }).IsUnique().HasDatabaseName("UX_ChecklistTemplates_Name");
+    }
+}
+
+internal sealed class ChecklistTemplateItemConfiguration : IEntityTypeConfiguration<ChecklistTemplateItem>
+{
+    public void Configure(EntityTypeBuilder<ChecklistTemplateItem> builder)
+    {
+        HrTables.ConfigureCommon(builder, "ChecklistTemplateItems");
+        builder.Property(i => i.Title).HasMaxLength(ChecklistTemplateItem.TitleMaxLength).IsRequired();
+        builder.Property(i => i.Description).HasMaxLength(ChecklistTemplateItem.TextMaxLength);
+        builder.Property(i => i.ResponsibleRole).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(i => i.TaskType).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.HasOne<ChecklistTemplate>().WithMany().HasForeignKey(i => new { i.TenantId, i.TemplateId })
+            .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(i => new { i.TenantId, i.TemplateId, i.Sequence }).HasDatabaseName("IX_ChecklistTemplateItems_Template");
+    }
+}
+
+internal sealed class EmployeeChecklistConfiguration : IEntityTypeConfiguration<EmployeeChecklist>
+{
+    public void Configure(EntityTypeBuilder<EmployeeChecklist> builder)
+    {
+        HrTables.ConfigureCommon(builder, "EmployeeChecklists");
+        builder.Property(c => c.Kind).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(c => c.Name).HasMaxLength(ChecklistTemplate.NameMaxLength).IsRequired();
+        builder.Property(c => c.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(c => c.CancelReason).HasMaxLength(EmployeeChecklist.ReasonMaxLength);
+        builder.HasOne<Employee>().WithMany().HasForeignKey(c => new { c.TenantId, c.EmployeeId })
+            .HasPrincipalKey(e => new { e.TenantId, e.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ChecklistTemplate>().WithMany().HasForeignKey(c => new { c.TenantId, c.TemplateId })
+            .HasPrincipalKey(t => new { t.TenantId, t.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(c => new { c.TenantId, c.EmployeeId, c.Kind }).HasDatabaseName("IX_EmployeeChecklists_Employee");
+        builder.HasIndex(c => new { c.TenantId, c.Status }).HasDatabaseName("IX_EmployeeChecklists_Status");
+        builder.HasIndex(c => new { c.TenantId, c.OwnerId }).HasDatabaseName("IX_EmployeeChecklists_Owner");
+    }
+}
+
+internal sealed class ChecklistTaskConfiguration : IEntityTypeConfiguration<ChecklistTask>
+{
+    public void Configure(EntityTypeBuilder<ChecklistTask> builder)
+    {
+        HrTables.ConfigureCommon(builder, "ChecklistTasks");
+        builder.Property(t => t.Title).HasMaxLength(ChecklistTemplateItem.TitleMaxLength).IsRequired();
+        builder.Property(t => t.Description).HasMaxLength(ChecklistTemplateItem.TextMaxLength);
+        builder.Property(t => t.ResponsibleRole).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(t => t.TaskType).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(t => t.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.Property(t => t.Note).HasMaxLength(ChecklistTask.NoteMaxLength);
+        builder.HasOne<EmployeeChecklist>().WithMany().HasForeignKey(t => new { t.TenantId, t.ChecklistId })
+            .HasPrincipalKey(c => new { c.TenantId, c.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(t => new { t.TenantId, t.ChecklistId, t.Sequence }).HasDatabaseName("IX_ChecklistTasks_Checklist");
+        builder.HasIndex(t => new { t.TenantId, t.AssigneeUserId, t.Status }).HasDatabaseName("IX_ChecklistTasks_Assignee");
+        builder.HasIndex(t => new { t.TenantId, t.OwnerId }).HasDatabaseName("IX_ChecklistTasks_Owner");
+    }
+}

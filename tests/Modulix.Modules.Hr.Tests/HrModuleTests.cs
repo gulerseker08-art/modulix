@@ -69,7 +69,8 @@ public class HrModuleTests
         Assert.Equal(
             [
                 HrModule.Entities.Employee, HrModule.Entities.LeaveRequest, HrModule.Entities.LeaveBalance, HrModule.Entities.ExpenseClaim,
-                HrModule.Entities.ExpenseLine, HrModule.Entities.Asset, HrModule.Entities.AssetAssignment,
+                HrModule.Entities.ExpenseLine, HrModule.Entities.Asset, HrModule.Entities.AssetAssignment, HrModule.Entities.ChecklistTemplate,
+                HrModule.Entities.ChecklistTemplateItem,
             ],
             HrForms.All.Select(f => f.EntityKey));
         foreach (var definition in HrForms.All)
@@ -172,6 +173,29 @@ public class HrModuleTests
     }
 
     [Fact]
+    public void Checklist_permissions_go_to_staff_as_read_and_to_the_specialist_as_manage_and_progress_follows_tasks()
+    {
+        Assert.Contains(HrModule.Permissions.ChecklistsRead, Module.RoleTemplates.Single(t => t.Key == "hr.staff").Permissions);
+        Assert.DoesNotContain(HrModule.Permissions.ChecklistsManage, Module.RoleTemplates.Single(t => t.Key == "hr.manager").Permissions);
+        Assert.Contains(HrModule.Permissions.ChecklistsManage, Module.RoleTemplates.Single(t => t.Key == "hr.specialist").Permissions);
+        var template = Module.Lookups.Single(l => l.Key == HrLookupDefinitions.ChecklistTemplate);
+        Assert.Equal((HrModule.Entities.ChecklistTemplate, "isActive", "true"), (template.TargetEntityKey, template.FixedFilterName, template.FixedFilterValue));
+
+        // İlerleme: bütün görevler kapanınca tamamlanır, biri yeniden açılınca açılır; iptal edilmiş süreç durumunu korur.
+        var checklist = new EmployeeChecklist();
+        checklist.SetProgress(3, 2);
+        Assert.Equal((EmployeeChecklist.Statuses.Open, (DateTimeOffset?)null), (checklist.Status, checklist.CompletedAt));
+        checklist.SetProgress(3, 3);
+        Assert.Equal(EmployeeChecklist.Statuses.Completed, checklist.Status);
+        Assert.NotNull(checklist.CompletedAt);
+        checklist.SetProgress(3, 2);
+        Assert.Equal(EmployeeChecklist.Statuses.Open, checklist.Status);
+        checklist.Status = EmployeeChecklist.Statuses.Cancelled;
+        checklist.SetProgress(3, 3);
+        Assert.Equal(EmployeeChecklist.Statuses.Cancelled, checklist.Status);
+    }
+
+    [Fact]
     public void Staff_and_managers_see_their_own_records_and_only_the_specialist_manages_leave()
     {
         var staff = Module.RoleTemplates.Single(t => t.Key == "hr.staff");
@@ -268,5 +292,18 @@ public class HrModuleTests
         Assert.Equal(HrLookupDefinitions.AssignmentAsset, HrAccess.AssignmentAssetLookup);
         Assert.Equal(Asset.Statuses.All, HrAccess.AssetStatuses.Select(s => s.Key));
         Assert.Equal(AssetAssignment.Statuses.All, HrAccess.AssignmentStatuses.Select(s => s.Key));
+        Assert.Equal(HrModule.Permissions.ChecklistsRead, HrAccess.ChecklistsRead);
+        Assert.Equal(HrModule.Permissions.ChecklistsManage, HrAccess.ChecklistsManage);
+        Assert.Equal(HrModule.Entities.ChecklistTemplate, HrAccess.ChecklistTemplateEntityKey);
+        Assert.Equal(HrModule.Entities.ChecklistTemplateItem, HrAccess.ChecklistTemplateItemEntityKey);
+        Assert.Equal(HrModule.Entities.EmployeeChecklist, HrAccess.EmployeeChecklistEntityKey);
+        Assert.Equal(HrModule.Entities.ChecklistTask, HrAccess.ChecklistTaskEntityKey);
+        Assert.Equal(HrLookupDefinitions.ChecklistEmployee, HrAccess.ChecklistEmployeeLookup);
+        Assert.Equal(HrLookupDefinitions.ChecklistTemplate, HrAccess.ChecklistTemplateLookup);
+        Assert.Equal(Checklists.Kinds.All, HrAccess.ChecklistKinds.Select(s => s.Key));
+        Assert.Equal(Checklists.Responsibles.All, HrAccess.ChecklistResponsibles.Select(s => s.Key));
+        Assert.Equal(Checklists.TaskTypes.All, HrAccess.ChecklistTaskTypes.Select(s => s.Key));
+        Assert.Equal(EmployeeChecklist.Statuses.All, HrAccess.ChecklistStatuses.Select(s => s.Key));
+        Assert.Equal(ChecklistTask.Statuses.All, HrAccess.TaskStatuses.Select(s => s.Key));
     }
 }

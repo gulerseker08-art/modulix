@@ -23,6 +23,8 @@ public static class HrAccess
     public const string ExpensesPay = "hr.expenses.pay";
     public const string AssetsRead = "hr.assets.read";
     public const string AssetsManage = "hr.assets.manage";
+    public const string ChecklistsRead = "hr.checklists.read";
+    public const string ChecklistsManage = "hr.checklists.manage";
 
     public const string EmployeeEntityKey = "hr.employee";
     public const string LeaveRequestEntityKey = "hr.leave-request";
@@ -40,6 +42,12 @@ public static class HrAccess
     public const string AssetCategoryList = "hr.asset-category";
     public const string AssignmentEmployeeLookup = "hr.asset-assignment.employee";
     public const string AssignmentAssetLookup = "hr.asset-assignment.asset";
+    public const string ChecklistTemplateEntityKey = "hr.checklist-template";
+    public const string ChecklistTemplateItemEntityKey = "hr.checklist-template-item";
+    public const string EmployeeChecklistEntityKey = "hr.employee-checklist";
+    public const string ChecklistTaskEntityKey = "hr.checklist-task";
+    public const string ChecklistEmployeeLookup = "hr.employee-checklist.employee";
+    public const string ChecklistTemplateLookup = "hr.employee-checklist.template";
 
     /// <summary>Yalnızca bu kategorideki izin türü yıllık haktan düşer.</summary>
     public const string AnnualCategory = "annual";
@@ -107,6 +115,44 @@ public static class HrAccess
         ("lost", "Kayıp"),
     ];
 
+    /// <summary>Süreç türleri (sabit; sunucudaki <c>Checklists.Kinds</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> ChecklistKinds { get; } =
+    [
+        ("onboarding", "İşe giriş"),
+        ("offboarding", "İşten çıkış"),
+    ];
+
+    /// <summary>Görev sorumluları (sabit; sunucudaki <c>Checklists.Responsibles</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> ChecklistResponsibles { get; } =
+    [
+        ("employee", "Çalışan"),
+        ("manager", "Yönetici"),
+        ("hr", "İK"),
+    ];
+
+    /// <summary>Görev türleri (sabit; sunucudaki <c>Checklists.TaskTypes</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> ChecklistTaskTypes { get; } =
+    [
+        ("manual", "Elle tamamlanır"),
+        ("assetReturn", "Zimmet iadesi (açık zimmet kalmamalı)"),
+    ];
+
+    /// <summary>Süreç durumları (sabit; sunucudaki <c>EmployeeChecklist.Statuses</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> ChecklistStatuses { get; } =
+    [
+        ("open", "Sürüyor"),
+        ("completed", "Tamamlandı"),
+        ("cancelled", "İptal edildi"),
+    ];
+
+    /// <summary>Görev durumları (sabit; sunucudaki <c>ChecklistTask.Statuses</c>).</summary>
+    public static IReadOnlyList<(string Key, string Label)> TaskStatuses { get; } =
+    [
+        ("open", "Açık"),
+        ("done", "Tamamlandı"),
+        ("skipped", "Atlandı"),
+    ];
+
     /// <summary>Özlük alanları (hassas; <see cref="EmployeesPersonal"/> izni olmadan sunucu göndermez).</summary>
     public static IReadOnlyList<string> PersonalFields { get; } =
         ["nationalId", "birthDate", "homeAddress", "emergencyContactName", "emergencyContactPhone", "iban"];
@@ -123,3 +169,6 @@ public sealed record LeavePreviewRequest(Guid EmployeeId, string? LeaveTypeKey, 
 
 /// <summary>İş günü sayısı; yıllık izinde görülebiliyorsa o yılın kalan hakkı ve onay bekleyen günler.</summary>
 public sealed record LeavePreviewDto(decimal Days, decimal? RemainingDays, decimal? PendingDays);
+
+/// <summary>İşe giriş/çıkış süreci başlatma isteği: çalışan, şablon ve görev son tarihlerinin hesaplanacağı başlangıç günü.</summary>
+public sealed record StartChecklistRequest(Guid EmployeeId, Guid TemplateId, DateOnly StartDate);

@@ -142,5 +142,33 @@ public static class HrForms
             new("expectedReturnOn", "Beklenen iade", "teslim", 6),
             new("conditionOut", "Teslimdeki durum ve aksesuarlar", "teslim", 12),
         ]),
+
+        new(HrModule.Entities.ChecklistTemplate, "Süreç şablonu",
+        [new(General, "Şablon"), new("ek", "Ek bilgiler")],
+        [
+            new("sablon", "Şablon", "clipboard-list"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ek"),
+        ],
+        [
+            new("name", "Ad", "sablon", 6, Required: true, Fixed: true),
+            new("kind", "Tür", "sablon", 3, Required: true, Fixed: true),
+            new("isActive", "Etkin", "sablon", 3),
+            new("description", "Açıklama", "sablon", 12),
+        ]),
+
+        new(HrModule.Entities.ChecklistTemplateItem, "Şablon adımı",
+        [new(General, "Adım"), new("ek", "Ek bilgiler")],
+        [
+            new("adim", "Adım", "check-circle"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ek"),
+        ],
+        [
+            new("title", "Başlık", "adim", 8, Required: true, Fixed: true),
+            new("sequence", "Sıra", "adim", 4),
+            new("responsibleRole", "Sorumlu", "adim", 4),
+            new("dueOffsetDays", "Gün farkı", "adim", 4),
+            new("taskType", "Görev türü", "adim", 4),
+            new("description", "Açıklama", "adim", 12),
+        ]),
     ];
 }

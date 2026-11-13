@@ -410,6 +410,11 @@ public class AppNavigationTests
         Assert.Equal(["Zimmetlerim"], Nav([HrAccess.ModuleKey], [HrAccess.AssetsRead]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
         Assert.Equal(["Zimmetlerim", "Demirbaşlar"], Nav([HrAccess.ModuleKey], [HrAccess.AssetsRead, HrAccess.AssetsManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
 
+        // İşe giriş/çıkış: okuma "Görevlerim"i, yönetim süreç ve şablon ekranlarını açar.
+        Assert.Equal(["Görevlerim"], Nav([HrAccess.ModuleKey], [HrAccess.ChecklistsRead]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["Görevlerim", "İşe giriş ve çıkış", "Süreç şablonları"],
+            Nav([HrAccess.ModuleKey], [HrAccess.ChecklistsRead, HrAccess.ChecklistsManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
         Assert.Empty(Nav([], [HrAccess.EmployeesRead]).Roots());
         Assert.Empty(Nav([HrAccess.ModuleKey], []).Roots());
     }

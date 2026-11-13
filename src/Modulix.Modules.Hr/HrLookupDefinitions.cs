@@ -18,6 +18,8 @@ public static class HrLookupDefinitions
     public const string ExpenseClaimEmployee = "hr.expense-claim.employee";
     public const string AssignmentEmployee = "hr.asset-assignment.employee";
     public const string AssignmentAsset = "hr.asset-assignment.asset";
+    public const string ChecklistEmployee = "hr.employee-checklist.employee";
+    public const string ChecklistTemplate = "hr.employee-checklist.template";
 
     private static readonly string[] PersonLabel = ["firstName", "lastName"];
     private static readonly string[] PersonSecondary = ["email", "phone"];
@@ -43,6 +45,15 @@ public static class HrLookupDefinitions
         Employee(LeaveBalanceEmployee, HrModule.Entities.LeaveBalance),
         Employee(ExpenseClaimEmployee, HrModule.Entities.ExpenseClaim),
         Employee(AssignmentEmployee, HrModule.Entities.AssetAssignment),
+        Employee(ChecklistEmployee, HrModule.Entities.EmployeeChecklist),
+        new(ChecklistTemplate, HrModule.Entities.EmployeeChecklist, "templateId", "Şablon", LookupTargetKind.Record, HrModule.Entities.ChecklistTemplate)
+        {
+            LabelFields = ["name"],
+            SecondaryFields = ["kind"],
+            SearchDescription = "Şablon adı (yalnızca etkin şablonlar)",
+            FixedFilterName = "isActive",
+            FixedFilterValue = "true",
+        },
         new(AssignmentAsset, HrModule.Entities.AssetAssignment, "assetId", "Demirbaş", LookupTargetKind.Record, HrModule.Entities.Asset)
         {
             LabelFields = ["assetTag", "name"],
