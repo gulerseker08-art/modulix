@@ -65,6 +65,9 @@ public static class ImportEndpoints
             StartAsync(ImportRunMode.Apply, entityKey, fileName, http, context, ct)).RequirePermission(CoreModule.Permissions.RunImports);
         group.MapGet("/{runId:guid}/error-report", GetErrorReportAsync);
 
+        // Geri alma (Dilim 4d): koşunun oluşturduğu kayıtlar boru hattından silinir; değişmiş, bağlı ya da yetkinin yetmediği kayıt korunur ve raporlanır.
+        group.MapPost("/{runId:guid}/rollback", RollBackAsync).RequirePermission(CoreModule.Permissions.RollbackImports);
+
         // İçe aktarma tasarımı: firma yöneticisi türleri açıp kapatır, sütunları seçer (form tasarımıyla aynı izin).
         var design = app.MapGroup("/api/customization/import-designs")
             .RequireAuthorization()
@@ -254,6 +257,22 @@ public static class ImportEndpoints
         return detail is null
             ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "İçe aktarma bulunamadı.")
             : Results.Ok(ToDto(detail));
+    }
+
+    private static async Task<IResult> RollBackAsync(
+        Guid runId, ImportRollbackRequest request, ImportRollback rollback, IImportLog log, CancellationToken ct)
+    {
+        var result = await rollback.RollBackAsync(runId, request.Reason, ct);
+        if (!result.IsSuccess)
+        {
+            return RecordEndpoints.ToProblem(result.Error!);
+        }
+
+        // Koşu geri alanın görebildiği bir koşudur (servis denetledi); özet, kullanıcı ve tür adıyla günlükten okunur.
+        var outcome = result.Value!;
+        var detail = await log.GetAsync(runId, new ImportIssueQuery(PageSize: 1), null, ct);
+        return Results.Ok(new ImportRollbackDto(
+            ToDto(detail!.Run), outcome.Removed, outcome.AlreadyRemoved, [.. outcome.Kept.Select(k => new ImportRollbackKeptDto(k.RecordId, k.Reason))]));
     }
 
     /// <summary>Firmanın tamamını görme izni yoksa yalnızca çağıranın kendi koşuları görünür.</summary>

@@ -123,3 +123,12 @@ public static class ImportText
         "custom-field-invalid", "permission-denied", "business-rule", "file-invalid", "system-error", "file-repeated",
     ];
 }
+
+/// <summary>İçe aktarmayı geri alma isteği (ADR-0033 Dilim 4d); gerekçe zorunludur ve koşunun notuna yazılır.</summary>
+public sealed record ImportRollbackRequest(string? Reason);
+
+/// <summary>Geri almada silinmeyen kayıt ve nedeni (değişmiş, bağlı ya da yetki yok).</summary>
+public sealed record ImportRollbackKeptDto(Guid RecordId, string Reason);
+
+/// <summary>Geri almanın sonucu: koşunun güncel hali, silinen, zaten silinmiş ve korunan kayıtlar.</summary>
+public sealed record ImportRollbackDto(ImportRunDto Run, int Removed, int AlreadyRemoved, IReadOnlyList<ImportRollbackKeptDto> Kept);

@@ -271,6 +271,26 @@ public sealed class ImportRun : ITenantEntity, ICompanyShared
         Finish(null, now);
     }
 
+    /// <summary>Geri alınabilir mi (Dilim 4d): yalnızca kayıt almış ve bitmiş bir uygulama; kuru çalışma ve başarısız koşu kayıt yazmamıştır.</summary>
+    public bool CanRollBack => Mode == ImportRunMode.Apply
+        && Status is ImportRunStatus.Succeeded or ImportRunStatus.PartiallySucceeded && CreatedCount > 0;
+
+    /// <summary>
+    /// Koşunun oluşturduğu kayıtlar geri alındı. Sonradan değiştirilmiş ya da başka kayda bağlanmış kayıtlar silinmez; not kaç kaydın
+    /// silindiğini ve kaçının neden korunduğunu söyler (kişisel veri içermez). Alınan satır sayıları özgün sonucu gösterdiği için değişmez.
+    /// </summary>
+    public void RollBack(string note)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(note);
+        if (!CanRollBack)
+        {
+            throw new InvalidOperationException("Yalnızca kayıt almış ve bitmiş bir içe aktarma geri alınabilir.");
+        }
+
+        Status = ImportRunStatus.RolledBack;
+        Note = Truncate(note, NoteMaxLength);
+    }
+
     private void Finish(string? note, DateTimeOffset now)
     {
         CompletedAt = now;
