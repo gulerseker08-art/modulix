@@ -182,7 +182,7 @@ internal sealed class ApprovalService(
     {
         TenantContext tenant = RequireTenant();
         Me me = await MeAsync(tenant, cancellationToken);
-        int page = Math.Max(1, query.Page);
+        int page = Math.Clamp(query.Page, 1, 100_000);
         int pageSize = Math.Clamp(query.PageSize, 1, ApprovalRequestQuery.MaxPageSize);
         IQueryable<ApprovalRequest> requests = query.View switch
         {

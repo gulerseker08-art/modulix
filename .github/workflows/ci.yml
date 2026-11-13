@@ -95,6 +95,9 @@ jobs:
       - name: Filo birim testleri
         run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.Modules.Fleet.Tests/Modulix.Modules.Fleet.Tests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/fleet-tests.log"
 
+      - name: IK birim testleri
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet test tests/Modulix.Modules.Hr.Tests/Modulix.Modules.Hr.Tests.csproj --configuration Release --no-build 2>&1 | tee "$RUNNER_TEMP/steplogs/hr-tests.log"
+
       - name: Test ozeti
         if: always()
         run: |

@@ -1,0 +1,184 @@
+@page "/ik/izin-haklari"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>İzin hakları · Modulix</PageTitle>
+
+@* Yıllık izin hakları (ADR-0042 dilim 2): çalışan ve yıl başına hak, devreden, kullanılan ve kalan gün. Kullanılan gün onaylı izinlerden gelir.
+   Görünürlük sunucudadır (veri kapsamı "kendi" olan çalışan yalnızca kendi hakkını görür); yazma "izin yönetimi" izniyle. *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.LeavesRead">
+    <PageHeader Title="İzin hakları" Icon="calendar" Subtitle="@(page is null ? "Çalışanların yıllık izin haklarını yönetin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <LeaveBalanceEditor Balance="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="() => editing = false" />
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="İzin hakkı görünümleri" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Çalışan ara" placeholder="Çalışan adı ara" @bind="search" />
+        </form>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(HrAccess.LeavesManage) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni izin hakkı</button>
+        }
+    </div>
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu yıl için tanımlı izin hakkı yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) izin hakkı listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">İzin hakları</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var balance in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, balance)
+                        }
+                        <td class="row-menu-cell">
+                            @if (Session.Can(HrAccess.LeavesManage))
+                            {
+                                <RowMenu Label="@($"{WarehouseLabels.Text(balance, "employeeName")} hakkı eylemleri")">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(balance)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                </RowMenu>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + HrAccess.LeaveBalanceEntityKey;
+    private static readonly int ThisYear = DateTime.Today.Year;
+
+    // Sıralama anahtarları kayıt deposunun beyanıdır (LeaveBalanceRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("employee", "Çalışan", "user", "employee", "-employee", Locked: true),
+        new("year", "Yıl", "calendar", "year", "-year"),
+        new("entitled", "Hak", "star", "entitledDays", "-entitledDays"),
+        new("carried", "Devreden", "repeat"),
+        new("used", "Kullanılan", "clock", "usedDays", "-usedDays"),
+        new("remaining", "Kalan", "check-circle"),
+    ];
+
+    private readonly GridViewState grid = new("hr.leave-balances", "employee");
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private string? message;
+    private string? search;
+    private string view = ThisYear.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static IReadOnlyList<ViewOption> ViewOptions { get; } =
+    [
+        new((ThisYear + 1).ToString(System.Globalization.CultureInfo.InvariantCulture), $"{ThisYear + 1}", Icon: "calendar"),
+        new(ThisYear.ToString(System.Globalization.CultureInfo.InvariantCulture), $"{ThisYear}", Icon: "calendar"),
+        new((ThisYear - 1).ToString(System.Globalization.CultureInfo.InvariantCulture), $"{ThisYear - 1}", Icon: "history"),
+        new("all", "Tüm yıllar", Icon: "list"),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.LeavesRead))
+        {
+            await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(HrAccess.LeaveBalanceEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (view != "all")
+        {
+            url += $"&year={view}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse balance) => @<td data-label="@column.Label" class="@(column.Key == "employee" ? "primary" : null)">@CellContent(column.Key, balance)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse balance) => key switch
+    {
+        "employee" => @<text>@(WarehouseLabels.Text(balance, "employeeName") is { Length: > 0 } name ? name : "—")</text>,
+        "year" => @<text>@WarehouseLabels.Number(balance, "year")</text>,
+        "entitled" => @<text>@HrLabels.Days(HrLabels.Decimal(balance, "entitledDays"))</text>,
+        "carried" => @<text>@HrLabels.Days(HrLabels.Decimal(balance, "carriedOverDays"))</text>,
+        "used" => @<text>@HrLabels.Days(HrLabels.Decimal(balance, "usedDays"))</text>,
+        "remaining" => @<strong>@HrLabels.Days(HrLabels.Decimal(balance, "remainingDays"))</strong>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.LeaveBalanceEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, balance.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private void Open(RecordResponse? balance)
+    {
+        selected = balance;
+        editing = true;
+        message = null;
+    }
+
+    private async Task SavedAsync()
+    {
+        editing = false;
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

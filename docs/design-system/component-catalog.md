@@ -77,6 +77,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Dinamik (özel) alanlar | Var | `CustomFieldInputs.razor` — aynı form sınıflarıyla çizilir; `Only` ile tek alan (form düzeni içinde) |
 | Metadata'dan form (LayoutForm) | Var | `Components/LayoutForm.razor` — `Layout` (`FormLayoutDto`), `Field` şablonu, `Shows`, özel alanlar; sekme / bölüm / alan düzeni firmanın form düzeninden (ADR-0021). Yönetim: `Pages/Admin/FormDesigner.razor` |
 | FieldError | Var | Alanın altında doğrulama iletisi |
+| Alan açıklaması baloncuğu | Var | Giriş alanıyla aynı kapsayıcıdaki `form-text`, alanın üzerine gelince/odaklanınca alanın üstünde baloncuk olarak açılır (yalnızca CSS, `app.css`; ikon yok, formda yer kaplamaz). Hata metni (`form-text text-danger`) ve girişle aynı kapsayıcıda olmayan `form-text` satır içi kalır |
 | FileUpload, RichTextEditor, MultiLookup | Yok | |
 
 ## Veri
@@ -89,6 +90,8 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Takvim | Var | `ActivityCalendar.razor`: ay ızgarası, hafta/gün saat çizelgesi (`cal-time-*`, çakışanlar yan yana, şimdiki zaman çizgisi), ajanda; renk `FamilyOf` → `fam-*` |
 | Günün ajandası | Var | `TodayActivities.razor` |
 | Grafikler | Var | `BarChart.razor`, `DonutChart.razor` (`--chart-c*`) |
+| Kişi kartları (rehber) | Var | `ul.profile-cards` + `li.profile-card`; kişi satırı `owner-cell` + `avatar avatar-tone-*` (baş harfler). Örnek: `Hr/Directory.razor` |
+| Organizasyon ağacı | Var | `ul.org-tree` (rol `tree`, alt düğümler `ul[role=group]`): her düğüm `org-node` (avatar + ad + ikincil satır), alt düzeyler sol kenarda ince çizgiyle girintili; vurgulanan düğüm `org-node active` (marka tonu zemin). Renk, köşe ve çizgi yalnızca `--mx-*` tokenlarından. Örnek: `Hr/OrgChart.razor` (13.11.2026) |
 
 ## Pano bandı ve adım izi
 

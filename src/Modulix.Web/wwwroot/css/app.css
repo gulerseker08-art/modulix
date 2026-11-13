@@ -569,6 +569,54 @@ a, .btn-link {
     color: var(--mx-text-secondary);
 }
 
+/* Alan açıklaması baloncuğu: giriş alanıyla aynı kapsayıcıdaki .form-text, alanın üzerine gelince ya da
+   odaklanınca alanın üstünde açılır; formda yer kaplamaz. Hata/uyarı metni (.text-danger) hariçtir.
+   Koyu/açık tema: yüzey ve metin renkleri ters çevrilir. */
+div:has(> .form-text:not(.text-danger)):has(> :is(.form-control, .form-select, input, select, textarea)) {
+    position: relative;
+}
+
+div:has(> :is(.form-control, .form-select, input, select, textarea)) > .form-text:not(.text-danger) {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 0.5rem);
+    z-index: 30;
+    width: max-content;
+    max-width: min(20rem, 100%);
+    margin: 0 !important;
+    padding: var(--mx-space-2) 0.75rem;
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-text-primary);
+    color: var(--mx-surface);
+    box-shadow: var(--mx-shadow-popover);
+    line-height: 1.5;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    pointer-events: none;
+}
+
+div:has(> :is(.form-control, .form-select, input, select, textarea)) > .form-text:not(.text-danger)::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 1.25rem;
+    border: 6px solid transparent;
+    border-top-color: var(--mx-text-primary);
+}
+
+div:has(> :is(.form-control, .form-select, input, select, textarea)):hover > .form-text:not(.text-danger),
+div:has(> :is(.form-control, .form-select, input, select, textarea)):focus-within > .form-text:not(.text-danger) {
+    opacity: 1;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    div:has(> :is(.form-control, .form-select, input, select, textarea)) > .form-text:not(.text-danger) {
+        transition: none;
+    }
+}
+
 .form-control, .form-select {
     background-color: var(--mx-surface);
     color: var(--mx-text-primary);
@@ -2609,6 +2657,45 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
 
     .profile-card .badge.category {
         color: var(--mx-ink);
+    }
+
+/* Organizasyon ağacı (İK organizasyon şeması): girintili iç içe liste, alt düzeyler sol çizgiyle bağlanır. */
+.org-tree,
+.org-tree ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+    .org-tree ul {
+        margin-left: 1.25rem;
+        padding-left: 1rem;
+        border-left: 1px solid var(--mx-border);
+    }
+
+    .org-tree li {
+        padding-top: 0.5rem;
+    }
+
+.org-node {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    color: var(--mx-ink);
+}
+
+    .org-node small {
+        display: block;
+        color: var(--mx-muted);
+    }
+
+    .org-node.active {
+        background: var(--mx-tone-brand-bg);
+        border-color: var(--mx-tone-brand-fg);
     }
 
 .profile-plan {

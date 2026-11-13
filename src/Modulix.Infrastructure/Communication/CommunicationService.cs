@@ -543,5 +543,5 @@ internal sealed class CommunicationService(
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static (int Page, int Size) Paging(int page, int size) => (Math.Max(page, 1), Math.Clamp(size, 1, MaxPageSize));
+    private static (int Page, int Size) Paging(int page, int size) => (Math.Clamp(page, 1, 100_000), Math.Clamp(size, 1, MaxPageSize));
 }

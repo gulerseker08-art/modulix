@@ -30,8 +30,8 @@ public class ModulesAndRolesTests(ModulixApiFactory factory) : IClassFixture<Mod
 
         var modules = (await client.GetFromJsonAsync<List<ModuleDto>>("/api/tenant/modules"))!;
 
-        Assert.Equal(["contracts", "core", "crm", "fleet", "logistics", "marketing", "orders", "support", "warehouse"], modules.Select(m => m.Key));
-        Assert.Equal([false, true, false, false, true, false, false, false, false], modules.Select(m => m.IsEnabled));
+        Assert.Equal(["contracts", "core", "crm", "fleet", "hr", "logistics", "marketing", "orders", "support", "warehouse"], modules.Select(m => m.Key));
+        Assert.Equal([false, true, false, false, false, true, false, false, false, false], modules.Select(m => m.IsEnabled));
     }
 
     [Fact]

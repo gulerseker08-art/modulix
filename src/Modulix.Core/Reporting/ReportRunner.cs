@@ -262,7 +262,7 @@ public sealed class ReportRunner(
         var shown = (spec.IsSummary ? [.. dataset.DefaultColumns] : spec.Columns)
             .Select(columns.Find).Where(c => c is not null).Select(c => c!).Take(ReportLimits.MaxColumns).ToList();
         var pageSize = request.ForExport ? ReportLimits.MaxRowsRead : Math.Clamp(request.PageSize, 1, ReportLimits.MaxPageSize);
-        var page = request.ForExport ? 1 : Math.Max(1, request.Page);
+        var page = request.ForExport ? 1 : Math.Clamp(request.Page, 1, 100_000);
         var slice = computation.Matched.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
         var labelMap = new Dictionary<string, IReadOnlyDictionary<string, string>>();

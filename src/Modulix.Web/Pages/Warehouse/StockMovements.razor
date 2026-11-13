@@ -1,0 +1,418 @@
+@page "/depo/hareketler"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Stok hareketleri · Modulix</PageTitle>
+
+<AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.MovementsRead">
+    <PageHeader Title="Stok hareketleri" Icon="repeat" Subtitle="@(page is null ? "Giriş, çıkış, transfer ve düzeltme hareketlerinin defteri; kayıtlar değiştirilmez." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (creating)
+    {
+        <StockMovementEditor Lookups="Lookups" LotId="lotId" Saved="CreatedAsync" Cancelled="() => creating = false" />
+    }
+
+    @if (reversing is { } target)
+    {
+        @* Onay adımı: ters kayıt geri alınamaz (bir düzeltme yeniden düzeltilemez); düz kırmızı düğme onay adımındadır. *@
+        <div class="alert alert-warning" role="alertdialog" aria-labelledby="reverse-title">
+            <h2 id="reverse-title" class="h6">Hareketi geri al</h2>
+            <p>
+                @Lookups.Label(WarehouseAccess.MovementTypeList, WarehouseLabels.Text(target, "typeKey")) ·
+                @WarehouseLabels.NameOf(lotNames, WarehouseLabels.Id(target, "lotId")) ·
+                @WarehouseLabels.Number(WarehouseLabels.Decimal(target, "quantity")) hareketi için ters yönde bir düzeltme kaydı yazılır.
+                Bakiye buna göre değişir; düzeltme kaydı da değiştirilemez.
+            </p>
+            @if (AdjustmentTypes.Count > 1)
+            {
+                <label class="form-label" for="reverse-type">Düzeltme türü</label>
+                <select id="reverse-type" class="form-select mb-2" @bind="reverseTypeKey">
+                    @foreach (var type in AdjustmentTypes)
+                    {
+                        <option value="@type.Key">@type.Label</option>
+                    }
+                </select>
+            }
+            @if (AdjustmentTypes.Count == 0)
+            {
+                <p class="text-danger">Hareket türü listesinde düzeltme kategorisinde etkin bir tür yok; önce Ayarlar'dan ekleyin.</p>
+            }
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => reversing = null">Vazgeç</button>
+                <button type="button" class="btn btn-danger" disabled="@(busy || string.IsNullOrEmpty(reverseTypeKey))" aria-busy="@(busy ? "true" : "false")" @onclick="ReverseAsync">Geri al</button>
+            </div>
+        </div>
+    }
+
+    @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. Gün sınırları sunucuda UTC'dir. *@
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Stok hareketi görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Hareket ara" placeholder="Belge referansı ara" @bind="search" />
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(WarehouseAccess.MovementsWrite) && !creating)
+        {
+            <button type="button" class="btn btn-primary" @onclick="StartCreate"><AppIcon Name="plus" Size="16" /> Yeni hareket</button>
+        }
+    </div>
+
+    @if (filtersOpen || ActiveFilters > 0)
+    {
+        <div class="filters">
+            <select class="form-select" aria-label="Hareket türü" @bind="typeKey" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm türler</option>
+                @foreach (var type in Lookups.ValuesOf(WarehouseAccess.MovementTypeList))
+                {
+                    <option value="@type.Key">@type.Label</option>
+                }
+            </select>
+            <LookupPicker Id="movement-lot-filter" LookupKey="@WarehouseAccess.MovementLotLookup" Value="lotId" ValueChanged="ChooseLotAsync" Placeholder="Tüm partiler" />
+            <LookupPicker Id="movement-location-filter" LookupKey="@WarehouseAccess.MovementToLocationLookup" Value="locationId" ValueChanged="ChooseLocationAsync" Placeholder="Tüm lokasyonlar" />
+            <input class="form-control" type="date" aria-label="Başlangıç günü" @bind="occurredFrom" @bind:format="yyyy-MM-dd" @bind:after="() => LoadAsync(1)" />
+            <input class="form-control" type="date" aria-label="Bitiş günü" @bind="occurredTo" @bind:format="yyyy-MM-dd" @bind:after="() => LoadAsync(1)" />
+        </div>
+    }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <p class="text-muted" role="status">Yükleniyor…</p>
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan stok hareketi yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) stok hareketi listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Stok hareketi listesi</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var movement in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, movement)
+                        }
+                        <td class="row-menu-cell">
+                            @if (Session.Can(WarehouseAccess.MovementsWrite) && CanReverse(movement))
+                            {
+                                <RowMenu Label="@($"{WarehouseLabels.NameOf(lotNames, WarehouseLabels.Id(movement, "lotId"))} hareketi eylemleri")">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => StartReverse(movement)"><AppIcon Name="arrow-left" Size="16" /> <span>Geri al (ters kayıt)</span></button>
+                                </RowMenu>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + WarehouseAccess.StockMovementEntityKey;
+
+    private const string AllViews = "all";
+    private const string TodayView = "today";
+    private const string WeekView = "week";
+
+    // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (StockMovementRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("occurredAt", "Zaman", "clock", "occurredAt", "-occurredAt", Locked: true),
+        new("typeKey", "Tür", "tag", "typeKey", "-typeKey"),
+        new("lot", "Parti", "package"),
+        new("from", "Kaynak", "map-pin"),
+        new("to", "Hedef", "map-pin"),
+        new("quantity", "Miktar", "hash", "quantity", "-quantity"),
+        new("reasonKey", "Neden", "info", DefaultVisible: false),
+        new("documentReference", "Belge", "file-text"),
+        new("reverses", "Geri aldığı", "history", DefaultVisible: false),
+    ];
+
+    private readonly GridViewState grid = new("warehouse.stock-movements", "-occurredAt");
+    private PersonalGridViews views = default!;
+    private RecordPageResponse? page;
+    private readonly Dictionary<Guid, string> lotNames = [];
+    private readonly Dictionary<Guid, string> locationNames = [];
+    private bool creating;
+    private bool filtersOpen;
+    private bool busy;
+    private string? message;
+    private string? notice;
+    private string? search;
+    private string view = AllViews;
+    private string typeKey = "";
+    private Guid? locationId;
+    private DateOnly? occurredFrom;
+    private DateOnly? occurredTo;
+    private RecordResponse? reversing;
+    private string reverseTypeKey = "";
+    private string reverseKey = "";
+
+    /// <summary>Partiler ekranından gelince (?lotId=…) liste o partiyle süzülür ve yeni hareket formunda parti seçili gelir.</summary>
+    [SupplyParameterFromQuery(Name = "lotId")] public Guid? QueryLotId { get; set; }
+
+    private Guid? lotId;
+
+    private int ActiveFilters => (typeKey.Length > 0 ? 1 : 0) + (lotId is null ? 0 : 1) + (locationId is null ? 0 : 1)
+        + (view == AllViews && occurredFrom is not null ? 1 : 0) + (view == AllViews && occurredTo is not null ? 1 : 0);
+
+    private IReadOnlyList<ChoiceValueDto> AdjustmentTypes =>
+        [.. Lookups.ValuesOf(WarehouseAccess.MovementTypeList).Where(v => v.Active && v.Category == WarehouseAccess.MovementAdjustment)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, "warehouse.stock-movements");
+        lotId = QueryLotId;
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(WarehouseAccess.MovementsRead))
+        {
+            await Lookups.LoadAsync();
+            grid.Define(BaseColumns);
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private GridViewDto? Active => views.Find(view);
+
+    // Görünümler yalnızca süzgeçtir (Tümü, Bugün, Son 7 gün, kişisel); tür, parti, lokasyon ve tarih "Filtrele" ile açılır.
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm hareketler", Icon: "repeat"),
+        new(TodayView, "Bugün", Icon: "clock"),
+        new(WeekView, "Son 7 gün", Icon: "calendar"),
+        .. views.Options,
+    ];
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (Active is { } saved)
+        {
+            // Kişisel görünüm: sütunlar, sıralama ve süzgeç birlikte gelir. Tarihler sabit gün olarak saklanır.
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            typeKey = filters.GetValueOrDefault("typeKey") ?? "";
+            lotId = Guid.TryParse(filters.GetValueOrDefault("lotId"), out var lot) ? lot : null;
+            locationId = Guid.TryParse(filters.GetValueOrDefault("locationId"), out var location) ? location : null;
+            occurredFrom = DateOnly.TryParse(filters.GetValueOrDefault("occurredFrom"), out var from) ? from : null;
+            occurredTo = DateOnly.TryParse(filters.GetValueOrDefault("occurredTo"), out var to) ? to : null;
+        }
+        else
+        {
+            grid.Reset();
+            typeKey = "";
+            lotId = locationId = null;
+            occurredFrom = key switch { TodayView => today, WeekView => today.AddDays(-6), _ => null };
+            occurredTo = null;
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task ChooseLotAsync(Guid? id)
+    {
+        lotId = id;
+        await LoadAsync(1);
+    }
+
+    private async Task ChooseLocationAsync(Guid? id)
+    {
+        locationId = id;
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    // Sütun seçimi/sırası değişince veri yeniden çekilmez; olay işleyicisi sayfada olduğu için tablo yeniden çizilir.
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(
+        ("typeKey", typeKey), lotId is { } l ? ("lotId", l.ToString()) : null, locationId is { } loc ? ("locationId", loc.ToString()) : null,
+        occurredFrom is { } f ? ("occurredFrom", f.ToString("yyyy-MM-dd")) : null, occurredTo is { } t ? ("occurredTo", t.ToString("yyyy-MM-dd")) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (typeKey.Length > 0)
+        {
+            url += $"&typeKey={Uri.EscapeDataString(typeKey)}";
+        }
+
+        if (lotId is { } lot)
+        {
+            url += $"&lotId={lot}";
+        }
+
+        if (locationId is { } location)
+        {
+            url += $"&locationId={location}";
+        }
+
+        if (occurredFrom is { } from)
+        {
+            url += $"&occurredFrom={from:yyyy-MM-dd}";
+        }
+
+        if (occurredTo is { } to)
+        {
+            url += $"&occurredTo={to:yyyy-MM-dd}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+        if (page is not null)
+        {
+            // Parti ve lokasyon adları yalnızca bu sayfanın kimlikleri için seçim kutusunun çözümleme ucundan gelir; okuma izni yoksa "—".
+            await WarehouseLabels.ResolveNamesAsync(Api, WarehouseAccess.MovementLotLookup, page.Items.Select(m => WarehouseLabels.Id(m, "lotId")).OfType<Guid>(), lotNames);
+            var locations = page.Items.SelectMany(m => new[] { WarehouseLabels.Id(m, "fromLocationId"), WarehouseLabels.Id(m, "toLocationId") }).OfType<Guid>();
+            await WarehouseLabels.ResolveNamesAsync(Api, WarehouseAccess.MovementToLocationLookup, locations, locationNames);
+        }
+    }
+
+    // Düzeltme kaydı ve başka bir hareketi geri alan kayıt yeniden geri alınamaz (sunucu da reddeder); zaten geri alınmış olanı sunucu bildirir.
+    private bool CanReverse(RecordResponse movement) =>
+        WarehouseLabels.Id(movement, "reversesMovementId") is null
+        && Lookups.CategoryOf(WarehouseAccess.MovementTypeList, WarehouseLabels.Text(movement, "typeKey")) != WarehouseAccess.MovementAdjustment;
+
+    private void StartCreate()
+    {
+        creating = true;
+        reversing = null;
+        message = notice = null;
+    }
+
+    private void StartReverse(RecordResponse movement)
+    {
+        reversing = movement;
+        creating = false;
+        message = notice = null;
+        reverseTypeKey = AdjustmentTypes.FirstOrDefault()?.Key ?? "";
+        reverseKey = "ui-" + Guid.NewGuid().ToString("N");
+    }
+
+    private async Task ReverseAsync()
+    {
+        if (reversing is not { } target)
+        {
+            return;
+        }
+
+        busy = true;
+        var values = new JsonObject
+        {
+            ["typeKey"] = reverseTypeKey,
+            ["reversesMovementId"] = target.Id.ToString(),
+            // Onay adımı başına bir anahtar: çift tıklama ikinci ters kaydı yazmaz. Aynı hareketin ikinci kez geri alınmasını sunucu ayrıca reddeder.
+            ["idempotencyKey"] = reverseKey,
+        };
+        var result = await Api.PostAsync<RecordResponse>(Url, new RecordWriteRequest(values, null));
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            reversing = null;
+            notice = "Hareket ters kayıtla geri alındı; bakiye güncellendi.";
+            await LoadAsync(1);
+            return;
+        }
+
+        message = result.FieldErrors?.Values.SelectMany(v => v).FirstOrDefault() ?? result.Error;
+    }
+
+    private async Task CreatedAsync()
+    {
+        creating = false;
+        notice = "Stok hareketi kaydedildi; bakiye güncellendi.";
+        await LoadAsync(1);
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse movement) => @<td data-label="@column.Label" class="@(column.Key == "occurredAt" ? "primary" : null)">@CellContent(column.Key, movement)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse movement) => key switch
+    {
+        "occurredAt" => @<text>@(DateTimeOffset.TryParse(WarehouseLabels.Text(movement, "occurredAt"), out var at) ? CrmLabels.Time(at) : "—")</text>,
+        "typeKey" => @<span class="badge @TypeBadge(movement)">@Lookups.Label(WarehouseAccess.MovementTypeList, WarehouseLabels.Text(movement, "typeKey"))</span>,
+        "lot" => @<text>@WarehouseLabels.NameOf(lotNames, WarehouseLabels.Id(movement, "lotId"))</text>,
+        "from" => @<text>@WarehouseLabels.NameOf(locationNames, WarehouseLabels.Id(movement, "fromLocationId"))</text>,
+        "to" => @<text>@WarehouseLabels.NameOf(locationNames, WarehouseLabels.Id(movement, "toLocationId"))</text>,
+        "quantity" => @<text>@WarehouseLabels.Number(WarehouseLabels.Decimal(movement, "quantity"))</text>,
+        "reasonKey" => @<text>@(WarehouseLabels.Text(movement, "reasonKey") is { Length: > 0 } reason ? Lookups.Label(WarehouseAccess.MovementReasonList, reason) : "—")</text>,
+        "documentReference" => @<text>@(WarehouseLabels.Text(movement, "documentReference") is { Length: > 0 } document ? document : "—")</text>,
+        "reverses" => @<text>@(WarehouseLabels.Id(movement, "reversesMovementId") is null ? "—" : "Ters kayıt")</text>,
+        _ => @<text></text>,
+    };
+
+    private string TypeBadge(RecordResponse movement) =>
+        WarehouseLabels.MovementBadge(Lookups.CategoryOf(WarehouseAccess.MovementTypeList, WarehouseLabels.Text(movement, "typeKey")));
+}

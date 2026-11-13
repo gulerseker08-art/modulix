@@ -28,7 +28,7 @@ internal sealed class AutomationRuleService(
 {
     public async Task<AutomationRulePage> ListAsync(AutomationRuleQuery query, CancellationToken cancellationToken)
     {
-        var page = Math.Max(1, query.Page);
+        var page = Math.Clamp(query.Page, 1, 100_000);
         var pageSize = Math.Clamp(query.PageSize, 1, AutomationRuleQuery.MaxPageSize);
         var rules = db.AutomationRules.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(query.ModuleKey))

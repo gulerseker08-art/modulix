@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Modulix.Core.Audit;
 using Modulix.Core.Authorization;
 using Modulix.Core.Automation;
@@ -160,6 +161,8 @@ public static class PersistenceSetup
         services.AddScoped<ILookupSettings>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<ILookupSearch>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<ISectorProfileService, SectorProfileService>();
+        services.AddScoped<ISubProfileService, SubProfileService>();
+        services.TryAddSingleton<CustomizationLimits>(); // varsayılan: sınırsız (ADR-0041 K7); uygulama yapılandırmadan üzerine yazar
         services.AddScoped<ISectorCatalog, SectorCatalogService>();
         services.AddScoped<IStarterPackages, StarterPackageInstaller>();
         services.AddScoped<IRelationshipRoles, RelationshipRoleService>();

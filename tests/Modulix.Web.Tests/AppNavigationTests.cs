@@ -7,6 +7,7 @@ using Modulix.Shared.Marketing;
 using Modulix.Shared.Orders;
 using Modulix.Shared.Support;
 using Modulix.Shared.Fleet;
+using Modulix.Shared.Hr;
 using Modulix.Shared.Logistics;
 using Modulix.Shared.Warehouse;
 using Modulix.Web.Services;
@@ -317,7 +318,7 @@ public class AppNavigationTests
 
         var root = Assert.Single(nav.Roots());
         Assert.Equal((AppCatalog.Logistics, "Lojistik"), (root.Id, root.Name));
-        Assert.Equal(["Sürücüler", "Sürücü belgeleri"], nav.MenuEntries(AppCatalog.Logistics).Select(e => e.Name)); // belge takibi sürücü okuma iznine bağlı
+        Assert.Equal(["Pano", "Sürücüler", "Sürücü belgeleri"], nav.MenuEntries(AppCatalog.Logistics).Select(e => e.Name)); // belge takibi ve pano sürücü okuma iznine bağlı
         Assert.Equal(AppCatalog.Logistics, nav.Context("lojistik/suruculer")!.Root.Id);
         Assert.Equal(AppCatalog.Logistics, nav.Context("lojistik/surucu-belgeleri")!.Root.Id);
 
@@ -325,8 +326,12 @@ public class AppNavigationTests
         Assert.Empty(Nav([LogisticsAccess.ModuleKey], []).Roots());
 
         // Taşıyıcı anlaşmaları kendi iznine bağlıdır: sürücü izni yetmez.
-        Assert.Equal(["Sürücüler", "Taşıyıcı anlaşmaları", "Sürücü belgeleri"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.DriversRead, LogisticsAccess.CarriersRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
+        Assert.Equal(["Pano", "Sürücüler", "Taşıyıcı anlaşmaları", "Sürücü belgeleri"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.DriversRead, LogisticsAccess.CarriersRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
         Assert.Equal(["Taşıyıcı anlaşmaları"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.CarriersRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
+
+        // Pano talep, sevkiyat, sefer ya da sürücü okuma izinlerinden biriyle görünür; taşıyıcı izni yetmez.
+        Assert.Equal("Pano", Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.TripsRead]).MenuEntries(AppCatalog.Logistics).First().Name);
+        Assert.Equal("lojistik/pano", Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.TripsRead]).Find("logistics.dashboard")!.Route);
     }
 
     [Fact]
@@ -379,10 +384,32 @@ public class AppNavigationTests
     }
 
     [Fact]
+    public void Hr_app_shows_employees_directory_and_org_chart_only_with_the_module_and_the_permission()
+    {
+        var nav = Nav([HrAccess.ModuleKey], [HrAccess.EmployeesRead]);
+
+        var root = Assert.Single(nav.Roots());
+        Assert.Equal((AppCatalog.Hr, "İnsan Kaynakları"), (root.Id, root.Name));
+        Assert.Equal(["Çalışanlar", "Rehber", "Organizasyon şeması"], nav.MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal("ik/calisanlar", nav.Find("hr.employees")!.Route);
+        Assert.Equal(AppCatalog.Hr, nav.Context("ik/rehber")!.Root.Id);
+        Assert.Equal(AppCatalog.Hr, nav.Context("ik/organizasyon-semasi")!.Root.Id);
+
+        // İzin ekranları kendi izinlerine bağlıdır: çalışan "İzinlerim"i, yönetici talepleri, İK hakları ve tatilleri görür.
+        Assert.Equal(["Çalışanlar", "Rehber", "Organizasyon şeması", "İzinlerim"],
+            Nav([HrAccess.ModuleKey], [HrAccess.EmployeesRead, HrAccess.LeavesRead, HrAccess.LeavesRequest]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Contains("İzin talepleri", Nav([HrAccess.ModuleKey], [HrAccess.LeavesApprove]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["İzin talepleri", "İzin hakları", "Resmî tatiller"], Nav([HrAccess.ModuleKey], [HrAccess.LeavesManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
+        Assert.Empty(Nav([], [HrAccess.EmployeesRead]).Roots());
+        Assert.Empty(Nav([HrAccess.ModuleKey], []).Roots());
+    }
+
+    [Fact]
     public void Planned_apps_are_listed_as_inert_cards_and_never_as_real_apps()
     {
-        // Antrepo ve Lojistik artık gerçek uygulamadır (AppCatalog.All); pasif kart olarak kalmaz.
-        Assert.Equal(["İnsan Kaynakları"], AppCatalog.Planned.Select(p => p.Name));
+        // Antrepo, Lojistik ve İnsan Kaynakları artık gerçek uygulamadır (AppCatalog.All); pasif kart olarak kalmaz.
+        Assert.Empty(AppCatalog.Planned);
 
         // Pasif kart: route'u, menüsü ve yetkisi yoktur; gerçek bir uygulama kataloğa girince çakışmamalı.
         var realNames = AppCatalog.All.Where(a => a.ParentId is null).Select(a => a.Name).ToHashSet();

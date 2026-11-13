@@ -3,6 +3,8 @@
 # Test ortami guncel imaji su komutlarla ceker:
 #   docker pull ghcr.io/gulerseker08-art/modulix-api:main
 #   (compose ile: image satirini bu etikete cevirip `docker compose pull api && docker compose up -d api`)
+#   Test ortami Development ile calistirilmaz: ASPNETCORE_ENVIRONMENT=Staging ve App__PublicUrl verilmelidir
+#   (Development e-posta baglantilarini istek basligindaki Host ile kurar ve OpenAPI/hata sayfasini acar).
 # Etiketler: main (hep en son main), sha-<kisa commit> (geri donus icin degismez).
 # Gizli bilgi imaja girmez; yapilandirma calisma aninda ortam degiskenleriyle verilir (tek imaj ilkesi).
 

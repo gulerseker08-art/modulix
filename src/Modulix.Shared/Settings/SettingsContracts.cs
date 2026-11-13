@@ -64,4 +64,7 @@ public static class SettingKeys
 
     /// <summary>Otomasyon acil durdurma anahtarı (ADR-0027): "false" ise firmanın hiçbir kuralı çalışmaz.</summary>
     public const string AutomationEnabled = "core.automation.enabled";
+
+    /// <summary>Yapay zekâ erişimi: "Hayır" ise firmada yapay zekâ özellikleri kapalıdır (varsayılan kapalı; açık rıza).</summary>
+    public const string AiEnabled = "core.ai.enabled";
 }

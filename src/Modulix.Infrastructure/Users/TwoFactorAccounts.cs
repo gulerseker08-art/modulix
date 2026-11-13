@@ -104,6 +104,8 @@ public sealed class TwoFactorAccounts(
 
         if (await VerifyCodeAsync(user, code) == TwoFactorCodeResult.Invalid)
         {
+            // Hatalı kodlar da sayılır: şifreyi bilen biri 6 haneli kodu sınırsız deneyemesin.
+            await users.AccessFailedAsync(user);
             throw new ArgumentException("Kod doğru değil. Uygulamadaki kodu veya bir kurtarma kodunu girin.", "code");
         }
 
@@ -155,6 +157,21 @@ public sealed class TwoFactorAccounts(
         if (user is null)
         {
             return false;
+        }
+
+        // Platform hesabının ikinci adımı yalnızca platform sahibi (Owner) tarafından ve başkası için sıfırlanır; yoksa
+        // Destek/Operasyon rolündeki biri üst yetkili bir hesabın doğrulamasını kapatıp o hesabın rolünü ele geçirebilir.
+        if (PlatformRoles.Effective(user.IsPlatformAdministrator, user.PlatformRoles) != PlatformRole.None)
+        {
+            ModulixUser? actor = await users.FindByIdAsync(platformAdministratorId.ToString());
+            bool actorIsOwner = actor is not null
+                && PlatformRoles.Effective(actor.IsPlatformAdministrator, actor.PlatformRoles).HasFlag(PlatformRole.Owner);
+            if (!actorIsOwner || user.Id == platformAdministratorId)
+            {
+                throw new UserAdministrationException(
+                    UserAdministrationError.PermissionDenied,
+                    "Platform hesabının iki adımlı doğrulamasını yalnızca başka bir platform sahibi sıfırlayabilir.");
+            }
         }
 
         if (!user.TwoFactorEnabled)
@@ -241,6 +258,12 @@ public sealed class TwoFactorAccounts(
         if (string.IsNullOrEmpty(currentPassword))
         {
             throw new ArgumentException("Mevcut şifrenizi girin.", "currentPassword");
+        }
+
+        // Kilitli hesapta doğru şifre de kabul edilmez; yoksa kilit açık oturumdan sınırsız denemeyi durdurmaz.
+        if (await users.IsLockedOutAsync(user))
+        {
+            throw new ArgumentException("Çok fazla hatalı deneme yapıldı; bir süre sonra yeniden deneyin.", "currentPassword");
         }
 
         if (!await users.CheckPasswordAsync(user, currentPassword))
