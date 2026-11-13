@@ -77,6 +77,24 @@ public static class SectorEndpoints
             .WithTags("Sectors")
             .MapGet("/", async (IRelationshipRoles service, CancellationToken ct) => (await service.ListAsync(ct)).Select(ToDto).ToList());
 
+        // Sektör kataloğu (ADR-0043): platform yönetir; sektör silinmez, pasife alınır.
+        catalog.MapGet("/industries", async (IIndustries service, CancellationToken ct) => (await service.ListAsync(ct)).Select(ToDto).ToList());
+        catalog.MapPost("/industries", (CreateIndustryRequest request, ClaimsPrincipal user, IIndustries service, CancellationToken ct) =>
+            Run(async () =>
+            {
+                var industry = await service.CreateAsync(UserId(user), request.Code, request.Name, ct);
+                return Results.Created($"/api/platform/sectors/industries/{industry.Code}", ToDto(industry));
+            }));
+        catalog.MapPut("/industries/{code}/active", (string code, SetActiveRequest request, ClaimsPrincipal user, IIndustries service, CancellationToken ct) =>
+            Run(async () => Results.Ok(ToDto(await service.SetActiveAsync(UserId(user), code, request.Active, ct)))));
+
+        // Firma formu sektörü katalogdan seçer: ürün standardıdır, tenant verisi değildir; her tenant kullanıcısı okuyabilir.
+        app.MapGroup("/api/industries")
+            .RequireAuthorization()
+            .AddEndpointFilter<RequireTenantFilter>()
+            .WithTags("Sectors")
+            .MapGet("/", async (IIndustries service, CancellationToken ct) => (await service.ListAsync(ct)).Select(ToDto).ToList());
+
         // Müşteri sektörü ve hizmet ihtiyacı seçimi aktif faaliyet ağacını okur; yalnızca ad ve konum döner, yetenek/sürüm bilgisi dönmez.
         app.MapGroup("/api/activity-options")
             .RequireAuthorization()
@@ -150,6 +168,8 @@ public static class SectorEndpoints
         new([.. p.CapabilitiesToCreate], [.. p.CapabilitiesExisting], [.. p.NodesToCreate], [.. p.NodesExisting], [.. p.Warnings], [.. p.Completions], p.NothingToDo);
 
     private static RelationshipRoleDto ToDto(RelationshipRoleView r) => new(r.Id, r.Code, r.Name, r.IsActive);
+
+    private static IndustryDto ToDto(IndustryView i) => new(i.Id, i.Code, i.Name, i.IsActive);
 
     private static List<ActivityOptionDto> ActivityOptions(SectorCatalogView view)
     {

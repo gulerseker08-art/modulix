@@ -68,6 +68,8 @@ internal static class CargoTables
         LogisticsTables.ConfigureCommon(builder, table);
         builder.Property(e => e.TransportModeKey).HasMaxLength(50).IsRequired();
         builder.Property(e => e.PickupCity).HasMaxLength(CargoEntity.CityMaxLength).IsRequired();
+        builder.Property(e => e.PickupCountry).HasMaxLength(CargoEntity.CountryLength).IsUnicode(false).IsFixedLength().IsRequired().HasDefaultValue(CargoEntity.DefaultCountry);
+        builder.Property(e => e.DeliveryCountry).HasMaxLength(CargoEntity.CountryLength).IsUnicode(false).IsFixedLength().IsRequired().HasDefaultValue(CargoEntity.DefaultCountry);
         builder.Property(e => e.PickupAddress).HasMaxLength(CargoEntity.AddressMaxLength);
         builder.Property(e => e.DeliveryCity).HasMaxLength(CargoEntity.CityMaxLength).IsRequired();
         builder.Property(e => e.DeliveryAddress).HasMaxLength(CargoEntity.AddressMaxLength);
@@ -183,17 +185,17 @@ internal sealed class TripExpenseConfiguration : IEntityTypeConfiguration<TripEx
     public void Configure(EntityTypeBuilder<TripExpense> builder)
     {
         LogisticsTables.ConfigureCommon(builder, "TripExpenses");
-        builder.Property(e => e.ExpenseTypeKey).HasMaxLength(40).IsUnicode(false).IsRequired();
+        builder.Property(e => e.KindKey).HasMaxLength(50).IsRequired();
+        builder.Property(e => e.Description).HasMaxLength(TripExpense.DescriptionMaxLength).IsRequired();
         builder.Property(e => e.Amount).HasPrecision(18, 2);
         builder.Property(e => e.Currency).HasMaxLength(LogisticsEntity.CurrencyLength).IsFixedLength().IsUnicode(false).IsRequired();
         builder.Property(e => e.VatAmount).HasPrecision(18, 2);
         builder.Property(e => e.DocumentNo).HasMaxLength(TripExpense.DocumentNoMaxLength);
         builder.Property(e => e.Liters).HasPrecision(12, 3);
-        builder.Property(e => e.Notes).HasMaxLength(TripExpense.TextMaxLength);
         builder.Property(e => e.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
-        builder.Property(e => e.StatusReason).HasMaxLength(TripExpense.TextMaxLength);
+        builder.Property(e => e.StatusReason).HasMaxLength(TripExpense.ReasonMaxLength);
 
-        // Sefer masrafları ve duruma göre bekleyen listesi; sefere aynı modül içinde bileşik yabancı anahtar (silinmez, K12).
+        // Seferin masrafları tarih sırasıyla; onay bekleyenler durum dizininden. Sefere aynı modül içinde bileşik yabancı anahtar.
         builder.HasIndex(e => new { e.TenantId, e.TripId, e.ExpenseDate }).HasDatabaseName("IX_TripExpenses_Trip");
         builder.HasIndex(e => new { e.TenantId, e.Status, e.ExpenseDate }).HasDatabaseName("IX_TripExpenses_Status");
         builder.HasOne<Trip>().WithMany().HasForeignKey(e => new { e.TenantId, e.TripId })

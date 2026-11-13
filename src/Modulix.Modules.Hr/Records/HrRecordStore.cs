@@ -120,7 +120,8 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
 
     public async Task<RecordData?> FindAsync(Guid id, CancellationToken cancellationToken)
     {
-        var entity = await Data.Set<TEntity>().AsNoTracking().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var visible = await RestrictAsync(Data.Set<TEntity>().AsNoTracking(), cancellationToken);
+        var entity = await visible.SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
         if (entity is null)
         {
             return null;
@@ -130,10 +131,16 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
         return ToData(entity);
     }
 
+    /// <summary>
+    /// Kullanıcıya göre okuma süzgeci (rol kapsamından bağımsız iş kuralı; ör. duyurunun hedef kitlesi ve yayın tarihi). Tekil okumada ve listede
+    /// uygulanır; görünmeyen kayıt "bulunamadı"dır. Varsayılan: süzgeç yok.
+    /// </summary>
+    protected virtual Task<IQueryable<TEntity>> RestrictAsync(IQueryable<TEntity> source, CancellationToken cancellationToken) => Task.FromResult(source);
+
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
     {
         var (queryFilters, sort) = SplitSort(query.Filters);
-        var source = ApplyFilters(Data.Set<TEntity>().AsNoTracking(), queryFilters);
+        var source = ApplyFilters(await RestrictAsync(Data.Set<TEntity>().AsNoTracking(), cancellationToken), queryFilters);
         if (query.Owners is { } owners && OwnerFieldName is not null)
         {
             source = ScopeToOwners(source, owners);

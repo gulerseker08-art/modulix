@@ -19,7 +19,7 @@ public class LogisticsAutomationCapabilityTests
 
         Assert.Equal(["core", "logistics"], catalog.Modules.Select(m => m.Key));
         Assert.Equal(
-            [LogisticsModule.AutomationEntityKeys.Shipment, LogisticsModule.AutomationEntityKeys.TransportRequest, LogisticsModule.AutomationEntityKeys.Trip],
+            [LogisticsModule.AutomationEntityKeys.Shipment, LogisticsModule.AutomationEntityKeys.TransportRequest, LogisticsModule.AutomationEntityKeys.Trip, LogisticsModule.AutomationEntityKeys.TripExpense],
             catalog.AutomationEntities.Where(e => e.ModuleKey != "core").Select(e => e.Entity.EntityKey).Order());
         Assert.All(catalog.AutomationEntities.Where(e => e.ModuleKey != "core"), e => Assert.Equal("logistics", e.ModuleKey));
     }

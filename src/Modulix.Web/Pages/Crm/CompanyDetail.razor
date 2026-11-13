@@ -31,9 +31,9 @@
                 <span class="page-icon" aria-hidden="true"><AppIcon Name="building" Size="24" /></span>
                 <div>
                     <h1>@company.Name</h1>
-                    @if (company.Industry is not null || company.City is not null)
+                    @if (company.IndustryName is not null || company.LegacyIndustry is not null || company.City is not null)
                     {
-                        <p class="page-subtitle">@(string.Join(" · ", new[] { company.Industry, company.City }.Where(x => !string.IsNullOrWhiteSpace(x))))</p>
+                        <p class="page-subtitle">@(string.Join(" · ", new[] { company.IndustryName ?? company.LegacyIndustry, company.City }.Where(x => !string.IsNullOrWhiteSpace(x))))</p>
                     }
                     <div class="header-meta">
                         <span class="badge status-@Lookups.Badge(CrmLists.CompanyStatus, company.Status)">@Lookups.Label(CrmLists.CompanyStatus, company.Status)</span>
@@ -68,7 +68,7 @@
 
                     <dl class="summary-facts">
                         <div><dt>@Texts.Get("common.field.owner")</dt><dd>@Lookups.MemberName(company.OwnerId)</dd></div>
-                        @if (company.Industry is { } industry)
+                        @if ((company.IndustryName ?? company.LegacyIndustry) is { } industry)
                         {
                             <div><dt>@Texts.Get("crm.companies.col.industry")</dt><dd>@industry</dd></div>
                         }

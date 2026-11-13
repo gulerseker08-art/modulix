@@ -1,0 +1,162 @@
+@* Anket formu (ADR-0042 dilim 7). Düzen firmanın form düzenine (ADR-0021) göre çizilir. "Kimliği gizli" yalnızca oluştururken seçilir (sunucu sonradan
+   değiştirmez); durum (yanıta aç, kapat) formdan değil eylem çubuğundan değişir. Hedef departman boşsa bütün çalışanlar yanıtlar. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Survey is null ? "Yeni anket" : "Anket")</h2>
+            @if (Survey is not null)
+            {
+                <p>@HrLabels.SurveyStatus(WarehouseLabels.Text(Survey, "status")) · @WarehouseLabels.Number(Survey, "questionCount") soru · @WarehouseLabels.Number(Survey, "responseCount") yanıt</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Anket bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
+            {
+                case "title":
+                    <label class="@f.LabelClass()" for="survey-title">@f.Label</label>
+                    <input id="survey-title" class="form-control" maxlength="200" required aria-required="true" placeholder="ör. Çalışan memnuniyeti 2026" @bind="form.Title" />
+                    <FieldError Field="title" Errors="errors" />
+                    break;
+                case "description":
+                    <label class="@f.LabelClass()" for="survey-description">@f.Label</label>
+                    <textarea id="survey-description" class="form-control" rows="3" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                    <FieldError Field="description" Errors="errors" />
+                    break;
+                case "isAnonymous":
+                    <div class="form-check mt-4">
+                        <input id="survey-anonymous" class="form-check-input" type="checkbox" disabled="@(form.Id is not null)" @bind="form.IsAnonymous" />
+                        <label class="form-check-label" for="survey-anonymous">@f.Label</label>
+                    </div>
+                    <small class="text-muted">Sonuçlarda kimin ne yanıtladığı gösterilmez; en az @MinAnonymousResponses yanıt gelince özet görünür. Kaydettikten sonra değişmez.</small>
+                    break;
+                case "audienceDepartmentKey":
+                    <label class="@f.LabelClass()" for="survey-audience">@f.Label</label>
+                    <select id="survey-audience" class="form-select" @bind="form.AudienceDepartmentKey">
+                        <option value="">Bütün çalışanlar</option>
+                        @foreach (var department in Lookups.Choices(HrAccess.DepartmentList, form.AudienceDepartmentKey))
+                        {
+                            <option value="@department.Key">@department.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="audienceDepartmentKey" Errors="errors" />
+                    break;
+                case "closesOn":
+                    <label class="@f.LabelClass()" for="survey-closes">@f.Label</label>
+                    <input id="survey-closes" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ClosesOn" />
+                    <FieldError Field="closesOn" Errors="errors" />
+                    <small class="text-muted">Boşsa elle kapatılana kadar açık.</small>
+                    break;
+            }
+        </Field>
+    </LayoutForm>
+</form>
+
+@code {
+    private const string EntityKey = HrAccess.SurveyEntityKey;
+    private const int MinAnonymousResponses = 3;
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private SurveyForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    [Parameter] public RecordResponse? Survey { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        form = Survey is { } s
+            ? new SurveyForm
+            {
+                Id = s.Id, Version = s.Version, Title = WarehouseLabels.Text(s, "title"), Description = WarehouseLabels.Text(s, "description"),
+                IsAnonymous = WarehouseLabels.Flag(s, "isAnonymous"), AudienceDepartmentKey = WarehouseLabels.Text(s, "audienceDepartmentKey"),
+                ClosesOn = FleetLabels.Day(WarehouseLabels.Text(s, "closesOn")), Custom = s.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new SurveyForm();
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var values = new JsonObject
+        {
+            ["title"] = string.IsNullOrWhiteSpace(form.Title) ? null : form.Title.Trim(),
+            ["description"] = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
+            ["audienceDepartmentKey"] = string.IsNullOrEmpty(form.AudienceDepartmentKey) ? null : form.AudienceDepartmentKey,
+            ["closesOn"] = form.ClosesOn?.ToString("yyyy-MM-dd"),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            values["isAnonymous"] = form.IsAnonymous;
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var url = "/api/records/" + EntityKey;
+        var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{url}/{id}", request) : await Api.PostAsync<RecordResponse>(url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class SurveyForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string? Title { get; set; }
+
+        public string? Description { get; set; }
+
+        public bool IsAnonymous { get; set; }
+
+        public string? AudienceDepartmentKey { get; set; }
+
+        public DateOnly? ClosesOn { get; set; }
+    }
+}

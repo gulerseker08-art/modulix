@@ -2,18 +2,18 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>İndirim politikaları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.discountPolicies.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.PricesRead">
     <div class="page-header">
-        <h1>İndirim politikaları</h1>
+        <h1>@Texts.Get("crm.discountPolicies.title")</h1>
         @if (Session.Can(CrmAccess.PricesWrite) && form is null)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => form = new()">Yeni politika</button>
+            <button type="button" class="btn btn-primary" @onclick="() => form = new()">@Texts.Get("crm.discountPolicies.newButton")</button>
         }
     </div>
 
-    <p class="text-muted">İndirimler öncelik sırasıyla ardışık uygulanır (%10 + %10 = %19). Onay eşiğini aşan etkin indirim fiyat hesabında "onay gerekir" olarak işaretlenir; azami toplam yüzde aşılırsa indirim o sınıra çekilir.</p>
+    <p class="text-muted">@Texts.Get("crm.discountPolicies.help")</p>
 
     @if (message is not null)
     {
@@ -23,30 +23,30 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>@(form.Id is null ? "Yeni indirim politikası" : "Politikayı düzenle")</h2>
-            <FormTabs Title="Politika bilgileri" Label="İndirim politikası formu bölümleri">
+            <h2>@(form.Id is null ? Texts.Get("crm.discountPolicies.new") : Texts.Get("crm.discountPolicies.edit"))</h2>
+            <FormTabs Title="@Texts.Get("crm.discountPolicies.info")" Label="@Texts.Get("crm.discountPolicies.formSections")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="name">Ad *</label>
+                    <label class="form-label" for="name">@Texts.Get("common.field.nameRequired")</label>
                     <input id="name" class="form-control" maxlength="150" @bind="form.Name" />
                     <FieldError Field="name" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="kind">Tür</label>
+                    <label class="form-label" for="kind">@Texts.Get("common.field.kind")</label>
                     <select id="kind" class="form-select" @bind="form.ByAmount">
-                        <option value="False">Yüzde</option>
-                        <option value="True">Tutar</option>
+                        <option value="False">@Texts.Get("crm.discountPolicies.kind.percent")</option>
+                        <option value="True">@Texts.Get("crm.quote-discount.amount")</option>
                     </select>
                 </div>
                 @if (form.ByAmount)
                 {
                     <div>
-                        <label class="form-label" for="amount">Tutar *</label>
+                        <label class="form-label" for="amount">@Texts.Get("crm.discountPolicies.field.amount")</label>
                         <input id="amount" class="form-control" type="number" step="0.01" min="0" @bind="form.Amount" />
                         <FieldError Field="amount" Errors="errors" />
                     </div>
                     <div>
-                        <label class="form-label" for="currency">Para birimi *</label>
+                        <label class="form-label" for="currency">@Texts.Get("common.field.currencyRequired")</label>
                         <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />
                         <FieldError Field="currency" Errors="errors" />
                     </div>
@@ -54,58 +54,58 @@
                 else
                 {
                     <div>
-                        <label class="form-label" for="percent">Yüzde *</label>
+                        <label class="form-label" for="percent">@Texts.Get("crm.discountPolicies.field.percent")</label>
                         <input id="percent" class="form-control" type="number" step="any" min="0" max="100" @bind="form.Percent" />
                         <FieldError Field="percent" Errors="errors" />
                     </div>
                 }
                 <div>
-                    <label class="form-label" for="priority">Öncelik (küçük önce)</label>
+                    <label class="form-label" for="priority">@Texts.Get("crm.discountPolicies.field.priority")</label>
                     <input id="priority" class="form-control" type="number" min="0" @bind="form.Priority" />
                     <FieldError Field="priority" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="stackable">Başka indirimle birleşir</label>
+                    <label class="form-label" for="stackable">@Texts.Get("crm.discountPolicies.field.stackable")</label>
                     <select id="stackable" class="form-select" @bind="form.Stackable">
-                        <option value="True">Evet</option>
-                        <option value="False">Hayır</option>
+                        <option value="True">@Texts.Get("common.yes")</option>
+                        <option value="False">@Texts.Get("common.no")</option>
                     </select>
                 </div>
                 <div>
-                    <label class="form-label" for="maxTotal">Azami toplam indirim (%)</label>
+                    <label class="form-label" for="maxTotal">@Texts.Get("crm.discountPolicies.field.maxTotal")</label>
                     <input id="maxTotal" class="form-control" type="number" step="any" min="0" max="100" @bind="form.MaxTotalPercent" />
                     <FieldError Field="maxTotalPercent" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="approval">Onay eşiği (%)</label>
+                    <label class="form-label" for="approval">@Texts.Get("crm.discountPolicies.field.approval")</label>
                     <input id="approval" class="form-control" type="number" step="any" min="0" max="100" @bind="form.ApprovalAbovePercent" />
                     <FieldError Field="approvalAbovePercent" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="from">Geçerlilik başı</label>
+                    <label class="form-label" for="from">@Texts.Get("crm.priceLists.field.validFrom")</label>
                     <input id="from" class="form-control" type="date" @bind="form.ValidFrom" />
                     <FieldError Field="validFrom" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="to">Geçerlilik sonu (dahil)</label>
+                    <label class="form-label" for="to">@Texts.Get("crm.discountPolicies.field.validTo")</label>
                     <input id="to" class="form-control" type="date" @bind="form.ValidTo" />
                     <FieldError Field="validTo" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="active">Durum</label>
+                    <label class="form-label" for="active">@Texts.Get("common.field.status")</label>
                     <select id="active" class="form-select" @bind="form.IsActive">
-                        <option value="True">Aktif</option>
-                        <option value="False">Pasif</option>
+                        <option value="True">@Texts.Get("common.active")</option>
+                        <option value="False">@Texts.Get("common.inactive")</option>
                     </select>
                 </div>
             </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </form>
@@ -113,29 +113,29 @@
 
     @if (policies is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else if (policies.Count == 0)
     {
-        <p class="text-muted">İndirim politikası yok.</p>
+        <p class="text-muted">@Texts.Get("crm.discountPolicies.none")</p>
     }
     else
     {
         <table class="table record-table">
-            <thead><tr><th>Ad</th><th>İndirim</th><th>Öncelik</th><th>Sınırlar</th><th>Durum</th><th></th></tr></thead>
+            <thead><tr><th>@Texts.Get("common.field.name")</th><th>@Texts.Get("crm.discountPolicies.col.discount")</th><th>@Texts.Get("crm.discountPolicies.col.priority")</th><th>@Texts.Get("crm.discountPolicies.col.limits")</th><th>@Texts.Get("common.field.status")</th><th></th></tr></thead>
             <tbody>
                 @foreach (var policy in policies)
                 {
                     <tr>
-                        <td data-label="Ad" class="primary">@policy.Name</td>
-                        <td data-label="İndirim">@(policy.Percent is { } p ? $"%{p}" : $"{policy.Amount} {policy.Currency}")</td>
-                        <td data-label="Öncelik">@policy.Priority@(policy.Stackable ? null : " · birleşmez")</td>
-                        <td data-label="Sınırlar">@Limits(policy)</td>
-                        <td data-label="Durum">@(policy.IsActive ? "Aktif" : "Pasif")</td>
+                        <td data-label="@Texts.Get("common.field.name")" class="primary">@policy.Name</td>
+                        <td data-label="@Texts.Get("crm.discountPolicies.col.discount")">@(policy.Percent is { } p ? $"%{p}" : $"{policy.Amount} {policy.Currency}")</td>
+                        <td data-label="@Texts.Get("crm.discountPolicies.col.priority")">@policy.Priority@(policy.Stackable ? null : " · " + Texts.Get("crm.discountPolicies.notStackable"))</td>
+                        <td data-label="@Texts.Get("crm.discountPolicies.col.limits")">@Limits(policy)</td>
+                        <td data-label="@Texts.Get("common.field.status")">@(policy.IsActive ? Texts.Get("common.active") : Texts.Get("common.inactive"))</td>
                         <td class="actions">
                             @if (Session.Can(CrmAccess.PricesWrite))
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(policy)">Düzenle</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(policy)">@Texts.Get("common.edit")</button>
                             }
                         </td>
                     </tr>
@@ -175,12 +175,12 @@
         var parts = new List<string>();
         if (policy.MaxTotalPercent is { } max)
         {
-            parts.Add($"azami %{max}");
+            parts.Add(Texts.Get("crm.discountPolicies.limit.max", max.ToString()));
         }
 
         if (policy.ApprovalAbovePercent is { } approval)
         {
-            parts.Add($"%{approval} üstü onay");
+            parts.Add(Texts.Get("crm.discountPolicies.limit.approval", approval.ToString()));
         }
 
         if (policy.ValidFrom is not null || policy.ValidTo is not null)

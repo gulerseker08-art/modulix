@@ -135,6 +135,10 @@ public sealed class CarrierTerms : LogisticsEntity
 public abstract class CargoEntity : LogisticsEntity
 {
     public const int CityMaxLength = 100;
+    public const int CountryLength = 2;
+
+    /// <summary>Ülke gönderilmediğinde ve firma ayarı yokken kullanılan ülke (ADR-0043 K2); sütun varsayılanı da budur (geriye uyumlu geçiş).</summary>
+    public const string DefaultCountry = "TR";
     public const int AddressMaxLength = 500;
     public const int TextMaxLength = 2000;
     public const int ReasonMaxLength = 500;
@@ -150,9 +154,15 @@ public abstract class CargoEntity : LogisticsEntity
 
     public string PickupCity { get; internal set; } = string.Empty;
 
+    /// <summary>Yükleme yerinin ülkesi: ISO 3166-1 alfa-2, büyük harf (ADR-0043 K1). Gönderilmezse firmanın varsayılan ülkesi.</summary>
+    public string PickupCountry { get; internal set; } = DefaultCountry;
+
     public string? PickupAddress { get; internal set; }
 
     public string DeliveryCity { get; internal set; } = string.Empty;
+
+    /// <summary>Teslim yerinin ülkesi: ISO 3166-1 alfa-2, büyük harf (ADR-0043 K1).</summary>
+    public string DeliveryCountry { get; internal set; } = DefaultCountry;
 
     public string? DeliveryAddress { get; internal set; }
 
@@ -407,4 +417,72 @@ public sealed class DeliveryProof : LogisticsEntity
     public string? FailureReason { get; internal set; }
 
     public string? Notes { get; internal set; }
+}
+
+/// <summary>
+/// Sefer masrafı (ADR-0038 K10, dilim 8): seferde yapılan harcama (yakıt, geçiş ücreti, harcırah, trafik cezası, diğer). Operasyon kaydıdır;
+/// ödeme, kasa ve banka finans işidir ve burada yoktur. Tür firmanın seçim listesindendir (Y9b <c>logistics.expense-kind</c>), kod türün
+/// adına değil <b>kategorisine</b> bakar: yakıt kategorisi litre ve kilometre alanlarını taşır (araç yakıt raporu buradan türetilir, ayrı defter
+/// yoktur), cezada sürücüye rücu yalnızca bilgi bayrağıdır ve borç kaydı üretmez. Tutar KDV dahil toplamdır; KDV tutarı içindeki paydır.
+/// Durum Beklemede → Onaylandı / Reddedildi; yalnızca beklemedeki masraf düzenlenir, onay ve ret iş akışı komutudur. Silinmez (K12): yanlış
+/// masraf reddedilir. Makbuz ve fiş kayda Core dosya deposuyla eklenir. Onaysız masraf kârlılığa girmez (dilim 9).
+/// </summary>
+public sealed class TripExpense : LogisticsEntity
+{
+    public const int DescriptionMaxLength = 200;
+    public const int DocumentNoMaxLength = 50;
+    public const int ReasonMaxLength = 2000;
+    public const int MaxOdometerKm = 9_999_999;
+    public const decimal MaxLiters = 999_999.999m;
+
+    public static class Statuses
+    {
+        public const string Pending = "pending";
+        public const string Approved = "approved";
+        public const string Rejected = "rejected";
+
+        public static IReadOnlyList<string> All { get; } = [Pending, Approved, Rejected];
+    }
+
+    public TripExpense() => Status = Statuses.Pending;
+
+    public Guid TripId { get; internal set; }
+
+    /// <summary>Masraf türü (Y9b seçim listesi <c>logistics.expense-kind</c>).</summary>
+    public string KindKey { get; internal set; } = string.Empty;
+
+    /// <summary>Kısa açıklama (ör. "Gebze–Orhangazi köprü geçişi"); onay isteğinde kaydın adı olarak görünür.</summary>
+    public string Description { get; internal set; } = string.Empty;
+
+    public DateOnly ExpenseDate { get; internal set; }
+
+    /// <summary>KDV dahil toplam tutar; sıfırdan büyüktür.</summary>
+    public decimal Amount { get; internal set; }
+
+    /// <summary>ISO 4217, üç harf.</summary>
+    public string Currency { get; internal set; } = string.Empty;
+
+    /// <summary>Tutarın içindeki KDV payı; tutarı aşamaz.</summary>
+    public decimal? VatAmount { get; internal set; }
+
+    /// <summary>Tedarikçi (yakıt istasyonu, otoyol işletmesi...): <c>core.Party</c> kaydı; boş olabilir (nakit harcırah).</summary>
+    public Guid? SupplierPartyId { get; internal set; }
+
+    /// <summary>Fiş ya da fatura numarası (isteğe bağlı); dosya eki makbuzun görüntüsüdür, bu alan numarasıdır.</summary>
+    public string? DocumentNo { get; internal set; }
+
+    /// <summary>Yakıt kategorisinde alınan litre (zorunlu); diğer kategorilerde boştur.</summary>
+    public decimal? Liters { get; internal set; }
+
+    /// <summary>Yakıt kategorisinde yakıt alımındaki kilometre sayacı (isteğe bağlı); diğer kategorilerde boştur.</summary>
+    public int? OdometerKm { get; internal set; }
+
+    /// <summary>Trafik cezası sürücüye rücu edilecek mi (yalnızca bilgi; borç kaydı üretmez). Yalnızca ceza kategorisinde işaretlenir.</summary>
+    public bool ChargeToDriver { get; internal set; }
+
+    /// <summary>Durum yalnızca iş akışı komutuyla değişir (onay, ret).</summary>
+    public string Status { get; internal set; }
+
+    /// <summary>Son kararın gerekçesi (ret gerekçesi).</summary>
+    public string? StatusReason { get; internal set; }
 }

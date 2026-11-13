@@ -13,8 +13,11 @@ internal sealed class CrmStoreContext(
     IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access,
     ICurrentAccess permissions, IEnumerable<IActivityLinkTarget> linkTargets, LeadWorkflowGate? leadGate = null,
     ActivityWorkflowGate? activityGate = null, IRecordCommandContext? command = null, OpportunityWorkflowGate? opportunityGate = null,
-    IOpportunityPolicyProvider? policy = null, IActivityCodeCatalog? activityCodes = null)
+    IOpportunityPolicyProvider? policy = null, IActivityCodeCatalog? activityCodes = null, IIndustryCatalog? industries = null)
 {
+    /// <summary>Sektör kataloğunu okuma sınırı (ADR-0043); yoksa (ör. birim testi) sektör kodu denetimi atlanır.</summary>
+    public IIndustryCatalog? Industries { get; } = industries;
+
     /// <summary>Faaliyet kataloğunu okuma sınırı (hizmet kapsamı doğrulaması); yoksa (ör. birim testi) katalog denetimi atlanır.</summary>
     public IActivityCodeCatalog? ActivityCodes { get; } = activityCodes;
 

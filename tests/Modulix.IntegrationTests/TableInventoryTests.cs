@@ -44,6 +44,7 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
         ["platform.Capabilities"] = "Yetenek kataloğu (ADR-0029): TenantId yok.",
         ["platform.CapabilityDependencies"] = "Yetenek bağımlılık grafiği (ADR-0029): TenantId yok.",
         ["platform.RelationshipRoles"] = "Firma ilişki rolü kataloğu (ADR-0029 K9): TenantId yok; platform yöneticisi yönetir.",
+        ["platform.Industries"] = "Sektör kataloğu (ADR-0043): firma sektörü seçim listesi, TenantId yok; platform yöneticisi yönetir, silinmez pasife alınır.",
         ["platform.ActivityNodeCapabilities"] ="Faaliyet–yetenek eşlemesi (ADR-0029): TenantId yok.",
         ["platform.GtipCatalogVersions"] = "GTİP kataloğu sürümü (ADR-0032 K9): Bakanlık tarifesi, TenantId yok; platform yöneticisi yönetir.",
         ["platform.GtipCatalogEntries"] = "GTİP kataloğu satırı (ADR-0032 K9): Bakanlık tarifesi, TenantId yok.",

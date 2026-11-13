@@ -53,7 +53,7 @@
                 <h3 class="summary-heading">@Texts.Get("crm.company.editor.summary")</h3>
                 <dl class="summary-facts">
                     <div><dt>@Texts.Get("crm.company.editor.kind")</dt><dd>@Texts.Get(form.Kind == "Individual" ? "crm.company.editor.individual" : "crm.company.editor.organization")</dd></div>
-                    <div><dt>@Texts.Get("crm.companies.col.industry")</dt><dd>@(string.IsNullOrWhiteSpace(form.Industry) ? "—" : form.Industry)</dd></div>
+                    <div><dt>@Texts.Get("crm.companies.col.industry")</dt><dd>@(IndustryName(form.Industry) ?? Company?.LegacyIndustry ?? "—")</dd></div>
                     <div><dt>@Texts.Get("common.field.city")</dt><dd>@(string.IsNullOrWhiteSpace(form.City) ? "—" : form.City)</dd></div>
                     <div><dt>@Texts.Get(form.Kind == "Individual" ? "crm.company.editor.nationalId" : "crm.companies.col.taxNumber")</dt><dd>@(string.IsNullOrWhiteSpace(form.TaxNumber) ? "—" : form.TaxNumber)</dd></div>
                     <div><dt>@Texts.Get("common.field.owner")</dt><dd>@(form.OwnerId is { } owner ? Lookups.MemberName(owner) : (Company is null ? Texts.Get("common.me") : "—"))</dd></div>
@@ -92,7 +92,17 @@
                             break;
                         case "industry":
                             <label class="@f.LabelClass()" for="industry">@f.Label</label>
-                            <input id="industry" class="form-control" maxlength="@CrmLimits.IndustryMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Industry" />
+                            <select id="industry" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Industry">
+                                <option value="">@Texts.Get("crm.company.editor.industryPlaceholder")</option>
+                                @foreach (var industry in IndustryChoices)
+                                {
+                                    <option value="@industry.Code">@industry.Name</option>
+                                }
+                            </select>
+                            @if (string.IsNullOrEmpty(form.Industry) && !string.IsNullOrWhiteSpace(Company?.LegacyIndustry))
+                            {
+                                <small class="form-text text-muted">@Texts.Get("crm.company.editor.industryLegacy", Company!.LegacyIndustry)</small>
+                            }
                             <FieldError Field="industry" Errors="errors" />
                             break;
                         case "source":
@@ -200,7 +210,18 @@
     {
         layout = await Layouts.ForAsync(CrmEntityKeys.Company);
         layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
+
+        // Sektör listesi platform kataloğundan gelir (ADR-0043); yüklenemezse alan boş kalır, form yine kaydedilebilir.
+        industries = (await Api.GetAsync<List<IndustryDto>>("/api/industries")).Value ?? [];
     }
+
+    private IReadOnlyList<IndustryDto> industries = [];
+
+    /// <summary>Etkin sektörler; kayıttaki sektör sonradan pasife alınmışsa o da listede kalır (seçili değer kaybolmaz).</summary>
+    private IEnumerable<IndustryDto> IndustryChoices =>
+        industries.Where(i => i.IsActive || i.Code == source?.Industry).OrderBy(i => i.Name, StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("tr-TR"), true));
+
+    private string? IndustryName(string? code) => string.IsNullOrEmpty(code) ? null : industries.FirstOrDefault(i => i.Code == code)?.Name;
 
     private const string Url = "/api/crm/companies";
 

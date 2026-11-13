@@ -599,6 +599,59 @@ public class LeadTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFact
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, Modulix.Core.Platform.Tenant> tenants = new();
 
+    [Fact]
+    public async Task Lead_industry_comes_from_the_catalog_by_code_or_name_and_is_listed_filtered_and_sorted()
+    {
+        var (client, _, _) = await ClientAsync();
+        using var _c = client;
+
+        var byCode = await CreateLeadAsync(client, new SaveLeadRequest("Sektör kodlu", LastName: "A", Industry: "gida-icecek"));
+        Assert.Equal(("gida-icecek", "Gıda ve içecek"), (byCode.Industry, byCode.IndustryName));
+        var byName = await CreateLeadAsync(client, new SaveLeadRequest("Sektör adlı", LastName: "B", Industry: "Tekstil ve hazır giyim"));
+        Assert.Equal(("tekstil-hazir-giyim", "Tekstil ve hazır giyim"), (byName.Industry, byName.IndustryName));
+        var none = await CreateLeadAsync(client, new SaveLeadRequest("Sektörsüz", LastName: "C"));
+        Assert.Null(none.Industry);
+
+        // Katalogda olmayan değer yazılmaz.
+        var rejected = await client.PostAsJsonAsync("/api/crm/leads", new SaveLeadRequest("Serbest metin", LastName: "D", Industry: "Serbest yazılmış sektör"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, rejected.StatusCode);
+        Assert.Contains("industry", (await rejected.Content.ReadFromJsonAsync<ValidationProblemDetails>())!.Errors.Keys);
+
+        async Task<List<string>> SubjectsAsync(string query) =>
+            [.. (await client.GetFromJsonAsync<CrmPage<LeadDto>>($"/api/crm/leads?pageSize=100&{query}"))!.Items.Select(l => l.Subject)];
+        Assert.Equal(["Sektör kodlu"], await SubjectsAsync("industry=gida-icecek"));
+        Assert.Equal(["Sektör kodlu", "Sektör adlı", "Sektörsüz"], await SubjectsAsync("sort=industry"));
+
+        // Güncellemede sektör değişir ve temizlenir; yanıt güncel adı taşır.
+        var changed = await client.PutAsJsonAsync($"/api/crm/leads/{byCode.Id}", new SaveLeadRequest("Sektör kodlu", LastName: "A", Industry: "enerji", Version: byCode.Version));
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+        var after = (await changed.Content.ReadFromJsonAsync<LeadDto>())!;
+        Assert.Equal(("enerji", "Enerji"), (after.Industry, after.IndustryName));
+        var cleared = (await (await client.PutAsJsonAsync($"/api/crm/leads/{byCode.Id}", new SaveLeadRequest("Sektör kodlu", LastName: "A", Industry: null, Version: after.Version))).Content.ReadFromJsonAsync<LeadDto>())!;
+        Assert.Null(cleared.Industry);
+        Assert.Null(cleared.IndustryName);
+    }
+
+    [Fact]
+    public async Task Converting_a_lead_carries_its_catalog_industry_to_the_new_company_and_other_tenants_never_see_it()
+    {
+        var (client, _, _) = await ClientAsync();
+        using var _c = client;
+        var lead = await QualifiedLeadAsync(client, "Sektörlü dönüşüm", companyName: "Sektör Dönüşüm Ltd.", industry: "lojistik-tasimacilik");
+
+        var response = await client.PostAsJsonAsync($"/api/crm/leads/{lead.Id}/convert", new ConvertLeadRequest(lead.Version, CreateCompany: true, OpportunityTitle: "Sektör fırsatı"));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = (await response.Content.ReadFromJsonAsync<ConvertLeadResultDto>())!;
+        var company = (await client.GetFromJsonAsync<CompanyDto>($"/api/crm/companies/{result.CompanyId}"))!;
+        Assert.Equal(("lojistik-tasimacilik", "Lojistik ve taşımacılık"), (company.Industry, company.IndustryName));
+
+        var (other, _, _) = await ClientAsync();
+        using var _o = other;
+        var page = (await other.GetFromJsonAsync<CrmPage<LeadDto>>("/api/crm/leads?industry=lojistik-tasimacilik"))!;
+        Assert.Empty(page.Items);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync($"/api/crm/leads/{lead.Id}")).StatusCode);
+    }
+
     private async Task<(HttpClient Client, Guid TenantId, ModulixUser User)> ClientAsync()
     {
         var tenant = await factory.CreateTenantAsync();
@@ -628,11 +681,11 @@ public class LeadTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFact
 
     /// <summary>Nitelikli Lead: gerekli bilgiler dolu, Lead nitelendirilmiş.</summary>
     private static async Task<LeadDto> QualifiedLeadAsync(
-        HttpClient client, string subject, string? companyName, string lastName = "Kaya", string email = "kaya@firma.test")
+        HttpClient client, string subject, string? companyName, string lastName = "Kaya", string email = "kaya@firma.test", string? industry = null)
     {
         var lead = await CreateLeadAsync(client, new SaveLeadRequest(
             subject, FirstName: "Mehmet", LastName: lastName, CompanyName: companyName, Email: email, NeedDescription: "Kapsam netleşti",
-            EstimatedBudget: 75_000m, Source: "Referral"));
+            EstimatedBudget: 75_000m, Source: "Referral", Industry: industry));
         return await ReadAsync<LeadDto>(await PostActionAsync(client, lead.Id, "qualify", new QualifyLeadRequest(lead.Version)));
     }
 

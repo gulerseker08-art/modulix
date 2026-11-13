@@ -42,7 +42,26 @@ public sealed class LogisticsModule : IModule
     public static class Lists
     {
         public const string TransportMode = "logistics.transport-mode";
-        public const string ExpenseType = "logistics.expense-type";
+        public const string ExpenseKind = "logistics.expense-kind";
+    }
+
+    /// <summary>
+    /// Masraf türü kategorileri (ADR-0038 K10): kod türün adına değil kategorisine bakar. Yakıt litre ve kilometre taşır; ceza sürücüye rücu bilgisi
+    /// taşır; geçiş ücreti, harcırah ve diğer ek alan taşımaz.
+    /// </summary>
+    public static class ExpenseKindCategories
+    {
+        public const string Fuel = "fuel";
+        public const string Toll = "toll";
+        public const string Allowance = "allowance";
+        public const string Fine = "fine";
+        public const string Other = "other";
+    }
+
+    /// <summary>Masrafın onaya bağlanabilen işlemi (ADR-0027 Ç6a.3): firma "onaylama"yı bir onay sürecine bağlayabilir.</summary>
+    public static class ApprovalCommands
+    {
+        public const string ApproveExpense = "approve";
     }
 
     /// <summary>Taşıma türü kategorileri: kod türün adına değil kategorisine bakar (komple: araç tek müşteriye; parsiyel: araç paylaşılır).</summary>
@@ -73,37 +92,17 @@ public sealed class LogisticsModule : IModule
         new(Permissions.TripsWrite, "Sefer planlar, araç ve sürücü atar, sevkiyat ekler, seferi yürütür ve iptal eder", "Seferler"),
         new(Permissions.FreightRead, "Navlun ve taşıyıcı hakedişi tutarlarını görür ve girer (sevkiyat ve sefer yazma izniyle birlikte)", "Navlun ve hakediş"),
         new(Permissions.ExpensesRead, "Sefer masraflarını görüntüler", "Sefer masrafları"),
-        new(Permissions.ExpensesWrite, "Sefer masrafı (yakıt, geçiş, harcırah, ceza...) girer ve düzeltir", "Sefer masrafları"),
+        new(Permissions.ExpensesWrite, "Sefer masrafı girer, beklemedeki ya da reddedilen masrafı düzenler ve yeniden onaya gönderir; makbuz ekler", "Sefer masrafları"),
         new(Permissions.ExpensesApprove, "Sefer masrafını onaylar ya da reddeder", "Sefer masrafları"),
     ];
 
     /// <summary>
-    /// Masraf türü kategorileri (ADR-0038 K10): kod türün adına değil kategorisine bakar. Yakıt kategorisi litre ister ve araç yakıt raporunu besler;
-    /// ceza kategorisinde sürücüye rücu bayrağı (yalnızca bilgi) girilebilir.
-    /// </summary>
-    public static class ExpenseCategories
-    {
-        public const string Fuel = "fuel";
-        public const string Toll = "toll";
-        public const string Allowance = "allowance";
-        public const string Fine = "fine";
-        public const string Other = "other";
-    }
-
-    /// <summary>Onay kapısına bağlanabilen masraf işlemi anahtarı (<c>IApprovalGate</c>): firma "masrafı onaylama"yı bir onay sürecine bağlayabilir.</summary>
-    public static class ApprovalCommands
-    {
-        public const string ApproveExpense = "approve";
-    }
-
-    /// <summary>
-    /// Masraf onaya gönderilebilir (ADR-0027 Dilim 4c, ADR-0038 K10): tutar ve para birimi kayıttan okunur, değişirse bekleyen talep ve verilmiş onay
-    /// geçersizleşir. Firma masrafı onaylamayı bir onay sürecine bağlamamışsa <c>logistics.expenses.approve</c> izni yeterlidir; bağlamışsa kaydın son
-    /// talebi onaylanmadan masraf onaylanamaz.
+    /// Masraf onaya gönderilebilir (ADR-0027 Dilim 4c): tutar ve para birimi kayıttan okunur. Firma masrafın onaylanmasını bir onay sürecine
+    /// bağlayabilir (Ç6a.3); iş akışı onaylamadan önce onay kapısına sorar. Kayıt zaten kararla kilitlendiği için tutar onaydan sonra değişmez.
     /// </summary>
     IReadOnlyList<Core.Contracts.Approvals.ApprovalTargetDefinition> IModule.ApprovalTargets { get; } =
     [
-        new(Entities.TripExpense, "Sefer masrafı", "label", "lojistik/seferler")
+        new(Entities.TripExpense, "Sefer masrafı", "description", "lojistik/seferler")
         {
             AmountField = "amount",
             CurrencyField = "currency",
@@ -128,6 +127,7 @@ public sealed class LogisticsModule : IModule
         public const string Shipment = Entities.Shipment;
         public const string TransportRequest = Entities.TransportRequest;
         public const string Trip = Entities.Trip;
+        public const string TripExpense = Entities.TripExpense;
     }
 
     /// <summary>
@@ -151,6 +151,11 @@ public sealed class LogisticsModule : IModule
             {
                 RecordSource = typeof(LogisticsAutomationRecordSource), LabelField = "number",
             },
+            // Masraf: kayıt olayları ("tutarı eşiği aşan masraf onaya gitsin") ve tarama (beklemede kalan masraf için hatırlatma).
+            new(AutomationEntityKeys.TripExpense, "Sefer masrafı", Permissions.ExpensesRead)
+            {
+                RecordSource = typeof(LogisticsAutomationRecordSource), LabelField = "description",
+            },
         ],
         Events =
         [
@@ -160,6 +165,8 @@ public sealed class LogisticsModule : IModule
             new("logistics.shipment.updated", AutomationEntityKeys.Shipment, DomainEventTypes.RecordUpdated, "Sevkiyat güncellendi"),
             new("logistics.trip.created", AutomationEntityKeys.Trip, DomainEventTypes.RecordCreated, "Sefer açıldı"),
             new("logistics.trip.updated", AutomationEntityKeys.Trip, DomainEventTypes.RecordUpdated, "Sefer güncellendi"),
+            new("logistics.trip-expense.created", AutomationEntityKeys.TripExpense, DomainEventTypes.RecordCreated, "Sefer masrafı girildi"),
+            new("logistics.trip-expense.updated", AutomationEntityKeys.TripExpense, DomainEventTypes.RecordUpdated, "Sefer masrafı güncellendi"),
         ],
         Fields = [.. CargoAutomationFields(AutomationEntityKeys.TransportRequest, Domain.TransportRequest.Statuses.All, RequestStatusLabels),
             .. CargoAutomationFields(AutomationEntityKeys.Shipment, Domain.Shipment.Statuses.All, ShipmentStatusLabels),
@@ -174,7 +181,17 @@ public sealed class LogisticsModule : IModule
             },
             new(AutomationEntityKeys.Trip, "plannedEnd", "Planlanan bitiş", AutomationFieldType.Date),
             new(AutomationEntityKeys.Trip, "vehicleId", "Araç (kimlik)", AutomationFieldType.Text),
-            new(AutomationEntityKeys.Trip, "driverId", "Sürücü (kimlik)", AutomationFieldType.Text)],
+            new(AutomationEntityKeys.Trip, "driverId", "Sürücü (kimlik)", AutomationFieldType.Text),
+            new(AutomationEntityKeys.TripExpense, "status", "Durum", AutomationFieldType.Choice)
+            {
+                Options = [.. Domain.TripExpense.Statuses.All.Select(s => new AutomationOption(s, ExpenseStatusLabels[s]))],
+            },
+            new(AutomationEntityKeys.TripExpense, "kindKey", "Masraf türü (anahtar)", AutomationFieldType.Text),
+            new(AutomationEntityKeys.TripExpense, "description", "Açıklama", AutomationFieldType.Text),
+            new(AutomationEntityKeys.TripExpense, "amount", "Tutar", AutomationFieldType.Number),
+            new(AutomationEntityKeys.TripExpense, "currency", "Para birimi", AutomationFieldType.Text),
+            new(AutomationEntityKeys.TripExpense, "expenseDate", "Masraf tarihi", AutomationFieldType.Date),
+            new(AutomationEntityKeys.TripExpense, "tripId", "Sefer (kimlik)", AutomationFieldType.Text)],
     };
 
     public static IReadOnlyDictionary<string, string> TripStatusLabels { get; } = new Dictionary<string, string>
@@ -199,6 +216,9 @@ public sealed class LogisticsModule : IModule
     public static class SettingKeys
     {
         public const string CredentialCheck = "logistics.trips.credential-check";
+
+        /// <summary>Talep ve sevkiyatta ülke gönderilmediğinde kullanılan ülke (ISO 3166-1 alfa-2; ADR-0043 K2).</summary>
+        public const string DefaultCountry = "logistics.default-country";
     }
 
     /// <summary>Belge kuralı değerleri: uyar (onay uyarıyla verilir) ya da engelle (onay verilmez).</summary>
@@ -214,6 +234,11 @@ public sealed class LogisticsModule : IModule
         {
             Description = "Seferi hazır yaparken araç, dorse ya da sürücü belgesinin (muayene, sigorta, ehliyet, SRC…) süresi doluyorsa ne olsun? Uyar: onay uyarıyla verilir ve uyarı seferde saklanır. Engelle: belge yenilenmeden sefer hazır olmaz.",
             Options = [new SettingOption(CredentialCheckModes.Warn, "Uyar"), new SettingOption(CredentialCheckModes.Block, "Engelle")],
+        },
+        new(SettingKeys.DefaultCountry, "Varsayılan ülke", "Lojistik", SettingType.Text, Domain.CargoEntity.DefaultCountry)
+        {
+            Description = "Taşıma talebi ve sevkiyatta yükleme ya da teslim ülkesi girilmediğinde kullanılan ülke. ISO 3166-1 alfa-2 kodu yazın (ör. TR, DE, BG). Geçersiz değer Türkiye (TR) sayılır.",
+            MaxLength = 2,
         },
     ];
 
@@ -244,7 +269,10 @@ public sealed class LogisticsModule : IModule
         new(entity, "cargoDescription", "Yük tanımı", AutomationFieldType.Text),
         new(entity, "transportModeKey", "Taşıma türü (anahtar)", AutomationFieldType.Text),
         new(entity, "pickupCity", "Yükleme şehri", AutomationFieldType.Text),
+        new(entity, "pickupCountry", "Yükleme ülkesi (ISO kodu)", AutomationFieldType.Text),
         new(entity, "deliveryCity", "Teslim şehri", AutomationFieldType.Text),
+        new(entity, "deliveryCountry", "Teslim ülkesi (ISO kodu)", AutomationFieldType.Text),
+        new(entity, "international", "Uluslararası (ülkeler farklı)", AutomationFieldType.Boolean),
         new(entity, "pickupDate", "Yükleme günü", AutomationFieldType.Date) { Hint = "\"Yükleme gününe 1 gün kala\" gibi uyarılar için tarihe bağlı tetikleyicide kullanın." },
         new(entity, "deliveryBy", "En geç teslim", AutomationFieldType.Date),
         new(entity, "weightKg", "Ağırlık (kg)", AutomationFieldType.Number),
@@ -256,20 +284,20 @@ public sealed class LogisticsModule : IModule
         new(
             "logistics.operations",
             "Operasyon",
-            "Taşıma taleplerini açar; sevkiyatları, seferleri, taşıyıcıları ve sürücü kartlarını görüntüler ve düzenler; maliyetleri görüntüler. Talep onaylamaz.",
+            "Taşıma taleplerini açar; sevkiyatları, seferleri, taşıyıcıları ve sürücü kartlarını görüntüler ve düzenler; maliyetleri görüntüler; sefer masrafı girer. Talep ve masraf onaylamaz.",
             [
                 Permissions.RequestsRead, Permissions.RequestsWrite,
                 Permissions.ShipmentsRead, Permissions.ShipmentsWrite,
                 Permissions.TripsRead, Permissions.TripsWrite,
                 Permissions.CarriersRead, Permissions.CarriersWrite,
                 Permissions.CostsRead,
-                Permissions.DriversRead, Permissions.DriversWrite,
                 Permissions.ExpensesRead, Permissions.ExpensesWrite,
+                Permissions.DriversRead, Permissions.DriversWrite,
             ]),
         new(
             "logistics.manager",
             "Operasyon müdürü",
-            "Operasyonun bütün işleri ve taşıma talebinin onayı ya da reddi.",
+            "Operasyonun bütün işleri, taşıma talebinin ve sefer masrafının onayı ya da reddi.",
             [
                 Permissions.RequestsRead, Permissions.RequestsWrite, Permissions.RequestsApprove,
                 Permissions.ShipmentsRead, Permissions.ShipmentsWrite,
@@ -316,31 +344,32 @@ public sealed class LogisticsModule : IModule
         {
             Default = "Ftl",
         },
-
-        // Masraf türü (ADR-0038 K10): hazır değerler örnektir; tenant kendi türlerini ekler ve her birini bir kategoriye bağlar. Kod kategoriye bakar.
+        // Masraf türü (ADR-0038 K10): hazır değerler örnektir; firma kendi türlerini ekler, yeni türde kategori seçilir. Kod kategoriye bakar:
+        // yakıt litre ve kilometre taşır, ceza sürücüye rücu bilgisi taşır. Varsayılan "Diğer": yakıt ek alan ister, bilinçli seçilmelidir.
         new(
-            Lists.ExpenseType,
+            Lists.ExpenseKind,
             "Masraf türü",
             Entities.TripExpense,
-            "expenseTypeKey",
+            "kindKey",
             Required: true,
             [
-                new(ExpenseCategories.Fuel, "Yakıt (litre girilir)"),
-                new(ExpenseCategories.Toll, "Geçiş ve otoyol"),
-                new(ExpenseCategories.Allowance, "Harcırah ve yemek"),
-                new(ExpenseCategories.Fine, "Trafik cezası"),
-                new(ExpenseCategories.Other, "Diğer"),
+                new(ExpenseKindCategories.Fuel, "Yakıt"),
+                new(ExpenseKindCategories.Toll, "Geçiş ücreti (köprü, otoyol, vinyet)"),
+                new(ExpenseKindCategories.Allowance, "Harcırah"),
+                new(ExpenseKindCategories.Fine, "Trafik cezası"),
+                new(ExpenseKindCategories.Other, "Diğer"),
             ],
             [
-                new("Diesel", "Mazot", ExpenseCategories.Fuel),
-                new("Toll", "Köprü / otoyol geçişi", ExpenseCategories.Toll),
-                new("Allowance", "Harcırah", ExpenseCategories.Allowance),
-                new("Fine", "Trafik cezası", ExpenseCategories.Fine),
-                new("Parking", "Otopark", ExpenseCategories.Other),
-                new("Other", "Diğer", ExpenseCategories.Other),
+                new("Fuel", "Yakıt", ExpenseKindCategories.Fuel),
+                new("Toll", "Köprü / otoyol geçişi", ExpenseKindCategories.Toll),
+                new("Allowance", "Harcırah", ExpenseKindCategories.Allowance),
+                new("Fine", "Trafik cezası", ExpenseKindCategories.Fine),
+                new("Parking", "Otopark", ExpenseKindCategories.Other),
+                new("Repair", "Yolda onarım / lastik", ExpenseKindCategories.Other),
+                new("Other", "Diğer", ExpenseKindCategories.Other),
             ])
         {
-            Default = "Diesel",
+            Default = "Other",
         },
     ];
 
@@ -427,16 +456,6 @@ public sealed class LogisticsModule : IModule
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["stopType"] = StopTypeLabels },
         },
-        new(Entities.TripExpense, "Sefer masrafı", Permissions.ExpensesRead, new Dictionary<string, string>
-        {
-            ["tripId"] = "Sefer", ["expenseTypeKey"] = "Masraf türü", ["expenseDate"] = "Masraf günü", ["amount"] = "Tutar", ["currency"] = "Para birimi",
-            ["vatAmount"] = "KDV", ["supplierPartyId"] = "Tedarikçi", ["documentNo"] = "Belge no", ["liters"] = "Litre", ["odometerKm"] = "Kilometre sayacı",
-            ["recoverFromDriver"] = "Sürücüye rücu", ["notes"] = "Notlar", ["status"] = "Durum", ["statusReason"] = "Ret gerekçesi",
-        }, "documentNo")
-        {
-            Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["status"] = ExpenseStatusLabels },
-            References = new Dictionary<string, string> { ["supplierPartyId"] = SharedEntities.Party },
-        },
         new(Entities.DeliveryProof, "Teslim kanıtı", Permissions.ShipmentsRead, new Dictionary<string, string>
         {
             ["shipmentId"] = "Sevkiyat", ["outcome"] = "Sonuç", ["receivedBy"] = "Teslim alan", ["receivedAt"] = "Teslim zamanı",
@@ -444,6 +463,16 @@ public sealed class LogisticsModule : IModule
         }, "receivedBy")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["outcome"] = DeliveryOutcomeLabels },
+        },
+        new(Entities.TripExpense, "Sefer masrafı", Permissions.ExpensesRead, new Dictionary<string, string>
+        {
+            ["tripId"] = "Sefer", ["kindKey"] = "Masraf türü", ["description"] = "Açıklama", ["expenseDate"] = "Masraf tarihi", ["amount"] = "Tutar",
+            ["currency"] = "Para birimi", ["vatAmount"] = "KDV", ["supplierPartyId"] = "Tedarikçi", ["liters"] = "Litre", ["odometerKm"] = "Kilometre",
+            ["chargeToDriver"] = "Sürücüye rücu", ["status"] = "Durum", ["statusReason"] = "Gerekçe",
+        }, "description")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["status"] = ExpenseStatusLabels },
+            References = new Dictionary<string, string> { ["supplierPartyId"] = SharedEntities.Party },
         },
     ];
 
@@ -466,7 +495,8 @@ public sealed class LogisticsModule : IModule
         new(entity, name, permission, new Dictionary<string, string>(extra)
         {
             ["customerPartyId"] = "Müşteri", ["senderPartyId"] = "Gönderen", ["receiverPartyId"] = "Alıcı", ["transportModeKey"] = "Taşıma türü",
-            ["pickupCity"] = "Yükleme şehri", ["pickupAddress"] = "Yükleme adresi", ["deliveryCity"] = "Teslim şehri", ["deliveryAddress"] = "Teslim adresi",
+            ["pickupCity"] = "Yükleme şehri", ["pickupCountry"] = "Yükleme ülkesi", ["pickupAddress"] = "Yükleme adresi",
+            ["deliveryCity"] = "Teslim şehri", ["deliveryCountry"] = "Teslim ülkesi", ["deliveryAddress"] = "Teslim adresi",
             ["pickupDate"] = "Yükleme günü", ["deliveryBy"] = "En geç teslim", ["cargoDescription"] = "Yük tanımı", ["weightKg"] = "Ağırlık (kg)",
             ["volumeM3"] = "Hacim (m³)", ["palletCount"] = "Palet", ["loadingMeters"] = "Yükleme metresi (LDM)", ["hazardous"] = "Tehlikeli madde",
             ["notes"] = "Notlar", ["status"] = "Durum", ["statusReason"] = "Gerekçe",
@@ -486,7 +516,6 @@ public sealed class LogisticsModule : IModule
         new(Entities.TransportRequest, "Taşıma talebi"),
         new(Entities.Shipment, "Sevkiyat"),
         new(Entities.Trip, "Sefer"),
-        new(Entities.TripExpense, "Sefer masrafı"),
     ];
 
     IReadOnlyList<LookupDefinition> IModule.Lookups => LogisticsLookupDefinitions.All;
