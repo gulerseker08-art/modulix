@@ -100,6 +100,9 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
             .HasDatabaseName("UX_Opportunities_SourceLead")
             .IsUnique()
             .HasFilter("[SourceLeadId] IS NOT NULL");
+        // Kampanya bağı (ADR-0025): Pazarlama modülünün kaydıdır, yabancı anahtar yoktur; "kampanyanın fırsatları" süzgeci bu dizini kullanır.
+        builder.HasIndex(o => new { o.TenantId, o.CampaignId })
+            .HasFilter("[CampaignId] IS NOT NULL");
         builder.HasOne<Lead>()
             .WithMany()
             .HasForeignKey(o => new { o.TenantId, o.SourceLeadId })
@@ -523,6 +526,9 @@ internal sealed class LeadConfiguration : IEntityTypeConfiguration<Lead>
         // Eski (TenantId, FirstReceivedAt) dizininin yerini alır; dönem aralığı süzgeçleri aynı önek dizinden yararlanır.
         builder.HasIndex(l => new { l.TenantId, l.FirstReceivedAt, l.Id }).IsDescending(false, true, false);
         builder.HasIndex(l => new { l.TenantId, l.Status, l.FirstReceivedAt, l.Id }).IsDescending(false, false, true, false);
+        // Kampanya bağı (ADR-0025): Pazarlama modülünün kaydıdır, yabancı anahtar yoktur; "kampanyanın müşteri adayları" süzgeci bu dizini kullanır.
+        builder.HasIndex(l => new { l.TenantId, l.CampaignId })
+            .HasFilter("[CampaignId] IS NOT NULL");
         builder.HasIndex(l => new { l.TenantId, l.NormalizedEmail });
         builder.HasIndex(l => new { l.TenantId, l.NormalizedPhone });
 
