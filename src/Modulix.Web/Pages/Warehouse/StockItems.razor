@@ -4,10 +4,10 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Stok kartları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.warehouse.stock-items") · Modulix</PageTitle>
 
 <AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.StockItemsRead">
-    <PageHeader Title="Stok kartları" Icon="package" Subtitle="@(page is null ? "Depoda tutulan malların kodunu, birimini ve varsayılan GTİP'ini yönetin." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.warehouse.stock-items")" Icon="package" Subtitle="@(page is null ? Texts.Get("warehouse.stockItems.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -20,31 +20,31 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Stok kartı görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("warehouse.stockItems.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Stok kartı ara" placeholder="Kod, ad veya GTİP ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("warehouse.stockItems.search")" placeholder="@Texts.Get("warehouse.stockItems.searchPlaceholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(WarehouseAccess.StockItemsWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni stok kartı</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("warehouse.stockItems.new")</button>
         }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <select class="form-select" aria-label="Birim" @bind="unitKey" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm birimler</option>
+            <select class="form-select" aria-label="@Texts.Get("warehouse.unit")" @bind="unitKey" @bind:after="() => LoadAsync(1)">
+                <option value="">@Texts.Get("warehouse.stockItems.allUnits")</option>
                 @foreach (var unit in Lookups.ValuesOf(WarehouseAccess.StockUnitList))
                 {
                     <option value="@unit.Key">@unit.Label</option>
                 }
             </select>
-            <input class="form-control" aria-label="GTİP ön eki" inputmode="numeric" maxlength="14" placeholder="GTİP ön eki (ör. 0902)" @bind="gtipPrefix" @bind:after="() => LoadAsync(1)" @bind:event="onchange" />
+            <input class="form-control" aria-label="@Texts.Get("warehouse.stockItems.gtipPrefix")" inputmode="numeric" maxlength="14" placeholder="@Texts.Get("warehouse.stockItems.gtipPrefixPlaceholder")" @bind="gtipPrefix" @bind:after="() => LoadAsync(1)" @bind:event="onchange" />
         </div>
     }
 
@@ -57,20 +57,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu görünüme uyan stok kartı yok.</p>
+        <p class="text-muted" role="status">@Texts.Get("warehouse.stockItems.empty")</p>
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) stok kartı listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("warehouse.stockItems.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Stok kartı listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("warehouse.stockItems.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -84,8 +84,8 @@
                         <td class="row-menu-cell">
                             @if (Session.Can(WarehouseAccess.StockItemsWrite))
                             {
-                                <RowMenu Label="@($"{WarehouseLabels.Text(item, "code")} eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(item)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <RowMenu Label="@Texts.Get("common.rowActionsOf", WarehouseLabels.Text(item, "code"))">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(item)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 </RowMenu>
                             }
                         </td>
@@ -105,13 +105,13 @@
     private const string InactiveView = "inactive";
 
     // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (WarehouseRecordStore.SortKeys).
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("code", "Kod", "hash", "code", "-code", Locked: true),
-        new("name", "Ad", "type", "name", "-name"),
-        new("unitKey", "Birim", "package", "unitKey", "-unitKey"),
-        new("gtip", "GTİP", "list", "gtip", "-gtip"),
-        new("isActive", "Durum", "tag", "isActive", "-isActive"),
+        new("code", Texts.Get("warehouse.code"), "hash", "code", "-code", Locked: true),
+        new("name", Texts.Get("common.field.name"), "type", "name", "-name"),
+        new("unitKey", Texts.Get("warehouse.unit"), "package", "unitKey", "-unitKey"),
+        new("gtip", Texts.Get("warehouse.gtip"), "list", "gtip", "-gtip"),
+        new("isActive", Texts.Get("common.field.status"), "tag", "isActive", "-isActive"),
     ];
 
     private readonly GridViewState grid = new("warehouse.stock-items", "code");
@@ -147,9 +147,9 @@
     // Görünümler yalnızca süzgeçtir (Tümü, Etkin, Pasif, kişisel); birim ve GTİP ön eki "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm stok kartları", Icon: "package"),
-        new(ActiveView, "Etkin kartlar", Icon: "check-circle"),
-        new(InactiveView, "Pasif kartlar", Icon: "clock"),
+        new(AllViews, Texts.Get("warehouse.stockItems.view.all"), Icon: "package"),
+        new(ActiveView, Texts.Get("warehouse.stockItems.view.active"), Icon: "check-circle"),
+        new(InactiveView, Texts.Get("warehouse.stockItems.view.inactive"), Icon: "clock"),
         .. views.Options,
     ];
 
@@ -252,7 +252,7 @@
         "name" => @<text>@WarehouseLabels.Text(item, "name")</text>,
         "unitKey" => @<text>@Lookups.Label(WarehouseAccess.StockUnitList, WarehouseLabels.Text(item, "unitKey"))</text>,
         "gtip" => @<text>@(WarehouseLabels.Text(item, "gtip") is { Length: > 0 } gtip ? gtip : "—")</text>,
-        "isActive" => @<span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(item, "isActive"))">@(WarehouseLabels.Flag(item, "isActive") ? "Etkin" : "Pasif")</span>,
+        "isActive" => @<span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(item, "isActive"))">@WarehouseLabels.ActiveText(WarehouseLabels.Flag(item, "isActive"))</span>,
         _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(WarehouseAccess.StockItemEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
             @<text>@CustomFieldText.Format(field, item.Values["custom"] as JsonObject)</text>,
         _ => @<text></text>,

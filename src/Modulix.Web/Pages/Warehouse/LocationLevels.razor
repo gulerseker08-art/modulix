@@ -2,10 +2,10 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Lokasyon seviyeleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.warehouse.location-levels") · Modulix</PageTitle>
 
 <AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.LocationLevelsRead">
-    <PageHeader Title="Lokasyon seviyeleri" Icon="sliders" Subtitle="@(page is null ? "Her tesis lokasyon kodunun yapısını kendisi tanımlar." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.warehouse.location-levels")" Icon="sliders" Subtitle="@(page is null ? Texts.Get("warehouse.locationLevels.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -16,33 +16,33 @@
     {
         @* Ayar niteliğinde küçük kayıt formu: tek bölümlü, FormTabs ile sekmeli (docs/design-system/form-standards.md). *@
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>@(form.Id is null ? "Yeni seviye" : "Seviyeyi düzenle")</h2>
-            <FormTabs Title="Seviye bilgileri" Label="Lokasyon seviyesi formu bölümleri">
+            <h2>@(form.Id is null ? Texts.Get("warehouse.locationLevels.new") : Texts.Get("warehouse.locationLevels.edit"))</h2>
+            <FormTabs Title="@Texts.Get("warehouse.locationLevels.formTitle")" Label="@Texts.Get("warehouse.locationLevels.tabs")">
                 <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label required" for="level-facility">Tesis</label>
-                        <LookupPicker Id="level-facility" LookupKey="@WarehouseAccess.LocationLevelFacilityLookup" @bind-Value="form.FacilityId" Required="true" Disabled="@(form.Id is not null)" Placeholder="Tesis seçin…" Invalid="@(errors?.ContainsKey("facilityId") == true)" />
+                        <label class="form-label required" for="level-facility">@Texts.Get("warehouse.facility")</label>
+                        <LookupPicker Id="level-facility" LookupKey="@WarehouseAccess.LocationLevelFacilityLookup" @bind-Value="form.FacilityId" Required="true" Disabled="@(form.Id is not null)" Placeholder="@Texts.Get("warehouse.chooseFacility")" Invalid="@(errors?.ContainsKey("facilityId") == true)" />
                         <FieldError Field="facilityId" Errors="errors" />
                     </div>
                     <div class="span-3">
-                        <label class="form-label required" for="level-position">Sıra</label>
+                        <label class="form-label required" for="level-position">@Texts.Get("warehouse.locationLevels.position")</label>
                         <input id="level-position" class="form-control" type="number" min="1" max="10" required aria-required="true" @bind="form.Position" />
                         <FieldError Field="position" Errors="errors" />
-                        <small class="text-muted">1 en dıştaki seviyedir (ör. tesis); 10'a kadar.</small>
+                        <small class="text-muted">@Texts.Get("warehouse.locationLevels.positionHelp")</small>
                     </div>
                     <div class="span-3">
-                        <label class="form-label required" for="level-key">Anahtar</label>
+                        <label class="form-label required" for="level-key">@Texts.Get("warehouse.locationLevels.key")</label>
                         <input id="level-key" class="form-control" maxlength="30" required aria-required="true" @bind="form.Key" />
                         <FieldError Field="key" Errors="errors" />
-                        <small class="text-muted">Küçük harf, rakam ve alt çizgi (ör. aisle).</small>
+                        <small class="text-muted">@Texts.Get("warehouse.locationLevels.keyHelp")</small>
                     </div>
                     <div class="span-6">
-                        <label class="form-label required" for="level-name">Ad</label>
+                        <label class="form-label required" for="level-name">@Texts.Get("common.field.name")</label>
                         <input id="level-name" class="form-control" maxlength="100" required aria-required="true" @bind="form.Name" />
                         <FieldError Field="name" Errors="errors" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="level-set">İzinli karakterler</label>
+                        <label class="form-label" for="level-set">@Texts.Get("warehouse.locationLevels.characterSet")</label>
                         <select id="level-set" class="form-select" @bind="form.CharacterSet">
                             @foreach (var (key, label) in WarehouseLabels.CharacterSets)
                             {
@@ -52,58 +52,58 @@
                         <FieldError Field="characterSet" Errors="errors" />
                     </div>
                     <div class="span-3">
-                        <label class="form-label" for="level-min">En az uzunluk</label>
+                        <label class="form-label" for="level-min">@Texts.Get("warehouse.locationLevels.minLength")</label>
                         <input id="level-min" class="form-control" type="number" min="1" max="20" @bind="form.MinLength" />
                         <FieldError Field="minLength" Errors="errors" />
                     </div>
                     <div class="span-3">
-                        <label class="form-label" for="level-max">En çok uzunluk</label>
+                        <label class="form-label" for="level-max">@Texts.Get("warehouse.locationLevels.maxLength")</label>
                         <input id="level-max" class="form-control" type="number" min="1" max="20" @bind="form.MaxLength" />
                         <FieldError Field="maxLength" Errors="errors" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="level-separator">Ayraç</label>
+                        <label class="form-label" for="level-separator">@Texts.Get("warehouse.locationLevels.separator")</label>
                         <input id="level-separator" class="form-control" maxlength="3" @bind="form.Separator" />
                         <FieldError Field="separator" Errors="errors" />
-                        <small class="text-muted">Bu seviyenin değerinden önce kodda durur; boş olabilir. İzinli karakterler: - . _ / :</small>
+                        <small class="text-muted">@Texts.Get("warehouse.locationLevels.separatorHelp")</small>
                     </div>
                 </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
             @if (form.Id is not null)
             {
-                <p class="small text-muted">Lokasyonu olan tesiste yalnızca seviye adı değişir; yeni seviye mevcutların sonuna eklenir.</p>
+                <p class="small text-muted">@Texts.Get("warehouse.locationLevels.lockedNote")</p>
             }
         </form>
     }
 
     @* Tek görünüm vardır (tüm seviyeler); tesis seçimi "Filtrele" ile açılır. Kişisel görünümler sütun, sıralama ve tesis süzgecini saklar. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Seviye görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("warehouse.locationLevels.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Seviye ara" placeholder="Anahtar veya ad ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("warehouse.locationLevels.search")" placeholder="@Texts.Get("warehouse.locationLevels.searchPlaceholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="@(string.IsNullOrEmpty(facilityId) ? 0 : 1)" />
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(WarehouseAccess.LocationLevelsWrite) && form is null)
         {
-            <button type="button" class="btn btn-primary" @onclick="NewLevel"><AppIcon Name="plus" Size="16" /> Yeni seviye</button>
+            <button type="button" class="btn btn-primary" @onclick="NewLevel"><AppIcon Name="plus" Size="16" /> @Texts.Get("warehouse.locationLevels.new")</button>
         }
     </div>
 
     @if (filtersOpen || !string.IsNullOrEmpty(facilityId))
     {
         <div class="filters">
-            <select class="form-select" aria-label="Tesis" @bind="facilityId" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm tesisler</option>
+            <select class="form-select" aria-label="@Texts.Get("warehouse.facility")" @bind="facilityId" @bind:after="() => LoadAsync(1)">
+                <option value="">@Texts.Get("warehouse.allFacilities")</option>
                 @foreach (var (id, name) in facilities.OrderBy(f => f.Value, StringComparer.CurrentCulture))
                 {
                     <option value="@id">@name</option>
@@ -121,19 +121,19 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Seviye tanımı yok.</p>
+        <p class="text-muted" role="status">@Texts.Get("warehouse.locationLevels.empty")</p>
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Lokasyon seviyesi listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("warehouse.locationLevels.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -147,8 +147,8 @@
                         <td class="row-menu-cell">
                             @if (Session.Can(WarehouseAccess.LocationLevelsWrite))
                             {
-                                <RowMenu Label="@($"{WarehouseLabels.Text(level, "name")} eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Edit(level)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <RowMenu Label="@Texts.Get("common.rowActionsOf", WarehouseLabels.Text(level, "name"))">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Edit(level)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 </RowMenu>
                             }
                         </td>
@@ -167,15 +167,15 @@
 
     // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (WarehouseRecordStore.SortKeys).
     // Varsayılan sıra tesis koduna, sonra seviye sırasına göredir.
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("facility", "Tesis", "warehouse", "facility", "-facility", Locked: true),
-        new("position", "Sıra", "hash", "position", "-position"),
-        new("name", "Ad", "type", "name", "-name"),
-        new("key", "Anahtar", "key", "key", "-key"),
-        new("characterSet", "Karakterler", "list", "characterSet", "-characterSet"),
-        new("length", "Uzunluk", "sliders", "maxLength", "-maxLength"),
-        new("separator", "Ayraç", "tag", "separator", "-separator"),
+        new("facility", Texts.Get("warehouse.facility"), "warehouse", "facility", "-facility", Locked: true),
+        new("position", Texts.Get("warehouse.locationLevels.position"), "hash", "position", "-position"),
+        new("name", Texts.Get("common.field.name"), "type", "name", "-name"),
+        new("key", Texts.Get("warehouse.locationLevels.key"), "key", "key", "-key"),
+        new("characterSet", Texts.Get("warehouse.locationLevels.col.characterSet"), "list", "characterSet", "-characterSet"),
+        new("length", Texts.Get("warehouse.locationLevels.col.length"), "sliders", "maxLength", "-maxLength"),
+        new("separator", Texts.Get("warehouse.locationLevels.separator"), "tag", "separator", "-separator"),
     ];
 
     private readonly GridViewState grid = new("warehouse.location-levels", "facility");
@@ -208,7 +208,7 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm seviyeler", Icon: "sliders"),
+        new(AllViews, Texts.Get("warehouse.locationLevels.view.all"), Icon: "sliders"),
         .. views.Options,
     ];
 

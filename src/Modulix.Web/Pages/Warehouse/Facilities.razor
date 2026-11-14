@@ -4,10 +4,10 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Tesisler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.warehouse.facilities") · Modulix</PageTitle>
 
 <AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.FacilitiesRead">
-    <PageHeader Title="Tesisler" Icon="warehouse" Subtitle="@(page is null ? "Depo ve antrepo işletilen yerleri yönetin." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.warehouse.facilities")" Icon="warehouse" Subtitle="@(page is null ? Texts.Get("warehouse.facilities.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -20,16 +20,16 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Tesis görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("warehouse.facilities.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Tesis ara" placeholder="Kod veya ad ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("warehouse.facilities.search")" placeholder="@Texts.Get("warehouse.searchCodeOrName")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(WarehouseAccess.FacilitiesWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni tesis</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("warehouse.facilities.new")</button>
         }
     </div>
 
@@ -42,20 +42,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu görünüme uyan tesis yok.</p>
+        <p class="text-muted" role="status">@Texts.Get("warehouse.facilities.empty")</p>
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) tesis listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("warehouse.facilities.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Tesis listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("warehouse.facilities.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -69,8 +69,8 @@
                         <td class="row-menu-cell">
                             @if (Session.Can(WarehouseAccess.FacilitiesWrite))
                             {
-                                <RowMenu Label="@($"{WarehouseLabels.Text(facility, "code")} eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(facility)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <RowMenu Label="@Texts.Get("common.rowActionsOf", WarehouseLabels.Text(facility, "code"))">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(facility)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 </RowMenu>
                             }
                         </td>
@@ -91,13 +91,13 @@
     private const string CustomsView = "customs";
 
     // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (WarehouseRecordStore.SortKeys).
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("code", "Kod", "hash", "code", "-code", Locked: true),
-        new("name", "Ad", "type", "name", "-name"),
-        new("countryCode", "Ülke", "globe", "countryCode", "-countryCode"),
-        new("customsEnabled", "Gümrük uzantısı", "landmark", "customsEnabled", "-customsEnabled"),
-        new("isActive", "Durum", "tag", "isActive", "-isActive"),
+        new("code", Texts.Get("warehouse.code"), "hash", "code", "-code", Locked: true),
+        new("name", Texts.Get("common.field.name"), "type", "name", "-name"),
+        new("countryCode", Texts.Get("warehouse.country"), "globe", "countryCode", "-countryCode"),
+        new("customsEnabled", Texts.Get("warehouse.customsExtension"), "landmark", "customsEnabled", "-customsEnabled"),
+        new("isActive", Texts.Get("common.field.status"), "tag", "isActive", "-isActive"),
     ];
 
     private readonly GridViewState grid = new("warehouse.facilities", "code");
@@ -129,10 +129,10 @@
     // Görünümler yalnızca süzgeçtir (Tümü, Etkin, Pasif, Gümrük uzantılı, kişisel); yetki ve kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm tesisler", Icon: "warehouse"),
-        new(ActiveView, "Etkin tesisler", Icon: "check-circle"),
-        new(InactiveView, "Pasif tesisler", Icon: "clock"),
-        new(CustomsView, "Gümrük uzantılı", Icon: "landmark"),
+        new(AllViews, Texts.Get("warehouse.allFacilities"), Icon: "warehouse"),
+        new(ActiveView, Texts.Get("warehouse.facilities.view.active"), Icon: "check-circle"),
+        new(InactiveView, Texts.Get("warehouse.facilities.view.inactive"), Icon: "clock"),
+        new(CustomsView, Texts.Get("warehouse.facilities.view.customs"), Icon: "landmark"),
         .. views.Options,
     ];
 
@@ -228,8 +228,8 @@
         "code" => @<text>@WarehouseLabels.Text(facility, "code")</text>,
         "name" => @<text>@WarehouseLabels.Text(facility, "name")</text>,
         "countryCode" => @<text>@WarehouseLabels.Text(facility, "countryCode")</text>,
-        "customsEnabled" => @<span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(facility, "customsEnabled"))">@(WarehouseLabels.Flag(facility, "customsEnabled") ? "Açık" : "Kapalı")</span>,
-        "isActive" => @<span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(facility, "isActive"))">@(WarehouseLabels.Flag(facility, "isActive") ? "Etkin" : "Pasif")</span>,
+        "customsEnabled" => @<span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(facility, "customsEnabled"))">@WarehouseLabels.OnOffText(WarehouseLabels.Flag(facility, "customsEnabled"))</span>,
+        "isActive" => @<span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(facility, "isActive"))">@WarehouseLabels.ActiveText(WarehouseLabels.Flag(facility, "isActive"))</span>,
         _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(WarehouseAccess.FacilityEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
             @<text>@CustomFieldText.Format(field, facility.Values["custom"] as JsonObject)</text>,
         _ => @<text></text>,
