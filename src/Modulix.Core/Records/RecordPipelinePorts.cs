@@ -166,6 +166,12 @@ public sealed record AuditEntry(
 {
     /// <summary>Değişikliği yapan olay aboneliği (ADR-0007, ör. "core.assignment-email"); kişinin değişikliğinde boş.</summary>
     public string? Subscription { get; init; }
+
+    /// <summary>
+    /// Anonim yazmanın denetim satırı (<see cref="RecordCommand.Anonymous"/>): kullanıcı, kayıt kimliği, değişiklikler ve iz kimliği boştur;
+    /// yazıcı satırın zamanını güne indirir ve kimliğini zamandan bağımsız üretir (sıralı kimlik yazma anını belli ederdi).
+    /// </summary>
+    public bool Anonymous { get; init; }
 }
 
 /// <summary>
