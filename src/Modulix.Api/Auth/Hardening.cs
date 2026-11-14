@@ -1,6 +1,9 @@
+using System.Globalization;
 using System.Net;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
+using Modulix.Api.Tenancy;
 
 namespace Modulix.Api.Auth;
 
@@ -55,9 +58,48 @@ public static class Hardening
             options.AddPolicy(AuthRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
                 $"auth|{context.Connection.RemoteIpAddress}",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+
+            // Oturum açmış istekler için genel sınır: kişi başına ve firma başına (tek paylaşımlı veritabanında bir hesabın
+            // ya da bir firmanın yükü diğer firmaları yavaşlatmasın). Oturumsuz uçlar kendi adlandırılmış ilkeleriyle sınırlıdır.
+            var perUser = configuration.GetValue($"{RateLimitingSection}:UserPerMinute", 600);
+            var perTenant = configuration.GetValue($"{RateLimitingSection}:TenantPerMinute", 3000);
+            options.GlobalLimiter = PartitionedRateLimiter.CreateChained(
+                PartitionedRateLimiter.Create<HttpContext, string>(context => SignedInPartition(context, "user", ClaimTypes.NameIdentifier, perUser)),
+                PartitionedRateLimiter.Create<HttpContext, string>(context => SignedInPartition(context, "tenant", ModulixClaimTypes.TenantId, perTenant)));
+
+            options.OnRejected = (context, _) =>
+            {
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                {
+                    context.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+                }
+
+                return ValueTask.CompletedTask;
+            };
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Genel sınırın ayarları: <c>RateLimiting:UserPerMinute</c> (varsayılan 600) ve <c>RateLimiting:TenantPerMinute</c>
+    /// (varsayılan 3000). 0 ya da negatif değer o sınırı kapatır.
+    /// </summary>
+    public const string RateLimitingSection = "RateLimiting";
+
+    // Yalnızca oturum açmış API istekleri sayılır; iddia değeri şifreli oturum çerezinden gelir (istemci seçemez).
+    private static RateLimitPartition<string> SignedInPartition(HttpContext context, string kind, string claimType, int permitsPerMinute)
+    {
+        if (permitsPerMinute <= 0
+            || !context.Request.Path.StartsWithSegments("/api")
+            || context.User.FindFirstValue(claimType) is not { Length: > 0 } key)
+        {
+            return RateLimitPartition.GetNoLimiter(string.Empty);
+        }
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            $"{kind}|{key}",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = permitsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
     }
 
     /// <summary>İstemci IP'sini vekil başlığından okur (yapılandırma açıksa); hız sınırından ve kimlik doğrulamadan önce çalışmalıdır.</summary>
@@ -71,9 +113,17 @@ public static class Hardening
         return app;
     }
 
+    /// <summary>Zorunlu CSP: gömme, form hedefi, temel adres ve eklenti kısıtları.</summary>
+    public const string EnforcedCsp = "frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'";
+
+    /// <summary>
+    /// Raporlanan CSP: betikler yalnızca aynı kaynaktan (WebAssembly derlemesi için <c>'wasm-unsafe-eval'</c>), ağ istekleri
+    /// yalnızca aynı kaynağa. Arayüz dış kaynak kullanmaz.
+    /// </summary>
+    public const string ReportOnlyCsp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'";
+
     /// <summary>
     /// Güvenlik başlıkları. Uç noktanın kendi koyduğu başlık (ör. imzalı belge yanıtlarının CSP'si) ezilmez.
-    /// CSP yalnızca gömme/form/temel adres kısıtlar; betik kaynağı kısıtlamaz (Blazor WebAssembly'yi bozmamak için).
     /// </summary>
     public static IApplicationBuilder UseModulixSecurityHeaders(this IApplicationBuilder app) =>
         app.Use(async (context, next) =>
@@ -85,7 +135,11 @@ public static class Hardening
                 headers.TryAdd("X-Frame-Options", "SAMEORIGIN");
                 headers.TryAdd("Referrer-Policy", "strict-origin-when-cross-origin");
                 headers.TryAdd("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
-                headers.TryAdd("Content-Security-Policy", "frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'");
+                headers.TryAdd("Content-Security-Policy", EnforcedCsp);
+
+                // Betik ve bağlantı kısıtı önce yalnızca raporlanır: arayüzün satır içi import map'i (Blazor parmak izi)
+                // tarayıcı konsolunda ihlal olarak görünür; karma (hash) ile izin verilip zorunlu hale getirilmesi sonraki adımdır.
+                headers.TryAdd("Content-Security-Policy-Report-Only", ReportOnlyCsp);
                 return Task.CompletedTask;
             });
 
