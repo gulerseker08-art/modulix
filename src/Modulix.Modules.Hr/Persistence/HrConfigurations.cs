@@ -267,6 +267,18 @@ internal sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Annou
     }
 }
 
+internal sealed class AudienceTargetConfiguration : IEntityTypeConfiguration<AudienceTarget>
+{
+    public void Configure(EntityTypeBuilder<AudienceTarget> builder)
+    {
+        HrTables.ConfigureCommon(builder, "AudienceTargets");
+        builder.HasIndex(t => new { t.TenantId, t.ContentId }).HasDatabaseName("IX_AudienceTargets_Content");
+        builder.HasIndex(t => new { t.TenantId, t.UserId }).HasDatabaseName("IX_AudienceTargets_User");
+        builder.ToTable(t => t.HasCheckConstraint("CK_AudienceTargets_OneKind",
+            "([BusinessUnitId] IS NULL AND [UserId] IS NOT NULL) OR ([BusinessUnitId] IS NOT NULL AND [UserId] IS NULL)"));
+    }
+}
+
 internal sealed class AnnouncementReadConfiguration : IEntityTypeConfiguration<AnnouncementRead>
 {
     public void Configure(EntityTypeBuilder<AnnouncementRead> builder)

@@ -645,7 +645,7 @@ public sealed class ChecklistTask : HrEntity
 /// herkes, doluysa yalnızca o departmandaki çalışanlar (kullanıcının çalışan kartından). Sabitlenmiş duyuru listenin başındadır. Metin düz metindir;
 /// ekranda HTML olarak yorumlanmaz. Okundu bilgisi ayrı kayıtta tutulur (<see cref="AnnouncementRead"/>).
 /// </summary>
-public sealed class Announcement : HrEntity
+public sealed class Announcement : HrEntity, IAudienceContent
 {
     public const int TitleMaxLength = 200;
     public const int BodyMaxLength = 8000;
@@ -676,6 +676,37 @@ public sealed class Announcement : HrEntity
     public Guid? AuthorUserId { get; internal set; }
 }
 
+/// <summary>
+/// Hedef kitlesi olan içerik (duyuru, anket; ADR-0042 bölüm 23c). Hedefler <see cref="AudienceTarget"/> satırlarıdır; tek departman kolonu ve eski İK
+/// departmanı geçiş için okunur (bölüm 22), yeni seçim onları temizler.
+/// </summary>
+public interface IAudienceContent
+{
+    Guid Id { get; }
+
+    Guid? AudienceBusinessUnitId { get; }
+
+    string? AudienceDepartmentKey { get; }
+}
+
+/// <summary>
+/// Duyuru ya da anketin bir hedefi (ADR-0042 bölüm 23c): bir Core departmanı (alt departmanları dahil) ya da bir kullanıcı; satırda ikisinden yalnızca
+/// biri doludur. İçeriğin hiç hedefi yoksa içerik herkese yöneliktir; varsa hedeflerden birine uyan okur görür. Satırları içeriğin kayıt deposu,
+/// içerikle aynı işlemde yazar.
+/// </summary>
+public sealed class AudienceTarget : HrEntity
+{
+    public const int MaxUnits = 50;
+    public const int MaxUsers = 200;
+
+    /// <summary>Duyurunun ya da anketin kimliği.</summary>
+    public Guid ContentId { get; internal set; }
+
+    public Guid? BusinessUnitId { get; internal set; }
+
+    public Guid? UserId { get; internal set; }
+}
+
 /// <summary>Duyurunun bir kullanıcı tarafından okunduğu an (duyuru başına kullanıcı tekil). Okur duyuruyu açınca yazılır; değişmez.</summary>
 public sealed class AnnouncementRead : HrEntity
 {
@@ -690,7 +721,7 @@ public sealed class AnnouncementRead : HrEntity
 /// Çalışan anketi (ADR-0042 dilim 7, K8). Taslakken soruları düzenlenir; "yanıta aç" ile hedef kitleye görünür, "kapat" ile yanıt almaz. Kimliği gizli
 /// ankette sonuçlar ve kayıt uçları yanıtlayanı göstermez (denetim kaydı yazanı tutar; bkz. ADR). Durum yalnızca komutla değişir.
 /// </summary>
-public sealed class Survey : HrEntity
+public sealed class Survey : HrEntity, IAudienceContent
 {
     public const int TitleMaxLength = 200;
     public const int DescriptionMaxLength = 2000;

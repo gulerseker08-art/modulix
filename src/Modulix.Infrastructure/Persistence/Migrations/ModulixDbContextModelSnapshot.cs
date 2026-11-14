@@ -9667,6 +9667,52 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("AssetAssignments", "hr");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Hr.Domain.AudienceTarget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BusinessUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ContentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ContentId")
+                        .HasDatabaseName("IX_AudienceTargets_Content");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .HasDatabaseName("IX_AudienceTargets_User");
+
+                    b.ToTable("AudienceTargets", "hr", t =>
+                        {
+                            t.HasCheckConstraint("CK_AudienceTargets_OneKind", "([BusinessUnitId] IS NULL AND [UserId] IS NOT NULL) OR ([BusinessUnitId] IS NOT NULL AND [UserId] IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Modules.Hr.Domain.BlogPost", b =>
                 {
                     b.Property<Guid>("Id")

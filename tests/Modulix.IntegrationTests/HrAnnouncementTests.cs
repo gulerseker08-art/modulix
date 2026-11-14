@@ -206,7 +206,78 @@ public class HrAnnouncementTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.Empty(await ListAsync(hrB, Announcements, "unread=true"));
     }
 
+    /// <summary>
+    /// Bölüm 23c: birden çok departmana ve kişiye hedefleme. Okur hedeflerden birine uyuyorsa görür (departmanı, üst departmanı ya da kendisi); yalnızca
+    /// kişi hedefi güncellenince departman hedefleri kalır; başka tenant'ın kullanıcısı, kapalı departman, tekrarlı ve biçimsiz liste reddedilir.
+    /// </summary>
+    [Fact]
+    public async Task Announcements_can_target_several_departments_and_people()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var hr = await LoginAsync(a.Hr);
+        using var staff = await LoginAsync(a.Staff);
+
+        var both = await PostAsync(hr, Announcements, Targets(Announcement("İki departman", "Metin", published: true, publishOn: "2026-01-01"),
+            [a.Finance, a.Management], []));
+        var person = await PostAsync(hr, Announcements, Targets(Announcement("Yönetim ve Sinan", "Metin", published: true, publishOn: "2026-01-02"),
+            [a.Management], [a.Staff.Id]));
+        var others = await PostAsync(hr, Announcements, Targets(Announcement("Yalnız yönetim", "Metin", published: true, publishOn: "2026-01-03"),
+            [a.Management], [a.Hr.Id]));
+
+        Assert.Equal(new[] { a.Finance, a.Management }.Order(), Ids(both, "audienceBusinessUnitIds").Order());
+        Assert.Null(Text(both, "audienceBusinessUnitId"));
+        Assert.EndsWith("· 1 kişi", Text(person, "audienceName"));
+        Assert.Equal([person.Id, both.Id], (await ListAsync(staff, Announcements, null)).Select(x => x.Id));
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.GetAsync($"{Announcements}/{others.Id}")).StatusCode);
+
+        // Yalnızca kişi hedefi değişince departman hedefleri kalır; kişi kaldırılınca okur artık göremez.
+        var updated = await PutAsync(hr, $"{Announcements}/{person.Id}", new JsonObject { ["audienceUserIds"] = new JsonArray() });
+        Assert.Equal([a.Management], Ids(updated, "audienceBusinessUnitIds"));
+        Assert.Empty(Ids(updated, "audienceUserIds"));
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.GetAsync($"{Announcements}/{person.Id}")).StatusCode);
+
+        // Doğrulama: başka tenant'ın kullanıcısı, kapalı departman, tekrar ve dizi olmayan değer.
+        var closed = await HrDepartments.CreateAsync(hr, "Kapanacak");
+        await HrDepartments.DeactivateAsync(hr, closed);
+        foreach (var (values, field) in new (JsonObject, string)[]
+        {
+            (Targets(Announcement("x", "y", true, "2026-01-01"), [], [b.Staff.Id]), "audienceUserIds"),
+            (Targets(Announcement("x", "y", true, "2026-01-01"), [closed], []), "audienceBusinessUnitIds"),
+            (Targets(Announcement("x", "y", true, "2026-01-01"), [a.Finance, a.Finance], []), "audienceBusinessUnitIds"),
+            (new JsonObject { ["title"] = "x", ["body"] = "y", ["audienceUserIds"] = a.Staff.Id.ToString() }, "audienceUserIds"),
+        })
+        {
+            var rejected = await hr.PostAsJsonAsync(Announcements, new RecordWriteRequest(values));
+            Assert.True((await ValidationProblemAsync(rejected)).Errors.ContainsKey(field), field);
+        }
+
+        // Okur hedef değiştiremez; B tenant'ı A'nın duyurusunu görmez.
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.PutAsJsonAsync($"{Announcements}/{both.Id}",
+            new RecordWriteRequest(new JsonObject { ["audienceUserIds"] = new JsonArray() }, both.Version))).StatusCode);
+        using var hrB = await LoginAsync(b.Hr);
+        Assert.Equal(HttpStatusCode.NotFound, (await hrB.GetAsync($"{Announcements}/{both.Id}")).StatusCode);
+    }
+
     // --- yardımcılar ---
+
+    private static JsonObject Targets(JsonObject values, Guid[] units, Guid[] users)
+    {
+        values["audienceBusinessUnitIds"] = new JsonArray([.. units.Select(u => (JsonNode?)JsonValue.Create(u.ToString()))]);
+        values["audienceUserIds"] = new JsonArray([.. users.Select(u => (JsonNode?)JsonValue.Create(u.ToString()))]);
+        return values;
+    }
+
+    private static async Task<RecordResponse> PutAsync(HttpClient client, string url, JsonObject values)
+    {
+        var current = (await client.GetFromJsonAsync<RecordResponse>(url))!;
+        var response = await client.PutAsJsonAsync(url, new RecordWriteRequest(values, current.Version));
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        return (await response.Content.ReadFromJsonAsync<RecordResponse>())!;
+    }
+
+    private static IReadOnlyList<Guid> Ids(RecordResponse record, string field) =>
+        [.. record.Values[field]!.AsArray().Select(n => Guid.Parse(n!.GetValue<string>()))];
 
     private const string Files = "/api/files";
 

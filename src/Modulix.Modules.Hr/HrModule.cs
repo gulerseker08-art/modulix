@@ -267,7 +267,7 @@ public sealed class HrModule : IModule
         },
         new(Entities.Announcement, "Duyuru", Permissions.AnnouncementsRead, new Dictionary<string, string>
         {
-            ["title"] = "Başlık", ["body"] = "Metin", ["audienceName"] = "Hedef departman", ["audienceDepartmentKey"] = "Eski hedef departman", ["isPinned"] = "Sabitlenmiş",
+            ["title"] = "Başlık", ["body"] = "Metin", ["audienceName"] = "Hedef kitle", ["audienceDepartmentKey"] = "Eski hedef departman", ["isPinned"] = "Sabitlenmiş",
             ["isPublished"] = "Yayında", ["publishOn"] = "Başlangıç", ["expiresOn"] = "Bitiş",
         }, "title")
         {
@@ -275,7 +275,7 @@ public sealed class HrModule : IModule
         },
         new(Entities.Survey, "Anket", Permissions.SurveysManage, new Dictionary<string, string>
         {
-            ["title"] = "Başlık", ["description"] = "Açıklama", ["isAnonymous"] = "Kimliği gizli", ["audienceName"] = "Hedef departman", ["audienceDepartmentKey"] = "Eski hedef departman",
+            ["title"] = "Başlık", ["description"] = "Açıklama", ["isAnonymous"] = "Kimliği gizli", ["audienceName"] = "Hedef kitle", ["audienceDepartmentKey"] = "Eski hedef departman",
             ["closesOn"] = "Kapanış", ["status"] = "Durum",
         }, "title")
         {

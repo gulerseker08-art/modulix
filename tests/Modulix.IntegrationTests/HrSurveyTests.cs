@@ -293,6 +293,32 @@ public class HrSurveyTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         Assert.Equal(HttpStatusCode.NotFound, (await hrB.GetAsync(url)).StatusCode);
     }
 
+    /// <summary>Bölüm 23c: kişiye hedeflenmiş anketi yalnızca o kişi görür ve yanıtlar; departman hedefiyle birlikte birleşim kuralı geçerlidir.</summary>
+    [Fact]
+    public async Task Surveys_targeted_at_people_are_only_available_to_them()
+    {
+        var s = await SetUpAsync();
+        using var hr = await LoginAsync(s.Hr);
+        using var staff = await LoginAsync(s.Staff);
+        using var colleague = await LoginAsync(s.Colleague);
+
+        var survey = await PostAsync(hr, Surveys, new JsonObject
+        {
+            ["title"] = "Yalnız Selin ve yönetim",
+            ["audienceBusinessUnitIds"] = new JsonArray(JsonValue.Create(s.Management.ToString())),
+            ["audienceUserIds"] = new JsonArray(JsonValue.Create(s.Colleague.Id.ToString())),
+        });
+        var question = await QuestionAsync(hr, survey.Id, "Puan", "rating", null, required: true);
+        await ActAsync(hr, survey.Id, "open");
+
+        Assert.Empty(await ListAsync(staff, Surveys, null));
+        Assert.Empty(await ListAsync(staff, Questions, $"surveyId={survey.Id}"));
+        Assert.Equal(HttpStatusCode.NotFound, (await PostResponseAsync(staff, survey.Id, new SurveyAnswerItem(question.Id, 3, null, null))).StatusCode);
+        Assert.Equal([survey.Id], (await ListAsync(colleague, Surveys, null)).Select(x => x.Id));
+        await SubmitAsync(colleague, survey.Id, new SurveyAnswerItem(question.Id, 3, null, null));
+        Assert.Equal(1, Number(await GetAsync(hr, $"{Surveys}/{survey.Id}"), "responseCount"));
+    }
+
     // --- yardımcılar ---
 
     private sealed record Setup(Guid TenantId, ModulixUser Hr, ModulixUser Staff, ModulixUser Colleague, ModulixUser Outsider, Guid Finance, Guid Management);
