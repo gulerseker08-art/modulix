@@ -6,14 +6,14 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>@(title ?? "Rapor") · Modulix</PageTitle>
+<PageTitle>@(title ?? Texts.Get("reports.run.pageTitle")) · Modulix</PageTitle>
 
 <AuthGate Permission="@ReportAccess.Read">
-    <a class="back-link" href="raporlar"><AppIcon Name="arrow-left" Size="16" /> Raporlar</a>
+    <a class="back-link" href="raporlar"><AppIcon Name="arrow-left" Size="16" /> @Texts.Get("nav.app.reports")</a>
 
     @if (loading)
     {
-        <p class="text-muted" role="status">Rapor yükleniyor…</p>
+        <p class="text-muted" role="status">@Texts.Get("reports.run.loading")</p>
     }
     else if (loadError is not null)
     {
@@ -21,7 +21,7 @@
             @loadError
             @if (!notFound)
             {
-                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadAsync">Tekrar dene</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadAsync">@Texts.Get("crm.sales.retry")</button>
             }
         </div>
     }
@@ -35,40 +35,40 @@
                     <p class="text-muted mb-0">@description</p>
                 }
                 <div class="header-meta">
-                    <span class="badge tag">Veri kümesi: @datasetName</span>
+                    <span class="badge tag">@Texts.Get("reports.run.datasetBadge", datasetName)</span>
                     @if (detail is not null)
                     {
                         var summary = detail.Summary;
-                        <span class="badge tag">Sahibi: @(summary.IsOwner ? "Siz" : summary.OwnerName ?? "—")</span>
-                        <span class="badge tag">Paylaşım: @ReportCenterLabels.Visibility(summary.Visibility, summary.SharedWithCount)</span>
-                        <span class="badge @ReportCenterLabels.HealthBadge(summary.Health)">Durum: @ReportCenterLabels.Health(summary.Health)</span>
+                        <span class="badge tag">@Texts.Get("reports.ownerBadge", summary.IsOwner ? Texts.Get("reports.ownerYou") : summary.OwnerName ?? "—")</span>
+                        <span class="badge tag">@Texts.Get("reports.sharingBadge", ReportCenterLabels.Visibility(summary.Visibility, summary.SharedWithCount))</span>
+                        <span class="badge @ReportCenterLabels.HealthBadge(summary.Health)">@Texts.Get("reports.healthBadge", ReportCenterLabels.Health(summary.Health))</span>
                     }
                     else
                     {
-                        <span class="badge tag">Hazır rapor</span>
+                        <span class="badge tag">@Texts.Get("reports.run.readyBadge")</span>
                     }
                 </div>
             </div>
             <div class="header-actions">
-                <button type="button" class="btn btn-outline-secondary" disabled="@running" @onclick="() => RunAsync(1)">Yenile</button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@running" @onclick="() => RunAsync(1)">@Texts.Get("crm.sales.refresh")</button>
                 @if (detail is not null)
                 {
                     <button type="button" class="btn btn-outline-secondary report-star" aria-pressed="@(detail.Summary.IsFavorite ? "true" : "false")"
-                            aria-label="@(detail.Summary.IsFavorite ? "Favorilerden çıkar" : "Favorilere ekle")" disabled="@busy" @onclick="ToggleFavoriteAsync">
+                            aria-label="@(detail.Summary.IsFavorite ? Texts.Get("reports.run.favoriteRemove") : Texts.Get("reports.run.favoriteAdd"))" disabled="@busy" @onclick="ToggleFavoriteAsync">
                         <span aria-hidden="true">@(detail.Summary.IsFavorite ? "★" : "☆")</span>
                     </button>
                     @if (detail.Summary.IsOwner && Session.Can(ReportAccess.Manage))
                     {
-                        <a class="btn btn-outline-secondary" href="raporlar/@detail.Summary.Id/duzenle">Düzenle</a>
+                        <a class="btn btn-outline-secondary" href="raporlar/@detail.Summary.Id/duzenle">@Texts.Get("common.edit")</a>
                     }
                     @if (detail.Summary.IsOwner && Session.Can(ReportAccess.Share))
                     {
-                        <button type="button" class="btn btn-outline-secondary" aria-expanded="@(sharing ? "true" : "false")" aria-controls="rr-share" @onclick="ToggleSharingAsync">Paylaş</button>
+                        <button type="button" class="btn btn-outline-secondary" aria-expanded="@(sharing ? "true" : "false")" aria-controls="rr-share" @onclick="ToggleSharingAsync">@Texts.Get("reports.run.share")</button>
                     }
                 }
                 @if (Session.Can(ReportAccess.Manage))
                 {
-                    <a class="btn btn-primary" href="@CopyLink()">Kopyasını oluştur</a>
+                    <a class="btn btn-primary" href="@CopyLink()">@Texts.Get("reports.copy")</a>
                 }
             </div>
         </div>
@@ -77,10 +77,10 @@
         {
             <div class="alert alert-warning" role="status">
                 <strong>@ReportCenterLabels.Health(unhealthy.Summary.Health).</strong>
-                @(unhealthy.Summary.HealthMessage ?? "Rapor şu an çalıştırılamıyor.")
+                @(unhealthy.Summary.HealthMessage ?? Texts.Get("reports.healthFallback"))
                 @if (unhealthy.Summary.IsOwner && Session.Can(ReportAccess.Manage))
                 {
-                    <text> Raporu <a href="raporlar/@unhealthy.Summary.Id/duzenle">düzenleyerek</a> sorunlu alanları çıkarabilirsiniz.</text>
+                    <text> @((MarkupString)Texts.Get("reports.run.fixHint", $"<a href=\"raporlar/{unhealthy.Summary.Id}/duzenle\">", "</a>"))</text>
                 }
             </div>
         }
@@ -93,12 +93,10 @@
         @if (sharing && detail is not null)
         {
             <section id="rr-share" class="report-builder-section" aria-labelledby="rr-share-title">
-                <h2 id="rr-share-title">Paylaşım</h2>
-                <p class="text-muted">
-                    Paylaşım veri erişimi vermez: raporu açan herkes verileri kendi yetkisi ve veri kapsamıyla görür; yetkisi olmayan kullanıcıya rapor yalnızca "yetkiniz yok" gösterir.
-                </p>
+                <h2 id="rr-share-title">@Texts.Get("reports.run.sharingTitle")</h2>
+                <p class="text-muted">@Texts.Get("reports.run.sharingNote")</p>
                 <fieldset class="mb-3">
-                    <legend class="form-label">Kimler görebilsin?</legend>
+                    <legend class="form-label">@Texts.Get("reports.run.whoCanSee")</legend>
                     @foreach (var (key, label) in ReportCenterLabels.Visibilities)
                     {
                         <div class="form-check">
@@ -111,22 +109,22 @@
                 @if (shareVisibility == "users")
                 {
                     <div class="mb-3">
-                        <label class="form-label" for="rr-member-filter">Kullanıcı ara</label>
-                        <input id="rr-member-filter" class="form-control mb-2" type="search" placeholder="Ad yazın" @bind="memberFilter" @bind:event="oninput" />
+                        <label class="form-label" for="rr-member-filter">@Texts.Get("reports.searchUser")</label>
+                        <input id="rr-member-filter" class="form-control mb-2" type="search" placeholder="@Texts.Get("reports.run.typeName")" @bind="memberFilter" @bind:event="oninput" />
                         @if (membersError is not null)
                         {
                             <div class="alert alert-danger" role="alert">
                                 @membersError
-                                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadMembersAsync">Tekrar dene</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadMembersAsync">@Texts.Get("crm.sales.retry")</button>
                             </div>
                         }
                         else if (members is null)
                         {
-                            <p class="text-muted" role="status">Kullanıcılar yükleniyor…</p>
+                            <p class="text-muted" role="status">@Texts.Get("reports.usersLoading")</p>
                         }
                         else
                         {
-                            <div class="report-member-list" role="group" aria-label="Paylaşılacak kullanıcılar">
+                            <div class="report-member-list" role="group" aria-label="@Texts.Get("reports.run.shareUsers")">
                                 @foreach (var member in FilteredMembers())
                                 {
                                     var id = member.UserId;
@@ -137,10 +135,10 @@
                                 }
                                 @if (!FilteredMembers().Any())
                                 {
-                                    <p class="text-muted mb-0">Kullanıcı bulunamadı.</p>
+                                    <p class="text-muted mb-0">@Texts.Get("reports.noUserFound")</p>
                                 }
                             </div>
-                            <p class="small text-muted mt-1" role="status">@shareUsers.Count kullanıcı seçili.</p>
+                            <p class="small text-muted mt-1" role="status">@Texts.Get("reports.run.usersSelected", shareUsers.Count)</p>
                         }
                     </div>
                 }
@@ -151,7 +149,7 @@
                         @shareError
                         @if (shareConflict)
                         {
-                            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadAsync">Sayfayı yenile</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadAsync">@Texts.Get("reports.run.reloadPage")</button>
                         }
                     </div>
                 }
@@ -159,9 +157,9 @@
                 <div class="form-actions">
                     <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveSharingAsync">
                         @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
-                        Paylaşımı kaydet
+                        @Texts.Get("reports.run.saveSharing")
                     </button>
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => sharing = false">Vazgeç</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => sharing = false">@Texts.Get("common.dismiss")</button>
                 </div>
             </section>
         }
@@ -183,7 +181,7 @@
                 @runError
                 @if (!runForbidden)
                 {
-                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@running" @onclick="() => RunAsync(pageNumber)">Tekrar dene</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@running" @onclick="() => RunAsync(pageNumber)">@Texts.Get("crm.sales.retry")</button>
                 }
             </div>
         }
@@ -289,7 +287,7 @@
             {
                 loading = false;
                 notFound = response.Status == HttpStatusCode.NotFound;
-                loadError = notFound ? "Rapor bulunamadı ya da bu raporu görme yetkiniz yok." : response.Error;
+                loadError = notFound ? Texts.Get("reports.notFound") : response.Error;
                 return;
             }
 
@@ -324,7 +322,7 @@
             {
                 loading = false;
                 notFound = true;
-                loadError = "Hazır rapor bulunamadı. Modül kapalı olabilir ya da bu rapor artık sunulmuyor.";
+                loadError = Texts.Get("reports.run.readyNotFound");
                 return;
             }
 
@@ -387,7 +385,7 @@
         }
 
         detail = detail with { Summary = detail.Summary with { IsFavorite = response.Value!.Favorite } };
-        actionMessage = detail.Summary.IsFavorite ? "Rapor favorilere eklendi." : "Rapor favorilerden çıkarıldı.";
+        actionMessage = detail.Summary.IsFavorite ? Texts.Get("reports.run.favoriteAdded") : Texts.Get("reports.run.favoriteRemoved");
         actionFailed = false;
     }
 
@@ -458,14 +456,14 @@
         {
             shareConflict = response.Status == HttpStatusCode.Conflict;
             shareError = shareConflict
-                ? "Bu rapor başka biri tarafından değiştirilmiş. Değişikliklerinizi kaybetmemek için sayfayı yenileyip paylaşımı yeniden ayarlayın."
+                ? Texts.Get("reports.run.shareConflict")
                 : response.Error;
             return;
         }
 
         detail = response.Value;
         sharing = false;
-        actionMessage = "Paylaşım güncellendi.";
+        actionMessage = Texts.Get("reports.run.sharingSaved");
         actionFailed = false;
     }
 

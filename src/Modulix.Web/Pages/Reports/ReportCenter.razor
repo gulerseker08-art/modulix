@@ -3,29 +3,28 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Raporlar · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.reports") · Modulix</PageTitle>
 
 <AuthGate Permission="@ReportAccess.Read">
-    <PageHeader Title="Raporlar" Icon="file-text"
-                Subtitle="Hazır raporlar, kendi raporlarınız ve sizinle paylaşılanlar. Her rapor sizin yetkiniz ve veri kapsamınızla çalışır; paylaşım veri erişimi vermez.">
+    <PageHeader Title="@Texts.Get("nav.app.reports")" Icon="file-text" Subtitle="@Texts.Get("reports.center.subtitle")">
         @if (Session.Can(ReportAccess.Manage))
         {
-            <a class="btn btn-primary" href="raporlar/yeni">Yeni rapor</a>
+            <a class="btn btn-primary" href="raporlar/yeni">@Texts.Get("reports.center.newReport")</a>
         }
         @if (Session.Can(ReportAccess.Export))
         {
-            <a class="btn btn-outline-secondary" href="raporlar/disa-aktarimlar">Dışa aktarımlar</a>
+            <a class="btn btn-outline-secondary" href="raporlar/disa-aktarimlar">@Texts.Get("reports.exports.title")</a>
         }
     </PageHeader>
 
-    <TabBar Tabs="Tabs" State="tabs" Label="Rapor bölümleri" Changed="OnTabChangedAsync" />
+    <TabBar Tabs="Tabs" State="tabs" Label="@Texts.Get("reports.center.tabs")" Changed="OnTabChangedAsync" />
 
     @if (tabs.Active != SchedulesTab)
     {
     <form class="search" role="search" @onsubmit="ApplySearchAsync" @onsubmit:preventDefault>
-        <label class="visually-hidden" for="rc-search">Rapor ara</label>
-        <input id="rc-search" class="form-control" type="search" maxlength="100" placeholder="@(tabs.Active == ReadyTab ? "Hazır raporlarda ara" : "Ad ya da açıklamada ara")" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        <label class="visually-hidden" for="rc-search">@Texts.Get("reports.center.search")</label>
+        <input id="rc-search" class="form-control" type="search" maxlength="100" placeholder="@(tabs.Active == ReadyTab ? Texts.Get("reports.center.searchReady") : Texts.Get("reports.center.searchSaved"))" @bind="search" />
+        <button type="submit" class="btn btn-outline-secondary">@Texts.Get("common.search")</button>
     </form>
     }
 
@@ -45,7 +44,7 @@
                 @if (datasets.Count == 0 && links.Count == 0)
                 {
                     <p class="text-muted" role="status">
-                        @(appliedSearch.Length > 0 ? "Aramanıza uyan hazır rapor yok." : "Etkin modüllerde sizin için hazır rapor yok.")
+                        @(appliedSearch.Length > 0 ? Texts.Get("reports.center.noReadyMatch") : Texts.Get("reports.center.noReady"))
                     </p>
                 }
 
@@ -57,7 +56,7 @@
                         @if (!dataset.Available)
                         {
                             <div class="alert alert-warning" role="status">
-                                <strong>Bu veri kümesi şu an kullanılamıyor.</strong> @(dataset.UnavailableReason ?? "Yetkiniz ya da modül durumu uygun değil.")
+                                <strong>@Texts.Get("reports.datasetUnavailable")</strong> @(dataset.UnavailableReason ?? Texts.Get("reports.unavailableFallback"))
                             </div>
                         }
                         else
@@ -69,18 +68,18 @@
                                         <h3><a href="raporlar/hazir/@ready.Key.Replace('.', '~')">@ready.Title</a></h3>
                                         <p class="text-muted mb-0">@ready.Description</p>
                                         <div class="report-row-meta">
-                                            <span class="badge tag">@(ReportCenterLabels.IsSummary(ready.Spec) ? "Özet rapor" : "Tablo rapor")</span>
+                                            <span class="badge tag">@(ReportCenterLabels.IsSummary(ready.Spec) ? Texts.Get("reports.summaryReport") : Texts.Get("reports.tableReport"))</span>
                                             @if (ready.Spec.Chart != "none")
                                             {
-                                                <span class="badge tag">Grafik: @ReportCenterLabels.Chart(ready.Spec.Chart)</span>
+                                                <span class="badge tag">@Texts.Get("reports.center.chartBadge", ReportCenterLabels.Chart(ready.Spec.Chart))</span>
                                             }
                                         </div>
                                     </div>
                                     <div class="report-row-actions">
-                                        <a class="btn btn-outline-secondary btn-sm" href="raporlar/hazir/@ready.Key.Replace('.', '~')" aria-label="Hazır raporu aç: @ready.Title">Aç</a>
+                                        <a class="btn btn-outline-secondary btn-sm" href="raporlar/hazir/@ready.Key.Replace('.', '~')" aria-label="@Texts.Get("reports.center.openReadyAria", ready.Title)">@Texts.Get("common.open")</a>
                                         @if (Session.Can(ReportAccess.Manage))
                                         {
-                                            <a class="btn btn-outline-secondary btn-sm" href="raporlar/yeni?hazir=@Uri.EscapeDataString(ready.Key)" aria-label="Kopyasını oluştur: @ready.Title">Kopyasını oluştur</a>
+                                            <a class="btn btn-outline-secondary btn-sm" href="raporlar/yeni?hazir=@Uri.EscapeDataString(ready.Key)" aria-label="@Texts.Get("reports.copyAria", ready.Title)">@Texts.Get("reports.copy")</a>
                                         }
                                     </div>
                                 </div>
@@ -92,8 +91,8 @@
                 @if (links.Count > 0)
                 {
                     <section class="detail-section" aria-labelledby="rc-links">
-                        <div class="section-header"><h2 id="rc-links">Modül raporları</h2></div>
-                        <p class="small text-muted">Bu raporlar kendi modüllerinin ekranlarında hesaplanır (kur, dönem, kohort gibi kurallar orada uygulanır).</p>
+                        <div class="section-header"><h2 id="rc-links">@Texts.Get("reports.center.moduleReports")</h2></div>
+                        <p class="small text-muted">@Texts.Get("reports.center.moduleReportsNote")</p>
                         @foreach (var link in links)
                         {
                             <div class="report-row">
@@ -102,7 +101,7 @@
                                     <p class="text-muted mb-0">@link.Description</p>
                                 </div>
                                 <div class="report-row-actions">
-                                    <a class="btn btn-outline-secondary btn-sm" href="@link.Path" aria-label="Ekranı aç: @link.Title">Aç</a>
+                                    <a class="btn btn-outline-secondary btn-sm" href="@link.Path" aria-label="@Texts.Get("reports.center.openScreenAria", link.Title)">@Texts.Get("common.open")</a>
                                 </div>
                             </div>
                         }
@@ -130,7 +129,7 @@
                 }
                 else
                 {
-                    <p class="visually-hidden" role="status" aria-live="polite">@totalCount rapor listelendi.</p>
+                    <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("reports.center.listed", totalCount)</p>
                     @foreach (var item in items)
                     {
                         <div class="report-row">
@@ -142,41 +141,41 @@
                                 }
                                 <div class="report-row-meta">
                                     <span class="badge tag">@(item.DatasetName ?? item.DatasetKey)</span>
-                                    <span class="badge tag">Sahibi: @(item.IsOwner ? "Siz" : item.OwnerName ?? "—")</span>
-                                    <span class="badge tag">Paylaşım: @ReportCenterLabels.Visibility(item.Visibility, item.SharedWithCount)</span>
-                                    <span class="badge @ReportCenterLabels.HealthBadge(item.Health)">Durum: @ReportCenterLabels.Health(item.Health)</span>
-                                    <span class="badge tag">Güncelleme: @CrmLabels.Time(item.UpdatedAt)</span>
+                                    <span class="badge tag">@Texts.Get("reports.ownerBadge", item.IsOwner ? Texts.Get("reports.ownerYou") : item.OwnerName ?? "—")</span>
+                                    <span class="badge tag">@Texts.Get("reports.sharingBadge", ReportCenterLabels.Visibility(item.Visibility, item.SharedWithCount))</span>
+                                    <span class="badge @ReportCenterLabels.HealthBadge(item.Health)">@Texts.Get("reports.healthBadge", ReportCenterLabels.Health(item.Health))</span>
+                                    <span class="badge tag">@Texts.Get("reports.center.updatedBadge", CrmLabels.Time(item.UpdatedAt))</span>
                                 </div>
                                 @if (item.Health != "ok")
                                 {
                                     <p class="small text-warning-emphasis mt-2 mb-0">
                                         <strong>@ReportCenterLabels.Health(item.Health).</strong>
-                                        @(item.HealthMessage ?? "Rapor şu an çalıştırılamıyor.")
+                                        @(item.HealthMessage ?? Texts.Get("reports.healthFallback"))
                                     </p>
                                 }
                             </div>
                             <div class="report-row-actions">
                                 <button type="button" class="btn btn-outline-secondary report-star" aria-pressed="@(item.IsFavorite ? "true" : "false")"
-                                        aria-label="@(item.IsFavorite ? "Favorilerden çıkar" : "Favorilere ekle"): @item.Name" disabled="@busy"
+                                        aria-label="@(item.IsFavorite ? Texts.Get("reports.center.favoriteRemoveAria", item.Name) : Texts.Get("reports.center.favoriteAddAria", item.Name))" disabled="@busy"
                                         @onclick="() => ToggleFavoriteAsync(item)">
                                     <span aria-hidden="true">@(item.IsFavorite ? "★" : "☆")</span>
                                 </button>
-                                <a class="btn btn-outline-secondary btn-sm" href="raporlar/@item.Id" aria-label="Raporu aç: @item.Name">Aç</a>
+                                <a class="btn btn-outline-secondary btn-sm" href="raporlar/@item.Id" aria-label="@Texts.Get("reports.center.openAria", item.Name)">@Texts.Get("common.open")</a>
                                 @if (item.IsOwner && Session.Can(ReportAccess.Manage))
                                 {
-                                    <a class="btn btn-outline-secondary btn-sm" href="raporlar/@item.Id/duzenle" aria-label="Raporu düzenle: @item.Name">Düzenle</a>
+                                    <a class="btn btn-outline-secondary btn-sm" href="raporlar/@item.Id/duzenle" aria-label="@Texts.Get("reports.center.editAria", item.Name)">@Texts.Get("common.edit")</a>
                                     @if (confirmDeleteId == item.Id)
                                     {
                                         <span class="confirm" role="alert">
-                                            <span>Bu rapor silinsin mi?</span>
-                                            <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">Evet, sil</button>
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirmDeleteId = null">Vazgeç</button>
+                                            <span>@Texts.Get("reports.center.deleteConfirm")</span>
+                                            <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">@Texts.Get("common.view.deleteYes")</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirmDeleteId = null">@Texts.Get("common.dismiss")</button>
                                         </span>
                                     }
                                     else
                                     {
-                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="Raporu sil: @item.Name"
-                                                @onclick="() => confirmDeleteId = item.Id">Sil</button>
+                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="@Texts.Get("reports.center.deleteAria", item.Name)"
+                                                @onclick="() => confirmDeleteId = item.Id">@Texts.Get("common.delete")</button>
                                     }
                                 }
                             </div>
@@ -201,8 +200,9 @@
 
     private IReadOnlyList<TabItem> Tabs =>
     [
-        new(ReadyTab, "Hazır raporlar"), new(MineTab, "Raporlarım"), new(SharedTab, "Benimle paylaşılan"), new(FavoritesTab, "Favoriler"),
-        .. (Session.Can(ReportAccess.Schedule) ? new[] { new TabItem(SchedulesTab, "Zamanlamalarım") } : Array.Empty<TabItem>()),
+        new(ReadyTab, Texts.Get("reports.center.tab.ready")), new(MineTab, Texts.Get("reports.center.tab.mine")), new(SharedTab, Texts.Get("reports.center.tab.shared")),
+        new(FavoritesTab, Texts.Get("reports.center.tab.favorites")),
+        .. (Session.Can(ReportAccess.Schedule) ? new[] { new TabItem(SchedulesTab, Texts.Get("reports.center.tab.schedules")) } : Array.Empty<TabItem>()),
     ];
 
     private readonly TabState tabs = new(ReadyTab);
@@ -337,12 +337,12 @@
     }
 
     private string EmptyText() => appliedSearch.Length > 0
-        ? "Aramanıza uyan rapor yok."
+        ? Texts.Get("reports.center.noMatch")
         : tabs.Active switch
         {
-            MineTab => Session.Can(ReportAccess.Manage) ? "Henüz raporunuz yok. \"Yeni rapor\" ile ilk raporunuzu oluşturabilirsiniz." : "Henüz raporunuz yok.",
-            SharedTab => "Sizinle paylaşılan rapor yok.",
-            _ => "Favori raporunuz yok. Bir raporun yıldızına tıklayarak favorilerinize ekleyebilirsiniz.",
+            MineTab => Session.Can(ReportAccess.Manage) ? Texts.Get("reports.center.emptyMineManage") : Texts.Get("reports.center.emptyMine"),
+            SharedTab => Texts.Get("reports.center.emptyShared"),
+            _ => Texts.Get("reports.center.emptyFavorites"),
         };
 
     private async Task ToggleFavoriteAsync(ReportSummaryDto item)
@@ -385,7 +385,7 @@
             return;
         }
 
-        actionMessage = $"\"{item.Name}\" silindi.";
+        actionMessage = Texts.Get("reports.center.deleted", item.Name);
         actionFailed = false;
         await LoadListAsync(items.Count == 1 && pageNumber > 1 ? pageNumber - 1 : pageNumber);
     }

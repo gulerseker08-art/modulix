@@ -24,7 +24,7 @@ public static class ReportExportDownloads
         }
         catch (JSException)
         {
-            return "Dosya tarayıcıya verilemedi. Tekrar deneyin.";
+            return Texts.Get("reports.download.browserFailed");
         }
 
         return null;
