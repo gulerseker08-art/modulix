@@ -31,7 +31,7 @@
 
     @if (review is null && error is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (review is not null)
     {
@@ -46,7 +46,7 @@
         <section aria-labelledby="cp-recurring"><h2 id="cp-recurring">Tekrarlayan nedenler (en az @review.MinOccurrences kez)</h2>
             @if (review.Recurring.Count == 0)
             {
-                <p class="text-muted">Bu dönemde eşiği aşan tekrarlayan neden yok.</p>
+                <EmptyState Title="Bu dönemde eşiği aşan tekrarlayan neden yok." />
             }
             else
             {
@@ -79,7 +79,7 @@
             </p>
             @if (review.OverdueActions.Count == 0)
             {
-                <p class="text-muted">Gecikmiş aksiyon yok.</p>
+                <EmptyState Title="Gecikmiş aksiyon yok." />
             }
             else
             {

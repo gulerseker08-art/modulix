@@ -4,63 +4,63 @@
 @inject CrmLookups Lookups
 @inject IJSRuntime Js
 
-<PageTitle>Sözleşme şablonları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.contracts.templates.menu") · Modulix</PageTitle>
 
 <NavigationLock ConfirmExternalNavigation="@dirty" OnBeforeInternalNavigation="ConfirmLeaveAsync" />
 
 <AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsRead">
     <div class="page-header">
         <div>
-            <h1>Sözleşme şablonları</h1>
-            <p class="text-muted mb-0">Şablon düz metindir: yalnızca kontrollü <code>{{değişken}}</code>'ler değiştirilir; kod ve HTML çalışmaz. Belgeler yalnızca yayımlanmış sürümden üretilir.</p>
+            <h1>@Texts.Get("nav.app.contracts.templates.menu")</h1>
+            <p class="text-muted mb-0">@((MarkupString)Texts.Get("contracts.templates.intro", $"<code>{{{{{Texts.Get("contracts.templates.variableExample")}}}}}</code>"))</p>
         </div>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="sozlesmeler">Sözleşmeler</a>
+            <a class="btn btn-outline-secondary" href="sozlesmeler">@Texts.Get("nav.app.contracts")</a>
             @if (CanEdit)
             {
-                <button type="button" class="btn btn-outline-primary" @onclick="NewFromSampleAsync">Örnek metinden başla</button>
-                <button type="button" class="btn btn-primary" @onclick="NewTemplate">Yeni şablon</button>
+                <button type="button" class="btn btn-outline-primary" @onclick="NewFromSampleAsync">@Texts.Get("contracts.templates.fromSample")</button>
+                <button type="button" class="btn btn-primary" @onclick="NewTemplate">@Texts.Get("contracts.templates.new")</button>
             }
         </div>
     </div>
 
     <Notice Text="@notice" Failed="@noticeFailed" />
 
-    <div class="filters" role="group" aria-label="Şablon süzgeçleri">
-        <label class="visually-hidden" for="t-status">Durum</label>
+    <div class="filters" role="group" aria-label="@Texts.Get("contracts.templates.filters")">
+        <label class="visually-hidden" for="t-status">@Texts.Get("common.field.status")</label>
         <select id="t-status" class="form-select form-select-sm filter-select" @bind="statusFilter" @bind:after="LoadAsync">
-            <option value="">Tüm durumlar</option>
+            <option value="">@Texts.Get("common.allStatuses")</option>
             @foreach (var s in TemplateLabels.Statuses) { <option value="@s.Key">@s.Label</option> }
         </select>
     </div>
 
     @if (templates is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (templates.Count == 0)
     {
-        <p class="text-muted">Henüz şablon yok. @(CanEdit ? "\"Örnek metinden başla\" ile bir örnek açabilirsiniz." : "")</p>
+        <p class="text-muted">@(CanEdit ? Texts.Get("contracts.templates.emptyCanEdit") : Texts.Get("contracts.templates.empty"))</p>
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Sözleşme şablonları</caption>
-            <thead><tr><th scope="col">Şablon</th><th scope="col">Dil</th><th scope="col">Tür</th><th scope="col">Durum</th><th scope="col">Yayımlanan sürüm</th><th scope="col"><span class="visually-hidden">İşlemler</span></th></tr></thead>
+            <caption class="visually-hidden">@Texts.Get("nav.app.contracts.templates.menu")</caption>
+            <thead><tr><th scope="col">@Texts.Get("contracts.templates.col.template")</th><th scope="col">@Texts.Get("contracts.templates.col.language")</th><th scope="col">@Texts.Get("common.field.kind")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("contracts.templates.col.published")</th><th scope="col"><span class="visually-hidden">@Texts.Get("crm.lead.actions")</span></th></tr></thead>
             <tbody>
                 @foreach (var t in templates)
                 {
                     <tr class="@(selected?.Id == t.Id ? "selected" : null)">
-                        <td data-label="Şablon" class="primary">
+                        <td data-label="@Texts.Get("contracts.templates.col.template")" class="primary">
                             @t.Name
-                            @if (t.IsExample) { <span class="badge stage-lost" title="Hukuki inceleme yapılmamış örnek metin">Örnek</span> }
+                            @if (t.IsExample) { <span class="badge stage-lost" title="@Texts.Get("contracts.templates.exampleHint")">@Texts.Get("contracts.templates.example")</span> }
                             @if (!string.IsNullOrWhiteSpace(t.UsageScope)) { <small class="text-muted">@t.UsageScope</small> }
                         </td>
-                        <td data-label="Dil">@t.Language.ToUpperInvariant()</td>
-                        <td data-label="Tür">@(t.ContractType is null ? "Her tür" : Lookups.Label(ContractsAccess.ContractTypeList, t.ContractType))</td>
-                        <td data-label="Durum"><span class="badge stage-@TemplateLabels.StatusBadge(t.Status)">@TemplateLabels.Label(TemplateLabels.Statuses, t.Status)</span></td>
-                        <td data-label="Yayımlanan sürüm">@(t.PublishedVersionNo is { } n ? $"V{n}" : "—")</td>
-                        <td data-label="İşlemler"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => SelectAsync(t)">@(CanEdit ? "Aç / düzenle" : "Görüntüle")</button></td>
+                        <td data-label="@Texts.Get("contracts.templates.col.language")">@t.Language.ToUpperInvariant()</td>
+                        <td data-label="@Texts.Get("common.field.kind")">@(t.ContractType is null ? Texts.Get("contracts.templates.anyType") : Lookups.Label(ContractsAccess.ContractTypeList, t.ContractType))</td>
+                        <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@TemplateLabels.StatusBadge(t.Status)">@TemplateLabels.Label(TemplateLabels.Statuses, t.Status)</span></td>
+                        <td data-label="@Texts.Get("contracts.templates.col.published")">@(t.PublishedVersionNo is { } n ? Texts.Get("contracts.versionNo", n) : "—")</td>
+                        <td data-label="@Texts.Get("crm.lead.actions")"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => SelectAsync(t)">@(CanEdit ? Texts.Get("contracts.templates.openEdit") : Texts.Get("contracts.templates.view"))</button></td>
                     </tr>
                 }
             </tbody>
@@ -70,94 +70,94 @@
     @if (form is not null)
     {
         <section aria-labelledby="template-editor-title" class="template-editor">
-            <h2 id="template-editor-title">@(selected is null ? "Yeni şablon" : selected.Name)</h2>
+            <h2 id="template-editor-title">@(selected is null ? Texts.Get("contracts.templates.new") : selected.Name)</h2>
             @if (selected is not null)
             {
                 <p class="text-muted">
                     <span class="badge stage-@TemplateLabels.StatusBadge(selected.Status)">@TemplateLabels.Label(TemplateLabels.Statuses, selected.Status)</span>
-                    @if (selected.PublishedVersionNo is { } pv) { <text> Yayımlanan sürüm V@(pv).</text> }
-                    @if (HasUnpublishedChanges) { <strong> Yayımlanmamış değişiklik var.</strong> }
+                    @if (selected.PublishedVersionNo is { } pv) { <text> @Texts.Get("contracts.templates.publishedVersion", pv)</text> }
+                    @if (HasUnpublishedChanges) { <strong> @Texts.Get("contracts.templates.unpublishedChanges")</strong> }
                 </p>
             }
             @if (selected?.Status == "Archived")
             {
-                <div class="alert alert-info" role="status">Arşivlenmiş şablon salt okunurdur; düzenlemek ya da kullanmak için geri alın.</div>
+                <div class="alert alert-info" role="status">@Texts.Get("contracts.templates.archivedReadOnly")</div>
             }
 
             <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-                <TabBar Tabs="FormTabs" State="tabs" Label="Şablon formu bölümleri" />
+                <TabBar Tabs="FormTabs" State="tabs" Label="@Texts.Get("contracts.templates.formSections")" />
                 <fieldset disabled="@(!CanEditSelected || busy)">
-                    <legend class="visually-hidden">Şablon bilgileri</legend>
+                    <legend class="visually-hidden">@Texts.Get("contracts.templates.info")</legend>
                     @if (errors is { Count: > 0 })
                     {
                         <div class="alert alert-danger" role="alert">
-                            <strong>Kaydetmeden önce şunları düzeltin:</strong>
+                            <strong>@Texts.Get("common.errorSummary")</strong>
                             <ul class="mb-0">@foreach (var (_, messages) in errors) { foreach (var text in messages) { <li>@text</li> } }</ul>
                         </div>
                     }
                     <TabPanel State="tabs" Key="form-genel">
                     <div class="form-grid" @oninput="() => dirty = true" @onchange="() => dirty = true">
                         <div class="span-6">
-                            <label class="form-label required" for="t-name">Ad</label>
+                            <label class="form-label required" for="t-name">@Texts.Get("common.field.name")</label>
                             <input id="t-name" class="form-control" maxlength="150" aria-required="true" @bind="form.Name" />
                             <FieldError Field="name" Errors="errors" />
                         </div>
                         <div class="span-3">
-                            <label class="form-label" for="t-lang">Dil</label>
+                            <label class="form-label" for="t-lang">@Texts.Get("contracts.templates.col.language")</label>
                             <select id="t-lang" class="form-select" @bind="form.Language">
-                                <option value="tr">Türkçe</option>
-                                <option value="en">İngilizce</option>
+                                <option value="tr">@Texts.Get("contracts.templates.language.tr")</option>
+                                <option value="en">@Texts.Get("contracts.templates.language.en")</option>
                             </select>
                         </div>
                         <div class="span-3">
-                            <label class="form-label" for="t-type">Sözleşme türü</label>
+                            <label class="form-label" for="t-type">@Texts.Get("contracts.templates.contractType")</label>
                             <select id="t-type" class="form-select" @bind="form.ContractType">
-                                <option value="">Her tür</option>
+                                <option value="">@Texts.Get("contracts.templates.anyType")</option>
                                 @foreach (var t in Lookups.Choices(ContractsAccess.ContractTypeList, form.ContractType)) { <option value="@t.Key">@t.Label</option> }
                             </select>
                             <FieldError Field="contractType" Errors="errors" />
                         </div>
                         <div class="span-6">
-                            <label class="form-label" for="t-scope">Kullanım kapsamı</label>
+                            <label class="form-label" for="t-scope">@Texts.Get("contracts.templates.usageScope")</label>
                             <input id="t-scope" class="form-control" maxlength="100" @bind="form.UsageScope" />
                         </div>
                         <div class="span-6">
-                            <label class="form-label" for="t-desc">Açıklama</label>
+                            <label class="form-label" for="t-desc">@Texts.Get("common.field.description")</label>
                             <input id="t-desc" class="form-control" maxlength="2000" @bind="form.Description" />
                         </div>
                         <div class="span-12 form-check">
                             <input id="t-example" type="checkbox" class="form-check-input" @bind="form.IsExample" />
-                            <label class="form-check-label" for="t-example">Örnek metin (hukuki inceleme yapılmamış; üretilen her belgede açıkça işaretlenir)</label>
+                            <label class="form-check-label" for="t-example">@Texts.Get("contracts.templates.isExample")</label>
                         </div>
                     </div>
                     </TabPanel>
                     <TabPanel State="tabs" Key="form-metin">
                     <div class="form-grid" @oninput="() => dirty = true" @onchange="() => dirty = true">
                         <div class="span-12">
-                            <label class="form-label required" for="t-body">Şablon metni</label>
+                            <label class="form-label required" for="t-body">@Texts.Get("contracts.templates.body")</label>
                             <textarea id="t-body" class="form-control template-body" maxlength="20000" aria-required="true" aria-describedby="t-body-help" @bind="form.Body" @bind:event="oninput"></textarea>
                             <small id="t-body-help" class="text-muted">
-                                Satır başında <code>#</code> / <code>##</code> başlık yapar; boş satır paragraf ayırır; blok değişkenleri (<code>{{kalem_tablosu}}</code>, <code>{{taraflar_listesi}}</code>, <code>{{imza_alani}}</code>, <code>{{sayfa_sonu}}</code>) satırda tek başına yazılır.
+                                @((MarkupString)Texts.Get("contracts.templates.bodyHelp", "<code>#</code>", "<code>##</code>", "<code>{{kalem_tablosu}}</code>, <code>{{taraflar_listesi}}</code>, <code>{{imza_alani}}</code>, <code>{{sayfa_sonu}}</code>"))
                             </small>
                             <FieldError Field="body" Errors="errors" />
                         </div>
                     </div>
                 <details class="variable-catalog">
-                    <summary>Değişken kataloğu (@variables.Count)</summary>
+                    <summary>@Texts.Get("contracts.templates.variables", variables.Count)</summary>
                     <table class="table record-table">
-                        <caption class="visually-hidden">Kullanılabilir şablon değişkenleri</caption>
-                        <thead><tr><th scope="col">Değişken</th><th scope="col">Anlamı</th><th scope="col">Grup</th><th scope="col"><span class="visually-hidden">Ekle</span></th></tr></thead>
+                        <caption class="visually-hidden">@Texts.Get("contracts.templates.variablesCaption")</caption>
+                        <thead><tr><th scope="col">@Texts.Get("contracts.templates.col.variable")</th><th scope="col">@Texts.Get("contracts.templates.col.meaning")</th><th scope="col">@Texts.Get("contracts.templates.col.group")</th><th scope="col"><span class="visually-hidden">@Texts.Get("common.add")</span></th></tr></thead>
                         <tbody>
                             @foreach (var v in variables)
                             {
                                 <tr>
-                                    <td data-label="Değişken"><code>@("{{" + v.Key + "}}")</code></td>
-                                    <td data-label="Anlamı">@v.Label @if (v.Financial) { <span class="badge stage-onhold" title="Tutar içerir; belge üretmek için finansal alan izni gerekir">Tutar</span> }</td>
-                                    <td data-label="Grup">@v.Group</td>
-                                    <td data-label="Ekle">
+                                    <td data-label="@Texts.Get("contracts.templates.col.variable")"><code>@("{{" + v.Key + "}}")</code></td>
+                                    <td data-label="@Texts.Get("contracts.templates.col.meaning")">@v.Label @if (v.Financial) { <span class="badge stage-onhold" title="@Texts.Get("contracts.templates.financialHint")">@Texts.Get("contracts.templates.financial")</span> }</td>
+                                    <td data-label="@Texts.Get("contracts.templates.col.group")">@v.Group</td>
+                                    <td data-label="@Texts.Get("common.add")">
                                         @if (CanEditSelected)
                                         {
-                                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Insert(v)">Metne ekle</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Insert(v)">@Texts.Get("contracts.templates.insert")</button>
                                         }
                                     </td>
                                 </tr>
@@ -171,26 +171,26 @@
                 <div class="form-actions">
                     @if (CanEditSelected)
                     {
-                        <button type="submit" class="btn btn-primary" disabled="@busy">@(selected is null ? "Taslağı oluştur" : "Kaydet")</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy">@(selected is null ? Texts.Get("contracts.templates.createDraft") : Texts.Get("common.save"))</button>
                     }
                     @if (selected is not null && CanPublish && selected.Status != "Archived")
                     {
-                        <button type="button" class="btn btn-outline-primary" disabled="@(busy || dirty)" title="@(dirty ? "Önce kaydedin" : null)" @onclick='() => StartAsync("publish")'>Yayımla</button>
-                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick='() => StartAsync("archive")'>Arşivle</button>
+                        <button type="button" class="btn btn-outline-primary" disabled="@(busy || dirty)" title="@(dirty ? Texts.Get("contracts.templates.saveFirst") : null)" @onclick='() => StartAsync("publish")'>@TemplateLabels.Action("publish")</button>
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick='() => StartAsync("archive")'>@TemplateLabels.Action("archive")</button>
                     }
                     @if (selected is { Status: "Archived" } && CanPublish)
                     {
-                        <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick='() => StartAsync("restore")'>Geri al</button>
+                        <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick='() => StartAsync("restore")'>@TemplateLabels.Action("restore")</button>
                     }
-                    <button type="button" class="btn btn-outline-secondary" @onclick="Close">Kapat</button>
-                    @if (dirty) { <span class="text-muted" role="status">Kaydedilmemiş değişiklikler var.</span> }
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Close">@Texts.Get("common.close")</button>
+                    @if (dirty) { <span class="text-muted" role="status">@Texts.Get("crm.quoteDetail.unsaved")</span> }
                 </div>
             </form>
 
             @if (action is not null)
             {
                 <form class="record-form" novalidate @onsubmit="ConfirmActionAsync" @onsubmit:preventDefault>
-                    <label class="form-label" for="t-reason">@(action == "publish" ? "Sürüm notu (isteğe bağlı)" : "Arşivleme gerekçesi *")</label>
+                    <label class="form-label" for="t-reason">@(action == "publish" ? Texts.Get("contracts.templates.publishNote") : Texts.Get("contracts.templates.archiveReason"))</label>
                     @if (action != "restore")
                     {
                         <textarea id="t-reason" class="form-control" rows="2" maxlength="500" @bind="reasonText"></textarea>
@@ -198,7 +198,7 @@
                     <FieldError Field="reason" Errors="errors" />
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary" disabled="@busy">@TemplateLabels.Action(action)</button>
-                        <button type="button" class="btn btn-outline-secondary" @onclick="() => action = null">Vazgeç</button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="() => action = null">@Texts.Get("common.dismiss")</button>
                     </div>
                 </form>
             }
@@ -206,39 +206,39 @@
             @if (selected is not null)
             {
                 <section aria-labelledby="preview-title">
-                    <h3 id="preview-title">Önizleme</h3>
-                    <p class="text-muted">Bir sözleşme seçerek şablonun çalışma kopyasını o sözleşmenin verisiyle görün (belge üretilmez).</p>
+                    <h3 id="preview-title">@Texts.Get("contracts.templates.preview")</h3>
+                    <p class="text-muted">@Texts.Get("contracts.templates.previewHelp")</p>
                     <div class="form-grid">
                         <div class="span-6">
-                            <label class="form-label" for="previewContract">Sözleşme</label>
-                            <LookupPicker Id="previewContract" LookupKey="contracts.contract.previous" @bind-Value="previewContractId" Placeholder="Sözleşme seçin…" />
+                            <label class="form-label" for="previewContract">@Texts.Get("contracts.list.col.contract")</label>
+                            <LookupPicker Id="previewContract" LookupKey="contracts.contract.previous" @bind-Value="previewContractId" Placeholder="@Texts.Get("contracts.templates.pickContract")" />
                         </div>
                         <div class="span-6 align-self-end">
-                            <button type="button" class="btn btn-outline-secondary" disabled="@(previewContractId is null || busy)" @onclick="PreviewAsync">Önizle</button>
+                            <button type="button" class="btn btn-outline-secondary" disabled="@(previewContractId is null || busy)" @onclick="PreviewAsync">@Texts.Get("contracts.templates.previewButton")</button>
                         </div>
                     </div>
                     <RenderedDocumentView Preview="preview" />
                 </section>
 
                 <section aria-labelledby="versions-title">
-                    <h3 id="versions-title">Yayımlanan sürümler</h3>
+                    <h3 id="versions-title">@Texts.Get("contracts.templates.versions")</h3>
                     @if (versions.Count == 0)
                     {
-                        <p class="text-muted">Henüz yayımlanmış sürüm yok.</p>
+                        <EmptyState Title="@Texts.Get("contracts.templates.noVersions")" />
                     }
                     else
                     {
                         <table class="table record-table">
-                            <caption class="visually-hidden">Şablon sürümleri</caption>
-                            <thead><tr><th scope="col">Sürüm</th><th scope="col">Yayımlanma</th><th scope="col">Özet (SHA-256)</th><th scope="col">Not</th></tr></thead>
+                            <caption class="visually-hidden">@Texts.Get("contracts.templates.versionsCaption")</caption>
+                            <thead><tr><th scope="col">@Texts.Get("contracts.templates.col.version")</th><th scope="col">@Texts.Get("contracts.templates.col.publishedAt")</th><th scope="col">@Texts.Get("contracts.templates.col.hash")</th><th scope="col">@Texts.Get("contracts.field.notes")</th></tr></thead>
                             <tbody>
                                 @foreach (var v in versions)
                                 {
                                     <tr>
-                                        <td data-label="Sürüm">V@(v.VersionNo)@(v.IsExample ? " (örnek)" : "")</td>
-                                        <td data-label="Yayımlanma">@CrmLabels.Time(v.PublishedAt) · @Lookups.MemberName(v.PublishedBy)</td>
-                                        <td data-label="Özet"><code title="@v.Sha256">@v.Sha256[..12]…</code></td>
-                                        <td data-label="Not">@v.Notes</td>
+                                        <td data-label="@Texts.Get("contracts.templates.col.version")">@(v.IsExample ? Texts.Get("contracts.templates.versionExample", v.VersionNo) : Texts.Get("contracts.versionNo", v.VersionNo))</td>
+                                        <td data-label="@Texts.Get("contracts.templates.col.publishedAt")">@CrmLabels.Time(v.PublishedAt) · @Lookups.MemberName(v.PublishedBy)</td>
+                                        <td data-label="@Texts.Get("contracts.templates.col.hashShort")"><code title="@v.Sha256">@v.Sha256[..12]…</code></td>
+                                        <td data-label="@Texts.Get("contracts.field.notes")">@v.Notes</td>
                                     </tr>
                                 }
                             </tbody>
@@ -268,8 +268,8 @@
 
     private IReadOnlyList<TabItem> FormTabs =>
     [
-        new("form-genel", "Genel", Errors: ErrorCount("name", "contractType")),
-        new("form-metin", "Şablon metni", Errors: ErrorCount("body")),
+        new("form-genel", Texts.Get("contracts.templates.tab.general"), Errors: ErrorCount("name", "contractType")),
+        new("form-metin", Texts.Get("contracts.templates.body"), Errors: ErrorCount("body")),
     ];
     private string? notice;
     private bool noticeFailed;
@@ -308,7 +308,7 @@
 
     private async Task ConfirmLeaveAsync(LocationChangingContext context)
     {
-        if (dirty && !await Js.InvokeAsync<bool>("confirm", "Kaydedilmemiş değişiklikler var. Sayfadan ayrılmak istiyor musunuz?"))
+        if (dirty && !await Js.InvokeAsync<bool>("confirm", Texts.Get("crm.quoteDetail.leaveConfirm")))
         {
             context.PreventNavigation();
         }
@@ -338,7 +338,7 @@
 
     private async Task SelectAsync(ContractTemplateDto template)
     {
-        if (dirty && !await Js.InvokeAsync<bool>("confirm", "Kaydedilmemiş değişiklikler var. Başka şablonu açmak istiyor musunuz?")) { return; }
+        if (dirty && !await Js.InvokeAsync<bool>("confirm", Texts.Get("contracts.templates.switchConfirm"))) { return; }
         await OpenAsync(template);
     }
 
@@ -385,13 +385,13 @@
         {
             errors = result.FieldErrors;
             tabs.RevealFirstFailing(FormTabs);
-            Notify(result.Status == System.Net.HttpStatusCode.Conflict ? $"{result.Error} Şablonu yeniden açıp tekrar deneyin." : result.Error, true);
+            Notify(result.Status == System.Net.HttpStatusCode.Conflict ? Texts.Get("contracts.templates.conflictRetry", result.Error) : result.Error, true);
             return;
         }
 
         errors = null;
         dirty = false;
-        Notify("Şablon kaydedildi.");
+        Notify(Texts.Get("contracts.templates.saved"));
         await LoadAsync();
         await OpenAsync(result.Value!);
     }
@@ -419,7 +419,7 @@
 
         var label = TemplateLabels.Action(action);
         action = null;
-        Notify($"{label}: tamamlandı.");
+        Notify(Texts.Get("crm.quoteApprovals.done", label));
         await LoadAsync();
         await OpenAsync(result.Value!);
     }

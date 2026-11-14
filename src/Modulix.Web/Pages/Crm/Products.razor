@@ -216,7 +216,7 @@
             <p class="text-muted">@Texts.Get("crm.products.components.help")</p>
             @if (components.Count == 0)
             {
-                <p class="text-muted">@Texts.Get("crm.products.components.none")</p>
+                <EmptyState Title="@Texts.Get("crm.products.components.none")" />
             }
             else
             {
@@ -308,11 +308,11 @@
 
     @if (page is null)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("common.noRecords")</p>
+        <EmptyState />
     }
     else
     {

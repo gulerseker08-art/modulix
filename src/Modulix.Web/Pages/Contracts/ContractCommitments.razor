@@ -3,60 +3,54 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Sözleşme taahhütleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("contracts.commitments.title") · Modulix</PageTitle>
 
 <AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsRead">
     <div class="page-header">
-        <h1>Sözleşme taahhütleri</h1>
+        <h1>@Texts.Get("contracts.commitments.title")</h1>
     </div>
-    <p class="text-muted">
-        Görebildiğiniz sözleşmelerin taahhüt gerçekleşmeleri. Tamamlamak, muaf tutmak ya da tanımlamak için sözleşmeyi açın (Taahhütler sekmesi). İhlalden sorumluya takip aktivitesi açılır;
-        ceza ya da finansal sonuç otomatik uygulanmaz.
-    </p>
+    <p class="text-muted">@Texts.Get("contracts.commitments.intro")</p>
 
     <Notice Text="@notice" Failed="true" />
 
     <div class="filters">
         <div class="form-check">
             <input id="cl-mine" class="form-check-input" type="checkbox" checked="@mine" @onchange="ToggleMineAsync" />
-            <label class="form-check-label" for="cl-mine">Yalnızca sorumlusu olduklarım</label>
+            <label class="form-check-label" for="cl-mine">@Texts.Get("contracts.commitments.onlyMine")</label>
         </div>
         <div>
-            <label class="form-label" for="cl-status">Durum</label>
+            <label class="form-label" for="cl-status">@Texts.Get("common.field.status")</label>
             <select id="cl-status" class="form-select" value="@status" @onchange="FilterAsync">
-                <option value="Overdue">Gecikmiş</option>
-                <option value="Open">Açık</option>
-                <option value="Breached">İhlal</option>
-                <option value="Fulfilled">Yerine getirildi</option>
-                <option value="Waived">Muaf</option>
-                <option value="">Tümü</option>
+                <option value="Overdue">@Texts.Get("contracts.commitments.overdue")</option>
+                @foreach (var key in FilterStatuses) { <option value="@key">@CommitmentLabels.Label(CommitmentLabels.OccurrenceStatuses, key)</option> }
+                <option value="">@Texts.Get("crm.pending.view.all")</option>
             </select>
         </div>
     </div>
 
     @if (items is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (items.Count == 0)
     {
-        <p class="text-muted">Bu süzgeçte gerçekleşme yok.</p>
+        <EmptyState Title="@Texts.Get("contracts.commitments.empty")" />
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Taahhüt gerçekleşmeleri</caption>
-            <thead><tr><th scope="col">Taahhüt</th><th scope="col">Sözleşme</th><th scope="col">Dönem</th><th scope="col">Son tarih</th><th scope="col">Durum</th><th scope="col">Sorumlu</th></tr></thead>
+            <caption class="visually-hidden">@Texts.Get("contracts.commitments.caption")</caption>
+            <thead><tr><th scope="col">@Texts.Get("contracts.commitments.col.commitment")</th><th scope="col">@Texts.Get("contracts.list.col.contract")</th><th scope="col">@Texts.Get("contracts.commitments.col.period")</th><th scope="col">@Texts.Get("contracts.commitments.col.due")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("common.field.owner")</th></tr></thead>
             <tbody>
                 @foreach (var o in items)
                 {
                     <tr>
-                        <td data-label="Taahhüt" class="primary">@o.CommitmentTitle <small class="text-muted">@Lookups.Label(ContractsAccess.CommitmentCategoryList, o.Category)</small></td>
-                        <td data-label="Sözleşme"><a href="sozlesmeler/@o.ContractId">@o.ContractTitle</a> <small class="text-muted">@o.ContractNumber</small></td>
-                        <td data-label="Dönem">@o.Sequence</td>
-                        <td data-label="Son tarih">@ContractLabels.Date(o.DueDate)@if (o.IsOverdue) { <div class="small text-danger">@o.DaysOverdue gün gecikti</div> }</td>
-                        <td data-label="Durum"><span class="badge stage-@CommitmentLabels.Badge(o.Status, o.IsOverdue && o.Status == "Open")">@CommitmentLabels.Label(CommitmentLabels.OccurrenceStatuses, o.Status)</span></td>
-                        <td data-label="Sorumlu">@(o.ResponsibleUserId is null ? "—" : Lookups.MemberName(o.ResponsibleUserId))</td>
+                        <td data-label="@Texts.Get("contracts.commitments.col.commitment")" class="primary">@o.CommitmentTitle <small class="text-muted">@Lookups.Label(ContractsAccess.CommitmentCategoryList, o.Category)</small></td>
+                        <td data-label="@Texts.Get("contracts.list.col.contract")"><a href="sozlesmeler/@o.ContractId">@o.ContractTitle</a> <small class="text-muted">@o.ContractNumber</small></td>
+                        <td data-label="@Texts.Get("contracts.commitments.col.period")">@o.Sequence</td>
+                        <td data-label="@Texts.Get("contracts.commitments.col.due")">@ContractLabels.Date(o.DueDate)@if (o.IsOverdue) { <div class="small text-danger">@Texts.Get("contracts.commitments.daysOverdue", o.DaysOverdue)</div> }</td>
+                        <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@CommitmentLabels.Badge(o.Status, o.IsOverdue && o.Status == "Open")">@CommitmentLabels.Label(CommitmentLabels.OccurrenceStatuses, o.Status)</span></td>
+                        <td data-label="@Texts.Get("common.field.owner")">@(o.ResponsibleUserId is null ? "—" : Lookups.MemberName(o.ResponsibleUserId))</td>
                     </tr>
                 }
             </tbody>
@@ -65,6 +59,9 @@
 </AuthGate>
 
 @code {
+    // Süzgeçteki durumlar (Gecikmiş ve Tümü dışında); adları gerçekleşme durumu tablosundan gelir.
+    private static readonly string[] FilterStatuses = ["Open", "Breached", "Fulfilled", "Waived"];
+
     private List<CommitmentOccurrenceDto>? items;
     private bool mine = true;
     private string status = "Overdue";

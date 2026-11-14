@@ -52,7 +52,7 @@
 
     @if (stops is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (stops.Count == 0)
     {

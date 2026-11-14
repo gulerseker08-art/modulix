@@ -5,46 +5,73 @@ namespace Modulix.Web.Services;
 /// <summary>Sipariş ekranlarının etiketleri; anahtarlar sunucudaki <c>OrderStatus</c>, <c>HandoverStatus</c> ve <c>FulfillmentStatus</c> ile aynıdır.</summary>
 public static class OrderLabels
 {
-    public static IReadOnlyList<(string Key, string Label)> Statuses { get; } =
+    /// <summary>Etkin dildeki metin: `orders.{grup}.{anahtar küçük harf}`; sözlükte yoksa Türkçe kaynak metin gösterilir (ADR-0034).</summary>
+    public static string Of(string group, string key, string fallback) =>
+        Texts.GetOr($"orders.{group}.{key.ToLowerInvariant()}", fallback);
+
+    private static IReadOnlyList<(string Key, string Label)> Translate(string group, (string Key, string Label)[] source) =>
+        [.. source.Select(x => (x.Key, Of(group, x.Key.StartsWith('-') ? "desc-" + x.Key[1..] : x.Key, x.Label)))];
+
+    public static IReadOnlyList<(string Key, string Label)> Statuses => Translate("status", StatusesSource);
+
+    private static readonly (string Key, string Label)[] StatusesSource =
     [
         ("Draft", "Taslak"), ("PendingApproval", "Onay bekliyor"), ("Approved", "Onaylandı"), ("Cancelled", "İptal edildi"), ("Closed", "Kapatıldı"),
     ];
 
-    public static IReadOnlyList<(string Key, string Label)> Handovers { get; } =
+    public static IReadOnlyList<(string Key, string Label)> Handovers => Translate("handover", HandoversSource);
+
+    private static readonly (string Key, string Label)[] HandoversSource =
     [
         ("NotStarted", "Devir başlamadı"), ("Preparing", "Devir hazırlanıyor"), ("Ready", "Devre hazır"), ("Sent", "Operasyona gönderildi"),
         ("InfoRequested", "Bilgi bekleniyor"), ("Accepted", "Operasyon kabul etti"),
     ];
 
-    public static IReadOnlyList<(string Key, string Label)> Fulfillments { get; } =
+    public static IReadOnlyList<(string Key, string Label)> Fulfillments => Translate("fulfillment", FulfillmentsSource);
+
+    private static readonly (string Key, string Label)[] FulfillmentsSource =
     [
         ("NotStarted", "Başlamadı"), ("Planned", "Planlandı"), ("Partial", "Kısmen gerçekleşti"), ("Completed", "Tamamlandı"),
     ];
 
-    public static IReadOnlyList<(string Key, string Label)> LineKinds { get; } =
+    public static IReadOnlyList<(string Key, string Label)> LineKinds => Translate("line-kind", LineKindsSource);
+
+    private static readonly (string Key, string Label)[] LineKindsSource =
         [("Product", "Ürün"), ("Service", "Hizmet"), ("Package", "Paket"), ("Free", "Serbest kalem")];
 
-    public static IReadOnlyList<(string Key, string Label)> AcceptanceMethods { get; } =
+    public static IReadOnlyList<(string Key, string Label)> AcceptanceMethods => Translate("acceptance", AcceptanceMethodsSource);
+
+    private static readonly (string Key, string Label)[] AcceptanceMethodsSource =
         [("Portal", "Müşteri sayfasından"), ("Manual", "Satış kullanıcısı kaydetti")];
 
-    public static IReadOnlyList<(string Key, string Label)> Sorts { get; } =
+    public static IReadOnlyList<(string Key, string Label)> Sorts => Translate("sort", SortsSource);
+
+    private static readonly (string Key, string Label)[] SortsSource =
     [
         ("-createdAt", "En yeni"), ("createdAt", "En eski"), ("number", "Numara (artan)"), ("-number", "Numara (azalan)"),
         ("deliveryDate", "Teslim tarihi (yakın)"), ("-deliveryDate", "Teslim tarihi (uzak)"), ("title", "Başlık (A-Z)"),
     ];
 
-    public static IReadOnlyList<(string Key, string Label)> JobStatuses { get; } =
+    public static IReadOnlyList<(string Key, string Label)> JobStatuses => Translate("job-status", JobStatusesSource);
+
+    private static readonly (string Key, string Label)[] JobStatusesSource =
     [
         ("AwaitingAssignment", "Atama bekliyor"), ("Planned", "Planlandı"), ("InProgress", "Devam ediyor"), ("Completed", "Tamamlandı"), ("Cancelled", "İptal edildi"),
     ];
 
-    public static IReadOnlyList<(string Key, string Label)> JobKinds { get; } =
+    public static IReadOnlyList<(string Key, string Label)> JobKinds => Translate("job-kind", JobKindsSource);
+
+    private static readonly (string Key, string Label)[] JobKindsSource =
         [("Delivery", "Teslimat"), ("Service", "Hizmet başlangıcı"), ("Mixed", "Karma"), ("Other", "Diğer")];
 
-    public static IReadOnlyList<(string Key, string Label)> Priorities { get; } =
+    public static IReadOnlyList<(string Key, string Label)> Priorities => Translate("priority", PrioritiesSource);
+
+    private static readonly (string Key, string Label)[] PrioritiesSource =
         [("Low", "Düşük"), ("Normal", "Normal"), ("High", "Yüksek"), ("Urgent", "Acil")];
 
-    public static IReadOnlyList<(string Key, string Label)> JobSorts { get; } =
+    public static IReadOnlyList<(string Key, string Label)> JobSorts => Translate("job-sort", JobSortsSource);
+
+    private static readonly (string Key, string Label)[] JobSortsSource =
     [
         ("-createdAt", "En yeni"), ("plannedEnd", "Planlanan bitiş (yakın)"), ("-plannedEnd", "Planlanan bitiş (uzak)"), ("number", "Numara (artan)"), ("title", "Başlık (A-Z)"),
     ];
@@ -58,16 +85,16 @@ public static class OrderLabels
         _ => "open",
     };
 
-    public static string JobAction(string key) => key switch
+    public static string JobAction(string key) => Of("job-action", key, key switch
     {
         "assign" => "Ata",
         "start" => "Başlat",
         "complete" => "Tamamla",
         "cancel" => "İptal et",
         _ => key,
-    };
+    });
 
-    public static string JobHistory(string kind) => kind switch
+    public static string JobHistory(string kind) => Of("job-history", kind, kind switch
     {
         "Generated" => "Devir kabulünden üretildi",
         "CreatedManually" => "Elle açıldı",
@@ -80,7 +107,7 @@ public static class OrderLabels
         "UnassignedAlert" => "Atama bekleme takibi açıldı",
         "OverdueAlert" => "Gecikme takibi açıldı",
         _ => kind,
-    };
+    });
 
     public static string Label(IReadOnlyList<(string Key, string Label)> list, string? key) =>
         list.FirstOrDefault(x => x.Key == key).Label ?? key ?? "—";
@@ -109,7 +136,9 @@ public static class OrderLabels
         _ => "open",
     };
 
-    public static IReadOnlyList<(string Key, string Label)> ChangeStatuses { get; } =
+    public static IReadOnlyList<(string Key, string Label)> ChangeStatuses => Translate("change-status", ChangeStatusesSource);
+
+    private static readonly (string Key, string Label)[] ChangeStatusesSource =
         [("Pending", "Karar bekliyor"), ("Approved", "Onaylandı ve uygulandı"), ("Rejected", "Reddedildi"), ("Withdrawn", "Geri çekildi")];
 
     public static string ChangeBadge(string status) => status switch
@@ -120,14 +149,16 @@ public static class OrderLabels
         _ => "cancelled",
     };
 
-    public static IReadOnlyList<(string Key, string Label)> HeaderFields { get; } =
+    public static IReadOnlyList<(string Key, string Label)> HeaderFields => Translate("header-field", HeaderFieldsSource);
+
+    private static readonly (string Key, string Label)[] HeaderFieldsSource =
     [
         ("deliveryAddress", "Teslimat adresi"), ("location", "Lokasyon"), ("plannedStartDate", "Planlanan başlangıç"), ("plannedDeliveryDate", "Planlanan teslim"),
         ("paymentTerms", "Ödeme koşulları"), ("deliveryTerms", "Teslimat koşulları"), ("commercialTerms", "Ticari koşullar"),
         ("commitments", "Müşteriye verilen taahhütler"), ("operationsNotes", "Operasyon notları"),
     ];
 
-    public static string Action(string key) => key switch
+    public static string Action(string key) => Of("action", key, key switch
     {
         "submit-for-approval" => "Onaya gönder",
         "withdraw-approval" => "Onayı geri çek",
@@ -137,13 +168,13 @@ public static class OrderLabels
         "close" => "Siparişi kapat",
         "force-close" => "Zorla kapat",
         _ => key,
-    };
+    });
 
     public static bool IsPrimary(string key) => key is "submit-for-approval" or "approve" or "close";
 
     public static bool IsDanger(string key) => key is "cancel" or "force-close";
 
-    public static string History(string kind) => kind switch
+    public static string History(string kind) => Of("history", kind, kind switch
     {
         "CreatedFromQuote" => "Kabul edilmiş tekliften oluşturuldu",
         "SubmittedForApproval" => "Onaya gönderildi",
@@ -169,11 +200,11 @@ public static class OrderLabels
         "ServiceCompleted" => "Hizmet tamamlandı",
         "FulfillmentChanged" => "Gerçekleşme durumu değişti",
         _ => kind,
-    };
+    });
 
     /// <summary>Tutar; izin yoksa (null) gizli olduğu söylenir. Para birimleri karıştırılmaz: her tutar kendi para biriminde gösterilir.</summary>
     public static string Money(decimal? amount, string currency) =>
-        amount is { } value ? $"{value.ToString("N2", Regional.Numbers)} {currency}" : "Gizli";
+        amount is { } value ? $"{value.ToString("N2", Regional.Numbers)} {currency}" : Texts.Get("orders.hidden");
 
     public static string Quantity(decimal value, string? unit) => $"{value.ToString("G29", Regional.Numbers)} {unit}".TrimEnd();
 

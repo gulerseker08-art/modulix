@@ -34,7 +34,7 @@
     {
         @if (message is null)
         {
-            <p class="text-muted">@Texts.Get("common.loading")</p>
+            <LoadingState />
         }
     }
     else if (editing)
@@ -393,7 +393,7 @@
                     <p class="text-muted small">@Texts.Get("crm.opp.linesHelp", $"{lineQuote.QuoteNumber} · V{lineQuote.RevisionNo}")</p>
                     @if (primaryLines is null)
                     {
-                        <p class="text-muted">@Texts.Get("common.loading")</p>
+                        <LoadingState Kind="LoadingKind.Table" />
                     }
                     else if (!primaryLines.Any(l => l.Included && l.Role != "PackageChild"))
                     {
@@ -465,7 +465,7 @@
                 }
                 @if (contacts is null)
                 {
-                    <p class="text-muted">@Texts.Get("common.loading")</p>
+                    <LoadingState />
                 }
                 else if (contacts.Count == 0)
                 {
@@ -528,7 +528,7 @@
                 }
                 @if (competitors is null)
                 {
-                    <p class="text-muted">@Texts.Get("common.loading")</p>
+                    <LoadingState />
                 }
                 else if (competitors.Count == 0)
                 {
@@ -579,7 +579,7 @@
                 }
                 else if (quotes is null)
                 {
-                    <p class="text-muted">@Texts.Get("common.loading")</p>
+                    <LoadingState />
                 }
                 else if (quotes.Count == 0)
                 {
@@ -635,7 +635,7 @@
             <FormSection Title="@Texts.Get("crm.opp.history")" Icon="history">
                 @if (history is null)
                 {
-                    <p class="text-muted">@Texts.Get("common.loading")</p>
+                    <LoadingState Kind="LoadingKind.Table" />
                 }
                 else
                 {
@@ -675,7 +675,7 @@
                     <ChildContent>
                     @if (activities is null)
                     {
-                        <p class="text-muted">@Texts.Get("common.loading")</p>
+                        <LoadingState />
                     }
                     else if (activities.Count == 0)
                     {

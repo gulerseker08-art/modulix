@@ -4,7 +4,8 @@
 
 <PageTitle>Sektör profili · Modulix</PageTitle>
 
-@* Sektör profili (Y9c): hazır alanlar ve liste değerleri. Bir kez uygulanır ve yalnızca ekler; önce önizleme gösterilir. *@
+@* Sektör profili (Y9c): hazır alanlar ve liste değerleri. Bir kez uygulanır ve yalnızca ekler; önce önizleme gösterilir. Altında firmanın alt profilleri
+   ve faaliyet seçimi vardır (ADR-0041 K8). *@
 <AuthGate Permission="@CoreAccess.ManageCustomization">
     <a class="back-link" href="yonetim">← Yönetim</a>
 
@@ -66,6 +67,8 @@
         }
 
         <SubProfilesSection />
+
+        <ActivitySelectionSection />
     }
 </AuthGate>
 

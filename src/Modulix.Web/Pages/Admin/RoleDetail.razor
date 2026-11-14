@@ -21,7 +21,7 @@
 
     @if (!loaded)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (IsNew || role is not null)
     {

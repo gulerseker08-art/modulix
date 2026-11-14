@@ -4,11 +4,11 @@
 @inject CrmLookups Lookups
 
 <section aria-labelledby="order-jobs-title">
-    <h2 id="order-jobs-title">Operasyon işleri</h2>
+    <h2 id="order-jobs-title">@Texts.Get("orders.jobs.title")</h2>
     <Notice Text="@message" Failed="@failed" />
     @if (jobs is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else
     {
@@ -16,27 +16,27 @@
         {
             <p class="text-muted">
                 @(Order.HandoverStatus == "Accepted"
-                    ? "Bu siparişin devri kabul edilmiş ancak açık operasyon işi yok."
-                    : "Operasyon işleri, satış devri operasyon tarafından kabul edilince otomatik açılır.")
+                    ? Texts.Get("orders.jobs.empty-accepted")
+                    : Texts.Get("orders.jobs.empty"))
             </p>
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">Siparişin operasyon işleri</caption>
-                <thead><tr><th scope="col">İş</th><th scope="col">Tür</th><th scope="col">Durum</th><th scope="col">Sorumlu / ekip</th><th scope="col">Planlanan</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("orders.jobs.caption")</caption>
+                <thead><tr><th scope="col">@Texts.Get("orders.jobs.col.job")</th><th scope="col">@Texts.Get("orders.jobs.col.kind")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("orders.jobs.col.responsible")</th><th scope="col">@Texts.Get("orders.jobs.col.planned")</th></tr></thead>
                 <tbody>
                     @foreach (var j in jobs)
                     {
                         <tr>
-                            <td data-label="İş" class="primary"><a href="siparisler/isler/@j.Id">@j.Title</a><small class="text-muted">@j.Number</small></td>
-                            <td data-label="Tür">@OrderLabels.Label(OrderLabels.JobKinds, j.Kind)</td>
-                            <td data-label="Durum"><span class="badge stage-@OrderLabels.JobBadge(j.Status)">@OrderLabels.Label(OrderLabels.JobStatuses, j.Status)</span></td>
-                            <td data-label="Sorumlu / ekip">
-                                @(Lookups.MemberName(j.ResponsibleUserId) is { Length: > 0 } who ? who : (string.IsNullOrEmpty(j.TeamName) ? "Atanmadı" : null))
+                            <td data-label="@Texts.Get("orders.jobs.col.job")" class="primary"><a href="siparisler/isler/@j.Id">@j.Title</a><small class="text-muted">@j.Number</small></td>
+                            <td data-label="@Texts.Get("orders.jobs.col.kind")">@OrderLabels.Label(OrderLabels.JobKinds, j.Kind)</td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@OrderLabels.JobBadge(j.Status)">@OrderLabels.Label(OrderLabels.JobStatuses, j.Status)</span></td>
+                            <td data-label="@Texts.Get("orders.jobs.col.responsible")">
+                                @(Lookups.MemberName(j.ResponsibleUserId) is { Length: > 0 } who ? who : (string.IsNullOrEmpty(j.TeamName) ? Texts.Get("orders.jobs.unassigned") : null))
                                 @if (!string.IsNullOrEmpty(j.TeamName)) { <small class="text-muted d-block">@j.TeamName</small> }
                             </td>
-                            <td data-label="Planlanan">@OrderLabels.Date(j.PlannedStartDate) – @OrderLabels.Date(j.PlannedEndDate)</td>
+                            <td data-label="@Texts.Get("orders.jobs.col.planned")">@OrderLabels.Date(j.PlannedStartDate) – @OrderLabels.Date(j.PlannedEndDate)</td>
                         </tr>
                     }
                 </tbody>
@@ -47,19 +47,19 @@
         {
             @if (!creating)
             {
-                <button type="button" class="btn btn-outline-primary" @onclick="StartCreate">Elle iş aç</button>
+                <button type="button" class="btn btn-outline-primary" @onclick="StartCreate">@Texts.Get("orders.jobs.create")</button>
             }
             else
             {
                 <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
                     <fieldset disabled="@busy">
-                        <legend class="visually-hidden">Yeni operasyon işi</legend>
-                        <p class="text-muted">Seçtiğiniz sipariş kalemleri yeni bir işe bağlanır. Bir kalem aynı anda yalnızca bir açık işte bulunur. Sorumlu ya da ekip girmezseniz iş "Atama bekliyor" durumunda açılır.</p>
+                        <legend class="visually-hidden">@Texts.Get("orders.jobs.new")</legend>
+                        <p class="text-muted">@Texts.Get("orders.jobs.new-note")</p>
                         <div class="form-grid">
-                            <div class="span-12"><label class="form-label" for="mj-title">İş başlığı</label><input id="mj-title" class="form-control" maxlength="200" @bind="title" /></div>
+                            <div class="span-12"><label class="form-label" for="mj-title">@Texts.Get("orders.jobs.field.title")</label><input id="mj-title" class="form-control" maxlength="200" @bind="title" /></div>
                             <div class="span-12">
                                 <fieldset>
-                                    <legend class="form-label">Bağlanacak kalemler</legend>
+                                    <legend class="form-label">@Texts.Get("orders.jobs.field.lines")</legend>
                                     @foreach (var line in Lines.Where(l => !l.IsCancelled))
                                     {
                                         <div class="form-check">
@@ -70,15 +70,15 @@
                                     <FieldError Field="lineIds" Errors="errors" />
                                 </fieldset>
                             </div>
-                            <div class="span-6"><label class="form-label" for="mj-user">Sorumlu kullanıcı</label><LookupPicker Id="mj-user" LookupKey="orders.operation-job.responsible" @bind-Value="responsible" Placeholder="Atama bekliyor" /></div>
-                            <div class="span-6"><label class="form-label" for="mj-team">Ekip</label><input id="mj-team" class="form-control" maxlength="300" @bind="team" /></div>
-                            <div class="span-6"><label class="form-label" for="mj-start">Planlanan başlangıç</label><input id="mj-start" type="date" class="form-control" @bind="start" /></div>
-                            <div class="span-6"><label class="form-label" for="mj-end">Planlanan bitiş</label><input id="mj-end" type="date" class="form-control" @bind="end" /></div>
+                            <div class="span-6"><label class="form-label" for="mj-user">@Texts.Get("orders.jobs.field.user")</label><LookupPicker Id="mj-user" LookupKey="orders.operation-job.responsible" @bind-Value="responsible" Placeholder="@Texts.Get("orders.job-status.awaitingassignment")" /></div>
+                            <div class="span-6"><label class="form-label" for="mj-team">@Texts.Get("orders.jobs.field.team")</label><input id="mj-team" class="form-control" maxlength="300" @bind="team" /></div>
+                            <div class="span-6"><label class="form-label" for="mj-start">@Texts.Get("orders.jobs.field.start")</label><input id="mj-start" type="date" class="form-control" @bind="start" /></div>
+                            <div class="span-6"><label class="form-label" for="mj-end">@Texts.Get("orders.jobs.field.end")</label><input id="mj-end" type="date" class="form-control" @bind="end" /></div>
                         </div>
                     </fieldset>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@(busy || selected.Count == 0)">İşi aç</button>
-                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => creating = false">Vazgeç</button>
+                        <button type="submit" class="btn btn-primary" disabled="@(busy || selected.Count == 0)">@Texts.Get("orders.jobs.submit")</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => creating = false">@Texts.Get("common.dismiss")</button>
                     </div>
                 </form>
             }
@@ -152,7 +152,7 @@
         busy = false;
         failed = !result.IsSuccess;
         errors = result.FieldErrors;
-        message = result.IsSuccess ? "Operasyon işi açıldı." : result.Error;
+        message = result.IsSuccess ? Texts.Get("orders.jobs.created") : result.Error;
         if (result.IsSuccess) { creating = false; }
         await LoadAsync();
     }

@@ -21,11 +21,11 @@
         <h2 id="queues-title">Kuyruklar</h2>
         @if (queues is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (queues.Count == 0)
         {
-            <p class="text-muted">Henüz kuyruk yok. Talepler kuyruksuz (atanmamış) açılır. Bir kuyruğu varsayılan yapmanız önerilir.</p>
+            <EmptyState Title="Henüz kuyruk yok. Talepler kuyruksuz (atanmamış) açılır. Bir kuyruğu varsayılan yapmanız önerilir." />
         }
         else
         {
@@ -83,11 +83,11 @@
         <h2 id="categories-title">Kategoriler</h2>
         @if (categories is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (categories.Count == 0)
         {
-            <p class="text-muted">Henüz kategori yok.</p>
+            <EmptyState Title="Henüz kategori yok." />
         }
         else
         {

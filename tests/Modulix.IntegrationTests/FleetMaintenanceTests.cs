@@ -30,7 +30,7 @@ public class FleetMaintenanceTests(CrmAutomationFixture fixture) : IClassFixture
     private const string Vehicles = "/api/records/fleet.vehicle";
     private const string Maintenance = "/api/records/fleet.maintenance";
 
-    private DateOnly Today => DateOnly.FromDateTime(fixture.Time.GetUtcNow().UtcDateTime);
+    private DateOnly Today => TenantToday.At(fixture.Time.GetUtcNow());
 
     private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

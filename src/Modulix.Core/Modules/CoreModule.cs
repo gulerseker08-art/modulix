@@ -376,6 +376,31 @@ public sealed class CoreModule : IModule
                 new("OhsTraining", "İş sağlığı ve güvenliği eğitimi", CredentialCategories.Employee),
                 new("WorkPermit", "Çalışma izni", CredentialCategories.Employee),
             ]),
+        new(
+            Place.KindList,
+            "Yer türü",
+            SharedEntities.Place,
+            "kindKey",
+            Required: true,
+            [
+                new(PlaceKindCategories.Site, "Tesis (depo, fabrika)"),
+                new(PlaceKindCategories.Port, "Liman"),
+                new(PlaceKindCategories.Border, "Sınır kapısı"),
+                new(PlaceKindCategories.Customs, "Gümrük"),
+                new(PlaceKindCategories.Other, "Diğer"),
+            ],
+            [
+                new("Depot", "Depo", PlaceKindCategories.Site),
+                new("Factory", "Fabrika", PlaceKindCategories.Site),
+                new("BondedWarehouse", "Antrepo", PlaceKindCategories.Site),
+                new("Port", "Liman", PlaceKindCategories.Port),
+                new("BorderGate", "Sınır kapısı", PlaceKindCategories.Border),
+                new("CustomsOffice", "Gümrük müdürlüğü", PlaceKindCategories.Customs),
+                new("Other", "Diğer", PlaceKindCategories.Other),
+            ])
+        {
+            Default = Place.DefaultKind,
+        },
     ];
 
     /// <summary>Core lookup'ları: kural aksiyonlarında üye seçimi ("Bildirim gönder" alıcısı).</summary>
@@ -683,6 +708,11 @@ public sealed class CoreModule : IModule
                 },
             },
         },
+        new(SharedEntities.Place, "Yer (ortak kayıt)", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["kindKey"] = "Tür", ["countryCode"] = "Ülke", ["city"] = "Şehir", ["district"] = "İlçe", ["addressLine"] = "Adres",
+            ["postalCode"] = "Posta kodu", ["latitude"] = "Enlem", ["longitude"] = "Boylam", ["isActive"] = "Etkin",
+        }, "name"),
         new(AuditedEntityKeys.Audit, "Denetim kaydı", null, new Dictionary<string, string>
         {
             ["filters"] = "Filtreler", ["rows"] = "Satır sayısı",
