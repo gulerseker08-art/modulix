@@ -166,11 +166,13 @@
         await Session.EnsureLoadedAsync();
         if (Session.Can(CrmAccess.CompaniesRead))
         {
-            await Lookups.LoadAsync();
+            // Seçim verileri birbirinden bağımsızdır; birlikte istenir, liste hepsi gelince okunur.
+            var rolesTask = Api.GetAsync<List<RelationshipRoleDto>>("/api/relationship-roles");
+            var activitiesTask = Api.GetAsync<List<ActivityOptionDto>>("/api/activity-options");
+            await Task.WhenAll(Lookups.LoadAsync(), views.LoadAsync(), rolesTask, activitiesTask);
             grid.Define([.. BaseColumns, .. Lookups.FieldsOf(CrmEntityKeys.Company).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
-            await views.LoadAsync();
-            roles = (await Api.GetAsync<List<RelationshipRoleDto>>("/api/relationship-roles")).Value ?? [];
-            activities = (await Api.GetAsync<List<ActivityOptionDto>>("/api/activity-options")).Value ?? [];
+            roles = (await rolesTask).Value ?? [];
+            activities = (await activitiesTask).Value ?? [];
             await LoadAsync(1);
         }
     }

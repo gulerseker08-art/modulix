@@ -1,22 +1,22 @@
 @page "/yonetim/onay-surecleri"
 @inject ApiClient Api
 
-<PageTitle>Onay süreçleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.approvals") · Modulix</PageTitle>
 
 @* Onay süreçleri (ADR-0027 Dilim 4a): firma kendi süreçlerini tanımlar. Değişiklik yeni sürüm açar; açık talepler açıldıkları andaki adımlarla sürer. *@
 <AuthGate Permission="@CoreAccess.ManageApprovals">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
-    <PageHeader Title="Onay süreçleri" Icon="check-circle"
-                Subtitle="Satın alma, masraf ya da iskonto gibi işler için kimin hangi sırayla onay vereceğini tanımlayın. Aynı sıra numarasındaki adımlar birlikte çalışır." />
+    <PageHeader Title="@Texts.Get("nav.app.admin.approvals")" Icon="check-circle"
+                Subtitle="@Texts.Get("admin.approvalProcesses.subtitle")" />
 
     <Notice Text="@message" Failed="true" />
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Süreç görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("admin.approvalProcesses.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
-        <button type="button" class="btn btn-primary" @onclick="() => Edit(null)"><AppIcon Name="plus" Size="16" /> Yeni süreç</button>
+        <button type="button" class="btn btn-primary" @onclick="() => Edit(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("admin.approvalProcesses.new")</button>
     </div>
 
     <PersonalViewBar Active="Active" Dirty="Dirty" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
@@ -28,19 +28,19 @@
     }
     else if (Shown.Count == 0)
     {
-        <p class="text-muted">@(definitions.Count == 0 ? "Henüz onay süreci yok." : "Bu görünümde onay süreci yok.")</p>
+        <p class="text-muted">@(definitions.Count == 0 ? Texts.Get("admin.approvalProcesses.empty") : Texts.Get("admin.approvalProcesses.emptyView"))</p>
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Onay süreçleri</caption>
+            <caption class="visually-hidden">@Texts.Get("nav.app.admin.approvals")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -52,9 +52,9 @@
                             <td data-label="@column.Label" class="@(column.Key == "name" ? "primary" : null)">@CellContent(column.Key, definition)</td>
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{definition.Name} eylemleri")">
-                                <button type="button" class="dropdown-item" role="menuitem" @onclick="() => Edit(definition)">Düzenle</button>
-                                <button type="button" class="dropdown-item" role="menuitem" @onclick="() => ToggleAsync(definition)">@(definition.IsActive ? "Kapat" : "Aç")</button>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", definition.Name)">
+                                <button type="button" class="dropdown-item" role="menuitem" @onclick="() => Edit(definition)">@Texts.Get("common.edit")</button>
+                                <button type="button" class="dropdown-item" role="menuitem" @onclick="() => ToggleAsync(definition)">@(definition.IsActive ? Texts.Get("admin.automationRule.turnOff") : Texts.Get("admin.automationRule.turnOn"))</button>
                             </RowMenu>
                         </td>
                     </tr>
@@ -63,34 +63,34 @@
         </table>
     }
 
-    <Drawer Open="editing" Label="Onay süreci" OnClose="() => editing = false">
+    <Drawer Open="editing" Label="@Texts.Get("approvals.record.process")" OnClose="() => editing = false">
         <div class="section-header">
-            <h2>@(editId is null ? "Yeni onay süreci" : name)</h2>
-            <button type="button" class="btn btn-icon btn-ghost" aria-label="Kapat" @onclick="() => editing = false"><AppIcon Name="x" Size="18" /></button>
+            <h2>@(editId is null ? Texts.Get("admin.approvalProcesses.newTitle") : name)</h2>
+            <button type="button" class="btn btn-icon btn-ghost" aria-label="@Texts.Get("common.close")" @onclick="() => editing = false"><AppIcon Name="x" Size="18" /></button>
         </div>
         <div>
-            <FormTabs Title="Süreç">
-                <FormSection Title="Genel" Icon="file-text">
+            <FormTabs Title="@Texts.Get("admin.approvalProcesses.process")">
+                <FormSection Title="@Texts.Get("admin.automationEditor.general")" Icon="file-text">
                     <div class="mb-3">
-                        <label class="form-label" for="process-name">Süreç adı</label>
+                        <label class="form-label" for="process-name">@Texts.Get("admin.approvalProcesses.name")</label>
                         <input id="process-name" class="form-control" maxlength="150" @bind="name" />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label" for="process-description">Açıklama</label>
+                        <label class="form-label" for="process-description">@Texts.Get("common.field.description")</label>
                         <textarea id="process-description" class="form-control" rows="2" maxlength="500" @bind="description"></textarea>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label" for="process-target">Kayıt türü</label>
+                        <label class="form-label" for="process-target">@Texts.Get("admin.automation.entity")</label>
                         <select id="process-target" class="form-select" @bind="target">
-                            <option value="">Kayda bağlı değil (serbest talep)</option>
+                            <option value="">@Texts.Get("admin.approvalProcesses.noTarget")</option>
                             @foreach (var item in targets) { <option value="@item.EntityKey">@item.DisplayName</option> }
                         </select>
-                        <small class="text-muted">Seçilirse talep o kayıttan açılır; tutar kayıttan okunur ve kayıtta değişirse bekleyen talep de verilmiş onay da geçersizleşir.</small>
+                        <small class="text-muted">@Texts.Get("admin.approvalProcesses.targetHelp")</small>
                     </div>
                     @if (TargetCommands() is { Count: > 0 } commands)
                     {
                         <fieldset class="mb-3">
-                            <legend class="form-label">Onaysız yapılamaz</legend>
+                            <legend class="form-label">@Texts.Get("admin.approvalProcesses.gated")</legend>
                             @foreach (var command in commands)
                             {
                                 <label class="form-check">
@@ -99,72 +99,72 @@
                                     <span class="form-check-label">@command.DisplayName</span>
                                 </label>
                             }
-                            <small class="text-muted">İşaretlenen işlem, kayıt bu süreçte onaylanmadan yapılamaz.</small>
+                            <small class="text-muted">@Texts.Get("admin.approvalProcesses.gatedHelp")</small>
                         </fieldset>
                     }
                     <div class="mb-3">
-                        <label class="form-label" for="process-currency">Para birimi</label>
+                        <label class="form-label" for="process-currency">@Texts.Get("admin.automationEditor.currency")</label>
                         <input id="process-currency" class="form-control" maxlength="3" placeholder="TRY" @bind="currency" />
-                        <small class="text-muted">Doluysa talepte tutar zorunludur ve adım eşikleri bu para birimindedir.</small>
+                        <small class="text-muted">@Texts.Get("admin.approvalProcesses.currencyHelp")</small>
                     </div>
                 </FormSection>
-                <FormSection Title="Adımlar" Icon="layers">
+                <FormSection Title="@Texts.Get("admin.automationRun.steps")" Icon="layers">
                     @foreach (var step in steps)
                     {
                         <div class="step-editor">
                             <div class="row g-2">
                                 <div class="col-2">
-                                    <label class="form-label" for="@($"order-{step.Key}")">Sıra</label>
+                                    <label class="form-label" for="@($"order-{step.Key}")">@Texts.Get("admin.automationRun.col.order")</label>
                                     <input id="@($"order-{step.Key}")" class="form-control" type="number" min="1" @bind="step.Order" />
                                 </div>
                                 <div class="col-10">
-                                    <label class="form-label" for="@($"name-{step.Key}")">Adım adı</label>
+                                    <label class="form-label" for="@($"name-{step.Key}")">@Texts.Get("admin.approvalProcesses.stepName")</label>
                                     <input id="@($"name-{step.Key}")" class="form-control" maxlength="100" @bind="step.Name" />
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label" for="@($"approver-{step.Key}")">Onaycı</label>
+                                    <label class="form-label" for="@($"approver-{step.Key}")">@Texts.Get("admin.approvalProcesses.approver")</label>
                                     <select id="@($"approver-{step.Key}")" class="form-select" @bind="step.Approver">
-                                        <option value="">Seçin…</option>
-                                        <optgroup label="Roller">
+                                        <option value="">@Texts.Get("common.choose")</option>
+                                        <optgroup label="@Texts.Get("nav.app.admin.roles")">
                                             @foreach (var role in options?.Roles ?? []) { <option value="@($"role:{role.Id}")">@role.Name</option> }
                                         </optgroup>
-                                        <optgroup label="Kişiler">
+                                        <optgroup label="@Texts.Get("admin.approvalProcesses.people")">
                                             @foreach (var person in options?.People ?? []) { <option value="@($"user:{person.Id}")">@person.Name</option> }
                                         </optgroup>
                                     </select>
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label" for="@($"min-{step.Key}")">En düşük tutar</label>
+                                    <label class="form-label" for="@($"min-{step.Key}")">@Texts.Get("admin.approvalProcesses.minAmount")</label>
                                     <input id="@($"min-{step.Key}")" class="form-control" type="number" min="0" step="0.01" @bind="step.MinAmount" />
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label" for="@($"due-{step.Key}")">Süre (saat)</label>
+                                    <label class="form-label" for="@($"due-{step.Key}")">@Texts.Get("admin.approvalProcesses.dueHours")</label>
                                     <input id="@($"due-{step.Key}")" class="form-control" type="number" min="1" @bind="step.DueHours" />
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label" for="@($"escalate-{step.Key}")">Süre aşılınca</label>
+                                    <label class="form-label" for="@($"escalate-{step.Key}")">@Texts.Get("admin.approvalProcesses.escalate")</label>
                                     <select id="@($"escalate-{step.Key}")" class="form-select" @bind="step.Escalate">
-                                        <option value="">Yalnızca hatırlat</option>
-                                        <optgroup label="Roller">
+                                        <option value="">@Texts.Get("admin.approvalProcesses.remindOnly")</option>
+                                        <optgroup label="@Texts.Get("nav.app.admin.roles")">
                                             @foreach (var role in options?.Roles ?? []) { <option value="@($"role:{role.Id}")">@role.Name</option> }
                                         </optgroup>
-                                        <optgroup label="Kişiler">
+                                        <optgroup label="@Texts.Get("admin.approvalProcesses.people")">
                                             @foreach (var person in options?.People ?? []) { <option value="@($"user:{person.Id}")">@person.Name</option> }
                                         </optgroup>
                                     </select>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-ghost" disabled="@(steps.Count == 1)" @onclick="() => steps.Remove(step)">Adımı kaldır</button>
+                            <button type="button" class="btn btn-ghost" disabled="@(steps.Count == 1)" @onclick="() => steps.Remove(step)">@Texts.Get("admin.approvalProcesses.removeStep")</button>
                         </div>
                     }
-                    <button type="button" class="btn btn-tonal" @onclick="AddStep"><AppIcon Name="plus" Size="16" /> Adım ekle</button>
+                    <button type="button" class="btn btn-tonal" @onclick="AddStep"><AppIcon Name="plus" Size="16" /> @Texts.Get("admin.approvalProcesses.addStep")</button>
                 </FormSection>
             </FormTabs>
             <Notice Text="@formError" Failed="true" />
         </div>
         <div class="form-actions">
-            <button type="button" class="btn btn-outline-secondary" @onclick="() => editing = false">İptal</button>
-            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveAsync">Kaydet</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="() => editing = false">@Texts.Get("common.cancel")</button>
+            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveAsync">@Texts.Get("common.save")</button>
         </div>
     </Drawer>
 </AuthGate>
@@ -199,13 +199,13 @@
     private const string DefaultSort = "name";
 
     // Liste tek seferde gelir (sayfalama yok); sıralama bu küçük listede istemcide yapılır, anahtarlar görünümle birlikte saklanır (ADR-0036).
-    private static readonly GridColumnDef[] Columns =
+    private static GridColumnDef[] Columns =>
     [
-        new("name", "Süreç", "type", "name", "-name", Locked: true),
-        new("steps", "Adımlar", "layers"),
-        new("currency", "Para birimi", "coins"),
-        new("revision", "Sürüm", "hash", "revision", "-revision"),
-        new("status", "Durum", "tag", "status", "-status"),
+        new("name", Texts.Get("admin.approvalProcesses.process"), "type", "name", "-name", Locked: true),
+        new("steps", Texts.Get("admin.automationRun.steps"), "layers"),
+        new("currency", Texts.Get("admin.automationEditor.currency"), "coins"),
+        new("revision", Texts.Get("admin.automation.version"), "hash", "revision", "-revision"),
+        new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
     ];
 
     private readonly GridViewState grid = new(ScreenKey, DefaultSort);
@@ -242,9 +242,9 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm süreçler", Icon: "check-circle"),
-        new("active:true", "Açık", Icon: "play"),
-        new("active:false", "Kapalı", Icon: "pause"),
+        new(AllViews, Texts.Get("admin.approvalProcesses.view.all"), Icon: "check-circle"),
+        new("active:true", Texts.Get("admin.approvalProcesses.active"), Icon: "play"),
+        new("active:false", Texts.Get("admin.approvalProcesses.inactive"), Icon: "pause"),
         .. views.Options,
     ];
 
@@ -335,7 +335,7 @@
         "steps" => @<text>@string.Join(" → ", definition.Steps.Select(s => s.Name))</text>,
         "currency" => @<text>@(definition.Currency ?? "—")</text>,
         "revision" => @<text>@definition.Revision</text>,
-        "status" => @<span class="badge @(definition.IsActive ? "stage-won" : "stage-cancelled")">@(definition.IsActive ? "Açık" : "Kapalı")</span>,
+        "status" => @<span class="badge @(definition.IsActive ? "stage-won" : "stage-cancelled")">@(definition.IsActive ? Texts.Get("admin.approvalProcesses.active") : Texts.Get("admin.approvalProcesses.inactive"))</span>,
         _ => @<text></text>,
     };
 

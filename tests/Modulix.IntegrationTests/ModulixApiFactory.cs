@@ -65,6 +65,10 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
             // Oturumsuz kimlik uçlarının IP başına hız sınırı testlerde pratikte kapalıdır; sınırı sınayan test düşürür (HardeningTests).
             .UseSetting("Auth:RateLimitPerMinute", "100000")
 
+            // Oturum açmış isteklerin kişi ve firma başına genel sınırı da testlerde kapalıdır; sınırı sınayan test açar (HardeningTests).
+            .UseSetting("RateLimiting:UserPerMinute", "0")
+            .UseSetting("RateLimiting:TenantPerMinute", "0")
+
             // Sözleşme imza simülasyonunun webhook gizli anahtarı (yalnızca testlerde; gerçek ortamda ortam değişkeniyle verilir).
             .UseSetting("ContractSignature:Simulation:WebhookSecret", ModulixApiFactory.SignatureWebhookSecret);
 

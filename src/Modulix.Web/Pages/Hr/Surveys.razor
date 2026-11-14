@@ -42,7 +42,7 @@
                         <h2 class="h6 mb-0 me-auto">@WarehouseLabels.Text(survey, "title")</h2>
                         @if (WarehouseLabels.Flag(survey, "isAnonymous"))
                         {
-                            <span class="badge status-inactive">Kimliği gizli</span>
+                            <span class="badge status-inactive">Anonim</span>
                         }
                         <span class="badge @(done ? "status-customer" : "stage-negotiation")">@(done ? "Yanıtlandı" : "Yanıt bekliyor")</span>
                     </div>

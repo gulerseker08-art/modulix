@@ -41,6 +41,14 @@ public sealed record RecordCommand(
 {
     /// <summary>Değişikliğin nedeni; olaya yazılır (ör. <see cref="Events.EventReasons.Transfer"/>), abonelikler buna göre davranır.</summary>
     public string? Reason { get; init; }
+
+    /// <summary>
+    /// Anonim oluşturma (ADR-0042 bölüm 24: tam anonim anket cevabı). Yalnızca <see cref="IRecordStore.AllowsAnonymousWrites"/> diyen depoda
+    /// kabul edilir. Yetki ve doğrulama her zamanki gibi işler, ama yazan kişi hiçbir yere bağlanmaz: denetim satırı kullanıcısız, kayıt
+    /// kimliksiz, değersiz ve iz kimliksizdir, zamanı yalnızca gündür; olay yayımlanmaz. "Her önemli yazma denetim kaydına yazılır" kuralının
+    /// bilinçli istisnasıdır: yazmanın olduğu denetlenir, kimin ve neyin yazdığı denetlenmez.
+    /// </summary>
+    public bool Anonymous { get; init; }
 }
 
 /// <summary>
@@ -246,6 +254,12 @@ public interface IRecordStore
 
     /// <summary>Veri kapsamı bu depoda uygulanır mı? Varsayılan: sorumlu alanı varsa.</summary>
     bool UsesOwnerScope => OwnerField is not null;
+
+    /// <summary>
+    /// Depo anonim oluşturmayı (<see cref="RecordCommand.Anonymous"/>) kabul eder mi? Varsayılan hayır: anonim yazma denetim kuralının istisnasıdır,
+    /// yalnızca kimliği hiçbir yerde saklanmaması gereken kayıt türü (tam anonim anket cevabı) açar.
+    /// </summary>
+    bool AllowsAnonymousWrites => false;
 
     /// <summary>
     /// Veri kapsamının hangi kayıt türüne göre çözüleceği (ADR-0030): rolün kapsamı ve platform tavanı bu anahtarla aranır.

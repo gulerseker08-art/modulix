@@ -43,6 +43,41 @@ public class RecordPipelineTests
 
     private RecordingFieldRules? _fieldRules;
 
+    // Anonim yazma (ADR-0042 bölüm 24): yetki ve doğrulama işler; denetim satırı kullanıcısız, kayıt kimliksiz, değersiz ve iz kimliksizdir,
+    // olay yayımlanmaz.
+    [Fact]
+    public async Task Anonymous_create_audits_that_a_write_happened_but_not_who_or_what()
+    {
+        _store.AllowsAnonymousWrites = true;
+
+        var created = await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "gizli cevap" }) with { Anonymous = true }, default);
+
+        Assert.True(created.IsSuccess);
+        var entry = Assert.Single(_audit.Entries);
+        Assert.True(entry.Anonymous);
+        Assert.Equal((Guid.Empty, Guid.Empty, (string?)null, AuditAction.Created), (entry.UserId, entry.RecordId, entry.CorrelationId, entry.Action));
+        Assert.Empty(entry.Changes);
+        Assert.Empty(_outbox.Events);
+        Assert.Equal(1, _unitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task Anonymous_create_is_rejected_by_stores_that_do_not_allow_it_and_still_needs_permission_and_valid_data()
+    {
+        var refused = await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }) with { Anonymous = true }, default);
+        Assert.Equal(RecordErrorCode.Conflict, refused.Error!.Code);
+        AssertNothingWritten();
+
+        _store.AllowsAnonymousWrites = true;
+        var invalid = await Pipeline().CreateAsync(Command([]) with { Anonymous = true }, default);
+        Assert.Equal(RecordErrorCode.ValidationFailed, invalid.Error!.Code);
+
+        _permitted = false;
+        var denied = await Pipeline().CreateAsync(Command(new JsonObject { ["text"] = "a" }) with { Anonymous = true }, default);
+        Assert.Equal(RecordErrorCode.PermissionDenied, denied.Error!.Code);
+        AssertNothingWritten();
+    }
+
     // Alan kuralları (ADR-0029 K7): kapı yazılacak son hali görür, hata verirse hiçbir şey yazılmaz.
     [Fact]
     public async Task Field_rule_errors_reject_create_and_update_and_nothing_is_written()
@@ -612,6 +647,8 @@ public class RecordPipelineTests
         public string? CompanyField { get; set; }
 
         public bool SupportsCustomFields => true;
+
+        public bool AllowsAnonymousWrites { get; set; }
 
         public RecordQuery? LastQuery { get; private set; }
 

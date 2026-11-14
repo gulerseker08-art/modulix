@@ -6,13 +6,13 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>@(IsNew ? "Yeni otomasyon kuralı" : "Kuralı düzenle") · Modulix</PageTitle>
+<PageTitle>@(IsNew ? Texts.Get("admin.automationEditor.newTitle") : Texts.Get("admin.automationEditor.editTitle")) · Modulix</PageTitle>
 
 @* Otomasyon kural düzenleyicisi (ADR-0027, Dilim 5c): genel bilgi, tetikleyici, koşul listesi ve aksiyon adımları. Kayıt yalnızca
    taslak yazar (core.automation.manage); taslak yayınlanana kadar hiçbir şey çalıştırmaz. Alan, operatör ve izin doğrulaması
    sunucudadır: "Doğrula" yan etkisiz önizlemeyi çağırır. Düzenleyicinin gösteremediği parçalar silinmeden korunur. *@
 <AuthGate Permission="@CoreAccess.ManageAutomation">
-    <a class="back-link" href="@(IsNew ? "yonetim/otomasyon" : $"yonetim/otomasyon/{RuleId}")">← @(IsNew ? "Otomasyon kuralları" : "Kural ayrıntısı")</a>
+    <a class="back-link" href="@(IsNew ? "yonetim/otomasyon" : $"yonetim/otomasyon/{RuleId}")">← @(IsNew ? Texts.Get("admin.automationRules.title") : Texts.Get("admin.automationEditor.ruleDetail"))</a>
 
     @if (catalog is null)
     {
@@ -27,8 +27,8 @@
     }
     else
     {
-        <PageHeader Title="@(IsNew ? "Yeni otomasyon kuralı" : "Kuralı düzenle")" Icon="zap"
-                    Subtitle="@(IsNew ? "Kural taslak olarak kaydedilir; yayınlanıp açılana kadar hiçbir şey çalıştırmaz." : "Kaydettiğinizde taslak güncellenir. Yayınlanmış sürüm, yeni taslak yayınlanana kadar çalışmaya devam eder.")" />
+        <PageHeader Title="@(IsNew ? Texts.Get("admin.automationEditor.newTitle") : Texts.Get("admin.automationEditor.editTitle"))" Icon="zap"
+                    Subtitle="@(IsNew ? Texts.Get("admin.automationEditor.newSubtitle") : Texts.Get("admin.automationEditor.editSubtitle"))" />
 
         <Notice Text="@notice" />
         @if (message is not null)
@@ -36,18 +36,18 @@
             <div class="alert alert-danger" role="alert">@message</div>
         }
 
-        <FormSection Title="Genel" Icon="clipboard-list">
+        <FormSection Title="@Texts.Get("admin.automationEditor.general")" Icon="clipboard-list">
             <div class="form-grid">
                 <div class="span-6">
-                    <label class="form-label" for="ruleName">Kural adı *</label>
-                    <input id="ruleName" class="form-control" maxlength="200" placeholder="ör. Hareketsiz adaylar için takip" @bind="name" @bind:event="oninput" />
+                    <label class="form-label" for="ruleName">@Texts.Get("admin.automationEditor.name")</label>
+                    <input id="ruleName" class="form-control" maxlength="200" placeholder="@Texts.Get("admin.automationEditor.namePlaceholder")" @bind="name" @bind:event="oninput" />
                 </div>
                 <div class="span-6">
-                    <label class="form-label" for="ruleEntity">Kayıt türü *</label>
+                    <label class="form-label" for="ruleEntity">@Texts.Get("admin.automationEditor.entity")</label>
                     @if (IsNew)
                     {
                         <select id="ruleEntity" class="form-select" value="@entityKey" @onchange="e => ChooseEntity(e.Value?.ToString())">
-                            <option value="">Seçin…</option>
+                            <option value="">@Texts.Get("common.choose")</option>
                             @foreach (var candidate in catalog.Entities)
                             {
                                 <option value="@candidate.EntityKey">@candidate.DisplayName</option>
@@ -60,18 +60,18 @@
                     }
                 </div>
                 <div class="span-12">
-                    <label class="form-label" for="ruleDescription">Açıklama</label>
+                    <label class="form-label" for="ruleDescription">@Texts.Get("common.field.description")</label>
                     <input id="ruleDescription" class="form-control" maxlength="1000" @bind="description" />
                 </div>
                 <div class="span-6">
-                    <label class="form-label" for="rulePriority">Öncelik</label>
+                    <label class="form-label" for="rulePriority">@Texts.Get("admin.automation.priority")</label>
                     <input id="rulePriority" class="form-control" type="number" min="0" max="1000" @bind="priority" />
-                    <small class="text-muted">Küçük sayı önce çalışır.</small>
+                    <small class="text-muted">@Texts.Get("admin.automationEditor.priorityHelp")</small>
                 </div>
                 <div class="span-6">
                     <label class="form-check">
                         <input class="form-check-input" type="checkbox" @bind="stopProcessing" />
-                        Bu kural çalışınca aynı kayıt için başka kural çalışmasın
+                        @Texts.Get("admin.automationEditor.stopProcessing")
                     </label>
                 </div>
             </div>
@@ -79,18 +79,18 @@
 
         @if (entity is not null)
         {
-            <FormSection Title="Ne zaman" Icon="zap" Description="Kuralı başlatan olay ya da zamanlama.">
+            <FormSection Title="@Texts.Get("admin.automationEditor.when")" Icon="zap" Description="@Texts.Get("admin.automationEditor.whenHelp")">
                 @if (definition.Trigger.IsLocked)
                 {
                     <p class="text-muted" role="status">
-                        Bu kuralın tetikleyicisi (@AutomationLabels.TriggerType(definition.Trigger.Type)) bu ekranda düzenlenemez; olduğu gibi korunur.
+                        @Texts.Get("admin.automationEditor.triggerLocked", AutomationLabels.TriggerType(definition.Trigger.Type))
                     </p>
                 }
                 else
                 {
                     <div class="form-grid">
                         <div class="span-6">
-                            <label class="form-label" for="triggerType">Tetikleyici</label>
+                            <label class="form-label" for="triggerType">@Texts.Get("admin.automationEditor.trigger")</label>
                             <select id="triggerType" class="form-select" value="@definition.Trigger.Type" @onchange="e => ChooseTrigger(e.Value?.ToString())">
                                 @foreach (var type in EditorTrigger.Types)
                                 {
@@ -102,7 +102,7 @@
                         {
                             case EditorTrigger.FieldChanged:
                                 <div class="span-12">
-                                    <span class="form-label">İzlenen alanlar (en az bir)</span>
+                                    <span class="form-label">@Texts.Get("admin.automationEditor.watchedFields")</span>
                                     <div class="chip-group">
                                         @foreach (var field in entity.Fields)
                                         {
@@ -119,9 +119,9 @@
 
                             case EditorTrigger.StatusTransition:
                                 <div class="span-6">
-                                    <label class="form-label" for="statusField">Durum alanı</label>
+                                    <label class="form-label" for="statusField">@Texts.Get("admin.automationEditor.statusField")</label>
                                     <select id="statusField" class="form-select" value="@definition.Trigger.Field" @onchange="e => ChooseStatusField(e.Value?.ToString())">
-                                        <option value="">Seçin…</option>
+                                        <option value="">@Texts.Get("common.choose")</option>
                                         @foreach (var field in entity.Fields.Where(f => f.Type == "Choice"))
                                         {
                                             <option value="@field.Key">@field.Label</option>
@@ -129,11 +129,11 @@
                                     </select>
                                 </div>
                                 <div class="span-6">
-                                    <label class="form-label" for="statusFrom">Önceki değer</label>
+                                    <label class="form-label" for="statusFrom">@Texts.Get("admin.automationEditor.fromValue")</label>
                                     @if (StatusOptions().Count > 0)
                                     {
                                         <select id="statusFrom" class="form-select" value="@(definition.Trigger.From ?? "")" @onchange="e => definition.Trigger.From = Empty(e.Value?.ToString())">
-                                            <option value="">Herhangi bir değer</option>
+                                            <option value="">@Texts.Get("admin.automationEditor.anyValue")</option>
                                             @foreach (var o in StatusOptions())
                                             {
                                                 <option value="@o.Key">@o.Label</option>
@@ -142,15 +142,15 @@
                                     }
                                     else
                                     {
-                                        <input id="statusFrom" class="form-control" placeholder="Boşsa herhangi bir değer" value="@(definition.Trigger.From ?? "")" @onchange="e => definition.Trigger.From = Empty(e.Value?.ToString())" />
+                                        <input id="statusFrom" class="form-control" placeholder="@Texts.Get("admin.automationEditor.anyValuePlaceholder")" value="@(definition.Trigger.From ?? "")" @onchange="e => definition.Trigger.From = Empty(e.Value?.ToString())" />
                                     }
                                 </div>
                                 <div class="span-6">
-                                    <label class="form-label" for="statusTo">Yeni değer *</label>
+                                    <label class="form-label" for="statusTo">@Texts.Get("admin.automationEditor.toValue")</label>
                                     @if (StatusOptions().Count > 0)
                                     {
                                         <select id="statusTo" class="form-select" value="@definition.Trigger.To" @onchange="e => definition.Trigger.To = e.Value?.ToString() ?? string.Empty">
-                                            <option value="">Seçin…</option>
+                                            <option value="">@Texts.Get("common.choose")</option>
                                             @foreach (var o in StatusOptions())
                                             {
                                                 <option value="@o.Key">@o.Label</option>
@@ -166,16 +166,16 @@
 
                             case EditorTrigger.Scheduled:
                                 <div class="span-6">
-                                    <label class="form-label" for="timeOfDay">Saat (firma saat dilimi)</label>
+                                    <label class="form-label" for="timeOfDay">@Texts.Get("admin.automationEditor.timeOfDay")</label>
                                     <input id="timeOfDay" class="form-control" type="time" value="@definition.Trigger.TimeOfDay" @onchange="e => definition.Trigger.TimeOfDay = e.Value?.ToString() ?? string.Empty" />
                                 </div>
                                 break;
 
                             case EditorTrigger.DateRelative:
                                 <div class="span-6">
-                                    <label class="form-label" for="dateField">Tarih alanı</label>
+                                    <label class="form-label" for="dateField">@Texts.Get("admin.automationEditor.dateField")</label>
                                     <select id="dateField" class="form-select" value="@definition.Trigger.Field" @onchange="e => definition.Trigger.Field = e.Value?.ToString() ?? string.Empty">
-                                        <option value="">Seçin…</option>
+                                        <option value="">@Texts.Get("common.choose")</option>
                                         @foreach (var field in entity.Fields.Where(f => f.Type is "Date" or "DateTime"))
                                         {
                                             <option value="@field.Key">@field.Label</option>
@@ -183,25 +183,25 @@
                                     </select>
                                 </div>
                                 <div class="span-3">
-                                    <label class="form-label" for="offsetDays">Kaç gün</label>
+                                    <label class="form-label" for="offsetDays">@Texts.Get("admin.automationEditor.offsetDays")</label>
                                     <input id="offsetDays" class="form-control" type="number" min="0" max="3650" value="@Math.Abs(definition.Trigger.OffsetDays)"
                                            @onchange="e => SetOffset(e.Value?.ToString(), OffsetIsBefore)" />
                                 </div>
                                 <div class="span-3">
-                                    <label class="form-label" for="offsetDirection">Tarihten</label>
+                                    <label class="form-label" for="offsetDirection">@Texts.Get("admin.automationEditor.offsetDirection")</label>
                                     <select id="offsetDirection" class="form-select" value="@(OffsetIsBefore ? "before" : "after")"
                                             @onchange="e => ChooseOffsetDirection(e.Value?.ToString())">
-                                        <option value="before">önce</option>
-                                        <option value="after">sonra</option>
+                                        <option value="before">@Texts.Get("admin.automationEditor.before")</option>
+                                        <option value="after">@Texts.Get("admin.automationEditor.after")</option>
                                     </select>
                                 </div>
                                 break;
 
                             case EditorTrigger.Inactivity:
                                 <div class="span-6">
-                                    <label class="form-label" for="inactivityRelation">Hareket kaynağı</label>
+                                    <label class="form-label" for="inactivityRelation">@Texts.Get("admin.automationEditor.activitySource")</label>
                                     <select id="inactivityRelation" class="form-select" value="@definition.Trigger.Relation" @onchange="e => definition.Trigger.Relation = e.Value?.ToString() ?? string.Empty">
-                                        <option value="">Seçin…</option>
+                                        <option value="">@Texts.Get("common.choose")</option>
                                         @foreach (var relation in entity.Relations)
                                         {
                                             <option value="@relation.Key">@relation.Label</option>
@@ -209,22 +209,22 @@
                                     </select>
                                 </div>
                                 <div class="span-6">
-                                    <label class="form-label" for="inactivityDays">Kaç gündür hareket yoksa</label>
+                                    <label class="form-label" for="inactivityDays">@Texts.Get("admin.automationEditor.inactiveDays")</label>
                                     <input id="inactivityDays" class="form-control" type="number" min="1" max="3650" @bind="definition.Trigger.Days" />
                                 </div>
                                 break;
 
                             case EditorTrigger.DomainEvent:
                                 <div class="span-12">
-                                    <label class="form-label" for="domainEvent">İş olayı</label>
+                                    <label class="form-label" for="domainEvent">@Texts.Get("admin.automationEditor.businessEvent")</label>
                                     <select id="domainEvent" class="form-select" value="@definition.Trigger.EventKey" @onchange="e => definition.Trigger.EventKey = e.Value?.ToString() ?? string.Empty">
-                                        <option value="">Seçin…</option>
+                                        <option value="">@Texts.Get("common.choose")</option>
                                         @foreach (var businessEvent in BusinessEvents())
                                         {
                                             <option value="@businessEvent.Key">@businessEvent.DisplayName</option>
                                         }
                                     </select>
-                                    <div class="form-text">Modülün açık iş komutlarının yayınladığı olaylar (ör. fırsat kazanıldı); kayıt oluşturma ve güncelleme ayrı tetikleyicilerdir.</div>
+                                    <div class="form-text">@Texts.Get("admin.automationEditor.businessEventHelp")</div>
                                 </div>
                                 break;
                         }
@@ -232,24 +232,24 @@
                 }
             </FormSection>
 
-            <FormSection Title="Hangi koşulda" Icon="filter" Description="Boş bırakılırsa tetikleyici olan her kayıtta çalışır.">
+            <FormSection Title="@Texts.Get("admin.automationEditor.condition")" Icon="filter" Description="@Texts.Get("admin.automationEditor.conditionHelp")">
                 <Actions>
                     @if (!definition.Condition.IsLocked)
                     {
-                        <button type="button" class="btn btn-tonal" @onclick="AddLeaf">Koşul ekle</button>
+                        <button type="button" class="btn btn-tonal" @onclick="AddLeaf">@Texts.Get("admin.automationEditor.addCondition")</button>
                     }
                 </Actions>
                 <ChildContent>
                     @if (definition.Condition.IsLocked)
                     {
                         <div class="alert alert-warning" role="status">
-                            Bu kuralın koşulu iç içe gruplar ya da ilişki sorgusu içeriyor; bu ekranda düzenlenemez ve olduğu gibi korunur.
-                            <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="ClearLockedCondition">Koşulu kaldırıp yeniden kur</button>
+                            @Texts.Get("admin.automationEditor.conditionLocked")
+                            <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="ClearLockedCondition">@Texts.Get("admin.automationEditor.rebuildCondition")</button>
                         </div>
                     }
                     else if (definition.Condition.Leaves.Count == 0)
                     {
-                        <EmptyState Compact="true" Title="Koşul yok." />
+                        <EmptyState Compact="true" Title="@Texts.Get("admin.automationEditor.noCondition")" />
                     }
                     else
                     {
@@ -258,14 +258,14 @@
                 </ChildContent>
             </FormSection>
 
-            <FormSection Title="Ne yapar" Icon="check" Description='Adımlar sırayla çalışır; başarısız bir adım kalanları durdurur. "Bekle" ve "Onay sonucunu bekle" adımlarıyla çok adımlı, kalıcı bir akış kurabilirsiniz; adım koşulu ve "Akışı bitir" ile akış dallanır.'>
+            <FormSection Title="@Texts.Get("admin.automationRule.summary")" Icon="check" Description="@Texts.Get("admin.automationEditor.actionsHelp")">
                 <Actions>
-                    <button type="button" class="btn btn-tonal" @onclick="AddAction">Aksiyon ekle</button>
+                    <button type="button" class="btn btn-tonal" @onclick="AddAction">@Texts.Get("admin.automationEditor.addAction")</button>
                 </Actions>
                 <ChildContent>
                     @if (definition.Actions.Count == 0)
                     {
-                        <EmptyState Compact="true" Title="Henüz aksiyon yok." Text="Kuralın bir şey yapması için en az bir aksiyon ekleyin." />
+                        <EmptyState Compact="true" Title="@Texts.Get("admin.automationEditor.noActions")" Text="@Texts.Get("admin.automationEditor.noActions.text")" />
                     }
 
                     @for (var i = 0; i < definition.Actions.Count; i++)
@@ -273,34 +273,34 @@
                         var step = definition.Actions[i];
                         var def = catalog.Actions.FirstOrDefault(a => a.Key == step.Action);
                         var number = i + 1;
-                        <div class="section-card" role="group" aria-label="@($"Adım {number}")">
+                        <div class="section-card" role="group" aria-label="@Texts.Get("admin.automationEditor.step", number)">
                             <div class="section-card-head">
-                                <div class="section-card-heading"><h3 class="section-card-title">Adım @number</h3>
+                                <div class="section-card-heading"><h3 class="section-card-title">@Texts.Get("admin.automationEditor.step", number)</h3>
                                     @if (def is not null)
                                     {
                                         <p class="section-card-description">@def.Description</p>
                                     }
                                 </div>
                                 <div class="section-card-actions">
-                                    <button type="button" class="btn btn-ghost" disabled="@(i == 0)" @onclick="() => MoveAction(step, -1)">Yukarı</button>
-                                    <button type="button" class="btn btn-ghost" disabled="@(i == definition.Actions.Count - 1)" @onclick="() => MoveAction(step, 1)">Aşağı</button>
-                                    <button type="button" class="btn btn-outline-danger" @onclick="() => RemoveAction(step)">Kaldır</button>
+                                    <button type="button" class="btn btn-ghost" disabled="@(i == 0)" @onclick="() => MoveAction(step, -1)">@Texts.Get("admin.automationEditor.moveUp")</button>
+                                    <button type="button" class="btn btn-ghost" disabled="@(i == definition.Actions.Count - 1)" @onclick="() => MoveAction(step, 1)">@Texts.Get("admin.automationEditor.moveDown")</button>
+                                    <button type="button" class="btn btn-outline-danger" @onclick="() => RemoveAction(step)">@Texts.Get("admin.automationEditor.remove")</button>
                                 </div>
                             </div>
                             <div class="section-card-body">
                                 <div class="form-grid">
                                     <div class="span-6">
-                                        <label class="form-label" for="@($"action{number}")">Aksiyon</label>
+                                        <label class="form-label" for="@($"action{number}")">@Texts.Get("admin.automationEditor.action")</label>
                                         <select id="@($"action{number}")" class="form-select" value="@step.Action" @onchange="e => ChooseAction(step, e.Value?.ToString())">
-                                            <option value="">Seçin…</option>
+                                            <option value="">@Texts.Get("common.choose")</option>
                                             @foreach (var a in catalog.Actions)
                                             {
-                                                <option value="@a.Key" disabled="@(!a.Available && a.Key != step.Action)">@a.DisplayName@(a.Available ? "" : " (kullanılamıyor)")</option>
+                                                <option value="@a.Key" disabled="@(!a.Available && a.Key != step.Action)">@a.DisplayName@(a.Available ? "" : " " + Texts.Get("admin.automationEditor.unavailableSuffix"))</option>
                                             }
                                         </select>
                                         @if (def is { Available: false })
                                         {
-                                            <small class="text-muted">@(def.UnavailableReason ?? "Bu aksiyon şu an kullanılamıyor.")</small>
+                                            <small class="text-muted">@(def.UnavailableReason ?? Texts.Get("admin.automationEditor.actionUnavailable"))</small>
                                         }
                                     </div>
                                     @if (def is not null)
@@ -313,18 +313,18 @@
                                                 @if (step.BoundField(p.Name) is { } bound)
                                                 {
                                                     <div class="d-flex gap-2 align-items-center">
-                                                        <span>Kayıttan: @(FieldOf(bound)?.Label ?? bound)</span>
-                                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => step.Parameters.Remove(p.Name)">Sabit değere çevir</button>
+                                                        <span>@Texts.Get("admin.automationEditor.fromRecord", FieldOf(bound)?.Label ?? bound)</span>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => step.Parameters.Remove(p.Name)">@Texts.Get("admin.automationEditor.toFixedValue")</button>
                                                     </div>
                                                 }
                                                 else if (step.Action == ApprovalRequestAction && p.Name == "process" && processes is { Count: > 0 })
                                                 {
                                                     @* Onaya gönder (Dilim 4c-2): süreç, kuralın kayıt türüne bağlı etkin süreçlerden seçilir; yayında ad yine sunucuda doğrulanır. *@
                                                     <select class="form-select" aria-label="@p.Label" value="@step.ValueText(p.Name)" @onchange="e => step.SetValue(p.Name, p.Type, e.Value?.ToString())">
-                                                        <option value="">Seçin…</option>
+                                                        <option value="">@Texts.Get("common.choose")</option>
                                                         @if (!string.IsNullOrEmpty(step.ValueText(p.Name)) && processes.All(d => d.Name != step.ValueText(p.Name) || d.TargetEntityKey != entityKey))
                                                         {
-                                                            <option value="@step.ValueText(p.Name)">@step.ValueText(p.Name) (etkin değil ya da bu kayıt türüne bağlı değil)</option>
+                                                            <option value="@step.ValueText(p.Name)">@Texts.Get("admin.automationEditor.processNotLinked", step.ValueText(p.Name))</option>
                                                         }
 
                                                         @foreach (var definitionOption in processes.Where(d => d.TargetEntityKey == entityKey))
@@ -336,7 +336,7 @@
                                                 else if (p.Options.Count > 0)
                                                 {
                                                     <select class="form-select" aria-label="@p.Label" value="@step.ValueText(p.Name)" @onchange="e => step.SetValue(p.Name, p.Type, e.Value?.ToString())">
-                                                        <option value="">Seçin…</option>
+                                                        <option value="">@Texts.Get("common.choose")</option>
                                                         @foreach (var o in p.Options)
                                                         {
                                                             <option value="@o.Key">@o.Label</option>
@@ -353,9 +353,9 @@
                                                 else if (p.Type == "Boolean")
                                                 {
                                                     <select class="form-select" aria-label="@p.Label" value="@step.ValueText(p.Name).ToLowerInvariant()" @onchange="e => step.SetValue(p.Name, p.Type, e.Value?.ToString())">
-                                                        <option value="">Seçin…</option>
-                                                        <option value="true">Evet</option>
-                                                        <option value="false">Hayır</option>
+                                                        <option value="">@Texts.Get("common.choose")</option>
+                                                        <option value="true">@Texts.Get("common.yes")</option>
+                                                        <option value="false">@Texts.Get("common.no")</option>
                                                     </select>
                                                 }
                                                 else
@@ -366,9 +366,9 @@
 
                                                 @if (p.Type == "Text" && p.AllowFieldBinding && step.BoundField(p.Name) is null)
                                                 {
-                                                    <select @key="@($"var-{step.Id}-{p.Name}-{insertions}")" class="form-select mt-2" aria-label="@($"{p.Label}: değişken ekle")" value=""
+                                                    <select @key="@($"var-{step.Id}-{p.Name}-{insertions}")" class="form-select mt-2" aria-label="@Texts.Get("admin.automationEditor.addVariableLabel", p.Label)" value=""
                                                             @onchange="e => InsertVariable(step, p, e.Value?.ToString())">
-                                                        <option value="">Kayıt değişkeni ekle…</option>
+                                                        <option value="">@Texts.Get("admin.automationEditor.addVariable")</option>
                                                         @foreach (var field in VariableFields())
                                                         {
                                                             <option value="@field.Key">@field.Label</option>
@@ -386,29 +386,25 @@
                                 </div>
 
                                 @* Adım koşulu (dallanma, Dilim 4c-5): adım yalnızca koşul sağlanırsa çalışır, sağlanmazsa atlanır ve akış sürer. *@
-                                <div class="cond-group mt-3" role="group" aria-label="@($"Adım {number} koşulu")">
+                                <div class="cond-group mt-3" role="group" aria-label="@Texts.Get("admin.automationEditor.stepCondition", number)">
                                     <div class="cond-head">
-                                        <strong>Yalnızca şu koşulda çalışsın</strong>
+                                        <strong>@Texts.Get("admin.automationEditor.onlyWhen")</strong>
                                         @if (!step.When.IsLocked)
                                         {
-                                            <button type="button" class="btn btn-tonal ms-auto" @onclick="() => step.When.Leaves.Add(new EditorLeaf())">Adım koşulu ekle</button>
+                                            <button type="button" class="btn btn-tonal ms-auto" @onclick="() => step.When.Leaves.Add(new EditorLeaf())">@Texts.Get("admin.automationEditor.addStepCondition")</button>
                                         }
-                                        <small class="text-muted cond-hint">
-                                            Koşul, adıma sıra geldiğinde kaydın güncel değerleriyle sorulur (önceki adımlar ve beklemelerden sonra). Sağlanmazsa
-                                            adım atlanır, akış sıradaki adımla sürer. Dallanma için iki adıma karşıt koşul verin; bir dalı bitirmek için
-                                            "Akışı bitir" adımını kullanın.
-                                        </small>
+                                        <small class="text-muted cond-hint">@Texts.Get("admin.automationEditor.stepConditionHelp")</small>
                                     </div>
                                     @if (step.When.IsLocked)
                                     {
                                         <div class="alert alert-warning" role="status">
-                                            Bu adımın koşulu iç içe gruplar ya da ilişki sorgusu içeriyor; burada düzenlenemez ve olduğu gibi korunur.
-                                            <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => step.When = new EditorCondition()">Koşulu kaldırıp yeniden kur</button>
+                                            @Texts.Get("admin.automationEditor.stepConditionLocked")
+                                            <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => step.When = new EditorCondition()">@Texts.Get("admin.automationEditor.rebuildCondition")</button>
                                         </div>
                                     }
                                     else if (step.When.Leaves.Count == 0)
                                     {
-                                        <p class="text-muted mb-0" role="status">Koşul yok: adım her zaman çalışır.</p>
+                                        <p class="text-muted mb-0" role="status">@Texts.Get("admin.automationEditor.noStepCondition")</p>
                                     }
                                     else
                                     {
@@ -421,30 +417,30 @@
                 </ChildContent>
             </FormSection>
 
-            <FormSection Title="Doğrulama" Icon="check" Description="Kaydetmeden önce kuralı sunucuda yan etkisiz denetler; hiçbir şey çalıştırmaz.">
+            <FormSection Title="@Texts.Get("admin.automationEditor.validation")" Icon="check" Description="@Texts.Get("admin.automationEditor.validationHelp")">
                 <Actions>
-                    <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="ValidateAsync">Doğrula</button>
+                    <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="ValidateAsync">@Texts.Get("admin.automationEditor.validate")</button>
                 </Actions>
                 <ChildContent>
                     <div class="form-grid">
                         <div class="span-6">
-                            <label class="form-label" for="sampleRecord">Deneme kaydı (isteğe bağlı)</label>
-                            <RecordPicker Id="sampleRecord" EntityKey="@entityKey" LabelField="@entity.LabelField" AccessibleName="Deneme kaydı"
+                            <label class="form-label" for="sampleRecord">@Texts.Get("admin.automationEditor.sampleRecordOptional")</label>
+                            <RecordPicker Id="sampleRecord" EntityKey="@entityKey" LabelField="@entity.LabelField" AccessibleName="@Texts.Get("admin.automationEditor.sampleRecord")"
                                           @bind-Value="sampleRecordId" />
-                            <small class="text-muted">Seçerseniz kural bu kaydın güncel değerleriyle değerlendirilir; hiçbir şey çalıştırılmaz.</small>
+                            <small class="text-muted">@Texts.Get("admin.automationEditor.sampleRecordHelp")</small>
                         </div>
                     </div>
 
                     @if (preview is null)
                     {
-                        <p class="text-muted" role="status">Henüz doğrulanmadı.</p>
+                        <p class="text-muted" role="status">@Texts.Get("admin.automationEditor.notValidated")</p>
                     }
                     else
                     {
                         @if (preview.Issues.Count > 0)
                         {
                             <div class="alert alert-warning" role="alert">
-                                <strong>Düzeltilmesi gerekenler</strong>
+                                <strong>@Texts.Get("admin.automationEditor.toFix")</strong>
                                 <ul class="mb-0">
                                     @foreach (var issue in preview.Issues)
                                     {
@@ -455,23 +451,23 @@
                         }
                         else
                         {
-                            <p role="status">Sorun bulunmadı.</p>
+                            <p role="status">@Texts.Get("admin.automationEditor.noIssues")</p>
                         }
 
                         <dl class="detail-grid">
-                            <dt>Ne zaman</dt>
+                            <dt>@Texts.Get("admin.automationEditor.when")</dt>
                             <dd>@preview.TriggerText</dd>
                             @if (!string.IsNullOrWhiteSpace(preview.ConditionText))
                             {
-                                <dt>Koşul</dt>
+                                <dt>@Texts.Get("admin.automationEditor.conditionLabel")</dt>
                                 <dd>@preview.ConditionText</dd>
                             }
                         </dl>
                         @if (preview.Evaluated)
                         {
                             <p role="status">
-                                <span class="badge stage-@(preview.ConditionsPassed ? "won" : "lost")">@(preview.ConditionsPassed ? "Koşullar sağlanıyor" : "Koşullar sağlanmıyor")</span>
-                                @(preview.ConditionsPassed ? "Kural bu kayıt için çalışırdı." : "Kural bu kayıt için çalışmazdı.")
+                                <span class="badge stage-@(preview.ConditionsPassed ? "won" : "lost")">@(preview.ConditionsPassed ? Texts.Get("admin.automationEditor.conditionsMet") : Texts.Get("admin.automationEditor.conditionsNotMet"))</span>
+                                @(preview.ConditionsPassed ? Texts.Get("admin.automationEditor.wouldRun") : Texts.Get("admin.automationEditor.wouldNotRun"))
                             </p>
                             @if (preview.Explanation is { } explanation)
                             {
@@ -480,15 +476,15 @@
 
                             @if (preview.ConditionsPassed && preview.PlannedActions.Count > 0)
                             {
-                                <h3 class="h6">Çalışsaydı yapacakları</h3>
+                                <h3 class="h6">@Texts.Get("admin.automationEditor.plannedActions")</h3>
                                 <ul>
                                     @foreach (var planned in preview.PlannedActions)
                                     {
                                         <li>
-                                            <strong>@planned.DisplayName</strong>@(planned.Permitted ? null : " (bu işlem için izniniz yok)")
+                                            <strong>@planned.DisplayName</strong>@(planned.Permitted ? null : " " + Texts.Get("admin.automationEditor.notPermitted"))
                                             @foreach (var parameter in ParametersOf(planned.Parameters))
                                             {
-                                                <small class="d-block text-muted">@ParameterLabel(planned.Action, parameter.Name): @(parameter.Value.ValueKind == System.Text.Json.JsonValueKind.Null ? "(boş)" : parameter.Value.ToString())</small>
+                                                <small class="d-block text-muted">@ParameterLabel(planned.Action, parameter.Name): @(parameter.Value.ValueKind == System.Text.Json.JsonValueKind.Null ? Texts.Get("admin.automationEditor.emptyValue") : parameter.Value.ToString())</small>
                                             }
                                             @if (!string.IsNullOrWhiteSpace(planned.Note))
                                             {
@@ -509,8 +505,8 @@
             </FormSection>
 
             <div class="form-actions">
-                <a class="btn btn-outline-secondary" href="@(IsNew ? "yonetim/otomasyon" : $"yonetim/otomasyon/{RuleId}")">Vazgeç</a>
-                <button type="button" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name))" @onclick="SaveAsync">Taslağı kaydet</button>
+                <a class="btn btn-outline-secondary" href="@(IsNew ? "yonetim/otomasyon" : $"yonetim/otomasyon/{RuleId}")">@Texts.Get("common.dismiss")</a>
+                <button type="button" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name))" @onclick="SaveAsync">@Texts.Get("admin.automationEditor.saveDraft")</button>
             </div>
         }
     }
@@ -557,7 +553,7 @@
         var catalogResult = await Api.GetAsync<AutomationCatalogDto>("/api/automation/catalog");
         if (catalogResult.Value is null)
         {
-            loadError = catalogResult.Error ?? "Kural kataloğu alınamadı.";
+            loadError = catalogResult.Error ?? Texts.Get("admin.automationEditor.catalogFailed");
             return;
         }
 
@@ -566,7 +562,7 @@
             var result = await Api.GetAsync<AutomationRuleDetailDto>($"/api/automation/rules/{id}");
             if (result.Value is not { } detail)
             {
-                loadError = result.Error ?? "Kural bulunamadı.";
+                loadError = result.Error ?? Texts.Get("admin.automationEditor.notFound");
                 return;
             }
 
@@ -574,7 +570,7 @@
             var version = detail.Draft ?? detail.Published;
             if (version is null)
             {
-                loadError = "Kuralın düzenlenecek bir sürümü yok.";
+                loadError = Texts.Get("admin.automationEditor.noVersion");
                 return;
             }
 
@@ -589,7 +585,7 @@
             definition = EditorDefinition.Parse(version.Definition);
             if (detail.Draft is null)
             {
-                notice = "Yayınlanmış sürümden yeni bir taslak hazırlanıyor; kaydedene kadar hiçbir şey değişmez.";
+                notice = Texts.Get("admin.automationEditor.draftFromPublished");
             }
         }
 
@@ -698,7 +694,7 @@
         {
             <div class="form-grid">
                 <div class="span-6">
-                    <label class="form-label" for="@($"{prefix}conditionLogic")">Koşulların birleşimi</label>
+                    <label class="form-label" for="@($"{prefix}conditionLogic")">@Texts.Get("admin.automationEditor.logic")</label>
                     <select id="@($"{prefix}conditionLogic")" class="form-select" @bind="condition.Logic">
                         <option value="@EditorCondition.And">@AutomationLabels.Logic(EditorCondition.And)</option>
                         <option value="@EditorCondition.Or">@AutomationLabels.Logic(EditorCondition.Or)</option>
@@ -713,11 +709,11 @@
             var leafField = FieldOf(leaf.Field);
             var count = EditorLeaf.ValueCount(leaf.Operator);
             var number = i + 1;
-            <div class="form-grid" role="group" aria-label="@($"Koşul {number}")">
+            <div class="form-grid" role="group" aria-label="@Texts.Get("admin.automationEditor.conditionNo", number)">
                 <div class="span-4">
-                    <label class="form-label" for="@($"{prefix}leafField{number}")">Alan</label>
+                    <label class="form-label" for="@($"{prefix}leafField{number}")">@Texts.Get("admin.automationEditor.field")</label>
                     <select id="@($"{prefix}leafField{number}")" class="form-select" value="@leaf.Field" @onchange="e => ChooseLeafField(leaf, e.Value?.ToString(), allowChanges)">
-                        <option value="">Seçin…</option>
+                        <option value="">@Texts.Get("common.choose")</option>
                         @foreach (var field in entity?.Fields ?? [])
                         {
                             <option value="@field.Key">@field.Label</option>
@@ -725,7 +721,7 @@
                     </select>
                 </div>
                 <div class="span-4">
-                    <label class="form-label" for="@($"{prefix}leafOp{number}")">Koşul</label>
+                    <label class="form-label" for="@($"{prefix}leafOp{number}")">@Texts.Get("admin.automationEditor.conditionLabel")</label>
                     <select id="@($"{prefix}leafOp{number}")" class="form-select" value="@leaf.Operator" @onchange="e => ChooseOperator(leaf, e.Value?.ToString())" disabled="@(leafField is null)">
                         @if (leafField is not null)
                         {
@@ -739,12 +735,12 @@
                 <div class="span-4">
                     @if (leafField is not null && count.Max > 0)
                     {
-                        <span class="form-label">Değer</span>
+                        <span class="form-label">@Texts.Get("admin.automationEditor.value")</span>
                         @if (count.Max == 2)
                         {
                             <div class="d-flex gap-2">
-                                <input class="form-control" type="@InputType(leafField)" aria-label="İlk değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())" />
-                                <input class="form-control" type="@InputType(leafField)" aria-label="İkinci değer" value="@ValueAt(leaf, 1)" @onchange="e => SetValueAt(leaf, 1, e.Value?.ToString())" />
+                                <input class="form-control" type="@InputType(leafField)" aria-label="@Texts.Get("admin.automationEditor.firstValue")" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())" />
+                                <input class="form-control" type="@InputType(leafField)" aria-label="@Texts.Get("admin.automationEditor.secondValue")" value="@ValueAt(leaf, 1)" @onchange="e => SetValueAt(leaf, 1, e.Value?.ToString())" />
                             </div>
                         }
                         else if (count.Max > 2 && leafField.Options.Count > 0)
@@ -763,13 +759,13 @@
                         }
                         else if (count.Max > 2)
                         {
-                            <input class="form-control" aria-label="Değerler" placeholder="Virgülle ayırın" value="@string.Join(", ", leaf.Values)"
+                            <input class="form-control" aria-label="@Texts.Get("admin.automationEditor.values")" placeholder="@Texts.Get("admin.automationEditor.commaSeparated")" value="@string.Join(", ", leaf.Values)"
                                    @onchange="e => SetList(leaf, e.Value?.ToString())" />
                         }
                         else if (leafField.Options.Count > 0)
                         {
-                            <select class="form-select" aria-label="Değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())">
-                                <option value="">Seçin…</option>
+                            <select class="form-select" aria-label="@Texts.Get("admin.automationEditor.value")" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())">
+                                <option value="">@Texts.Get("common.choose")</option>
                                 @foreach (var o in leafField.Options)
                                 {
                                     <option value="@o.Key">@o.Label</option>
@@ -778,30 +774,30 @@
                         }
                         else if (leafField.Type == "Boolean")
                         {
-                            <select class="form-select" aria-label="Değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())">
-                                <option value="">Seçin…</option>
-                                <option value="true">Evet</option>
-                                <option value="false">Hayır</option>
+                            <select class="form-select" aria-label="@Texts.Get("admin.automationEditor.value")" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())">
+                                <option value="">@Texts.Get("common.choose")</option>
+                                <option value="true">@Texts.Get("common.yes")</option>
+                                <option value="false">@Texts.Get("common.no")</option>
                             </select>
                         }
                         else
                         {
-                            <input class="form-control" type="@InputType(leafField)" aria-label="Değer" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())" />
+                            <input class="form-control" type="@InputType(leafField)" aria-label="@Texts.Get("admin.automationEditor.value")" value="@ValueAt(leaf, 0)" @onchange="e => SetValueAt(leaf, 0, e.Value?.ToString())" />
                         }
 
                         @if (leafField.Type == "Money")
                         {
-                            <input class="form-control mt-2" maxlength="3" aria-label="Para birimi" placeholder="Para birimi (ör. TRY)" value="@leaf.Currency" @onchange="e => leaf.Currency = Empty(e.Value?.ToString()?.ToUpperInvariant())" />
+                            <input class="form-control mt-2" maxlength="3" aria-label="@Texts.Get("admin.automationEditor.currency")" placeholder="@Texts.Get("admin.automationEditor.currencyPlaceholder")" value="@leaf.Currency" @onchange="e => leaf.Currency = Empty(e.Value?.ToString()?.ToUpperInvariant())" />
                         }
                     }
                     @if (allowChanges)
                     {
-                        <select class="form-select mt-2" aria-label="Hangi değere bakılsın" @bind="leaf.Source">
-                            <option value="new">Yeni değere bak</option>
-                            <option value="old">Eski değere bak</option>
+                        <select class="form-select mt-2" aria-label="@Texts.Get("admin.automationEditor.valueSource")" @bind="leaf.Source">
+                            <option value="new">@Texts.Get("admin.automationEditor.useNew")</option>
+                            <option value="old">@Texts.Get("admin.automationEditor.useOld")</option>
                         </select>
                     }
-                    <button type="button" class="btn btn-sm btn-outline-danger mt-2" @onclick="() => condition.Leaves.Remove(leaf)">Koşulu kaldır</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger mt-2" @onclick="() => condition.Leaves.Remove(leaf)">@Texts.Get("admin.automationEditor.removeCondition")</button>
                 </div>
             </div>
         }
@@ -912,7 +908,7 @@
 
     /// <summary>Koşul açıklamasının bir düğümü ve çocukları: geçti mi, neden (görülemeyen alanın değeri sunucuda zaten maskelenir).</summary>
     private RenderFragment Explain(ConditionExplanationDto node) => @<li>
-        <span class="badge stage-@(node.Passed ? "won" : "lost")">@(node.Passed ? "Sağlandı" : "Sağlanmadı")</span> @node.Text
+        <span class="badge stage-@(node.Passed ? "won" : "lost")">@(node.Passed ? Texts.Get("admin.automationEditor.met") : Texts.Get("admin.automationEditor.notMet"))</span> @node.Text
         @if (node.Children.Count > 0)
         {
             <ul>
@@ -958,7 +954,7 @@
             if (entity is null)
             {
                 busy = false;
-                message = "Önce kayıt türünü seçin.";
+                message = Texts.Get("admin.automationEditor.chooseEntity");
                 return;
             }
 
@@ -976,7 +972,7 @@
 
         // Sürüm çakışmasında (başkası değiştirdi) ve diğer hatalarda sunucunun iletisi gösterilir; yazdıklarınız kaybolmaz.
         message = result.Status == System.Net.HttpStatusCode.Conflict
-            ? "Kural siz düzenlerken başkası tarafından değiştirildi. Yazdıklarınızı not alıp sayfayı yeniden açın."
+            ? Texts.Get("admin.automationEditor.conflict")
             : result.Error;
     }
 }

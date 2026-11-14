@@ -2,12 +2,12 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>@(detail?.Run.RuleName ?? "Otomasyon çalışması") · Modulix</PageTitle>
+<PageTitle>@(detail?.Run.RuleName ?? Texts.Get("admin.automationRun.title")) · Modulix</PageTitle>
 
 @* Otomasyon çalışması ayrıntısı (ADR-0027, Dilim 5b): adımlar, deneme sayısı, sonuç özeti; başarısızı yeniden dene, bitmemişi iptal et.
    Okuma core.automation-logs.read, yeniden deneme ve iptal core.automation.run ister. Düğmeleri gizlemek yetki değildir, sunucu uygular. *@
 <AuthGate Permission="@CoreAccess.ReadAutomationLogs">
-    <a class="back-link" href="yonetim/otomasyon/calismalar">← Otomasyon çalışmaları</a>
+    <a class="back-link" href="yonetim/otomasyon/calismalar">← @Texts.Get("admin.automationRuns.title")</a>
 
     @if (detail is null)
     {
@@ -27,11 +27,11 @@
             <span class="badge stage-@AutomationLabels.RunStatusBadge(run.Status)">@AutomationLabels.RunStatus(run.Status)</span>
             @if (CanRun && AutomationLabels.CanCancel(run.Status))
             {
-                <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => confirmingCancel = true">İptal et</button>
+                <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => confirmingCancel = true">@Texts.Get("admin.automationRun.cancel")</button>
             }
             @if (CanRun && AutomationLabels.CanRetry(run.Status))
             {
-                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="RetryAsync">Yeniden dene</button>
+                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="RetryAsync">@Texts.Get("admin.automationRun.retry")</button>
             }
         </PageHeader>
 
@@ -43,16 +43,16 @@
 
         @if (confirmingCancel)
         {
-            <div class="alert alert-warning confirm" role="alertdialog" aria-label="İptal onayı">
-                <p>Çalışmamış adımlar iptal edilir; tamamlanmış adımların etkisi geri alınmaz. İptal edilsin mi?</p>
-                <button type="button" class="btn btn-danger" disabled="@busy" @onclick="CancelAsync">İptal et</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="() => confirmingCancel = false">Vazgeç</button>
+            <div class="alert alert-warning confirm" role="alertdialog" aria-label="@Texts.Get("admin.automationRun.cancelConfirmLabel")">
+                <p>@Texts.Get("admin.automationRun.cancelConfirm")</p>
+                <button type="button" class="btn btn-danger" disabled="@busy" @onclick="CancelAsync">@Texts.Get("admin.automationRun.cancel")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => confirmingCancel = false">@Texts.Get("common.dismiss")</button>
             </div>
         }
 
-        <FormSection Title="Çalışma" Icon="clipboard-list">
+        <FormSection Title="@Texts.Get("admin.automationRun.section")" Icon="clipboard-list">
             <dl class="detail-list">
-                <dt>Kural</dt>
+                <dt>@Texts.Get("admin.automation.rule")</dt>
                 <dd>
                     @if (Session.Can(CoreAccess.ReadAutomation))
                     {
@@ -64,53 +64,53 @@
                     }
                     (v@(run.VersionNo))
                 </dd>
-                <dt>Kayıt türü</dt>
+                <dt>@Texts.Get("admin.automation.entity")</dt>
                 <dd>@AutomationLabels.EntityName(entities, run.EntityKey)</dd>
-                <dt>Kaynak</dt>
+                <dt>@Texts.Get("admin.automation.source")</dt>
                 <dd>@AutomationLabels.Origin(run.Origin)</dd>
-                <dt>Başladı</dt>
+                <dt>@Texts.Get("admin.automation.started")</dt>
                 <dd>@CrmLabels.Time(run.CreatedAt)</dd>
-                <dt>Bitti</dt>
+                <dt>@Texts.Get("admin.automation.finished")</dt>
                 <dd>@(run.CompletedAt is { } done ? CrmLabels.Time(done) : "—")</dd>
                 @if (run.Status == AutomationLabels.RunRunning)
                 {
-                    <dt>@(detail.Steps.Any(s => s.WaitingUntil is not null) ? "Akış sürecek" : "Sonraki deneme")</dt>
+                    <dt>@(detail.Steps.Any(s => s.WaitingUntil is not null) ? Texts.Get("admin.automationRun.resumesAt") : Texts.Get("admin.automationRun.nextAttempt"))</dt>
                     <dd>@CrmLabels.Time(detail.NextAttemptAt)</dd>
                 }
                 @if (!string.IsNullOrWhiteSpace(run.Note))
                 {
-                    <dt>Not</dt>
+                    <dt>@Texts.Get("admin.automationRun.note")</dt>
                     <dd>@run.Note</dd>
                 }
             </dl>
         </FormSection>
 
-        <FormSection Title="Adımlar" Icon="check"
-                     Description="Adımlar sırayla çalışır; başarısız adım kalanları durdurur. Bekleme adımında akış kaydedilir ve zamanı gelince kaldığı yerden sürer.">
+        <FormSection Title="@Texts.Get("admin.automationRun.steps")" Icon="check"
+                     Description="@Texts.Get("admin.automationRun.stepsHelp")">
             @if (detail.Steps.Count == 0)
             {
                 <p class="text-muted" role="status">
-                    @(run.Status == AutomationLabels.RunNotMatched ? "Koşul sağlanmadığı için hiçbir adım çalışmadı." : "Bu çalışmada adım yok.")
+                    @(run.Status == AutomationLabels.RunNotMatched ? Texts.Get("admin.automationRun.notMatched") : Texts.Get("admin.automationRun.noSteps"))
                 </p>
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Çalışma adımları</caption>
+                    <caption class="visually-hidden">@Texts.Get("admin.automationRun.stepsCaption")</caption>
                     <thead>
-                        <tr><th scope="col">Sıra</th><th scope="col">Adım</th><th scope="col">İşlem</th><th scope="col">Durum</th><th scope="col">Deneme</th><th scope="col">Sonuç</th></tr>
+                        <tr><th scope="col">@Texts.Get("admin.automationRun.col.order")</th><th scope="col">@Texts.Get("admin.automationRun.col.step")</th><th scope="col">@Texts.Get("admin.automationRun.col.action")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("admin.automationRun.col.attempts")</th><th scope="col">@Texts.Get("admin.automationRun.col.result")</th></tr>
                     </thead>
                     <tbody>
                         @foreach (var step in detail.Steps)
                         {
                             <tr>
-                                <td data-label="Sıra">@step.StepNo</td>
-                                <td data-label="Adım" class="primary">@step.StepId</td>
-                                <td data-label="İşlem">@ActionName(step.Action)</td>
-                                <td data-label="Durum"><span class="badge stage-@AutomationLabels.StepStatusBadge(step.Status)">@(step.Status == "Pending" && step.WaitingUntil is null && detail.Steps.Any(s => s.WaitingUntil is not null) ? "Sırada" : AutomationLabels.StepStatus(step.Status))</span>
-                                    @if (step.WaitingUntil is { } until) { <small class="text-muted"> · @CrmLabels.Time(until) tarihine kadar</small> }</td>
-                                <td data-label="Deneme">@step.Attempts</td>
-                                <td data-label="Sonuç">@(string.IsNullOrWhiteSpace(step.Summary) ? "—" : step.Summary)</td>
+                                <td data-label="@Texts.Get("admin.automationRun.col.order")">@step.StepNo</td>
+                                <td data-label="@Texts.Get("admin.automationRun.col.step")" class="primary">@step.StepId</td>
+                                <td data-label="@Texts.Get("admin.automationRun.col.action")">@ActionName(step.Action)</td>
+                                <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@AutomationLabels.StepStatusBadge(step.Status)">@(step.Status == "Pending" && step.WaitingUntil is null && detail.Steps.Any(s => s.WaitingUntil is not null) ? Texts.Get("admin.automationRun.queued") : AutomationLabels.StepStatus(step.Status))</span>
+                                    @if (step.WaitingUntil is { } until) { <small class="text-muted"> · @Texts.Get("admin.automationRun.waitingUntil", CrmLabels.Time(until))</small> }</td>
+                                <td data-label="@Texts.Get("admin.automationRun.col.attempts")">@step.Attempts</td>
+                                <td data-label="@Texts.Get("admin.automationRun.col.result")">@(string.IsNullOrWhiteSpace(step.Summary) ? "—" : step.Summary)</td>
                             </tr>
                         }
                     </tbody>
@@ -156,11 +156,11 @@
 
     private string ActionName(string key) => actions.FirstOrDefault(a => a.Key == key)?.DisplayName ?? key;
 
-    private Task RetryAsync() => ChangeAsync($"/api/automation/runs/{RunId}/retry", "Çalışma yeniden kuyruğa alındı.");
+    private Task RetryAsync() => ChangeAsync($"/api/automation/runs/{RunId}/retry", Texts.Get("admin.automationRun.retried"));
 
     private async Task CancelAsync()
     {
-        await ChangeAsync($"/api/automation/runs/{RunId}/cancel", "Çalışma iptal edildi.");
+        await ChangeAsync($"/api/automation/runs/{RunId}/cancel", Texts.Get("admin.automationRun.cancelled"));
     }
 
     private async Task ChangeAsync(string url, string done)

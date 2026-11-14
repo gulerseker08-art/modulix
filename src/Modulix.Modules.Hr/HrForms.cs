@@ -199,7 +199,7 @@ public static class HrForms
         [
             new("title", "Başlık", "anket", 12, Required: true, Fixed: true),
             new("description", "Açıklama", "anket", 12),
-            new("isAnonymous", "Kimliği gizli", "hedef", 4),
+            new("isAnonymous", "Anonim (kimliği gizli)", "hedef", 4),
             new("audienceBusinessUnitIds", "Hedef departmanlar", "hedef", 6),
             new("audienceUserIds", "Hedef kişiler", "hedef", 6),
             new("closesOn", "Kapanış günü", "hedef", 4),

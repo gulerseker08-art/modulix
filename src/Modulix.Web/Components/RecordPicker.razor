@@ -14,7 +14,7 @@
                @onfocus="OpenAsync" @onclick="OpenAsync" @oninput="OnInputAsync" @onkeydown="OnKeyDownAsync" @onfocusout="Close" />
         @if (selected is not null)
         {
-            <button type="button" class="lookup-clear" aria-label="Seçimi temizle: @AccessibleName" @onclick="ClearAsync">×</button>
+            <button type="button" class="lookup-clear" aria-label="@Texts.Get("lookup.clear", AccessibleName)" @onclick="ClearAsync">×</button>
         }
     </div>
 
@@ -31,24 +31,24 @@
         }
         @if (open && loading)
         {
-            <li class="lookup-note" role="presentation">Yükleniyor…</li>
+            <li class="lookup-note" role="presentation">@Texts.Get("common.loading")</li>
         }
         else if (open && error is not null)
         {
             <li class="lookup-note text-danger" role="presentation">
                 @error
-                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onmousedown="() => LoadAsync(1)" @onmousedown:preventDefault>Tekrar dene</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onmousedown="() => LoadAsync(1)" @onmousedown:preventDefault>@Texts.Get("lookup.retry")</button>
             </li>
         }
         else if (open && items.Count == 0)
         {
-            <li class="lookup-note text-muted" role="presentation">Sonuç bulunamadı.</li>
+            <li class="lookup-note text-muted" role="presentation">@Texts.Get("lookup.noResults")</li>
         }
         @if (open && !loading && error is null && items.Count < total)
         {
             <li class="lookup-note" role="presentation">
                 <button type="button" class="btn btn-sm btn-outline-secondary" @onmousedown="() => LoadAsync(page + 1)" @onmousedown:preventDefault>
-                    Daha fazla göster (@items.Count / @total)
+                    @Texts.Get("lookup.showMore", items.Count, total)
                 </button>
             </li>
         }
@@ -86,9 +86,9 @@
 
     [Parameter] public EventCallback<Guid?> ValueChanged { get; set; }
 
-    [Parameter] public string AccessibleName { get; set; } = "Kayıt";
+    [Parameter] public string AccessibleName { get; set; } = Texts.Get("admin.recordPicker.record");
 
-    [Parameter] public string? Placeholder { get; set; } = "Kayıt arayın…";
+    [Parameter] public string? Placeholder { get; set; } = Texts.Get("admin.recordPicker.placeholder");
 
     private string ListId => $"{Id}-list";
 
@@ -172,7 +172,7 @@
         loading = false;
         if (result.Value is not { } found)
         {
-            error = result.Error ?? "Kayıtlar alınamadı.";
+            error = result.Error ?? Texts.Get("admin.recordPicker.loadFailed");
             return;
         }
 
@@ -185,7 +185,7 @@
         items.AddRange(found.Items);
         total = found.TotalCount;
         page = found.Page;
-        announcement = $"{total} kayıt bulundu.";
+        announcement = Texts.Get("admin.recordPicker.found", total);
     }
 
     private async Task SelectAsync(RecordResponse item)
