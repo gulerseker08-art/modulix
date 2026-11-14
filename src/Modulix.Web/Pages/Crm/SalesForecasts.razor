@@ -110,7 +110,7 @@
 
     @if (loading && items is null)
     {
-        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (items is not null)
     {

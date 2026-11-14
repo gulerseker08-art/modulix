@@ -147,7 +147,7 @@
 
     @if (loading)
     {
-        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
     else if (commitments.Count == 0)
     {

@@ -12,7 +12,7 @@
     }
     else if (order is null)
     {
-        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
     else
     {
@@ -85,11 +85,11 @@
             <h2 id="lines-title">@Texts.Get("orders.detail.lines")</h2>
             @if (lines is null)
             {
-                <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+                <LoadingState Kind="LoadingKind.Table" />
             }
             else if (lines.Count == 0)
             {
-                <p class="text-muted">@Texts.Get("orders.detail.lines-empty")</p>
+                <EmptyState Title="@Texts.Get("orders.detail.lines-empty")" />
             }
             else
             {
@@ -254,7 +254,7 @@
                 <h2 id="activities-title">@Texts.Get("orders.detail.activities")</h2>
                 @if (activities is null)
                 {
-                    <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+                    <LoadingState />
                 }
                 else if (activities.Count == 0)
                 {
@@ -279,7 +279,7 @@
             <h2 id="history-title">@Texts.Get("orders.detail.history")</h2>
             @if (history is null)
             {
-                <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+                <LoadingState />
             }
             else if (history.Count == 0)
             {

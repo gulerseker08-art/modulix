@@ -46,7 +46,7 @@
 
     @if (loading)
     {
-        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
     else if (step == 0)
     {
@@ -96,7 +96,7 @@
                 }
                 else if (quotes.Count == 0)
                 {
-                    <p class="text-muted">@Texts.Get("contracts.wizard.noQuotes")</p>
+                    <EmptyState Title="@Texts.Get("contracts.wizard.noQuotes")" />
                 }
                 else
                 {

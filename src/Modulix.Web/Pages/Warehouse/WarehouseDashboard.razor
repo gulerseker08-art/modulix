@@ -28,7 +28,7 @@
 
     @if (loading && data is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
 
     @if (error is not null)

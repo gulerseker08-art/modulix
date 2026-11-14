@@ -6,7 +6,7 @@
     <Notice Text="@message" Failed="@failed" />
     @if (actions is null)
     {
-        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
     else if (actions.Count == 0)
     {

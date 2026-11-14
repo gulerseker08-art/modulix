@@ -19,7 +19,7 @@
 
     @if (data is null && error is null)
     {
-        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
     else if (data is not null)
     {
@@ -62,7 +62,7 @@
                 }
                 else if (data.Money.Count == 0)
                 {
-                    <p class="text-muted">@Texts.Get("contracts.dashboard.noneActive")</p>
+                    <EmptyState Title="@Texts.Get("contracts.dashboard.noneActive")" />
                 }
                 else
                 {
@@ -90,7 +90,7 @@
             <h2 id="upcoming-title">@Texts.Get("contracts.dashboard.upcoming")</h2>
             @if (data.Upcoming.Count == 0)
             {
-                <p class="text-muted">@Texts.Get("contracts.dashboard.noUpcoming")</p>
+                <EmptyState Title="@Texts.Get("contracts.dashboard.noUpcoming")" />
             }
             else
             {

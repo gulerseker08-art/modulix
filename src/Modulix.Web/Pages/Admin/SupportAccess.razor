@@ -21,7 +21,7 @@
 
     @if (items is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (items.Count == 0)
     {

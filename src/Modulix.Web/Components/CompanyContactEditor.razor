@@ -1,5 +1,6 @@
 @* Firma–kişi ilişkisi ekleme/düzenleme formu (ADR-0011); firma detay sayfası kullanır. İlişki rolleri güvenlik rolü değildir. *@
 @inject ApiClient Api
+@inject ToastService Toasts
 
 <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
     <h2>@Texts.Get(Link is null ? "crm.company.people.link" : "crm.link.editor.edit")</h2>
@@ -144,6 +145,7 @@
 
         if (result.IsSuccess)
         {
+            Toasts.Success(Texts.Get("common.saved"));
             await Saved.InvokeAsync();
             return;
         }
