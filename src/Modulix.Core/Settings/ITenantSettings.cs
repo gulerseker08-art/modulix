@@ -1,5 +1,6 @@
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Settings;
 
 namespace Modulix.Core.Settings;
 
@@ -15,13 +16,10 @@ public sealed record SettingWrite(string Value, long Version);
 /// Aktif tenant'ın firma ayarları (Y6). Okuma her üyeye açıktır; yazma <c>core.settings.manage</c> ister ve kayıt boru
 /// hattından geçer (izin, sürüm, denetim kaydı). Yalnızca açık modüllerin tanımlı ayarları görünür ve yazılır.
 /// </summary>
-public interface ITenantSettings
+public interface ITenantSettings : ITenantSettingReader
 {
     /// <summary>Açık modüllerin ayarları, tanım sırasıyla, kaydedilmemişler varsayılanla.</summary>
     Task<IReadOnlyList<TenantSettingValue>> GetAsync(CancellationToken cancellationToken);
-
-    /// <summary>Tek ayarın değeri (kaydedilmemişse varsayılan). Tanımsız anahtar için <see cref="ArgumentException"/>.</summary>
-    Task<string> GetValueAsync(string key, CancellationToken cancellationToken);
 
     /// <summary>
     /// Değerleri tek işlemde kaydeder; biri başarısız olursa hiçbiri yazılmaz. Değişmeyen değer yazılmaz (denetim kaydı

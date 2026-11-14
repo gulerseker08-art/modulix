@@ -5,6 +5,7 @@ using Modulix.Api.Access;
 using Modulix.Api.Records;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Settings;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Reporting;
@@ -231,7 +232,7 @@ internal sealed class SalesReportingPolicyProvider(IServiceProvider services) : 
     public async Task<SalesReportingPolicy> GetAsync(CancellationToken cancellationToken)
     {
         // Ayar servisi kayıt boru hattını kullanır; kayıt depoları bu sağlayıcıya bağlı olabileceğinden çözümleme gecikmelidir (döngüyü önler).
-        var settings = services.GetRequiredService<ITenantSettings>();
+        var settings = services.GetRequiredService<ITenantSettingReader>();
         var zone = RegionalTime.Find(await settings.GetValueAsync(CoreModule.SettingKeys.TimeZone, cancellationToken));
         var currency = (await settings.GetValueAsync(CoreModule.SettingKeys.Currency, cancellationToken)) is { Length: 3 } code ? code.ToUpperInvariant() : RegionalOptions.DefaultCurrency;
 

@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Api.Access;
 using Modulix.Api.Records;
 using Modulix.Core.Contracts.Records;
-using Modulix.Core.Settings;
+using Modulix.Core.Contracts.Settings;
 using Modulix.Modules.Contracts;
 using Modulix.Modules.Contracts.Lifecycle;
 using Modulix.Shared.Contracts;
@@ -233,7 +233,7 @@ internal sealed class ContractPolicyProvider(IServiceProvider services) : IContr
 {
     public async Task<ContractPolicySettings> GetAsync(CancellationToken cancellationToken)
     {
-        var settings = services.GetRequiredService<ITenantSettings>();
+        var settings = services.GetRequiredService<ITenantSettingReader>();
         static string? Text(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         return new ContractPolicySettings(
             string.Equals(await settings.GetValueAsync(ContractsModule.SettingKeys.AllowSelfApproval, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),

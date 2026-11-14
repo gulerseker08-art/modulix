@@ -8,7 +8,7 @@ using Modulix.Api.Records;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Records;
-using Modulix.Core.Settings;
+using Modulix.Core.Contracts.Settings;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Opportunities;
 using Modulix.Modules.Crm.Reporting;
@@ -165,7 +165,7 @@ internal sealed class OpportunityPolicyProvider(IServiceProvider services) : IOp
     public async Task<OpportunityPolicy> GetAsync(CancellationToken cancellationToken)
     {
         // Ayar servisi kayıt boru hattını kullanır; kayıt depolarının (CrmStoreContext) bağımlılığı olduğu için çözümleme gecikmelidir (döngüyü önler).
-        var settings = services.GetRequiredService<ITenantSettings>();
+        var settings = services.GetRequiredService<ITenantSettingReader>();
         var stale = int.TryParse(await settings.GetValueAsync(CrmModule.SettingKeys.OpportunityStaleDays, cancellationToken),
             NumberStyles.None, CultureInfo.InvariantCulture, out var days) && days > 0
             ? days

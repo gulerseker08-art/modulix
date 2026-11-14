@@ -12,7 +12,7 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
-using Modulix.Core.Settings;
+using Modulix.Core.Contracts.Settings;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
 using Modulix.Modules.Crm;
@@ -379,7 +379,7 @@ internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvid
 
     private async Task<QuoteSellerInfo> SellerAsync(CancellationToken cancellationToken)
     {
-        var settings = services.GetRequiredService<ITenantSettings>();
+        var settings = services.GetRequiredService<ITenantSettingReader>();
         var name = (await settings.GetValueAsync(CoreModule.SettingKeys.DisplayName, cancellationToken)).Trim();
         if (name.Length == 0)
         {

@@ -170,7 +170,7 @@ internal sealed class SupportPolicyProvider(IServiceProvider services) : ISuppor
 {
     public async Task<TicketPolicySettings> GetAsync(CancellationToken cancellationToken)
     {
-        var settings = services.GetRequiredService<Modulix.Core.Settings.ITenantSettings>();
+        var settings = services.GetRequiredService<Modulix.Core.Contracts.Settings.ITenantSettingReader>();
         return new TicketPolicySettings(
             int.TryParse(await settings.GetValueAsync(SupportModule.SettingKeys.ReopenWindowDays, cancellationToken), out var days) ? Math.Clamp(days, 1, 90) : 7,
             !string.Equals(await settings.GetValueAsync(SupportModule.SettingKeys.RequireRootCause, cancellationToken), "false", StringComparison.OrdinalIgnoreCase),

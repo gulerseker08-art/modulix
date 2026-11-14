@@ -1,12 +1,12 @@
 using System.Globalization;
-using Modulix.Core.Settings;
+using Modulix.Core.Contracts.Settings;
 using Modulix.Modules.Marketing;
 using Modulix.Modules.Marketing.Runs;
 
 namespace Modulix.Api.Marketing;
 
 /// <summary>Pazarlama ayarlarını tenant ayar servisinden okur (modül Core'un ayar servisini doğrudan görmez). Geçersiz değer güvenli varsayılana düşer: sağlayıcı yok, günlük sınır 1, onay zorunlu.</summary>
-internal sealed class MarketingPolicyProvider(ITenantSettings settings) : IMarketingPolicyProvider
+internal sealed class MarketingPolicyProvider(ITenantSettingReader settings) : IMarketingPolicyProvider
 {
     public async Task<MarketingPolicy> GetAsync(CancellationToken cancellationToken)
     {

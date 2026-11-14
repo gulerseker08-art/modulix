@@ -6,7 +6,7 @@ using Modulix.Api.Records;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Records;
-using Modulix.Core.Settings;
+using Modulix.Core.Contracts.Settings;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Leads;
 using Modulix.Shared.Crm;
@@ -98,10 +98,10 @@ internal static class LeadEndpoints
 
     // ---- Ayarlar
 
-    private static async Task<IResult> SettingsAsync(ITenantSettings settings, CancellationToken ct) =>
+    private static async Task<IResult> SettingsAsync(ITenantSettingReader settings, CancellationToken ct) =>
         Results.Ok(new LeadSettingsDto(await TargetHoursAsync(settings, ct)));
 
-    private static async Task<int?> TargetHoursAsync(ITenantSettings settings, CancellationToken ct) =>
+    private static async Task<int?> TargetHoursAsync(ITenantSettingReader settings, CancellationToken ct) =>
         int.TryParse(await settings.GetValueAsync(CrmModule.SettingKeys.LeadFirstContactTargetHours, ct), NumberStyles.None, CultureInfo.InvariantCulture, out var hours) && hours > 0
             ? hours
             : null;
@@ -187,7 +187,7 @@ internal static class LeadEndpoints
     // ---- Rapor
 
     private static async Task<IResult> ReportAsync(
-        DateTimeOffset? from, DateTimeOffset? to, IRecordPipeline pipeline, ITenantSettings settings, TimeProvider time, CancellationToken ct)
+        DateTimeOffset? from, DateTimeOffset? to, IRecordPipeline pipeline, ITenantSettingReader settings, TimeProvider time, CancellationToken ct)
     {
         var now = time.GetUtcNow();
         var end = to ?? now;

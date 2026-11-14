@@ -13,6 +13,7 @@ using Modulix.Core.Contracts.Customs;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Sectors;
+using Modulix.Core.Contracts.Settings;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
 using Modulix.Core.Customs;
@@ -210,6 +211,8 @@ public static class PersistenceSetup
         // Denetim kaydı okuma (Y5).
         services.AddScoped<IAuditLog, AuditLog>();
         services.AddScoped<ITenantSettings, TenantSettings>();
+        // Modüllerin ayar okuma sözleşmesi (ADR-0046); aynı kapsamdaki ITenantSettings örneğini verir.
+        services.AddScoped<ITenantSettingReader>(provider => provider.GetRequiredService<ITenantSettings>());
         services.AddScoped<ITenantClock, TenantClock>();
         services.AddScoped<ITenantLogo, TenantLogoStore>();
         services.AddScoped<TenantDisplayNames>();
