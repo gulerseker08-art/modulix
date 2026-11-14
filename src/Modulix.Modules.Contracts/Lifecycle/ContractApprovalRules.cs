@@ -175,7 +175,9 @@ public static class ContractApprovalPlans
 
         try
         {
-            return JsonSerializer.Deserialize<ContractApprovalPlan>(json, Json) ?? new ContractApprovalPlan([]);
+            // "{}" ya da "matches": null içeren eski planda serileştirici kurucuya null geçirir; eşleşmesiz plana çevrilir.
+            ContractApprovalPlan? plan = JsonSerializer.Deserialize<ContractApprovalPlan>(json, Json);
+            return plan?.Matches is null ? new ContractApprovalPlan([], plan?.Note) : plan;
         }
         catch (JsonException)
         {
