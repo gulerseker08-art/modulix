@@ -726,7 +726,9 @@ internal sealed class SubProfileService(
         var issues = await FieldRuleChecker.ValidateAsync([rule], catalog, entityKey => automation.GetFieldSetAsync(entityKey, cancellationToken));
         if (issues.Count > 0)
         {
-            throw new ArgumentException(string.Join(" ", issues.Select(i => $"{i.Path}: {i.Message}")), "rule");
+            // Yol "<kural anahtarı>.<alan>" ile başlar; anahtar sunucu ürettiği için kullanıcıya gösterilmez.
+            string Readable(string path) => path.StartsWith(key + ".", StringComparison.Ordinal) ? path[(key.Length + 1)..] : path;
+            throw new ArgumentException(string.Join(" ", issues.Select(i => $"{Readable(i.Path)}: {i.Message}")), "rule");
         }
 
         return rule;

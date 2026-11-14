@@ -520,13 +520,27 @@
                                 {
                                     <div>
                                         <label class="form-label" for="ruleCondValue">Değer</label>
-                                        <input id="ruleCondValue" class="form-control" list="ruleCondOptions" placeholder="birden fazlaysa virgülle ayırın" @bind="ruleForm.CondValues" @bind:event="oninput" />
-                                        <datalist id="ruleCondOptions">
-                                            @foreach (var option in ConditionField?.Options ?? [])
-                                            {
-                                                <option value="@option.Key">@option.Label</option>
-                                            }
-                                        </datalist>
+                                        @if (ConditionField is { Options.Count: > 0 } && EditorLeaf.ValueCount(ruleForm.CondOperator).Max == 1)
+                                        {
+                                            @* Seçim alanında değer listeden seçilir: serbest yazılan anahtar sunucuda reddedilirdi. *@
+                                            <select id="ruleCondValue" class="form-select" @bind="ruleForm.CondValues">
+                                                <option value="">Değer seçin</option>
+                                                @foreach (var option in ConditionField.Options)
+                                                {
+                                                    <option value="@option.Key">@option.Label</option>
+                                                }
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <input id="ruleCondValue" class="form-control" list="ruleCondOptions" placeholder="birden fazlaysa virgülle ayırın" @bind="ruleForm.CondValues" @bind:event="oninput" />
+                                            <datalist id="ruleCondOptions">
+                                                @foreach (var option in ConditionField?.Options ?? [])
+                                                {
+                                                    <option value="@option.Key">@option.Label</option>
+                                                }
+                                            </datalist>
+                                        }
                                     </div>
                                 }
                             }
