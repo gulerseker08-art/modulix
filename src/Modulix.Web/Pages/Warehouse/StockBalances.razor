@@ -3,35 +3,35 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>Stok bakiyeleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.warehouse.stock-balances") · Modulix</PageTitle>
 
 @* Bakiye yalnızca okunur (ADR-0032 K13): hareket defterinden türetilir, hareket kaydıyla aynı işlemde değişir. Bu ekranda yazma eylemi yoktur;
    stok değiştirmek için Stok hareketleri ekranından hareket kaydedilir. *@
 <AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.MovementsRead">
-    <PageHeader Title="Stok bakiyeleri" Icon="list" Subtitle="@(page is null ? "Partilerin lokasyon bazında güncel miktarları; hareket defterinden türetilir." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.warehouse.stock-balances")" Icon="list" Subtitle="@(page is null ? Texts.Get("warehouse.stockBalances.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Bakiye görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("warehouse.stockBalances.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(WarehouseAccess.MovementsWrite))
         {
-            <button type="button" class="btn btn-tonal" @onclick="@(() => Navigation.NavigateTo(lotId is { } lot ? $"depo/hareketler?lotId={lot}" : "depo/hareketler"))"><AppIcon Name="repeat" Size="16" /> Hareketler</button>
+            <button type="button" class="btn btn-tonal" @onclick="@(() => Navigation.NavigateTo(lotId is { } lot ? $"depo/hareketler?lotId={lot}" : "depo/hareketler"))"><AppIcon Name="repeat" Size="16" /> @Texts.Get("warehouse.stockBalances.movements")</button>
         }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <LookupPicker Id="balance-stock-item-filter" LookupKey="@WarehouseAccess.LotStockItemLookup" Value="stockItemId" ValueChanged="ChooseStockItemAsync" Placeholder="Tüm stok kartları" />
-            <LookupPicker Id="balance-lot-filter" LookupKey="@WarehouseAccess.MovementLotLookup" Value="lotId" ValueChanged="ChooseLotAsync" Placeholder="Tüm partiler" />
-            <LookupPicker Id="balance-location-filter" LookupKey="@WarehouseAccess.MovementToLocationLookup" Value="locationId" ValueChanged="ChooseLocationAsync" Placeholder="Tüm lokasyonlar" />
+            <LookupPicker Id="balance-stock-item-filter" LookupKey="@WarehouseAccess.LotStockItemLookup" Value="stockItemId" ValueChanged="ChooseStockItemAsync" Placeholder="@Texts.Get("warehouse.stockItems.view.all")" />
+            <LookupPicker Id="balance-lot-filter" LookupKey="@WarehouseAccess.MovementLotLookup" Value="lotId" ValueChanged="ChooseLotAsync" Placeholder="@Texts.Get("warehouse.lots.view.all")" />
+            <LookupPicker Id="balance-location-filter" LookupKey="@WarehouseAccess.MovementToLocationLookup" Value="locationId" ValueChanged="ChooseLocationAsync" Placeholder="@Texts.Get("warehouse.locations.view.all")" />
         </div>
     }
 
@@ -44,20 +44,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan bakiye yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("warehouse.stockBalances.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) bakiye satırı listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("warehouse.stockBalances.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Stok bakiyesi listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("warehouse.stockBalances.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -69,8 +69,8 @@
                             @Cell(column, balance)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{WarehouseLabels.NameOf(lotNames, WarehouseLabels.Id(balance, "lotId"))} bakiyesi eylemleri")">
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="@(() => Navigation.NavigateTo($"depo/hareketler?lotId={WarehouseLabels.Id(balance, "lotId")}"))"><AppIcon Name="repeat" Size="16" /> <span>Partinin hareketleri</span></button>
+                            <RowMenu Label="@Texts.Get("warehouse.stockBalances.rowActions", WarehouseLabels.NameOf(lotNames, WarehouseLabels.Id(balance, "lotId")))">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="@(() => Navigation.NavigateTo($"depo/hareketler?lotId={WarehouseLabels.Id(balance, "lotId")}"))"><AppIcon Name="repeat" Size="16" /> <span>@Texts.Get("warehouse.stockBalances.lotMovements")</span></button>
                             </RowMenu>
                         </td>
                     </tr>
@@ -88,11 +88,11 @@
     private const string AllViews = "all";
 
     // Sıralama yalnızca miktara göredir (StockBalanceRecordStore.SortKeys); varsayılan en çok stok önce.
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("lot", "Parti", "package", Locked: true),
-        new("location", "Lokasyon", "map-pin"),
-        new("quantity", "Miktar", "hash", "quantity", "-quantity"),
+        new("lot", Texts.Get("warehouse.lot"), "package", Locked: true),
+        new("location", Texts.Get("warehouse.location"), "map-pin"),
+        new("quantity", Texts.Get("warehouse.quantity"), "hash", "quantity", "-quantity"),
     ];
 
     private readonly GridViewState grid = new("warehouse.stock-balances", "");
@@ -131,8 +131,8 @@
     // Varsayılan görünüm stokta olanlardır (sıfır bakiyeli satırlar gizli); "Tüm satırlar" tükenmiş satırları da gösterir.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(InStockView, "Stokta olanlar", Icon: "check-circle"),
-        new(AllViews, "Tüm satırlar", Icon: "list"),
+        new(InStockView, Texts.Get("warehouse.stockBalances.view.inStock"), Icon: "check-circle"),
+        new(AllViews, Texts.Get("warehouse.stockBalances.view.all"), Icon: "list"),
         .. views.Options,
     ];
 

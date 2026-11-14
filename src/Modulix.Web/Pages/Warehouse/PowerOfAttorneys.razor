@@ -5,10 +5,10 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Vekâletler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.warehouse.power-of-attorneys") · Modulix</PageTitle>
 
 <AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.AttorneysRead">
-    <PageHeader Title="Vekâletler" Icon="file-text" Subtitle="@(page is null ? "İthalatçıların gümrük müşavirlerine verdiği vekâletleri yönetin." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.warehouse.power-of-attorneys")" Icon="file-text" Subtitle="@(page is null ? Texts.Get("warehouse.powerOfAttorneys.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -21,25 +21,25 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. Geçerlilik bugünün tarihine göre sunucuda hesaplanır. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Vekâlet görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("warehouse.powerOfAttorneys.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Vekâlet ara" placeholder="Kapsam veya belge ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("warehouse.powerOfAttorneys.search")" placeholder="@Texts.Get("warehouse.powerOfAttorneys.searchPlaceholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(WarehouseAccess.AttorneysWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni vekâlet</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("warehouse.powerOfAttorneys.new")</button>
         }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <LookupPicker Id="attorney-importer-filter" LookupKey="@WarehouseAccess.AttorneyImporterLookup" Value="importerId" ValueChanged="ChooseImporterAsync" Placeholder="Tüm ithalatçılar" />
-            <LookupPicker Id="attorney-broker-filter" LookupKey="@WarehouseAccess.AttorneyBrokerLookup" Value="brokerId" ValueChanged="ChooseBrokerAsync" Placeholder="Tüm müşavirler" />
+            <LookupPicker Id="attorney-importer-filter" LookupKey="@WarehouseAccess.AttorneyImporterLookup" Value="importerId" ValueChanged="ChooseImporterAsync" Placeholder="@Texts.Get("warehouse.declarations.allImporters")" />
+            <LookupPicker Id="attorney-broker-filter" LookupKey="@WarehouseAccess.AttorneyBrokerLookup" Value="brokerId" ValueChanged="ChooseBrokerAsync" Placeholder="@Texts.Get("warehouse.declarations.allBrokers")" />
         </div>
     }
 
@@ -52,20 +52,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan vekâlet yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("warehouse.powerOfAttorneys.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) vekâlet listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("warehouse.powerOfAttorneys.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Vekâlet listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("warehouse.powerOfAttorneys.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -79,8 +79,8 @@
                         <td class="row-menu-cell">
                             @if (Session.Can(WarehouseAccess.AttorneysWrite))
                             {
-                                <RowMenu Label="@($"{WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(attorney, "importerPartyId"))} vekâleti eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(attorney)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <RowMenu Label="@Texts.Get("warehouse.powerOfAttorneys.rowActions", WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(attorney, "importerPartyId")))">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(attorney)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 </RowMenu>
                             }
                         </td>
@@ -102,13 +102,13 @@
     // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (WarehouseRecordStore.SortKeys).
     // Taraflar (firma adı) sunucuda sıralanamaz: firma görünürlüğü sıralamayla dolanılmasın. Durum satır içi hesaplanır; sıralanamaz.
     // Varsayılan sıra başlangıç tarihine göre en yenidir.
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("importer", "İthalatçı", "building", Locked: true),
-        new("broker", "Gümrük müşaviri", "user"),
-        new("validFrom", "Başlangıç", "calendar", "validFrom", "-validFrom"),
-        new("validTo", "Bitiş", "calendar", "validTo", "-validTo"),
-        new("status", "Durum", "tag"),
+        new("importer", Texts.Get("warehouse.importer"), "building", Locked: true),
+        new("broker", Texts.Get("warehouse.broker"), "user"),
+        new("validFrom", Texts.Get("warehouse.validFrom"), "calendar", "validFrom", "-validFrom"),
+        new("validTo", Texts.Get("warehouse.validTo"), "calendar", "validTo", "-validTo"),
+        new("status", Texts.Get("common.field.status"), "tag"),
     ];
 
     private readonly GridViewState grid = new("warehouse.power-of-attorneys", "-validFrom");
@@ -146,9 +146,9 @@
     // Görünümler yalnızca süzgeçtir (Tümü, Bugün geçerli, İptal edilmiş, kişisel); taraf seçimleri "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm vekâletler", Icon: "file-text"),
-        new(ValidView, "Bugün geçerli", Icon: "check-circle"),
-        new(RevokedView, "İptal edilmiş", Icon: "clock"),
+        new(AllViews, Texts.Get("warehouse.powerOfAttorneys.view.all"), Icon: "file-text"),
+        new(ValidView, Texts.Get("warehouse.powerOfAttorneys.view.valid"), Icon: "check-circle"),
+        new(RevokedView, Texts.Get("warehouse.powerOfAttorneys.view.revoked"), Icon: "clock"),
         .. views.Options,
     ];
 
@@ -276,7 +276,7 @@
         "importer" => @<text>@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(attorney, "importerPartyId"))</text>,
         "broker" => @<text>@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(attorney, "brokerPartyId"))</text>,
         "validFrom" => @<text>@Display(WarehouseLabels.Text(attorney, "validFrom"))</text>,
-        "validTo" => @<text>@(WarehouseLabels.Text(attorney, "validTo") is { Length: > 0 } to ? Display(to) : "Süresiz")</text>,
+        "validTo" => @<text>@(WarehouseLabels.Text(attorney, "validTo") is { Length: > 0 } to ? Display(to) : Texts.Get("warehouse.openEnded"))</text>,
         "status" => StatusBadge(attorney),
         _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(WarehouseAccess.PowerOfAttorneyEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
             @<text>@CustomFieldText.Format(field, attorney.Values["custom"] as JsonObject)</text>,
@@ -296,20 +296,20 @@
         var today = DateOnly.FromDateTime(DateTime.Today);
         if (!WarehouseLabels.Flag(attorney, "isActive", true))
         {
-            return ("İptal edildi", "status-inactive");
+            return (Texts.Get("warehouse.attorneyStatus.revoked"), "status-inactive");
         }
 
         if (DateOnly.TryParseExact(WarehouseLabels.Text(attorney, "validFrom"), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var from) && from > today)
         {
-            return ("Başlamadı", "stage-qualified");
+            return (Texts.Get("warehouse.attorneyStatus.notStarted"), "stage-qualified");
         }
 
         if (DateOnly.TryParseExact(WarehouseLabels.Text(attorney, "validTo"), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var to) && to < today)
         {
-            return ("Süresi doldu", "status-inactive");
+            return (Texts.Get("warehouse.attorneyStatus.expired"), "status-inactive");
         }
 
-        return ("Geçerli", "status-customer");
+        return (Texts.Get("warehouse.attorneyStatus.valid"), "status-customer");
     }
 
     private static string Display(string isoDate) =>
