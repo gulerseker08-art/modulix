@@ -3,21 +3,20 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Teklif onay kuralları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.quoteRules.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.QuoteRulesManage">
     <div class="page-header">
-        <h1>Teklif onay kuralları</h1>
+        <h1>@Texts.Get("crm.quoteRules.title")</h1>
         @if (form is null)
         {
-            <button type="button" class="btn btn-primary" @onclick="NewRule">Yeni kural</button>
+            <button type="button" class="btn btn-primary" @onclick="NewRule">@Texts.Get("crm.quoteRules.new")</button>
         }
     </div>
 
     <p class="text-muted">
-        Bir kuralın girilen <strong>tüm koşulları birlikte</strong> sağlanırsa teklif müşteriye sunulmadan önce iç onay ister; <strong>kurallardan biri</strong> yeterlidir.
-        Genel eşik ayarları (CRM Teklif ayarları) da geçerlidir. Onaylayan seçilirse onay yalnızca o kullanıcıdan kabul edilir. Kural değişikliği
-        yeni onaya gönderilen tekliflerde etkilidir; her onaya gönderimde eşleşen kuralların adı ve sürümü teklif geçmişine yazılır.
+        @Texts.Strong("crm.quoteRules.intro1", Texts.Get("crm.quoteRules.introAll"), Texts.Get("crm.quoteRules.introAny"))
+        @Texts.Get("crm.quoteRules.intro2")
     </p>
 
     <Notice Text="@message" Failed="@(failed)" />
@@ -25,62 +24,62 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>@(form.Id is null ? "Yeni kural" : "Kuralı düzenle")</h2>
-            <FormTabs Title="Kural bilgileri" Label="Teklif kuralı formu bölümleri">
+            <h2>@(form.Id is null ? Texts.Get("crm.quoteRules.new") : Texts.Get("crm.quoteRules.edit"))</h2>
+            <FormTabs Title="@Texts.Get("crm.quoteRules.info")" Label="@Texts.Get("crm.quoteRules.formSections")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="r-name">Ad *</label>
+                    <label class="form-label" for="r-name">@Texts.Get("common.field.nameRequired")</label>
                     <input id="r-name" class="form-control" maxlength="150" @bind="form.Name" />
                     <FieldError Field="name" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="r-step">Onay adımı (1-9)</label>
+                    <label class="form-label" for="r-step">@Texts.Get("crm.quoteRules.field.step")</label>
                     <input id="r-step" class="form-control" type="number" min="1" max="9" @bind="form.Step" />
                     <FieldError Field="step" Errors="errors" />
-                    <div class="form-text">Küçük adımlar önce tamamlanır; aynı adımdaki adlı onaylayanların hepsi onaylamalıdır.</div>
+                    <div class="form-text">@Texts.Get("crm.quoteRules.field.stepHelp")</div>
                 </div>
                 <div>
-                    <label class="form-label" for="r-priority">Öncelik (küçük önce)</label>
+                    <label class="form-label" for="r-priority">@Texts.Get("crm.quoteRules.field.priority")</label>
                     <input id="r-priority" class="form-control" type="number" min="0" @bind="form.Priority" />
                     <FieldError Field="priority" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="r-discount">İndirim eşiği (%) — aşılırsa</label>
+                    <label class="form-label" for="r-discount">@Texts.Get("crm.quoteRules.field.discount")</label>
                     <input id="r-discount" class="form-control" type="number" step="any" min="0" max="99.99" @bind="form.MinDiscountPercent" />
                     <FieldError Field="minDiscountPercent" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="r-gross">Genel toplam eşiği — aşılırsa</label>
+                    <label class="form-label" for="r-gross">@Texts.Get("crm.quoteRules.field.gross")</label>
                     <input id="r-gross" class="form-control" type="number" step="0.01" min="0" @bind="form.MinGrossTotal" />
                     <FieldError Field="minGrossTotal" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="r-currency">Para birimi (tutar için)</label>
-                    <input id="r-currency" class="form-control" maxlength="3" placeholder="Hepsi" @bind="form.Currency" />
+                    <label class="form-label" for="r-currency">@Texts.Get("crm.quoteRules.field.currency")</label>
+                    <input id="r-currency" class="form-control" maxlength="3" placeholder="@Texts.Get("crm.quoteRules.field.currencyAll")" @bind="form.Currency" />
                     <FieldError Field="currency" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="approverId">Onaylayan (isteğe bağlı)</label>
-                    <LookupPicker Id="approverId" LookupKey="crm.quote-approval-rule.approver" @bind-Value="form.ApproverId" Placeholder="Onay izni olan herkes"
+                    <label class="form-label" for="approverId">@Texts.Get("crm.quoteRules.field.approver")</label>
+                    <LookupPicker Id="approverId" LookupKey="crm.quote-approval-rule.approver" @bind-Value="form.ApproverId" Placeholder="@Texts.Get("crm.quoteRules.anyApprover")"
                                   Invalid="@(errors?.ContainsKey("approverId") == true)" />
                     <FieldError Field="approverId" Errors="errors" />
                 </div>
                 <div class="form-check">
                     <input id="r-active" class="form-check-input" type="checkbox" @bind="form.IsActive" />
-                    <label class="form-check-label" for="r-active">Kural etkin</label>
+                    <label class="form-check-label" for="r-active">@Texts.Get("crm.quoteRules.field.active")</label>
                 </div>
                 <div class="wide">
-                    <label class="form-label" for="r-description">Açıklama</label>
+                    <label class="form-label" for="r-description">@Texts.Get("crm.products.field.description")</label>
                     <textarea id="r-description" class="form-control" rows="2" maxlength="500" @bind="form.Description"></textarea>
                 </div>
             </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Vazgeç</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">@Texts.Get("common.dismiss")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </form>
@@ -88,29 +87,29 @@
 
     @if (rules is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (rules.Count == 0)
     {
-        <p class="text-muted">Kural yok; yalnızca genel eşik ayarları uygulanır.</p>
+        <EmptyState Title="@Texts.Get("crm.quoteRules.none")" />
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Teklif onay kuralları</caption>
-            <thead><tr><th scope="col">Kural</th><th scope="col">Adım</th><th scope="col">Koşullar (hepsi)</th><th scope="col">Onaylayan</th><th scope="col">Durum</th><th scope="col"></th></tr></thead>
+            <caption class="visually-hidden">@Texts.Get("crm.quoteRules.title")</caption>
+            <thead><tr><th scope="col">@Texts.Get("crm.quoteRules.col.rule")</th><th scope="col">@Texts.Get("crm.quoteRules.col.step")</th><th scope="col">@Texts.Get("crm.quoteRules.col.conditionsAll")</th><th scope="col">@Texts.Get("crm.quoteRules.col.approver")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col"></th></tr></thead>
             <tbody>
                 @foreach (var rule in rules)
                 {
                     <tr>
-                        <td data-label="Kural" class="primary">@rule.Name <small class="text-muted">öncelik @rule.Priority · sürüm @rule.Version</small>
+                        <td data-label="@Texts.Get("crm.quoteRules.col.rule")" class="primary">@rule.Name <small class="text-muted">@Texts.Get("crm.quoteRules.priorityVersion", rule.Priority, rule.Version)</small>
                             @if (!string.IsNullOrWhiteSpace(rule.Description)) { <div class="small text-muted">@rule.Description</div> }</td>
-                        <td data-label="Adım">@rule.Step</td>
-                        <td data-label="Koşullar">@Conditions(rule)</td>
-                        <td data-label="Onaylayan">@(rule.ApproverId is null ? "Onay izni olan herkes" : Lookups.MemberName(rule.ApproverId))</td>
-                        <td data-label="Durum">@(rule.IsActive ? "Etkin" : "Pasif")</td>
+                        <td data-label="@Texts.Get("crm.quoteRules.col.step")">@rule.Step</td>
+                        <td data-label="@Texts.Get("crm.quoteRules.col.conditions")">@Conditions(rule)</td>
+                        <td data-label="@Texts.Get("crm.quoteRules.col.approver")">@(rule.ApproverId is null ? Texts.Get("crm.quoteRules.anyApprover") : Lookups.MemberName(rule.ApproverId))</td>
+                        <td data-label="@Texts.Get("common.field.status")">@(rule.IsActive ? Texts.Get("crm.quoteRules.active") : Texts.Get("common.inactive"))</td>
                         <td class="actions">
-                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(rule)">Düzenle</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(rule)">@Texts.Get("common.edit")</button>
                         </td>
                     </tr>
                 }
@@ -151,15 +150,15 @@
         var parts = new List<string>();
         if (rule.MinDiscountPercent is { } percent)
         {
-            parts.Add($"indirim > %{percent:0.##}");
+            parts.Add(Texts.Get("crm.quoteRules.cond.discount", percent.ToString("0.##")));
         }
 
         if (rule.MinGrossTotal is { } gross)
         {
-            parts.Add($"genel toplam > {gross:N2} {rule.Currency ?? "(her para birimi)"}");
+            parts.Add(Texts.Get("crm.quoteRules.cond.gross", gross.ToString("N2"), rule.Currency ?? Texts.Get("crm.quoteRules.anyCurrency")));
         }
 
-        return string.Join(" ve ", parts);
+        return parts.Count == 2 ? Texts.Get("crm.quoteRules.cond.both", parts[0], parts[1]) : string.Join(string.Empty, parts);
     }
 
     private void NewRule()
@@ -201,13 +200,13 @@
         {
             form = null;
             errors = null;
-            Notify("Kural kaydedildi.", false);
+            Notify(Texts.Get("crm.quoteRules.saved"), false);
             await LoadAsync();
             return;
         }
 
         errors = result.FieldErrors;
-        Notify(result.Status == System.Net.HttpStatusCode.Conflict ? $"{result.Error} Sayfayı yenileyip tekrar deneyin." : result.Error, true);
+        Notify(result.Status == System.Net.HttpStatusCode.Conflict ? Texts.Get("crm.quoteDetail.conflictRetry", result.Error) : result.Error, true);
     }
 
     private async Task DeleteAsync()
@@ -216,7 +215,7 @@
         busy = true;
         var result = await Api.DeleteAsync($"{Url}/{form!.Id}?version={form.Version}");
         busy = false;
-        Notify(result.IsSuccess ? "Kural silindi." : result.Error, !result.IsSuccess);
+        Notify(result.IsSuccess ? Texts.Get("crm.quoteRules.deleted") : result.Error, !result.IsSuccess);
         if (result.IsSuccess)
         {
             form = null;

@@ -16,7 +16,7 @@
 
     @if (profiles is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <LoadingState />
     }
     else
     {
@@ -63,7 +63,7 @@
 
         @if (profiles.Count == 0)
         {
-            <p class="text-muted">Henüz alt profil yok.</p>
+            <EmptyState Title="Henüz alt profil yok." />
         }
         else
         {
@@ -132,7 +132,7 @@
                 <h4>Seçenekler</h4>
                 @if (current.Options.Count == 0)
                 {
-                    <p class="text-muted">Bu alt profilde henüz seçenek yok.</p>
+                    <EmptyState Title="Bu alt profilde henüz seçenek yok." />
                 }
                 else
                 {

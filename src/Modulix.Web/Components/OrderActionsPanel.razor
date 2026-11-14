@@ -2,19 +2,19 @@
 @inject ApiClient Api
 
 <section aria-labelledby="order-actions-title">
-    <h2 id="order-actions-title">Durum işlemleri</h2>
+    <h2 id="order-actions-title">@Texts.Get("orders.actions.title")</h2>
     <Notice Text="@message" Failed="@failed" />
     @if (actions is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (actions.Count == 0)
     {
-        <p class="text-muted">Bu sipariş için yapabileceğiniz durum işlemi yok.</p>
+        <p class="text-muted">@Texts.Get("orders.actions.none")</p>
     }
     else
     {
-        <div class="header-actions" role="group" aria-label="Sipariş durum işlemleri">
+        <div class="header-actions" role="group" aria-label="@Texts.Get("orders.actions.group")">
             @foreach (var action in actions)
             {
                 <button type="button" class="btn @(OrderLabels.IsDanger(action.Action) ? "btn-outline-danger" : OrderLabels.IsPrimary(action.Action) ? "btn-primary" : "btn-outline-secondary")"
@@ -32,16 +32,16 @@
         @if (selectedAction is { RequiresReason: true })
         {
             <form class="record-form" novalidate @onsubmit="RunAsync" @onsubmit:preventDefault>
-                <label class="form-label" for="action-reason">Gerekçe (zorunlu) — @OrderLabels.Action(selectedAction.Action)</label>
+                <label class="form-label" for="action-reason">@Texts.Get("orders.actions.reason", OrderLabels.Action(selectedAction.Action))</label>
                 <textarea id="action-reason" class="form-control" rows="2" maxlength="500" @bind="reason" aria-invalid="@(reasonError is not null ? "true" : null)"></textarea>
                 @if (reasonError is not null) { <div class="invalid-feedback d-block" role="alert">@reasonError</div> }
                 @if (selectedAction.Action is "cancel")
                 {
-                    <p class="small text-muted mt-1">İptal siparişin teslim edilmemiş kısmını sonlandırır; teslim edilen kayıtlar korunur. İptal bir iade ya da fatura işlemi değildir.</p>
+                    <p class="small text-muted mt-1">@Texts.Get("orders.actions.cancel-note")</p>
                 }
                 <div class="form-actions">
-                    <button type="submit" class="btn @(OrderLabels.IsDanger(selectedAction.Action) ? "btn-danger" : "btn-primary")" disabled="@busy">Onayla: @OrderLabels.Action(selectedAction.Action)</button>
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">Vazgeç</button>
+                    <button type="submit" class="btn @(OrderLabels.IsDanger(selectedAction.Action) ? "btn-danger" : "btn-primary")" disabled="@busy">@Texts.Get("orders.actions.confirm", OrderLabels.Action(selectedAction.Action))</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">@Texts.Get("common.dismiss")</button>
                 </div>
             </form>
         }
@@ -105,7 +105,7 @@
         if (busy || selectedAction is not { } action) { return; }
         if (action.RequiresReason && string.IsNullOrWhiteSpace(reason))
         {
-            reasonError = "Gerekçe zorunludur.";
+            reasonError = Texts.Get("orders.actions.reason-required");
             return;
         }
 
@@ -122,7 +122,7 @@
         }
 
         failed = false;
-        message = $"{OrderLabels.Action(action.Action)}: işlem tamamlandı.";
+        message = Texts.Get("orders.actions.done", OrderLabels.Action(action.Action));
         selected = null;
         reason = string.Empty;
         await Changed.InvokeAsync(result.Value!);

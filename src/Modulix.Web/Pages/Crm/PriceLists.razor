@@ -124,11 +124,11 @@
             <h2>@Texts.Get("crm.priceLists.itemsTitle", opened.Name) <span class="badge status-@PricingLabels.ListBadge(opened.Status)">@PricingLabels.Label(PricingLabels.ListStatuses, opened.Status)</span></h2>
             @if (items is null)
             {
-                <p class="text-muted">@Texts.Get("common.loading")</p>
+                <LoadingState Kind="LoadingKind.Table" />
             }
             else if (items.Count == 0)
             {
-                <p class="text-muted">@Texts.Get("crm.priceLists.noItems")</p>
+                <EmptyState Title="@Texts.Get("crm.priceLists.noItems")" />
             }
             else
             {
@@ -217,11 +217,11 @@
 
     @if (page is null)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("crm.priceLists.none")</p>
+        <EmptyState Title="@Texts.Get("crm.priceLists.none")" />
     }
     else
     {

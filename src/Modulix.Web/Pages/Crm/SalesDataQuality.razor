@@ -108,7 +108,7 @@
                                 <div id="@panelId" class="mt-2">
                                     @if (issue.Samples.Count == 0)
                                     {
-                                        <p class="text-muted">@Texts.Get("crm.dataQuality.noSamples")</p>
+                                        <EmptyState Title="@Texts.Get("crm.dataQuality.noSamples")" />
                                     }
                                     else
                                     {

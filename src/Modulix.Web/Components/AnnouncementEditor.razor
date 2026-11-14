@@ -3,6 +3,7 @@
 @using System.Text.Json.Nodes
 @inject ApiClient Api
 @inject FormLayouts Layouts
+@inject ToastService Toasts
 
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
@@ -140,6 +141,7 @@
         if (result.IsSuccess)
         {
             dirty = false;
+            Toasts.Success(Texts.Get("common.saved"));
             await Saved.InvokeAsync(result.Value!);
             return;
         }

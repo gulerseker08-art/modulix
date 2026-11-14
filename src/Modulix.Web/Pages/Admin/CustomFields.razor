@@ -115,11 +115,11 @@
 
         @if (fields is null)
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (fields.Count == 0)
         {
-            <p class="text-muted">Bu kayıt türünde özel alan yok.</p>
+            <EmptyState Title="Bu kayıt türünde özel alan yok." />
         }
         else
         {

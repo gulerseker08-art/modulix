@@ -18,7 +18,7 @@
 
     <section aria-labelledby="matrix-title">
         <h2 id="matrix-title">Öncelik matrisi</h2>
-        @if (cells is null) { <p class="text-muted" role="status">Yükleniyor…</p> }
+        @if (cells is null) { <LoadingState Kind="LoadingKind.Table" /> }
         else
         {
             <form class="record-form" novalidate @onsubmit="SaveMatrixAsync" @onsubmit:preventDefault>
@@ -55,7 +55,7 @@
     <section aria-labelledby="rules-title">
         <h2 id="rules-title">Yönlendirme kuralları</h2>
         <p class="small text-muted">Etkin kurallardan sırası küçük olan, eşit sırada daha çok kısıtı olan <strong>ilk eşleşen</strong> uygulanır; yalnızca talep açılırken bir kez değerlendirilir. Yetkiyle açıkça kuyruk/sorumlu verilen talepte kural uygulanmaz. Hiçbiri uymazsa kategori, sonra varsayılan kuyruk kullanılır.</p>
-        @if (rules is null) { <p class="text-muted" role="status">Yükleniyor…</p> }
+        @if (rules is null) { <LoadingState Kind="LoadingKind.Table" /> }
         else if (rules.Count == 0) { <p class="text-muted">Kural yok.</p> }
         else
         {

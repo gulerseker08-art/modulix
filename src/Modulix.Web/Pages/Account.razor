@@ -29,7 +29,7 @@
     }
     else if (profile is null)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
     else
     {
@@ -107,7 +107,7 @@
             <Notice Text="@sessionNotice" Failed="sessionFailed" />
             @if (sessions is null)
             {
-                <p class="text-muted">@Texts.Get("common.loading")</p>
+                <LoadingState />
             }
             else
             {

@@ -66,12 +66,12 @@
     {
         @if (message is null)
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Kullanıcı yok.</p>
+        <EmptyState Title="Kullanıcı yok." />
     }
     else
     {

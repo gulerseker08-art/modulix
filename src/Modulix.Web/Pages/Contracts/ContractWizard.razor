@@ -5,26 +5,26 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
 
-<PageTitle>Yeni sözleşme sihirbazı · Modulix</PageTitle>
+<PageTitle>@Texts.Get("contracts.wizard.title") · Modulix</PageTitle>
 
 <NavigationLock ConfirmExternalNavigation="@dirty" OnBeforeInternalNavigation="ConfirmLeaveAsync" />
 
 <AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsWrite">
     <div class="page-header">
         <div>
-            <h1>Yeni sözleşme sihirbazı</h1>
-            <p class="text-muted mb-0">Taslak her adımda sunucuya kaydedilir; istediğiniz zaman çıkıp sözleşme detayından devam edebilirsiniz.</p>
+            <h1>@Texts.Get("contracts.wizard.title")</h1>
+            <p class="text-muted mb-0">@Texts.Get("contracts.wizard.intro")</p>
         </div>
         <div class="header-actions">
             @if (contract is not null)
             {
-                <a class="btn btn-outline-secondary" href="sozlesmeler/@contract.Id">Detaya git</a>
+                <a class="btn btn-outline-secondary" href="sozlesmeler/@contract.Id">@Texts.Get("contracts.wizard.goToDetail")</a>
             }
-            <a class="btn btn-outline-secondary" href="sozlesmeler">Listeye dön</a>
+            <a class="btn btn-outline-secondary" href="sozlesmeler">@Texts.Get("crm.quoteDetail.backToList")</a>
         </div>
     </div>
 
-    <ol class="wizard-steps" aria-label="Sihirbaz adımları">
+    <ol class="wizard-steps" aria-label="@Texts.Get("contracts.wizard.stepsLabel")">
         @for (var i = 0; i < Steps.Length; i++)
         {
             var index = i;
@@ -46,27 +46,27 @@
 
     @if (loading)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (step == 0)
     {
         <section class="record-form" aria-labelledby="step-title">
-            <h2 id="step-title" tabindex="-1" @ref="stepHeading">Sözleşme nereden başlasın?</h2>
+            <h2 id="step-title" tabindex="-1" @ref="stepHeading">@Texts.Get("contracts.wizard.sourceTitle")</h2>
             <fieldset>
-                <legend class="visually-hidden">Kaynak</legend>
+                <legend class="visually-hidden">@Texts.Get("contracts.wizard.step.source")</legend>
                 <div class="form-check">
                     <input id="src-blank" class="form-check-input" type="radio" name="source" checked="@(source == "blank")" @onchange='() => source = "blank"' />
-                    <label class="form-check-label" for="src-blank">Boş sözleşme — müşteri, kapsam ve tarihleri adım adım girerim.</label>
+                    <label class="form-check-label" for="src-blank">@Texts.Get("contracts.wizard.sourceBlank")</label>
                 </div>
                 <div class="form-check">
                     <input id="src-template" class="form-check-input" type="radio" name="source" checked="@(source == "template")" @onchange='() => source = "template"' />
-                    <label class="form-check-label" for="src-template">Şablondan — yayımlanmış bir şablonun türü ve metni son adımda belge önizlemesinde kullanılır.</label>
+                    <label class="form-check-label" for="src-template">@Texts.Get("contracts.wizard.sourceTemplate")</label>
                 </div>
                 @if (Session.IsModuleEnabled("crm") && Session.Can(CrmAccess.QuotesRead))
                 {
                     <div class="form-check">
                         <input id="src-quote" class="form-check-input" type="radio" name="source" checked="@(source == "quote")" @onchange='() => source = "quote"' />
-                        <label class="form-check-label" for="src-quote">Kabul edilmiş tekliften — kalemler ve fiyatlar tekliften sabitlenir.</label>
+                        <label class="form-check-label" for="src-quote">@Texts.Get("contracts.wizard.sourceQuote")</label>
                     </div>
                 }
             </fieldset>
@@ -74,16 +74,16 @@
             @if (source == "template")
             {
                 <div>
-                    <label class="form-label" for="wiz-template">Şablon</label>
+                    <label class="form-label" for="wiz-template">@Texts.Get("contracts.detail.col.template")</label>
                     @if (templates.Count == 0)
                     {
-                        <p class="text-muted">Yayımlanmış şablon yok. <a href="sozlesmeler/sablonlar">Şablonlar</a> ekranından bir şablon yayımlayın ya da boş sözleşmeyle başlayın.</p>
+                        <p class="text-muted">@((MarkupString)Texts.Get("contracts.wizard.noTemplates", $"<a href=\"sozlesmeler/sablonlar\">{System.Net.WebUtility.HtmlEncode(Texts.Get("nav.app.contracts.templates"))}</a>"))</p>
                     }
                     else
                     {
                         <select id="wiz-template" class="form-select" @bind="templateId" @bind:after="TemplateChosen">
-                            <option value="">Şablon seçin…</option>
-                            @foreach (var t in templates) { <option value="@t.Id">@t.Name@(t.IsExample ? " (örnek metin)" : "")</option> }
+                            <option value="">@Texts.Get("contracts.detail.chooseTemplate")</option>
+                            @foreach (var t in templates) { <option value="@t.Id">@t.Name@(t.IsExample ? " " + Texts.Get("contracts.wizard.exampleText") : "")</option> }
                         </select>
                     }
                 </div>
@@ -92,37 +92,37 @@
             {
                 @if (quotes is null)
                 {
-                    <p class="text-muted" role="status">Kabul edilmiş teklifler yükleniyor…</p>
+                    <p class="text-muted" role="status">@Texts.Get("contracts.wizard.quotesLoading")</p>
                 }
                 else if (quotes.Count == 0)
                 {
-                    <p class="text-muted">Kabul edilmiş teklif yok.</p>
+                    <EmptyState Title="@Texts.Get("contracts.wizard.noQuotes")" />
                 }
                 else
                 {
                     <table class="table record-table">
-                        <caption class="visually-hidden">Kabul edilmiş teklifler</caption>
-                        <thead><tr><th scope="col">Teklif</th><th scope="col">Başlık</th><th scope="col" class="text-end">Toplam</th><th scope="col"><span class="visually-hidden">İşlem</span></th></tr></thead>
+                        <caption class="visually-hidden">@Texts.Get("contracts.wizard.quotesCaption")</caption>
+                        <thead><tr><th scope="col">@Texts.Get("contracts.wizard.col.quote")</th><th scope="col">@Texts.Get("contracts.field.title")</th><th scope="col" class="text-end">@Texts.Get("contracts.field.gross")</th><th scope="col"><span class="visually-hidden">@Texts.Get("crm.quoteApprovals.col.action")</span></th></tr></thead>
                         <tbody>
                             @foreach (var q in quotes)
                             {
                                 <tr>
-                                    <td data-label="Teklif" class="primary">@q.QuoteNumber V@(q.RevisionNo)</td>
-                                    <td data-label="Başlık">@q.Title</td>
-                                    <td data-label="Toplam" class="text-end">@ContractLabels.Money(q.GrossTotal, q.Currency)</td>
-                                    <td><a class="btn btn-sm btn-outline-primary" href="sozlesmeler/tekliften/@q.Id">Bu teklifle başla</a></td>
+                                    <td data-label="@Texts.Get("contracts.wizard.col.quote")" class="primary">@q.QuoteNumber @Texts.Get("contracts.versionNo", q.RevisionNo)</td>
+                                    <td data-label="@Texts.Get("contracts.field.title")">@q.Title</td>
+                                    <td data-label="@Texts.Get("contracts.field.gross")" class="text-end">@ContractLabels.Money(q.GrossTotal, q.Currency)</td>
+                                    <td><a class="btn btn-sm btn-outline-primary" href="sozlesmeler/tekliften/@q.Id">@Texts.Get("contracts.wizard.startWithQuote")</a></td>
                                 </tr>
                             }
                         </tbody>
                     </table>
-                    <p class="small text-muted">Teklifle başlayınca sözleşme taslağı açılır ve detay ekranında düzenlenir.</p>
+                    <p class="small text-muted">@Texts.Get("contracts.wizard.quoteHelp")</p>
                 }
             }
 
             <div class="form-actions">
                 @if (source != "quote")
                 {
-                    <button type="button" class="btn btn-primary" disabled="@(source == "template" && templateId == "")" @onclick="() => GoAsync(1)">Devam</button>
+                    <button type="button" class="btn btn-primary" disabled="@(source == "template" && templateId == "")" @onclick="() => GoAsync(1)">@Texts.Get("contracts.wizard.continue")</button>
                 }
             </div>
         </section>
@@ -130,34 +130,34 @@
     else if (step == 1)
     {
         <form class="record-form" novalidate @onsubmit="() => NextAsync(2)" @onsubmit:preventDefault aria-labelledby="step-title">
-            <h2 id="step-title" tabindex="-1" @ref="stepHeading">Müşteri ve taraflar</h2>
+            <h2 id="step-title" tabindex="-1" @ref="stepHeading">@Texts.Get("contracts.wizard.step.parties")</h2>
             <ErrorSummary Errors="errors" />
             <div @oninput="() => dirty = true" @onchange="() => dirty = true">
                 <div>
-                    <label class="form-label required" for="w-title">Başlık</label>
+                    <label class="form-label required" for="w-title">@Texts.Get("contracts.field.title")</label>
                     <input id="w-title" class="form-control" maxlength="200" required aria-required="true" @bind="form.Title" aria-invalid="@(errors?.ContainsKey("title") == true)" />
                     <FieldError Field="title" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="w-type">Tür</label>
+                    <label class="form-label" for="w-type">@Texts.Get("contracts.field.type")</label>
                     <select id="w-type" class="form-select" @bind="form.Type">
                         @foreach (var t in Lookups.Choices(ContractsAccess.ContractTypeList, contract?.Type)) { <option value="@t.Key">@t.Label</option> }
                     </select>
                     <FieldError Field="type" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label required" for="partyId">Müşteri</label>
+                    <label class="form-label required" for="partyId">@Texts.Get("contracts.field.partyid")</label>
                     <LookupPicker Id="partyId" LookupKey="contracts.contract.party" @bind-Value="form.PartyId" Required="true" Invalid="@(errors?.ContainsKey("partyId") == true)" />
                     <FieldError Field="partyId" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="personId">İlgili kişi</label>
+                    <label class="form-label" for="personId">@Texts.Get("contracts.field.personid")</label>
                     <LookupPicker Id="personId" LookupKey="contracts.contract.person" @bind-Value="form.PersonId" ParentId="form.PartyId" Placeholder="—" Invalid="@(errors?.ContainsKey("personId") == true)" />
                     <FieldError Field="personId" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="ownerId">Sorumlu</label>
-                    <LookupPicker Id="ownerId" LookupKey="contracts.contract.owner" @bind-Value="form.OwnerId" Placeholder="Ben" />
+                    <label class="form-label" for="ownerId">@Texts.Get("common.field.owner")</label>
+                    <LookupPicker Id="ownerId" LookupKey="contracts.contract.owner" @bind-Value="form.OwnerId" Placeholder="@Texts.Get("common.me")" />
                     <FieldError Field="ownerId" Errors="errors" />
                 </div>
             </div>
@@ -165,33 +165,33 @@
             @if (contract is not null)
             {
                 <fieldset class="wizard-sub" aria-labelledby="parties-title">
-                    <legend id="parties-title" class="h6">Diğer taraflar (isteğe bağlı)</legend>
-                    @if (parties.Count == 0) { <p class="text-muted small">Henüz ek taraf yok (imzacı, fatura yetkilisi, kefil…).</p> }
+                    <legend id="parties-title" class="h6">@Texts.Get("contracts.wizard.otherParties")</legend>
+                    @if (parties.Count == 0) { <p class="text-muted small">@Texts.Get("contracts.wizard.noOtherParties")</p> }
                     else
                     {
                         <ul class="list-unstyled">
                             @foreach (var p in parties)
                             {
                                 <li>
-                                    @ContractLabels.Label(ContractPartyRoleLabels, p.Role): @PartyName(p.PartyId ?? p.PersonId ?? Guid.Empty)
-                                    <button type="button" class="btn btn-link btn-sm text-danger" disabled="@busy" @onclick="() => DeletePartyAsync(p)" aria-label="Tarafı kaldır">Kaldır</button>
+                                    @ContractLabels.Label(ContractLabels.PartyRoles, p.Role): @PartyName(p.PartyId ?? p.PersonId ?? Guid.Empty)
+                                    <button type="button" class="btn btn-link btn-sm text-danger" disabled="@busy" @onclick="() => DeletePartyAsync(p)" aria-label="@Texts.Get("contracts.wizard.removeParty")">@Texts.Get("contracts.signaturePanel.remove")</button>
                                 </li>
                             }
                         </ul>
                     }
                     <div class="row g-2">
                         <div class="col-md-4">
-                            <label class="form-label" for="p-role">Rol</label>
+                            <label class="form-label" for="p-role">@Texts.Get("contracts.field.role")</label>
                             <select id="p-role" class="form-select" @bind="partyRole">
-                                @foreach (var r in ContractPartyRoles.All) { <option value="@r.Key">@r.Label</option> }
+                                @foreach (var r in ContractLabels.PartyRoles) { <option value="@r.Key">@r.Label</option> }
                             </select>
                         </div>
                         <div class="col-md-5">
-                            <label class="form-label" for="p-party">Taraf</label>
-                            <LookupPicker Id="p-party" LookupKey="contracts.contract-party.party" @bind-Value="partyPick" Placeholder="Taraf seçin…" />
+                            <label class="form-label" for="p-party">@Texts.Get("contracts.detail.party")</label>
+                            <LookupPicker Id="p-party" LookupKey="contracts.contract-party.party" @bind-Value="partyPick" Placeholder="@Texts.Get("contracts.wizard.chooseParty")" />
                         </div>
                         <div class="col-md-3 d-flex align-items-end">
-                            <button type="button" class="btn btn-outline-secondary" disabled="@(busy || partyPick is null)" @onclick="AddPartyAsync">Taraf ekle</button>
+                            <button type="button" class="btn btn-outline-secondary" disabled="@(busy || partyPick is null)" @onclick="AddPartyAsync">@Texts.Get("contracts.wizard.addParty")</button>
                         </div>
                     </div>
                     <FieldError Field="role" Errors="partyErrors" />
@@ -199,135 +199,135 @@
             }
 
             <div class="form-actions">
-                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => GoAsync(0)">Geri</button>
-                <button type="submit" class="btn btn-primary" disabled="@busy">@(contract is null ? "Taslağı oluştur ve devam" : "Kaydet ve devam")</button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => GoAsync(0)">@Texts.Get("contracts.wizard.back")</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get(contract is null ? "contracts.wizard.createAndContinue" : "contracts.wizard.saveAndContinue")</button>
             </div>
         </form>
     }
     else if (step == 2)
     {
         <section class="record-form" aria-labelledby="step-title">
-            <h2 id="step-title" tabindex="-1" @ref="stepHeading">Kapsam ve ticari kalemler</h2>
-            @if (lines.Count == 0) { <p class="text-muted">Henüz kalem yok. Kalemsiz taslak kaydedilebilir; onaya göndermeden önce kalem gerekebilir.</p> }
+            <h2 id="step-title" tabindex="-1" @ref="stepHeading">@Texts.Get("contracts.detail.linesTitle")</h2>
+            @if (lines.Count == 0) { <p class="text-muted">@Texts.Get("contracts.wizard.noLines")</p> }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Sözleşme kalemleri</caption>
-                    <thead><tr><th scope="col">Kalem</th><th scope="col" class="text-end">Miktar</th><th scope="col" class="text-end">Birim fiyat</th><th scope="col" class="text-end">KDV %</th><th scope="col"><span class="visually-hidden">İşlem</span></th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("contracts.detail.linesCaption")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("crm.quoteDetail.col.line")</th><th scope="col" class="text-end">@Texts.Get("crm.quoteDetail.col.quantity")</th><th scope="col" class="text-end">@Texts.Get("crm.quoteDetail.col.unitPrice")</th><th scope="col" class="text-end">@Texts.Get("contracts.wizard.vatPercent")</th><th scope="col"><span class="visually-hidden">@Texts.Get("crm.quoteApprovals.col.action")</span></th></tr></thead>
                     <tbody>
                         @foreach (var l in lines)
                         {
                             <tr>
-                                <td data-label="Kalem" class="primary">@l.Name</td>
-                                <td data-label="Miktar" class="text-end">@l.Quantity.ToString("0.##", Regional.Numbers) @l.UnitName</td>
-                                <td data-label="Birim fiyat" class="text-end">@(Session.Can(ContractsAccess.FinancialsRead) ? ContractLabels.Money(l.UnitPrice, contract!.Currency) : "—")</td>
-                                <td data-label="KDV %" class="text-end">@l.TaxRatePercent.ToString("0.##", Regional.Numbers)</td>
-                                <td><button type="button" class="btn btn-link btn-sm text-danger" disabled="@busy" @onclick="() => DeleteLineAsync(l)" aria-label="Kalemi kaldır: @l.Name">Kaldır</button></td>
+                                <td data-label="@Texts.Get("crm.quoteDetail.col.line")" class="primary">@l.Name</td>
+                                <td data-label="@Texts.Get("crm.quoteDetail.col.quantity")" class="text-end">@l.Quantity.ToString("0.##", Regional.Numbers) @l.UnitName</td>
+                                <td data-label="@Texts.Get("crm.quoteDetail.col.unitPrice")" class="text-end">@(Session.Can(ContractsAccess.FinancialsRead) ? ContractLabels.Money(l.UnitPrice, contract!.Currency) : "—")</td>
+                                <td data-label="@Texts.Get("contracts.wizard.vatPercent")" class="text-end">@l.TaxRatePercent.ToString("0.##", Regional.Numbers)</td>
+                                <td><button type="button" class="btn btn-link btn-sm text-danger" disabled="@busy" @onclick="() => DeleteLineAsync(l)" aria-label="@Texts.Get("contracts.wizard.removeLine", l.Name)">@Texts.Get("contracts.signaturePanel.remove")</button></td>
                             </tr>
                         }
                     </tbody>
                 </table>
-                @if (Session.Can(ContractsAccess.FinancialsRead)) { <p><strong>Genel toplam:</strong> @ContractLabels.Money(contract!.GrossTotal, contract.Currency)</p> }
+                @if (Session.Can(ContractsAccess.FinancialsRead)) { <p><strong>@Texts.Get("contracts.wizard.grandTotalLabel")</strong> @ContractLabels.Money(contract!.GrossTotal, contract.Currency)</p> }
             }
 
             <form class="wizard-sub" novalidate @onsubmit="AddLineAsync" @onsubmit:preventDefault>
-                <h3 class="h6">Kalem ekle</h3>
+                <h3 class="h6">@Texts.Get("crm.quoteDetail.addLine")</h3>
                 <div class="row g-2">
                     <div class="col-md-5">
-                        <label class="form-label required" for="l-name">Ad</label>
+                        <label class="form-label required" for="l-name">@Texts.Get("common.field.name")</label>
                         <input id="l-name" class="form-control" maxlength="200" required aria-required="true" @bind="lineName" aria-invalid="@(lineErrors?.ContainsKey("name") == true)" />
                         <FieldError Field="name" Errors="lineErrors" />
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label" for="l-qty">Miktar</label>
+                        <label class="form-label" for="l-qty">@Texts.Get("crm.quoteDetail.col.quantity")</label>
                         <input id="l-qty" class="form-control" type="number" step="any" min="0" @bind="lineQuantity" />
                         <FieldError Field="quantity" Errors="lineErrors" />
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label" for="l-unit">Birim</label>
+                        <label class="form-label" for="l-unit">@Texts.Get("contracts.field.unitname")</label>
                         <input id="l-unit" class="form-control" maxlength="30" @bind="lineUnit" />
                     </div>
                     @if (Session.Can(ContractsAccess.FinancialsRead))
                     {
                         <div class="col-md-2">
-                            <label class="form-label" for="l-price">Birim fiyat</label>
+                            <label class="form-label" for="l-price">@Texts.Get("crm.quoteDetail.col.unitPrice")</label>
                             <input id="l-price" class="form-control" type="number" step="any" min="0" @bind="linePrice" />
                             <FieldError Field="unitPrice" Errors="lineErrors" />
                         </div>
                         <div class="col-md-1">
-                            <label class="form-label" for="l-tax">KDV %</label>
+                            <label class="form-label" for="l-tax">@Texts.Get("contracts.wizard.vatPercent")</label>
                             <input id="l-tax" class="form-control" type="number" step="any" min="0" max="100" @bind="lineTax" />
                             <FieldError Field="taxRatePercent" Errors="lineErrors" />
                         </div>
                     }
                 </div>
-                <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Kalemi ekle</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">@Texts.Get("contracts.wizard.addLineSubmit")</button></div>
             </form>
 
             <div class="form-actions">
-                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => GoAsync(1)">Geri</button>
-                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => GoAsync(3)">Devam</button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => GoAsync(1)">@Texts.Get("contracts.wizard.back")</button>
+                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => GoAsync(3)">@Texts.Get("contracts.wizard.continue")</button>
             </div>
         </section>
     }
     else if (step == 3)
     {
         <form class="record-form" novalidate @onsubmit="() => NextAsync(4)" @onsubmit:preventDefault aria-labelledby="step-title">
-            <h2 id="step-title" tabindex="-1" @ref="stepHeading">Tarihler ve yenileme</h2>
+            <h2 id="step-title" tabindex="-1" @ref="stepHeading">@Texts.Get("contracts.wizard.step.dates")</h2>
             <ErrorSummary Errors="errors" />
             <div @oninput="() => dirty = true" @onchange="() => dirty = true">
                 <div class="row g-2">
                     <div class="col-md-4">
-                        <label class="form-label" for="d-start">Başlangıç</label>
+                        <label class="form-label" for="d-start">@Texts.Get("contracts.field.startdate")</label>
                         <input id="d-start" type="date" class="form-control" @bind="form.StartDate" aria-invalid="@(errors?.ContainsKey("startDate") == true)" />
                         <FieldError Field="startDate" Errors="errors" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="d-end">Bitiş</label>
+                        <label class="form-label" for="d-end">@Texts.Get("contracts.field.enddate")</label>
                         <input id="d-end" type="date" class="form-control" @bind="form.EndDate" disabled="@form.IsIndefinite" aria-invalid="@(errors?.ContainsKey("endDate") == true)" />
                         <FieldError Field="endDate" Errors="errors" />
                     </div>
                     <div class="col-md-4 d-flex align-items-end">
                         <div class="form-check">
                             <input id="d-indef" type="checkbox" class="form-check-input" @bind="form.IsIndefinite" />
-                            <label class="form-check-label" for="d-indef">Belirsiz süreli</label>
+                            <label class="form-check-label" for="d-indef">@Texts.Get("contracts.indefinite")</label>
                         </div>
                     </div>
                 </div>
                 <div class="row g-2">
                     <div class="col-md-4">
-                        <label class="form-label" for="d-renewal">Yenileme yöntemi</label>
+                        <label class="form-label" for="d-renewal">@Texts.Get("contracts.field.renewalmode")</label>
                         <select id="d-renewal" class="form-select" @bind="form.RenewalMode">
                             @foreach (var m in ContractLabels.RenewalModes) { <option value="@m.Key">@m.Label</option> }
                         </select>
                         <FieldError Field="renewalMode" Errors="errors" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="d-period">Yenileme süresi (ay)</label>
+                        <label class="form-label" for="d-period">@Texts.Get("contracts.field.renewalperiodmonths")</label>
                         <input id="d-period" type="number" min="1" max="120" class="form-control" @bind="form.RenewalPeriodMonths" disabled="@(form.RenewalMode == "None")" />
                         <FieldError Field="renewalPeriodMonths" Errors="errors" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="d-notice">Bildirim süresi (gün)</label>
+                        <label class="form-label" for="d-notice">@Texts.Get("contracts.field.noticeperioddays")</label>
                         <input id="d-notice" type="number" min="0" max="3650" class="form-control" @bind="form.NoticePeriodDays" />
                         <FieldError Field="noticePeriodDays" Errors="errors" />
                     </div>
                 </div>
                 <div>
-                    <label class="form-label" for="escalationUserId">Yenileme eskalasyonu</label>
+                    <label class="form-label" for="escalationUserId">@Texts.Get("contracts.wizard.renewalEscalation")</label>
                     <LookupPicker Id="escalationUserId" LookupKey="contracts.contract.escalation" @bind-Value="form.EscalationUserId" Placeholder="—" />
-                    <small class="text-muted">Son bildirim tarihi geçip karar verilmezse bu kullanıcıya takip aktivitesi açılır.</small>
+                    <small class="text-muted">@Texts.Get("contracts.detail.escalationHelp")</small>
                 </div>
                 <div class="row g-2">
                     <div class="col-md-4">
-                        <label class="form-label" for="d-currency">Para birimi</label>
+                        <label class="form-label" for="d-currency">@Texts.Get("contracts.field.currency")</label>
                         <input id="d-currency" class="form-control" maxlength="3" @bind="form.Currency" aria-invalid="@(errors?.ContainsKey("currency") == true)" />
                         <FieldError Field="currency" Errors="errors" />
                     </div>
                     @if (Session.Can(ContractsAccess.FinancialsRead))
                     {
                         <div class="col-md-4">
-                            <label class="form-label" for="d-value">Sözleşme bedeli</label>
+                            <label class="form-label" for="d-value">@Texts.Get("contracts.field.contractvalue")</label>
                             <input id="d-value" type="number" step="any" min="0" class="form-control" @bind="form.ContractValue" />
                             <FieldError Field="contractValue" Errors="errors" />
                         </div>
@@ -335,91 +335,91 @@
                     <div class="col-md-4 d-flex align-items-end">
                         <div class="form-check">
                             <input id="d-tax" type="checkbox" class="form-check-input" @bind="form.PriceIncludesTax" />
-                            <label class="form-check-label" for="d-tax">Fiyatlar vergi dahil</label>
+                            <label class="form-check-label" for="d-tax">@Texts.Get("crm.quoteDetail.taxIncluded")</label>
                         </div>
                     </div>
                 </div>
                 <div>
-                    <label class="form-label" for="d-payment">Ödeme koşulları</label>
+                    <label class="form-label" for="d-payment">@Texts.Get("contracts.field.paymentterms")</label>
                     <textarea id="d-payment" class="form-control" rows="2" maxlength="2000" @bind="form.PaymentTerms"></textarea>
                     <FieldError Field="paymentTerms" Errors="errors" />
                 </div>
             </div>
             <div class="form-actions">
-                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => GoAsync(2)">Geri</button>
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet ve devam</button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => GoAsync(2)">@Texts.Get("contracts.wizard.back")</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("contracts.wizard.saveAndContinue")</button>
             </div>
         </form>
     }
     else if (step == 4)
     {
         <section class="record-form" aria-labelledby="step-title">
-            <h2 id="step-title" tabindex="-1" @ref="stepHeading">Taahhütler (isteğe bağlı)</h2>
+            <h2 id="step-title" tabindex="-1" @ref="stepHeading">@Texts.Get("contracts.wizard.commitmentsTitle")</h2>
             @if (!Session.Can(ContractsAccess.CommitmentsWrite))
             {
-                <p class="text-muted">Taahhüt tanımlama yetkiniz yok; bu adımı geçebilirsiniz.</p>
+                <p class="text-muted">@Texts.Get("contracts.wizard.noCommitmentPermission")</p>
             }
             else
             {
-                @if (commitments.Count == 0) { <p class="text-muted">Henüz taahhüt yok (teslimat, eğitim, raporlama…). Dönemsel taahhütleri sözleşme detayında tanımlayabilirsiniz.</p> }
+                @if (commitments.Count == 0) { <p class="text-muted">@Texts.Get("contracts.wizard.noCommitments")</p> }
                 else
                 {
                     <ul class="list-unstyled">
                         @foreach (var c in commitments)
                         {
-                            <li>@c.Title — son tarih @ContractLabels.Date(c.DueDate) <button type="button" class="btn btn-link btn-sm text-danger" disabled="@busy" @onclick="() => DeleteCommitmentAsync(c)" aria-label="Taahhüdü iptal et: @c.Title">İptal et</button></li>
+                            <li>@Texts.Get("contracts.wizard.commitmentDue", c.Title, ContractLabels.Date(c.DueDate)) <button type="button" class="btn btn-link btn-sm text-danger" disabled="@busy" @onclick="() => DeleteCommitmentAsync(c)" aria-label="@Texts.Get("contracts.wizard.cancelCommitment", c.Title)">@Texts.Get("contracts.commitmentsPanel.cancelConfirm")</button></li>
                         }
                     </ul>
                 }
 
                 <form class="wizard-sub" novalidate @onsubmit="AddCommitmentAsync" @onsubmit:preventDefault>
-                    <h3 class="h6">Tek seferlik taahhüt ekle</h3>
+                    <h3 class="h6">@Texts.Get("contracts.wizard.addOneTimeCommitment")</h3>
                     <div class="row g-2">
                         <div class="col-md-5">
-                            <label class="form-label required" for="c-title">Başlık</label>
+                            <label class="form-label required" for="c-title">@Texts.Get("contracts.field.title")</label>
                             <input id="c-title" class="form-control" maxlength="200" required aria-required="true" @bind="commitmentTitle" aria-invalid="@(commitmentErrors?.ContainsKey("title") == true)" />
                             <FieldError Field="title" Errors="commitmentErrors" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label" for="c-category">Kategori</label>
+                            <label class="form-label" for="c-category">@Texts.Get("contracts.commitmentsPanel.category")</label>
                             <select id="c-category" class="form-select" @bind="commitmentCategory">
                                 <option value="">—</option>
                                 @foreach (var c in Lookups.Choices(ContractsAccess.CommitmentCategoryList)) { <option value="@c.Key">@c.Label</option> }
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label required" for="c-due">Son tarih</label>
+                            <label class="form-label required" for="c-due">@Texts.Get("contracts.commitments.col.due")</label>
                             <input id="c-due" type="date" class="form-control" required aria-required="true" @bind="commitmentDue" aria-invalid="@(commitmentErrors?.ContainsKey("dueDate") == true)" />
                             <FieldError Field="dueDate" Errors="commitmentErrors" />
                         </div>
                     </div>
-                    <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Taahhüdü ekle</button></div>
+                    <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">@Texts.Get("contracts.wizard.addCommitment")</button></div>
                 </form>
             }
 
             <div class="form-actions">
-                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => GoAsync(3)">Geri</button>
-                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => GoAsync(5)">Devam</button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => GoAsync(3)">@Texts.Get("contracts.wizard.back")</button>
+                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => GoAsync(5)">@Texts.Get("contracts.wizard.continue")</button>
             </div>
         </section>
     }
     else if (step == 5 && contract is not null)
     {
         <section class="record-form" aria-labelledby="step-title">
-            <h2 id="step-title" tabindex="-1" @ref="stepHeading">Önizleme ve gönderim</h2>
+            <h2 id="step-title" tabindex="-1" @ref="stepHeading">@Texts.Get("contracts.wizard.step.review")</h2>
             <dl class="summary-list">
-                <dt>Sözleşme</dt><dd>@contract.Title <small class="text-muted">@contract.Number</small></dd>
-                <dt>Müşteri</dt><dd>@PartyName(contract.PartyId)</dd>
-                <dt>Süre</dt><dd>@ContractLabels.Date(contract.StartDate) – @(contract.IsIndefinite ? "Belirsiz süreli" : ContractLabels.Date(contract.EndDate))</dd>
-                <dt>Yenileme</dt><dd>@ContractLabels.Label(ContractLabels.RenewalModes, contract.RenewalMode)@(contract.NoticeDeadline is { } nd ? $" · son bildirim {ContractLabels.Date(nd)}" : "")</dd>
-                <dt>Kalem / taahhüt</dt><dd>@lines.Count kalem · @commitments.Count taahhüt · @(parties.Count + 1) taraf</dd>
-                @if (Session.Can(ContractsAccess.FinancialsRead)) { <dt>Genel toplam</dt><dd>@ContractLabels.Money(contract.GrossTotal, contract.Currency)</dd> }
+                <dt>@Texts.Get("contracts.list.col.contract")</dt><dd>@contract.Title <small class="text-muted">@contract.Number</small></dd>
+                <dt>@Texts.Get("contracts.list.col.customer")</dt><dd>@PartyName(contract.PartyId)</dd>
+                <dt>@Texts.Get("contracts.wizard.term")</dt><dd>@ContractLabels.Date(contract.StartDate) – @(contract.IsIndefinite ? Texts.Get("contracts.indefinite") : ContractLabels.Date(contract.EndDate))</dd>
+                <dt>@Texts.Get("contracts.detail.tab.renewal")</dt><dd>@ContractLabels.Label(ContractLabels.RenewalModes, contract.RenewalMode)@(contract.NoticeDeadline is { } nd ? " · " + Texts.Get("contracts.wizard.noticeSummary", ContractLabels.Date(nd)) : "")</dd>
+                <dt>@Texts.Get("contracts.wizard.countsLabel")</dt><dd>@Texts.Get("contracts.wizard.counts", lines.Count, commitments.Count, parties.Count + 1)</dd>
+                @if (Session.Can(ContractsAccess.FinancialsRead)) { <dt>@Texts.Get("contracts.field.grosstotal")</dt><dd>@ContractLabels.Money(contract.GrossTotal, contract.Currency)</dd> }
             </dl>
 
             @if (actions.Any(a => !a.Allowed && WizardActions.Contains(a.Action)))
             {
                 <div class="alert alert-warning" role="status">
-                    <strong>Gönderim için eksikler:</strong>
+                    <strong>@Texts.Get("contracts.wizard.missingForSubmit")</strong>
                     <ul class="mb-0">
                         @foreach (var a in actions.Where(a => !a.Allowed && WizardActions.Contains(a.Action)))
                         {
@@ -432,21 +432,21 @@
             @if (Session.Can(ContractsAccess.DocumentsGenerate) && templates.Count > 0)
             {
                 <div class="wizard-sub">
-                    <label class="form-label" for="r-template">Belge önizlemesi için şablon</label>
+                    <label class="form-label" for="r-template">@Texts.Get("contracts.wizard.previewTemplate")</label>
                     <div class="search">
                         <select id="r-template" class="form-select" @bind="templateId">
-                            <option value="">Şablon seçin…</option>
-                            @foreach (var t in templates) { <option value="@t.Id">@t.Name@(t.IsExample ? " (örnek metin)" : "")</option> }
+                            <option value="">@Texts.Get("contracts.detail.chooseTemplate")</option>
+                            @foreach (var t in templates) { <option value="@t.Id">@t.Name@(t.IsExample ? " " + Texts.Get("contracts.wizard.exampleText") : "")</option> }
                         </select>
-                        <button type="button" class="btn btn-outline-secondary" disabled="@(busy || templateId == "")" @onclick="PreviewAsync">Önizle</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@(busy || templateId == "")" @onclick="PreviewAsync">@Texts.Get("contracts.templates.previewButton")</button>
                     </div>
                     @if (preview is not null) { <RenderedDocumentView Preview="preview" /> }
                 </div>
             }
 
-            <div class="form-actions" role="group" aria-label="Gönderim işlemleri">
-                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => GoAsync(4)">Geri</button>
-                <a class="btn btn-outline-secondary" href="sozlesmeler/@contract.Id">Taslak olarak bırak</a>
+            <div class="form-actions" role="group" aria-label="@Texts.Get("contracts.wizard.submitActions")">
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => GoAsync(4)">@Texts.Get("contracts.wizard.back")</button>
+                <a class="btn btn-outline-secondary" href="sozlesmeler/@contract.Id">@Texts.Get("contracts.wizard.leaveAsDraft")</a>
                 @foreach (var a in actions.Where(a => a.Allowed && WizardActions.Contains(a.Action)))
                 {
                     <button type="button" class="btn @(ContractActionLabels.IsPrimary(a.Action) ? "btn-primary" : "btn-outline-secondary")" disabled="@busy" @onclick="() => RunActionAsync(a)">@ContractActionLabels.Action(a.Action)</button>
@@ -457,11 +457,14 @@
 </AuthGate>
 
 @code {
-    private static readonly string[] Steps = ["Kaynak", "Müşteri ve taraflar", "Kapsam ve kalemler", "Tarihler ve yenileme", "Taahhütler", "Önizleme ve gönderim"];
+    // Adım adları her okunuşta çevrilir (sözlük sonradan yüklenir, ADR-0034).
+    private static string[] Steps =>
+    [
+        Texts.Get("contracts.wizard.step.source"), Texts.Get("contracts.wizard.step.parties"), Texts.Get("contracts.detail.tab.lines"),
+        Texts.Get("contracts.wizard.step.dates"), Texts.Get("contracts.commitmentsPanel.title"), Texts.Get("contracts.wizard.step.review"),
+    ];
 
     private static readonly string[] WizardActions = ["send-to-review", "mark-ready", "submit-for-approval"];
-
-    private static IReadOnlyList<(string Key, string Label)> ContractPartyRoleLabels { get; } = ContractPartyRoles.All;
 
     [SupplyParameterFromQuery(Name = "id")] public Guid? ResumeId { get; set; }
 
@@ -522,7 +525,7 @@
         {
             var loaded = await Api.GetAsync<ContractDto>($"/api/contracts/contracts/{id}");
             if (loaded.IsSuccess) { await AdoptAsync(loaded.Value!); step = 1; }
-            else { Notify("Devam edilecek taslak bulunamadı ya da erişim yetkiniz yok.", true); }
+            else { Notify(Texts.Get("contracts.wizard.resumeNotFound"), true); }
         }
 
         loading = false;
@@ -574,7 +577,7 @@
 
     private async Task ConfirmLeaveAsync(LocationChangingContext context)
     {
-        if (dirty && !await Js.InvokeAsync<bool>("confirm", "Kaydedilmemiş değişiklikler var. Sayfadan ayrılmak istiyor musunuz?"))
+        if (dirty && !await Js.InvokeAsync<bool>("confirm", Texts.Get("crm.quoteDetail.leaveConfirm")))
         {
             context.PreventNavigation();
         }
@@ -586,12 +589,12 @@
     {
         // Zorunlu alanlar sunucuya gitmeden de denetlenir (anlaşılır ileti, gereksiz istek yok); asıl doğrulama yine sunucudadır.
         var local = new Dictionary<string, string[]>();
-        if (string.IsNullOrWhiteSpace(form.Title)) { local["title"] = ["Başlık zorunludur."]; }
-        if (form.PartyId is null) { local["partyId"] = ["Müşteri seçimi zorunludur."]; }
+        if (string.IsNullOrWhiteSpace(form.Title)) { local["title"] = [Texts.Get("contracts.wizard.titleRequired")]; }
+        if (form.PartyId is null) { local["partyId"] = [Texts.Get("contracts.wizard.partyRequired")]; }
         if (local.Count > 0)
         {
             errors = local;
-            Notify("Kaydetmeden önce işaretli alanları düzeltin.", true);
+            Notify(Texts.Get("contracts.wizard.fixFields"), true);
             return false;
         }
 
@@ -609,14 +612,14 @@
         busy = false;
         if (!result.IsSuccess)
         {
-            errors = result.FieldErrors.Count > 0 ? result.FieldErrors : new Dictionary<string, string[]> { ["title"] = [result.Error ?? "Kaydedilemedi."] };
-            Notify(result.FieldErrors.Count > 0 ? "Kaydetmeden önce işaretli alanları düzeltin." : result.Error, true);
+            errors = result.FieldErrors.Count > 0 ? result.FieldErrors : new Dictionary<string, string[]> { ["title"] = [result.Error ?? Texts.Get("common.saveFailed")] };
+            Notify(result.FieldErrors.Count > 0 ? Texts.Get("contracts.wizard.fixFields") : result.Error, true);
             return false;
         }
 
         contract = result.Value;
         dirty = false;
-        Notify("Taslak kaydedildi.", false);
+        Notify(Texts.Get("contracts.wizard.draftSaved"), false);
         return true;
     }
 
@@ -672,7 +675,7 @@
         busy = false;
         if (!result.IsSuccess)
         {
-            partyErrors = result.FieldErrors.Count > 0 ? result.FieldErrors : new Dictionary<string, string[]> { ["role"] = [result.Error ?? "Taraf eklenemedi."] };
+            partyErrors = result.FieldErrors.Count > 0 ? result.FieldErrors : new Dictionary<string, string[]> { ["role"] = [result.Error ?? Texts.Get("contracts.wizard.partyAddFailed")] };
             return;
         }
 
@@ -703,7 +706,7 @@
         busy = false;
         if (!result.IsSuccess)
         {
-            lineErrors = result.FieldErrors.Count > 0 ? result.FieldErrors : new Dictionary<string, string[]> { ["name"] = [result.Error ?? "Kalem eklenemedi."] };
+            lineErrors = result.FieldErrors.Count > 0 ? result.FieldErrors : new Dictionary<string, string[]> { ["name"] = [result.Error ?? Texts.Get("contracts.wizard.lineAddFailed")] };
             return;
         }
 
@@ -738,7 +741,7 @@
         if (!result.IsSuccess || commitmentDue is null)
         {
             commitmentErrors = result.FieldErrors.Count > 0 ? result.FieldErrors
-                : new Dictionary<string, string[]> { [commitmentDue is null ? "dueDate" : "title"] = [commitmentDue is null ? "Son tarih zorunludur." : result.Error ?? "Taahhüt eklenemedi."] };
+                : new Dictionary<string, string[]> { [commitmentDue is null ? "dueDate" : "title"] = [commitmentDue is null ? Texts.Get("contracts.wizard.dueRequired") : result.Error ?? Texts.Get("contracts.wizard.commitmentAddFailed")] };
             return;
         }
 
@@ -795,7 +798,7 @@
         await RefreshChildrenAsync();
         await LoadActionsAsync();
         preview = null;
-        Notify($"{ContractActionLabels.Action(action.Action)} tamamlandı.", false);
+        Notify(Texts.Get("contracts.wizard.actionDone", ContractActionLabels.Action(action.Action)), false);
     }
 
     private void Notify(string? text, bool failed)

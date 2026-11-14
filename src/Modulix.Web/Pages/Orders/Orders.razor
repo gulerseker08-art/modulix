@@ -3,42 +3,42 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Siparişler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("orders.list.title") · Modulix</PageTitle>
 
 <AuthGate Module="@OrdersAccess.ModuleKey" Permission="@OrdersAccess.OrdersRead">
     <div class="page-header">
         <div>
-            <h1>Siparişler</h1>
-            <p class="text-muted mb-0">Siparişler kabul edilmiş tekliften oluşur. Tutarlar her siparişin kendi para birimindedir; farklı para birimleri toplanmaz. Sipariş tutarı tahsilat ya da gelir değildir.</p>
+            <h1>@Texts.Get("orders.list.title")</h1>
+            <p class="text-muted mb-0">@Texts.Get("orders.list.intro")</p>
         </div>
     </div>
 
     @if (message is not null)
     {
-        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">@Texts.Get("orders.list.retry")</button></div>
     }
 
-    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="ChooseViewAsync" Label="Sipariş görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="ChooseViewAsync" Label="@Texts.Get("orders.list.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <label class="visually-hidden" for="order-search">Sipariş ara</label>
-            <input id="order-search" class="form-control" type="search" placeholder="Başlık, sipariş no, teklif no veya müşteri ara" @bind="search" />
+            <label class="visually-hidden" for="order-search">@Texts.Get("orders.list.search-label")</label>
+            <input id="order-search" class="form-control" type="search" placeholder="@Texts.Get("orders.list.search-placeholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(OrdersAccess.OrdersCreate))
         {
-            <a class="btn btn-primary" href="crm/teklifler"><AppIcon Name="plus" Size="16" /> Teklif seç</a>
+            <a class="btn btn-primary" href="crm/teklifler"><AppIcon Name="plus" Size="16" /> @Texts.Get("orders.list.pick-quote")</a>
         }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <label class="visually-hidden" for="status-filter">Sipariş durumu</label>
+            <label class="visually-hidden" for="status-filter">@Texts.Get("orders.list.status-filter")</label>
             <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm durumlar</option>
+                <option value="">@Texts.Get("common.allStatuses")</option>
                 @foreach (var s in OrderLabels.Statuses)
                 {
                     <option value="@s.Key">@s.Label</option>
@@ -52,24 +52,24 @@
 
     @if (page is null && message is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (page is not null && page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu süzgece uyan sipariş yok.@(Session.Can(OrdersAccess.OrdersCreate) ? " Kabul edilmiş bir teklifin sayfasından sipariş oluşturabilirsiniz." : null)</p>
+        <p class="text-muted" role="status">@Texts.Get("orders.list.empty")@(Session.Can(OrdersAccess.OrdersCreate) ? Texts.Get("orders.list.empty-hint") : null)</p>
     }
     else if (page is not null)
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) sipariş listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("orders.list.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Sipariş listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("orders.dashboard.list-link")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" Class="@(column.Key == "total" ? "text-end" : null)" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -81,8 +81,8 @@
                             @Cell(column, o)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{o.Number} eylemleri")">
-                                <a class="view-menu-item" role="menuitem" href="siparisler/@o.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", o.Number)">
+                                <a class="view-menu-item" role="menuitem" href="siparisler/@o.Id"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></a>
                             </RowMenu>
                         </td>
                     </tr>
@@ -103,23 +103,24 @@
     private const string AllViews = "all";
 
     /// <summary>Hızlı görünümler; her biri sunucudaki süzgeçlerden birine karşılık gelir.</summary>
-    private static readonly (string Key, string Label, string Icon)[] Presets =
+    private static (string Key, string Label, string Icon)[] Presets =>
     [
-        ("mine", "Benim siparişlerim", "star"), ("draft", "Taslaklar", "pencil"), ("handover", "Devir bekleyenler", "repeat"), ("overdue", "Gecikenler", "clock"), ("partial", "Kısmen gerçekleşenler", "package"),
+        ("mine", Texts.Get("orders.list.view.mine"), "star"), ("draft", Texts.Get("orders.list.view.draft"), "pencil"), ("handover", Texts.Get("orders.list.view.handover"), "repeat"),
+        ("overdue", Texts.Get("orders.list.view.overdue"), "clock"), ("partial", Texts.Get("orders.list.view.partial"), "package"),
     ];
 
     // Sıralama sunucudaki sort anahtarlarıdır; Sipariş sütunu numaraya göre sıralanır.
-    private static readonly GridColumnDef[] Columns =
+    private static GridColumnDef[] Columns =>
     [
-        new("order", "Sipariş", "file-text", "number", "-number", Locked: true),
-        new("customer", "Müşteri", "building"),
-        new("quote", "Teklif", "file-text"),
-        new("statuses", "Durumlar", "tag"),
-        new("delivery", "Planlanan teslim", "calendar", "deliveryDate", "-deliveryDate"),
-        new("total", "Tutar", "coins"),
-        new("owner", "Sorumlu", "user"),
-        new("contract", "Sözleşme", "file-text", DefaultVisible: false),
-        new("location", "Konum", "map-pin", DefaultVisible: false),
+        new("order", Texts.Get("orders.col.order"), "file-text", "number", "-number", Locked: true),
+        new("customer", Texts.Get("orders.list.col.customer"), "building"),
+        new("quote", Texts.Get("orders.list.col.quote"), "file-text"),
+        new("statuses", Texts.Get("orders.list.col.statuses"), "tag"),
+        new("delivery", Texts.Get("orders.list.col.delivery"), "calendar", "deliveryDate", "-deliveryDate"),
+        new("total", Texts.Get("orders.col.amount"), "coins"),
+        new("owner", Texts.Get("common.field.owner"), "user"),
+        new("contract", Texts.Get("orders.list.col.contract"), "file-text", DefaultVisible: false),
+        new("location", Texts.Get("orders.list.col.location"), "map-pin", DefaultVisible: false),
     ];
 
     /// <summary>Özet panosundan gelen bağlantılar: <c>?gorunum=handover</c>, <c>?durum=PendingApproval</c>.</summary>
@@ -158,7 +159,7 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm siparişler", Icon: "file-text"),
+        new(AllViews, Texts.Get("orders.list.view.all"), Icon: "file-text"),
         .. Presets.Select(p => new ViewOption(p.Key, p.Label, Icon: p.Icon)),
         .. views.Options,
     ];

@@ -4,74 +4,74 @@
 @inject CrmLookups Lookups
 @inject NavigationManager Navigation
 
-<PageTitle>Tekliften sözleşme · Modulix</PageTitle>
+<PageTitle>@Texts.Get("contracts.fromQuote.pageTitle") · Modulix</PageTitle>
 
 <AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsWrite">
     <div class="page-header">
         <div>
-            <h1>Tekliften sözleşme oluştur</h1>
-            <p class="text-muted mb-0">Kabul edilmiş teklif revizyonu sözleşme taslağına dönüştürülür; taslak onaya gitmeden düzenlenebilir.</p>
+            <h1>@Texts.Get("contracts.fromQuote.title")</h1>
+            <p class="text-muted mb-0">@Texts.Get("contracts.fromQuote.intro")</p>
         </div>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="crm/teklifler/@QuoteId">Teklife dön</a>
+            <a class="btn btn-outline-secondary" href="crm/teklifler/@QuoteId">@Texts.Get("contracts.fromQuote.backToQuote")</a>
         </div>
     </div>
 
     @if (!Session.Can(ContractsAccess.FinancialsRead))
     {
-        <div class="alert alert-warning" role="alert">Fiyatlar sözleşmeye sunucu tarafından yazıldığı için bu işlem finansal alan izni (<code>@ContractsAccess.FinancialsRead</code>) ister.</div>
+        <div class="alert alert-warning" role="alert">@((MarkupString)Texts.Get("contracts.fromQuote.needsFinancials", $"<code>{ContractsAccess.FinancialsRead}</code>"))</div>
     }
     else if (notFound)
     {
-        <div class="alert alert-warning" role="alert">Kabul edilmiş teklif bulunamadı ya da erişim yetkiniz yok. <a href="crm/teklifler">Tekliflere dön</a></div>
+        <div class="alert alert-warning" role="alert">@Texts.Get("contracts.fromQuote.notFound") <a href="crm/teklifler">@Texts.Get("contracts.fromQuote.backToQuotes")</a></div>
     }
     else if (preview is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else
     {
         <Notice Text="@message" Failed="true" />
         @if (!preview.CustomerLinked)
         {
-            <div class="alert alert-danger" role="alert">Teklifin müşterisi ortak kayıtla eşleşmedi; bu tekliften sözleşme oluşturulamaz. Sözleşmeyi boş taslaktan açın.</div>
+            <div class="alert alert-danger" role="alert">@Texts.Get("contracts.fromQuote.customerNotLinked")</div>
         }
 
         <section aria-labelledby="quote-summary-title">
-            <h2 id="quote-summary-title">Kaynak teklif</h2>
+            <h2 id="quote-summary-title">@Texts.Get("contracts.fromQuote.source")</h2>
             <p>
-                <strong>@preview.Title</strong> · @preview.QuoteNumber · Revizyon V@(preview.RevisionNo)<br />
-                Kabul: @(preview.AcceptedBy ?? "—") · @CrmLabels.Time(preview.AcceptedAt) ·
-                Net @CrmLabels.Amount(preview.NetTotal, preview.Currency) · Genel @CrmLabels.Amount(preview.GrossTotal, preview.Currency)
-                @if (preview.DocumentSha256 is { Length: > 12 } sha) { <small class="text-muted"> · Belge özeti <code title="@sha">@sha[..12]…</code></small> }
+                <strong>@preview.Title</strong> · @preview.QuoteNumber · @Texts.Get("contracts.fromQuote.revision", preview.RevisionNo)<br />
+                @Texts.Get("contracts.fromQuote.acceptedBy", preview.AcceptedBy ?? "—") · @CrmLabels.Time(preview.AcceptedAt) ·
+                @Texts.Get("contracts.fromQuote.totals", CrmLabels.Amount(preview.NetTotal, preview.Currency), CrmLabels.Amount(preview.GrossTotal, preview.Currency))
+                @if (preview.DocumentSha256 is { Length: > 12 } sha) { <small class="text-muted"> · @Texts.Get("contracts.fromQuote.documentHash") <code title="@sha">@sha[..12]…</code></small> }
             </p>
         </section>
 
         <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
-            <TabBar Tabs="FormTabs" State="tabs" Label="Sözleşme formu bölümleri" />
+            <TabBar Tabs="FormTabs" State="tabs" Label="@Texts.Get("contracts.fromQuote.formSections")" />
             <fieldset disabled="@(busy || !preview.CustomerLinked)">
-                <legend class="visually-hidden">Sözleşmeye alınacak kalemler ve seçenekler</legend>
+                <legend class="visually-hidden">@Texts.Get("contracts.fromQuote.legend")</legend>
                 <TabPanel State="tabs" Key="form-kapsam">
-                <p class="text-muted">Bir tekliften birden çok sözleşme açılabilir: yalnızca bu sözleşmeye alınacak kalemleri seçin. Başka bir sözleşmede olan kalem ikinci kez alınamaz.</p>
+                <p class="text-muted">@Texts.Get("contracts.fromQuote.scopeHelp")</p>
                 <table class="table record-table">
-                    <caption class="visually-hidden">Teklif kalemleri</caption>
-                    <thead><tr><th scope="col"><span class="visually-hidden">Seç</span></th><th scope="col">Kalem</th><th scope="col" class="text-end">Miktar</th><th scope="col" class="text-end">Net</th><th scope="col">Dönem</th><th scope="col">Durum</th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("contracts.fromQuote.linesCaption")</caption>
+                    <thead><tr><th scope="col"><span class="visually-hidden">@Texts.Get("crm.act.select")</span></th><th scope="col">@Texts.Get("contracts.fromQuote.col.line")</th><th scope="col" class="text-end">@Texts.Get("contracts.field.quantity")</th><th scope="col" class="text-end">@Texts.Get("contracts.field.net")</th><th scope="col">@Texts.Get("contracts.field.billingperiod")</th><th scope="col">@Texts.Get("common.field.status")</th></tr></thead>
                     <tbody>
                         @foreach (var line in preview.Lines)
                         {
                             <tr>
-                                <td data-label="Seç"><input type="checkbox" class="form-check-input" id="line-@line.StableKey" aria-label="@line.Name kalemini seç" disabled="@line.Taken" checked="@selected.Contains(line.StableKey)" @onchange="e => Toggle(line.StableKey, (bool)e.Value!)" /></td>
-                                <td data-label="Kalem" class="primary"><label for="line-@line.StableKey">@line.Name</label></td>
-                                <td data-label="Miktar" class="text-end">@line.Quantity.ToString("G29", Regional.Numbers) @line.Unit</td>
-                                <td data-label="Net" class="text-end">@CrmLabels.Amount(line.Net, preview.Currency)</td>
-                                <td data-label="Dönem">@ContractLabels.Label(ContractLabels.Periods, line.RecurringPeriod ?? "")</td>
-                                <td data-label="Durum">
+                                <td data-label="@Texts.Get("crm.act.select")"><input type="checkbox" class="form-check-input" id="line-@line.StableKey" aria-label="@Texts.Get("contracts.fromQuote.selectLine", line.Name)" disabled="@line.Taken" checked="@selected.Contains(line.StableKey)" @onchange="e => Toggle(line.StableKey, (bool)e.Value!)" /></td>
+                                <td data-label="@Texts.Get("contracts.fromQuote.col.line")" class="primary"><label for="line-@line.StableKey">@line.Name</label></td>
+                                <td data-label="@Texts.Get("contracts.field.quantity")" class="text-end">@line.Quantity.ToString("G29", Regional.Numbers) @line.Unit</td>
+                                <td data-label="@Texts.Get("contracts.field.net")" class="text-end">@CrmLabels.Amount(line.Net, preview.Currency)</td>
+                                <td data-label="@Texts.Get("contracts.field.billingperiod")">@ContractLabels.Label(ContractLabels.Periods, line.RecurringPeriod ?? "")</td>
+                                <td data-label="@Texts.Get("common.field.status")">
                                     @if (line.Taken)
                                     {
-                                        @if (line.ContractId is { } cid) { <span>Sözleşmede: <a href="sozlesmeler/@cid">@line.ContractNumber</a></span> }
-                                        else { <span>Başka bir sözleşmede</span> }
+                                        @if (line.ContractId is { } cid) { <span>@Texts.Get("contracts.fromQuote.inContract") <a href="sozlesmeler/@cid">@line.ContractNumber</a></span> }
+                                        else { <span>@Texts.Get("contracts.fromQuote.inOtherContract")</span> }
                                     }
-                                    else { <span class="text-muted">Alınabilir</span> }
+                                    else { <span class="text-muted">@Texts.Get("contracts.fromQuote.available")</span> }
                                 </td>
                             </tr>
                         }
@@ -82,36 +82,36 @@
                 <TabPanel State="tabs" Key="form-sure">
                 <div class="form-grid">
                     <div class="span-4">
-                        <label class="form-label" for="f-type">Tür</label>
+                        <label class="form-label" for="f-type">@Texts.Get("common.field.kind")</label>
                         <select id="f-type" class="form-select" @bind="type">
                             @foreach (var t in Lookups.Choices(ContractsAccess.ContractTypeList)) { <option value="@t.Key">@t.Label</option> }
                         </select>
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="f-start">Başlangıç tarihi</label>
+                        <label class="form-label" for="f-start">@Texts.Get("contracts.fromQuote.startDate")</label>
                         <input id="f-start" type="date" class="form-control" @bind="startDate" />
                         <FieldError Field="startDate" Errors="errors" />
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="f-term">Süre (ay)</label>
+                        <label class="form-label" for="f-term">@Texts.Get("contracts.fromQuote.term")</label>
                         <input id="f-term" type="number" min="1" max="120" class="form-control" @bind="termMonths" />
-                        <small class="text-muted">Bitiş takvim ayıyla hesaplanır (ör. 1 Kasım + 12 ay → 31 Ekim).@(EndPreview)</small>
+                        <small class="text-muted">@Texts.Get("contracts.fromQuote.termHelp")@(EndPreview)</small>
                         <FieldError Field="termMonths" Errors="errors" />
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="f-renewal">Yenileme yöntemi</label>
+                        <label class="form-label" for="f-renewal">@Texts.Get("contracts.field.renewalmode")</label>
                         <select id="f-renewal" class="form-select" @bind="renewalMode">
                             @foreach (var m in ContractLabels.RenewalModes) { <option value="@m.Key">@m.Label</option> }
                         </select>
                         <FieldError Field="renewalMode" Errors="errors" />
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="f-renewal-months">Yenileme süresi (ay)</label>
+                        <label class="form-label" for="f-renewal-months">@Texts.Get("contracts.field.renewalperiodmonths")</label>
                         <input id="f-renewal-months" type="number" min="1" max="120" class="form-control" @bind="renewalPeriodMonths" disabled="@(renewalMode == "None")" />
                         <FieldError Field="renewalPeriodMonths" Errors="errors" />
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="f-notice">Bildirim süresi (gün)</label>
+                        <label class="form-label" for="f-notice">@Texts.Get("contracts.field.noticeperioddays")</label>
                         <input id="f-notice" type="number" min="0" max="3650" class="form-control" @bind="noticePeriodDays" />
                         <FieldError Field="noticePeriodDays" Errors="errors" />
                     </div>
@@ -119,7 +119,7 @@
                 </TabPanel>
             </fieldset>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || !preview.CustomerLinked || selected.Count == 0)">Sözleşme taslağını oluştur</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || !preview.CustomerLinked || selected.Count == 0)">@Texts.Get("contracts.fromQuote.create")</button>
             </div>
         </form>
     }
@@ -139,8 +139,8 @@
 
     private IReadOnlyList<TabItem> FormTabs =>
     [
-        new("form-kapsam", "Kapsam", Errors: ErrorCount("lineKeys")),
-        new("form-sure", "Süre ve yenileme", Errors: ErrorCount("type", "startDate", "termMonths", "renewalMode", "renewalPeriodMonths", "noticePeriodDays")),
+        new("form-kapsam", Texts.Get("contracts.fromQuote.tab.scope"), Errors: ErrorCount("lineKeys")),
+        new("form-sure", Texts.Get("contracts.fromQuote.tab.term"), Errors: ErrorCount("type", "startDate", "termMonths", "renewalMode", "renewalPeriodMonths", "noticePeriodDays")),
     ];
     private string? message;
     private bool notFound;
@@ -153,7 +153,7 @@
     private int? noticePeriodDays;
 
     /// <summary>Hesaplanan bitiş önizlemesi (yalnızca bilgi; kaydı sunucu hesaplar).</summary>
-    private string EndPreview => startDate is { } start && termMonths is >= 1 and <= 120 ? $" Bitiş: {ContractLabels.Date(AddTerm(start, termMonths.Value))}." : string.Empty;
+    private string EndPreview => startDate is { } start && termMonths is >= 1 and <= 120 ? " " + Texts.Get("contracts.fromQuote.endPreview", ContractLabels.Date(AddTerm(start, termMonths.Value))) : string.Empty;
 
     protected override async Task OnParametersSetAsync()
     {

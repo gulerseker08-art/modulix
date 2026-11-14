@@ -6,6 +6,7 @@
     <Project Path="src/Modulix.Core/Modulix.Core.csproj" />
     <Project Path="src/Modulix.Infrastructure/Modulix.Infrastructure.csproj" />
     <Project Path="src/Modulix.Modules.Crm/Modulix.Modules.Crm.csproj" />
+    <Project Path="src/Modulix.Modules.Crm.Contracts/Modulix.Modules.Crm.Contracts.csproj" />
     <Project Path="src/Modulix.Modules.Contracts/Modulix.Modules.Contracts.csproj" />
     <Project Path="src/Modulix.Modules.Logistics/Modulix.Modules.Logistics.csproj" />
     <Project Path="src/Modulix.Modules.Marketing/Modulix.Modules.Marketing.csproj" />

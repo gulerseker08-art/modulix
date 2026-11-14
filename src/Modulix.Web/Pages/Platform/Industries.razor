@@ -1,0 +1,179 @@
+@page "/platform/firma-sektorleri"
+@inject ApiClient Api
+
+<PageTitle>Firma sektörleri · Platform · Modulix</PageTitle>
+
+@* Firma sektörü kataloğu (ADR-0043). Firma ve müşteri adayı formlarındaki "Sektör" alanı bu listeden seçilir; bütün modüller aynı listeyi kullanır.
+   Faaliyet ağacından (Sektörler ve faaliyetler) ayrıdır: ağaç firmanın hangi işi yaptığını, bu liste firmanın hangi sektörde olduğunu söyler.
+   Sektör silinmez, pasife alınır; kayıtlardaki değer korunur. *@
+<PlatformGate>
+    <a class="back-link" href="platform">← Platform</a>
+    <h1>Firma sektörleri</h1>
+    <p class="text-muted">
+        Firma ve müşteri adayı formlarındaki "Sektör" alanı bu listeden seçilir. Sektör silinmez, pasife alınır: pasif sektör yeni kayıtlarda seçilemez,
+        mevcut kayıtlarda değeri korunur. Kod sonradan değişmez; adın değiştirilmesi desteklenmez (yanlış girişte pasife alıp yenisini ekleyin).
+    </p>
+
+    <Notice Text="@notice" Failed="failed" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit:preventDefault>
+            <input id="industrySearch" class="form-control" type="search" maxlength="100" placeholder="Ad ya da kod ara" aria-label="Sektör ara" @bind="search" @bind:event="oninput" />
+        </form>
+        @if (!adding)
+        {
+            <button type="button" class="btn btn-primary" @onclick="StartNew"><AppIcon Name="plus" Size="16" /> Yeni sektör</button>
+        }
+    </div>
+
+    @if (adding)
+    {
+        <form class="record-form settings-group" novalidate @onsubmit="AddAsync" @onsubmit:preventDefault>
+            <h2>Yeni sektör</h2>
+            <div class="form-grid">
+                <div>
+                    <label class="form-label" for="industryName">Ad *</label>
+                    <input id="industryName" class="form-control" maxlength="100" placeholder="ör. Gıda ve içecek" @bind="draftName" @bind:event="oninput" @onchange="SuggestCode" />
+                </div>
+                <div>
+                    <label class="form-label" for="industryCode">Kod *</label>
+                    <input id="industryCode" class="form-control" maxlength="50" placeholder="ör. gida-icecek" @bind="draftCode" @bind:event="oninput" @onchange="() => codeEdited = true" />
+                    <div class="form-text">Küçük harf, rakam ve "-". Sonradan değişmez.</div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">Ekle</button>
+            </div>
+        </form>
+    }
+
+    @if (industries is null)
+    {
+        <p class="text-muted">Yükleniyor…</p>
+    }
+    else if (industries.Count == 0)
+    {
+        <p class="text-muted">Henüz sektör yok.</p>
+    }
+    else
+    {
+        var shown = Filtered;
+        <p class="text-muted" role="status">@industries.Count(i => i.IsActive) etkin, @industries.Count(i => !i.IsActive) pasif sektör@(search.Length > 0 ? $" · {shown.Count} sonuç" : "")</p>
+        @if (shown.Count == 0)
+        {
+            <p class="text-muted">Aramaya uyan sektör yok.</p>
+        }
+        else
+        {
+            <table class="table record-table">
+                <thead><tr><th>Ad</th><th>Kod</th><th>Durum</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var industry in shown)
+                    {
+                        <tr>
+                            <td data-label="Ad" class="primary">@industry.Name</td>
+                            <td data-label="Kod"><code>@industry.Code</code></td>
+                            <td data-label="Durum"><span class="badge @(industry.IsActive ? "user-active" : "user-disabled")">@(industry.IsActive ? "Etkin" : "Pasif")</span></td>
+                            <td class="actions">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="@(industry.IsActive ? $"{industry.Name} sektörünü pasife al" : $"{industry.Name} sektörünü etkinleştir")"
+                                        @onclick="() => SetActiveAsync(industry, !industry.IsActive)">@(industry.IsActive ? "Pasife al" : "Etkinleştir")</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+</PlatformGate>
+
+@code {
+    private List<IndustryDto>? industries;
+    private string search = string.Empty;
+    private bool adding;
+    private string draftName = string.Empty;
+    private string draftCode = string.Empty;
+    private bool codeEdited;
+    private string? notice;
+    private bool failed;
+    private bool busy;
+
+    private List<IndustryDto> Filtered
+    {
+        get
+        {
+            var term = search.Trim();
+            var tr = System.Globalization.CultureInfo.GetCultureInfo("tr-TR").CompareInfo;
+            return [.. (industries ?? [])
+                .Where(i => term.Length == 0
+                    || tr.IndexOf(i.Name, term, System.Globalization.CompareOptions.IgnoreCase) >= 0
+                    || i.Code.Contains(term, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(i => !i.IsActive)
+                .ThenBy(i => i.Name, StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("tr-TR"), true))];
+        }
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<IndustryDto>>("/api/platform/sectors/industries");
+        industries = result.Value;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.Error, true);
+        }
+    }
+
+    private void StartNew()
+    {
+        (adding, draftName, draftCode, codeEdited, notice) = (true, string.Empty, string.Empty, false, null);
+    }
+
+    private void Cancel() => adding = false;
+
+    /// <summary>Kod elle değiştirilmediyse addan türetilir (Türkçe harfler sadeleştirilir); kullanıcı yine düzenleyebilir.</summary>
+    private void SuggestCode()
+    {
+        if (!codeEdited)
+        {
+            draftCode = IndustryCodeSuggestion.FromName(draftName);
+        }
+    }
+
+    private async Task AddAsync()
+    {
+        if (string.IsNullOrWhiteSpace(draftName) || string.IsNullOrWhiteSpace(draftCode))
+        {
+            (notice, failed) = ("Ad ve kod zorunludur.", true);
+            return;
+        }
+
+        busy = true;
+        var result = await Api.PostAsync<IndustryDto>("/api/platform/sectors/industries", new CreateIndustryRequest(draftCode.Trim(), draftName.Trim()));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.Error, true);
+            return;
+        }
+
+        (notice, failed, adding) = ($"\"{draftName.Trim()}\" sektörü eklendi.", false, false);
+        await LoadAsync();
+    }
+
+    private async Task SetActiveAsync(IndustryDto industry, bool active)
+    {
+        busy = true;
+        var result = await Api.PutAsync<IndustryDto>($"/api/platform/sectors/industries/{industry.Code}/active", new SetActiveRequest(active));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            (notice, failed) = (result.Error, true);
+            return;
+        }
+
+        (notice, failed) = (active ? $"\"{industry.Name}\" etkinleştirildi." : $"\"{industry.Name}\" pasife alındı; mevcut kayıtlardaki değer korunur.", false);
+        await LoadAsync();
+    }
+}

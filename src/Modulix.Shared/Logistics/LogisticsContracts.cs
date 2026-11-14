@@ -90,6 +90,7 @@ public static class LogisticsAccess
     public const string TripExpenseEntityKey = "logistics.trip-expense";
     public const string ExpenseKindList = "logistics.expense-kind";
     public const string ExpenseSupplierLookup = "logistics.trip-expense.supplier";
+    public const string ExpenseTripLookup = "logistics.trip-expense.trip";
 
     /// <summary>Masraf durumları (sabit; sunucudaki <c>TripExpense.Statuses</c>).</summary>
     public static IReadOnlyList<(string Key, string Label)> ExpenseStatuses { get; } =

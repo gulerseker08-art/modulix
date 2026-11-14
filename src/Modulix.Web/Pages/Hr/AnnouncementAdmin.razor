@@ -1,4 +1,5 @@
 @page "/ik/duyuru-yonetimi"
+@using System.Text.Json.Nodes
 @inject ApiClient Api
 @inject SessionState Session
 @inject CrmLookups Lookups
@@ -42,21 +43,25 @@
         }
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Duyuru görünümleri" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Duyuru görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <input class="form-control" type="search" aria-label="Duyuru ara" placeholder="Başlık ya da metinde ara" @bind="search" />
         </form>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (!editing)
         {
             <button type="button" class="btn btn-primary" @onclick="() => OpenAsync(null)"><AppIcon Name="plus" Size="16" /> Yeni duyuru</button>
         }
     </div>
 
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
     @if (page is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (page.Items.Count == 0)
     {
@@ -64,15 +69,15 @@
     }
     else
     {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) duyuru listelendi.</p>
         <table class="table record-table">
             <caption class="visually-hidden">Duyurular</caption>
             <thead>
                 <tr>
-                    <th scope="col"><AppIcon Name="bell" Size="14" /> Başlık</th>
-                    <th scope="col"><AppIcon Name="users" Size="14" /> Hedef</th>
-                    <th scope="col"><AppIcon Name="calendar" Size="14" /> Yayın aralığı</th>
-                    <th scope="col"><AppIcon Name="eye" Size="14" /> Okuyan</th>
-                    <th scope="col"><AppIcon Name="tag" Size="14" /> Durum</th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
                     <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
@@ -80,16 +85,10 @@
                 @foreach (var announcement in page.Items)
                 {
                     <tr>
-                        <td data-label="Başlık" class="primary">@WarehouseLabels.Text(announcement, "title")
-                            @if (WarehouseLabels.Flag(announcement, "isPinned"))
-                            {
-                                <span class="badge stage-qualified">Sabitlenmiş</span>
-                            }
-                        </td>
-                        <td data-label="Hedef">@(WarehouseLabels.Text(announcement, "audienceDepartmentKey") is { Length: > 0 } dep ? Lookups.Label(HrAccess.DepartmentList, dep) : "Herkes")</td>
-                        <td data-label="Yayın aralığı">@HrLabels.Date(WarehouseLabels.Text(announcement, "publishOn")) – @(WarehouseLabels.Text(announcement, "expiresOn") is { Length: > 0 } e ? HrLabels.Date(e) : "süresiz")</td>
-                        <td data-label="Okuyan">@WarehouseLabels.Number(announcement, "readCount")</td>
-                        <td data-label="Durum"><span class="badge @(WarehouseLabels.Flag(announcement, "isPublished") ? "status-customer" : "status-inactive")">@(WarehouseLabels.Flag(announcement, "isPublished") ? "Yayında" : "Taslak")</span></td>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, announcement)
+                        }
                         <td class="row-menu-cell">
                             <RowMenu Label="@($"{WarehouseLabels.Text(announcement, "title")} eylemleri")">
                                 <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenAsync(announcement)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
@@ -107,28 +106,51 @@
 @code {
     private static readonly string Url = "/api/records/" + HrAccess.AnnouncementEntityKey;
 
+    private const string AllViews = "all";
+
+    // Sıralama anahtarları kayıt deposunun beyanıdır (AnnouncementRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("title", "Başlık", "bell", "title", "-title", Locked: true),
+        new("audience", "Hedef", "users"),
+        new("publishOn", "Yayın aralığı", "calendar", "publishOn", "-publishOn"),
+        new("readCount", "Okuyan", "eye"),
+        new("status", "Durum", "tag"),
+    ];
+
+    private readonly GridViewState grid = new("hr.announcement-admin", "-publishOn");
+    private PersonalGridViews views = default!;
+    private string view = "active=true";
+    private (string Key, string Value)? filter = ("active", "true");
+
     private RecordPageResponse? page;
     private List<RecordResponse>? reads;
     private RecordResponse? selected;
     private bool editing;
     private string? message;
     private string? search;
-    private string view = "active=true";
 
-    private static IReadOnlyList<ViewOption> ViewOptions { get; } =
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
     [
         new("active=true", "Yayında", Icon: "bell"),
         new("isPublished=false", "Taslak", Icon: "pencil"),
         new("expired=true", "Süresi geçen", Icon: "history"),
         new("all", "Tüm duyurular", Icon: "list"),
+        .. views.Options,
     ];
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "hr.announcement-admin");
         await Session.EnsureLoadedAsync();
         if (Session.Can(HrAccess.AnnouncementsManage))
         {
             await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(HrAccess.AnnouncementEntityKey)
+                .Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
             await LoadAsync(1);
         }
     }
@@ -136,21 +158,91 @@
     private async Task ChooseViewAsync(string key)
     {
         view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            filter = GridFilters.Parse(saved.Filters).Select(p => ((string, string)?)(p.Key, p.Value)).FirstOrDefault();
+        }
+        else
+        {
+            grid.Reset();
+            filter = key == AllViews ? null : (key.Split('=')[0], key.Split('=')[1]);
+        }
+
         await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(filter);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
     }
 
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
-        if (view != "all")
+        if (grid.Sort != grid.DefaultSort)
         {
-            url += "&" + view;
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (filter is { } f)
+        {
+            url += $"&{f.Key}={Uri.EscapeDataString(f.Value)}";
         }
 
         var result = await Api.GetAsync<RecordPageResponse>(url);
         page = result.Value;
         message = result.Error;
     }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse record) =>
+        @<td data-label="@column.Label" class="@(column.Key == "title" ? "primary" : null)">@CellContent(column.Key, record)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse record) => key switch
+    {
+        "title" => @<text>@WarehouseLabels.Text(record, "title") @if (WarehouseLabels.Flag(record, "isPinned")) { <span class="badge stage-qualified">Sabitlenmiş</span> }</text>,
+        "audience" => @<text>@(WarehouseLabels.Text(record, "audienceDepartmentKey") is { Length: > 0 } dep ? Lookups.Label(HrAccess.DepartmentList, dep) : "Herkes")</text>,
+        "publishOn" => @<text>@HrLabels.Date(WarehouseLabels.Text(record, "publishOn")) – @(WarehouseLabels.Text(record, "expiresOn") is { Length: > 0 } e ? HrLabels.Date(e) : "süresiz")</text>,
+        "readCount" => @<text>@WarehouseLabels.Number(record, "readCount")</text>,
+        "status" => @<span class="badge @(WarehouseLabels.Flag(record, "isPublished") ? "status-customer" : "status-inactive")">@(WarehouseLabels.Flag(record, "isPublished") ? "Yayında" : "Taslak")</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.AnnouncementEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, record.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
 
     private async Task OpenAsync(RecordResponse? announcement)
     {

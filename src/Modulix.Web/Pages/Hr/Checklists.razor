@@ -1,4 +1,5 @@
 @page "/ik/giris-cikis"
+@using System.Text.Json.Nodes
 @inject ApiClient Api
 @inject SessionState Session
 @inject CrmLookups Lookups
@@ -67,21 +68,39 @@
         </section>
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Süreç görünümleri" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Süreç görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <input class="form-control" type="search" aria-label="Süreç ara" placeholder="Çalışan adı ya da şablon ara" @bind="search" />
         </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="@(kind is null ? 0 : 1)" />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(HrAccess.ChecklistsManage) && !starting)
         {
             <button type="button" class="btn btn-primary" @onclick="OpenStart"><AppIcon Name="plus" Size="16" /> Süreç başlat</button>
         }
     </div>
 
+    @if (filtersOpen || kind is not null)
+    {
+        <div class="filters">
+            <select class="form-select" aria-label="Süreç türü" @bind="KindFilter" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm türler</option>
+                @foreach (var (key, label) in HrAccess.ChecklistKinds)
+                {
+                    <option value="@key">@label</option>
+                }
+            </select>
+        </div>
+    }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
     @if (page is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (page.Items.Count == 0)
     {
@@ -89,15 +108,15 @@
     }
     else
     {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) süreç listelendi.</p>
         <table class="table record-table">
             <caption class="visually-hidden">İşe giriş ve çıkış süreçleri</caption>
             <thead>
                 <tr>
-                    <th scope="col"><AppIcon Name="user" Size="14" /> Çalışan</th>
-                    <th scope="col"><AppIcon Name="clipboard-list" Size="14" /> Süreç</th>
-                    <th scope="col"><AppIcon Name="calendar" Size="14" /> Başlangıç</th>
-                    <th scope="col"><AppIcon Name="check-circle" Size="14" /> İlerleme</th>
-                    <th scope="col"><AppIcon Name="tag" Size="14" /> Durum</th>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
                     <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
@@ -105,11 +124,10 @@
                 @foreach (var checklist in page.Items)
                 {
                     <tr>
-                        <td data-label="Çalışan" class="primary">@WarehouseLabels.Text(checklist, "employeeName")</td>
-                        <td data-label="Süreç">@HrLabels.ChecklistKind(WarehouseLabels.Text(checklist, "kind")) · @WarehouseLabels.Text(checklist, "name")</td>
-                        <td data-label="Başlangıç">@HrLabels.Date(WarehouseLabels.Text(checklist, "startDate"))</td>
-                        <td data-label="İlerleme">@WarehouseLabels.Number(checklist, "closedCount") / @WarehouseLabels.Number(checklist, "taskCount")</td>
-                        <td data-label="Durum"><span class="badge @HrLabels.ChecklistStatusBadge(WarehouseLabels.Text(checklist, "status"))">@HrLabels.ChecklistStatus(WarehouseLabels.Text(checklist, "status"))</span></td>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, checklist)
+                        }
                         <td class="row-menu-cell">
                             <RowMenu Label="@($"{WarehouseLabels.Text(checklist, "employeeName")} süreci eylemleri")">
                                 <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(checklist)"><AppIcon Name="eye" Size="16" /> <span>Aç</span></button>
@@ -126,33 +144,63 @@
 @code {
     private static readonly string Url = "/api/records/" + HrAccess.EmployeeChecklistEntityKey;
 
+    private const string AllViews = "all";
+
+    // Sıralama anahtarları kayıt deposunun beyanıdır (EmployeeChecklistRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("employee", "Çalışan", "user", Locked: true),
+        new("process", "Süreç", "clipboard-list", "kind", "-kind"),
+        new("startDate", "Başlangıç", "calendar", "startDate", "-startDate"),
+        new("progress", "İlerleme", "check-circle"),
+        new("status", "Durum", "tag", "status", "-status"),
+    ];
+
+    private readonly GridViewState grid = new("hr.checklists", "-startDate");
+    private PersonalGridViews views = default!;
     private RecordPageResponse? page;
     private RecordResponse? selected;
     private IReadOnlyDictionary<string, string[]>? errors;
     private string? message;
     private string? search;
     private string view = "open";
+    private string? status = "open";
+    private string? kind;
+    private bool filtersOpen;
     private bool starting;
     private bool busy;
     private Guid? startEmployee;
     private Guid? startTemplate;
     private DateOnly? startDate;
 
-    private static IReadOnlyList<ViewOption> ViewOptions { get; } =
+    private string KindFilter
+    {
+        get => kind ?? string.Empty;
+        set => kind = string.IsNullOrEmpty(value) ? null : value;
+    }
+
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
     [
         new("open", "Süren süreçler", Icon: "hourglass"),
         new("open:onboarding", "İşe giriş", Icon: "user-check"),
         new("open:offboarding", "İşten çıkış", Icon: "log-out"),
         new("completed", "Tamamlanan", Icon: "check-circle"),
-        new("all", "Tüm süreçler", Icon: "list"),
+        new(AllViews, "Tüm süreçler", Icon: "list"),
+        .. views.Options,
     ];
 
     protected override async Task OnInitializedAsync()
     {
+        views = new PersonalGridViews(Api, "hr.checklists");
         await Session.EnsureLoadedAsync();
         if (Session.Can(HrAccess.ChecklistsRead))
         {
             await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(HrAccess.EmployeeChecklistEntityKey)
+                .Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
             await LoadAsync(1);
         }
     }
@@ -160,27 +208,100 @@
     private async Task ChooseViewAsync(string key)
     {
         view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            status = filters.GetValueOrDefault("status");
+            kind = filters.GetValueOrDefault("kind");
+        }
+        else
+        {
+            grid.Reset();
+            var parts = key.Split(':');
+            status = parts[0] == AllViews ? null : parts[0];
+            kind = parts.Length > 1 ? parts[1] : null;
+        }
+
         await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(status is { } s ? ("status", s) : null, kind is { } k ? ("kind", k) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
     }
 
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
-        var parts = view.Split(':');
-        if (parts[0] != "all")
+        if (grid.Sort != grid.DefaultSort)
         {
-            url += $"&status={parts[0]}";
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
         }
 
-        if (parts.Length > 1)
+        if (status is { } s)
         {
-            url += $"&kind={parts[1]}";
+            url += $"&status={Uri.EscapeDataString(s)}";
+        }
+
+        if (kind is { } k)
+        {
+            url += $"&kind={Uri.EscapeDataString(k)}";
         }
 
         var result = await Api.GetAsync<RecordPageResponse>(url);
         page = result.Value;
         message = result.Error;
     }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse checklist) =>
+        @<td data-label="@column.Label" class="@(column.Key == "employee" ? "primary" : null)">@CellContent(column.Key, checklist)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse checklist) => key switch
+    {
+        "employee" => @<text>@WarehouseLabels.Text(checklist, "employeeName")</text>,
+        "process" => @<text>@HrLabels.ChecklistKind(WarehouseLabels.Text(checklist, "kind")) · @WarehouseLabels.Text(checklist, "name")</text>,
+        "startDate" => @<text>@HrLabels.Date(WarehouseLabels.Text(checklist, "startDate"))</text>,
+        "progress" => @<text>@WarehouseLabels.Number(checklist, "closedCount") / @WarehouseLabels.Number(checklist, "taskCount")</text>,
+        "status" => @<span class="badge @HrLabels.ChecklistStatusBadge(WarehouseLabels.Text(checklist, "status"))">@HrLabels.ChecklistStatus(WarehouseLabels.Text(checklist, "status"))</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.EmployeeChecklistEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, checklist.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
 
     private void OpenStart()
     {
