@@ -148,7 +148,7 @@
                         <input class="form-check-input" type="checkbox" id="task-@task.Id" checked="@task.IsDone" disabled="@(!CanManageTasks || busy)" @onchange="e => ToggleAsync(task, (bool)e.Value!)" />
                         <label class="form-check-label" for="task-@task.Id">@task.Title@(task.IsRequired ? null : Texts.Get("orders.handover-page.optional"))</label>
                         @if (task.IsDone && task.DoneAt is { } doneAt) { <small class="text-muted"> · @Lookups.MemberName(task.DoneBy), @CrmLabels.Time(doneAt)</small> }
-                        @if (CanManageTasks && !task.IsDefault) { <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteTaskAsync(task)">@Texts.Get("common.delete")</button> }
+                        @if (CanManageTasks && !task.IsDefault) { <ConfirmAction Class="btn btn-link btn-sm" Disabled="@busy" OnConfirm="() => DeleteTaskAsync(task)">@Texts.Get("common.delete")</ConfirmAction> }
                     </li>
                 }
             </ul>
@@ -177,7 +177,7 @@
                         <li>
                             <a href="siparisler/isler/@d.JobId">@d.Number · @d.Title</a>
                             <span class="badge stage-@OrderLabels.JobBadge(d.Status)">@OrderLabels.Label(OrderLabels.JobStatuses, d.Status)</span>
-                            @if (CanManageTasks && !job.Status.StartsWith("C")) { <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => RemoveDependencyAsync(d)">@Texts.Get("orders.jobdetail.remove")</button> }
+                            @if (CanManageTasks && !job.Status.StartsWith("C")) { <ConfirmAction Class="btn btn-link btn-sm" Disabled="@busy" OnConfirm="() => RemoveDependencyAsync(d)">@Texts.Get("orders.jobdetail.remove")</ConfirmAction> }
                         </li>
                     }
                 </ul>

@@ -4,6 +4,8 @@
   "common.deleted": "Deleted.",
   "common.confirm.deleteOf": "Delete \"{0}\"?",
   "common.confirm.cancel": "Keep",
+  "common.confirm.sure": "Are you sure?",
+  "common.confirm.delete": "Delete this record?",
   "common.email": "Email",
   "common.password": "Password",
   "common.loading": "Loading…",

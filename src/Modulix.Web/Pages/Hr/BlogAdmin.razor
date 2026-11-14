@@ -74,7 +74,7 @@
                         <td class="row-menu-cell">
                             <RowMenu Label="@($"{WarehouseLabels.Text(post, "title")} eylemleri")">
                                 <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(post)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteAsync(post)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                <RowMenuDelete OnConfirm="() => DeleteAsync(post)" />
                             </RowMenu>
                         </td>
                     </tr>

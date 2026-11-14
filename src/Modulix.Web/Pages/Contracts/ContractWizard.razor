@@ -174,7 +174,7 @@
                             {
                                 <li>
                                     @ContractLabels.Label(ContractLabels.PartyRoles, p.Role): @PartyName(p.PartyId ?? p.PersonId ?? Guid.Empty)
-                                    <button type="button" class="btn btn-link btn-sm text-danger" disabled="@busy" @onclick="() => DeletePartyAsync(p)" aria-label="@Texts.Get("contracts.wizard.removeParty")">@Texts.Get("contracts.signaturePanel.remove")</button>
+                                    <ConfirmAction Class="btn btn-link btn-sm text-danger" Disabled="@busy" AriaLabel="@Texts.Get("contracts.wizard.removeParty")" OnConfirm="() => DeletePartyAsync(p)">@Texts.Get("contracts.signaturePanel.remove")</ConfirmAction>
                                 </li>
                             }
                         </ul>
@@ -222,7 +222,7 @@
                                 <td data-label="@Texts.Get("crm.quoteDetail.col.quantity")" class="text-end">@l.Quantity.ToString("0.##", Regional.Numbers) @l.UnitName</td>
                                 <td data-label="@Texts.Get("crm.quoteDetail.col.unitPrice")" class="text-end">@(Session.Can(ContractsAccess.FinancialsRead) ? ContractLabels.Money(l.UnitPrice, contract!.Currency) : "—")</td>
                                 <td data-label="@Texts.Get("contracts.wizard.vatPercent")" class="text-end">@l.TaxRatePercent.ToString("0.##", Regional.Numbers)</td>
-                                <td><button type="button" class="btn btn-link btn-sm text-danger" disabled="@busy" @onclick="() => DeleteLineAsync(l)" aria-label="@Texts.Get("contracts.wizard.removeLine", l.Name)">@Texts.Get("contracts.signaturePanel.remove")</button></td>
+                                <td><ConfirmAction Class="btn btn-link btn-sm text-danger" Disabled="@busy" AriaLabel="@Texts.Get("contracts.wizard.removeLine", l.Name)" OnConfirm="() => DeleteLineAsync(l)">@Texts.Get("contracts.signaturePanel.remove")</ConfirmAction></td>
                             </tr>
                         }
                     </tbody>
@@ -367,7 +367,7 @@
                     <ul class="list-unstyled">
                         @foreach (var c in commitments)
                         {
-                            <li>@Texts.Get("contracts.wizard.commitmentDue", c.Title, ContractLabels.Date(c.DueDate)) <button type="button" class="btn btn-link btn-sm text-danger" disabled="@busy" @onclick="() => DeleteCommitmentAsync(c)" aria-label="@Texts.Get("contracts.wizard.cancelCommitment", c.Title)">@Texts.Get("contracts.commitmentsPanel.cancelConfirm")</button></li>
+                            <li>@Texts.Get("contracts.wizard.commitmentDue", c.Title, ContractLabels.Date(c.DueDate)) <ConfirmAction Class="btn btn-link btn-sm text-danger" Disabled="@busy" AriaLabel="@Texts.Get("contracts.wizard.cancelCommitment", c.Title)" OnConfirm="() => DeleteCommitmentAsync(c)">@Texts.Get("contracts.commitmentsPanel.cancelConfirm")</ConfirmAction></li>
                         }
                     </ul>
                 }

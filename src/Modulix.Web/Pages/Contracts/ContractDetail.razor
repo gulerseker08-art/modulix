@@ -339,7 +339,7 @@
                                             @if (Editable && CanWrite)
                                             {
                                                 <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => EditParty(p)">@Texts.Get("common.edit")</button>
-                                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeletePartyAsync(p)">@Texts.Get("contracts.signaturePanel.remove")</button>
+                                                <ConfirmAction Class="btn btn-sm btn-outline-danger" OnConfirm="() => DeletePartyAsync(p)">@Texts.Get("contracts.signaturePanel.remove")</ConfirmAction>
                                             }
                                         </td>
                                     </tr>
@@ -459,7 +459,7 @@
                                             @if (Editable && CanWrite)
                                             {
                                                 <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => EditLine(l)">@Texts.Get("common.edit")</button>
-                                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteLineAsync(l)">@Texts.Get("contracts.signaturePanel.remove")</button>
+                                                <ConfirmAction Class="btn btn-sm btn-outline-danger" OnConfirm="() => DeleteLineAsync(l)">@Texts.Get("contracts.signaturePanel.remove")</ConfirmAction>
                                             }
                                         </td>
                                     </tr>

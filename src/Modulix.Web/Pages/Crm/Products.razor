@@ -231,7 +231,7 @@
                                 <td class="actions">
                                     @if (Session.Can(CrmAccess.ProductsWrite))
                                     {
-                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => DeleteComponentAsync(component)">@Texts.Get("common.delete")</button>
+                                        <ConfirmAction OnConfirm="() => DeleteComponentAsync(component)">@Texts.Get("common.delete")</ConfirmAction>
                                     }
                                 </td>
                             </tr>

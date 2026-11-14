@@ -141,3 +141,15 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 - Ana sayfa özet kutuları toplamın altında son 30 günde eklenen kayıt sayısını gösterir: `small.stat-trend` içinde `dash-delta` rozeti (işaretli sayı + ok ikonu; önceki 30 güne göre azaldıysa `is-down`, aynıysa `is-flat`) ve "son 30 günde yeni" etiketi. Yön yalnızca renkle anlatılmaz; ekran okuyucuya iki dönemin sayıları tam cümleyle okunur (`visually-hidden`).
 - Sayılar liste uçlarının `createdSince` (dahil) ve `createdBefore` (hariç) süzgeçleriyle alınır (ISO 8601 an; firma, kişi, fırsat, aktivite). Kapsam ve yetki sunucudadır; yüklenemeyen kutuda karşılaştırma çizilmez. Hesap `PeriodChange` ile yapılır.
 
+## Onaylı yıkıcı eylemler: hangi bileşen nerede (14.11.2026)
+
+Kalıcı olarak silen ya da ilişkiyi kaldıran hiçbir düğme tek tıkla çalışmaz. Üç bileşen vardır:
+
+| Bileşen | Nerede | Davranış |
+|---|---|---|
+| `ConfirmAction` | Tablo hücresi, liste satırı ya da satır içi düğme ("Sil", "Kaldır", "Çıkar") | Düğme yerinde `confirm-inline` satırına dönüşür: "Emin misiniz?" + `btn-danger` (düğmenin kendi metni) + "Vazgeç". `Class` ilk düğmenin sınıfıdır (varsayılan `btn btn-outline-danger btn-sm`), `Question` soru metnini değiştirir. |
+| `RowMenuDelete` | `RowMenu` ("⋯") içindeki silme öğesi | Menü kapanır, aynı yerde `row-menu-confirm` içinde `ConfirmBox` açılır. `Label` (varsayılan "Sil"), `Question` (varsayılan "Bu kayıt silinsin mi?"). Menüye elle `view-menu-item` silme düğmesi yazılmaz. |
+| `ConfirmBox` | Soru metni uzun ya da ek seçim gerektiren onaylar; liste satırının yerinde | Tam genişlikte uyarı kutusu. |
+
+Üçünde de odak "Vazgeç"e gelir, Escape kapatır, onay düğmesi çalışırken `aria-busy` taşır. Kaydedilmeden önce yalnızca ekrandaki girdiyi değiştiren kaldırmalar (ör. `TagInput` etiketi) onay istemez.
+

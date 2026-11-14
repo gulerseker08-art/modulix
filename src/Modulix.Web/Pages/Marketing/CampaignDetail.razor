@@ -173,7 +173,7 @@
                                         <td data-label="@Texts.Get("crm.quoteApprovals.reasonLabel")">@(e.Reason ?? "—")</td>
                                         @if (CanEntries)
                                         {
-                                            <td data-label="@Texts.Get("crm.quoteApprovals.col.action")"><button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => RemoveEntryAsync(e)">@Texts.Get("marketing.remove")</button></td>
+                                            <td data-label="@Texts.Get("crm.quoteApprovals.col.action")"><ConfirmAction Class="btn btn-sm btn-outline-secondary" Disabled="@busy" OnConfirm="() => RemoveEntryAsync(e)">@Texts.Get("marketing.remove")</ConfirmAction></td>
                                         }
                                     </tr>
                                 }

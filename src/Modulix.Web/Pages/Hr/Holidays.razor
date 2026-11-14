@@ -65,7 +65,7 @@
                             @if (Session.Can(HrAccess.LeavesManage))
                             {
                                 <RowMenu Label="@($"{WarehouseLabels.Text(holiday, "name")} eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteAsync(holiday)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                    <RowMenuDelete OnConfirm="() => DeleteAsync(holiday)" />
                                 </RowMenu>
                             }
                         </td>
