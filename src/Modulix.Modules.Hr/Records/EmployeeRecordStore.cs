@@ -77,6 +77,11 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
         ["personId"] = (q, v) => FilterValue.Id(v) is { } id ? q.Where(e => e.PersonId == id) : null,
         ["userId"] = (q, v) => FilterValue.Id(v) is { } id ? q.Where(e => e.UserId == id) : null,
 
+        // Sicil numarası büyük harfle saklanır; içe aktarmada çalışan bağlantısı bununla çözülür.
+        ["employeeNumber"] = (q, v) => v.Trim().ToUpperInvariant() is { Length: > 0 and <= Employee.EmployeeNumberMaxLength } number
+            ? q.Where(e => e.EmployeeNumber == number)
+            : null,
+
         // "Çalışanlar" ve rehber görünümü: ayrılmamış (etkin ya da izinde) çalışanlar.
         ["current"] = (q, v) => v switch { "true" => q.Where(e => e.Status != Employee.Statuses.Terminated), "false" => q, _ => null },
     };

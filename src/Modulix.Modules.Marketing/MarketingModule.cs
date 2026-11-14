@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Events;
-using Modulix.Core.Contracts.Marketing;
+using Modulix.Modules.Marketing.Contracts;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
@@ -16,7 +16,7 @@ namespace Modulix.Modules.Marketing;
 
 /// <summary>
 /// Pazarlama: segment ve (sonraki dilimlerde) kampanya yönetimi (EPIC 12, ADR-0025). Sektörden ve CRM'den bağımsızdır; müşteri ve kişiler ortak
-/// kayıttır, başka modüllerin alanları yalnızca <see cref="Core.Contracts.Marketing.ISegmentFieldSource"/> sözleşmesiyle kullanılır. İzin ve
+/// kayıttır, başka modüllerin alanları yalnızca <see cref="Modulix.Modules.Marketing.Contracts.ISegmentFieldSource"/> sözleşmesiyle kullanılır. İzin ve
 /// engel kararı çekirdeğin <see cref="Core.Contracts.Communication.ICommunicationPreferences"/> sözleşmesindedir; bu modül tercihin sahibi değildir.
 /// </summary>
 public sealed class MarketingModule : IModule

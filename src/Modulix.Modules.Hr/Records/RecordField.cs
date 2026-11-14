@@ -96,10 +96,13 @@ internal static class Field
             CreateOnly = createOnly,
         };
 
-    /// <summary>Sınırlı aralıkta tam sayı. Zorunlu değilse boş bırakılabilir (verilmezse mevcut/varsayılan değer kalır).</summary>
+    /// <summary>
+    /// Sınırlı aralıkta tam sayı. Zorunlu değilse boş bırakılabilir (verilmezse mevcut/varsayılan değer kalır). Küsuratsız ondalık sayı da kabul edilir
+    /// (içe aktarma sayıları ondalık olarak verir, ör. 2026).
+    /// </summary>
     public static RecordField<T> Integer<T>(string name, Func<T, int?> get, Action<T, int?> set, int min, int max, bool required = false, bool createOnly = false) =>
         new(name, required, nullable: !required, node =>
-                node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var value) && value >= min && value <= max
+                node.GetValueKind() == JsonValueKind.Number && WholeNumber(node.AsValue()) is { } value && value >= min && value <= max
                     ? ParsedValue.Of(value)
                     : ParsedValue.Fail($"{min} ile {max} arasında bir tam sayı girin."),
             e => get(e) is { } value ? JsonValue.Create(value) : null,
@@ -107,6 +110,11 @@ internal static class Field
         {
             CreateOnly = createOnly,
         };
+
+    private static int? WholeNumber(JsonValue value) =>
+        value.TryGetValue<int>(out var number) ? number
+        : value.TryGetValue<decimal>(out var dec) && dec == decimal.Truncate(dec) && dec is >= int.MinValue and <= int.MaxValue ? (int)dec
+        : null;
 
     /// <summary>Sabit anahtar listesinden tek değer (teknik doğrulama seçimi; tenant listesi değildir). Boş gönderilirse verilmemiş sayılır.</summary>
     public static RecordField<T> Choice<T>(string name, IReadOnlyCollection<string> allowed, Func<T, string> get, Action<T, string> set, bool createOnly = false) =>

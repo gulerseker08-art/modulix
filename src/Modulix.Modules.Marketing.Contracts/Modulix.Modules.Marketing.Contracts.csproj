@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pazarlama modülünün tanımladığı sözleşmeler (ADR-0044): başka modüllerin uyguladığı genişleme noktaları ve veri tipleri; entity ve veri erişimi yok. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Modulix.Core.Contracts\Modulix.Core.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

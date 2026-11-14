@@ -1,4 +1,4 @@
-namespace Modulix.Core.Contracts.Marketing;
+namespace Modulix.Modules.Marketing.Contracts;
 
 // Segment alan kaynağı sözleşmesi (ADR-0025, K3). Pazarlama modülü başka modüllerin tablolarına dokunmaz; bir modül segmentte
 // kullanılabilecek alanlarını bu sözleşmeyle bildirir ve "bu koşulu sağlayan hedef kimlikleri" bir sorgu olarak döndürür.

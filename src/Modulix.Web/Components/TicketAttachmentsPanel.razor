@@ -4,7 +4,7 @@
 @inject SessionState Session
 
 <section aria-labelledby="attachments-title">
-    <h2 id="attachments-title">Ekler</h2>
+    <h2 id="attachments-title">@Texts.Get("support.attachmentsPanel.title")</h2>
     <Notice Text="@message" Failed="@failed" />
     @if (items is null)
     {
@@ -12,7 +12,7 @@
     }
     else if (items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Ek yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("support.attachmentsPanel.none")" />
     }
     else
     {
@@ -22,8 +22,8 @@
                 <li>
                     <a href="api/support/tickets/@Ticket.Id/attachments/@a.Id/file" download="@a.FileName">@a.FileName</a>
                     <small class="text-muted"> · @Size(a.SizeBytes) · @CrmLabels.Time(a.CreatedAt) · SHA-256 @a.Sha256[..12]…</small>
-                    @if (a.IsInternal) { <span class="badge stage-lost">İç not eki</span> }
-                    <span class="badge stage-open">Taranmadı</span>
+                    @if (a.IsInternal) { <span class="badge stage-lost">@Texts.Get("support.attachmentsPanel.internal")</span> }
+                    <span class="badge stage-open">@Texts.Get("support.attachmentsPanel.notScanned")</span>
                 </li>
             }
         </ul>
@@ -33,30 +33,29 @@
     {
         <form class="record-form" novalidate @onsubmit="UploadAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
-                <legend class="h6">Ek ekle</legend>
+                <legend class="h6">@Texts.Get("support.attachmentsPanel.add")</legend>
                 <p class="small text-muted">
-                    İzinli türler: pdf, png, jpg, gif, docx, xlsx, doc, xls, txt, csv. En çok 5 MB; mesaj başına 5, talep başına 20 ek.
-                    Dosya içeriği virüs/kötü amaçlı yazılım için taranmaz; bilinmeyen kaynaktan gelen dosyaları açmayın.
+                    @Texts.Get("support.attachmentsPanel.help", "pdf, png, jpg, gif, docx, xlsx, doc, xls, txt, csv")
                 </p>
                 <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label" for="attach-message">Hangi mesaja</label>
+                        <label class="form-label" for="attach-message">@Texts.Get("support.attachmentsPanel.message")</label>
                         <select id="attach-message" class="form-select" @bind="targetId">
-                            <option value="">Mesaj seçin</option>
+                            <option value="">@Texts.Get("support.attachmentsPanel.chooseMessage")</option>
                             @foreach (var m in targets)
                             {
-                                <option value="@m.Id">@(m.Visibility == "Internal" ? "İç not" : m.Direction == "Inbound" ? "Müşteri mesajı" : "Yanıt") · @CrmLabels.Time(m.CreatedAt) · @Preview(m.Body)</option>
+                                <option value="@m.Id">@(m.Visibility == "Internal" ? Texts.Get("support.attachmentsPanel.kind.note") : m.Direction == "Inbound" ? Texts.Get("support.attachmentsPanel.kind.inbound") : Texts.Get("support.attachmentsPanel.kind.reply")) · @CrmLabels.Time(m.CreatedAt) · @Preview(m.Body)</option>
                             }
                         </select>
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="attach-file">Dosya</label>
+                        <label class="form-label" for="attach-file">@Texts.Get("support.attachmentsPanel.file")</label>
                         <InputFile @key="inputKey" id="attach-file" class="form-control" OnChange="OnFileChosen" />
                         <FieldError Field="file" Errors="errors" />
                     </div>
                 </div>
             </fieldset>
-            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@(busy || file is null || targetId == string.Empty)">Yükle</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@(busy || file is null || targetId == string.Empty)">@Texts.Get("support.attachmentsPanel.upload")</button></div>
         </form>
     }
 </section>
@@ -115,9 +114,9 @@
         {
             if (file.Size > MaxBytes)
             {
-                errors = new Dictionary<string, string[]> { ["file"] = ["Dosya en fazla 5 MB olabilir."] };
+                errors = new Dictionary<string, string[]> { ["file"] = [Texts.Get("support.attachmentsPanel.tooLarge")] };
                 failed = true;
-                message = "Dosya yüklenemedi.";
+                message = Texts.Get("support.attachmentsPanel.failed");
                 return;
             }
 
@@ -127,7 +126,7 @@
             var result = await Api.PostBytesAsync<AttachmentDto>(
                 $"/api/support/tickets/{Ticket.Id}/messages/{messageId}/attachments?fileName={Uri.EscapeDataString(file.Name)}", buffer.ToArray(), "application/octet-stream");
             failed = !result.IsSuccess;
-            message = result.IsSuccess ? "Ek yüklendi." : result.Error;
+            message = result.IsSuccess ? Texts.Get("support.attachmentsPanel.uploaded") : result.Error;
             errors = result.FieldErrors;
             if (result.IsSuccess)
             {

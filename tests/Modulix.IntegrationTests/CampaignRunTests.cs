@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Communication;
-using Modulix.Core.Contracts.Marketing;
+using Modulix.Modules.Marketing.Contracts;
 using Modulix.Core.Modules;
 using Modulix.Infrastructure.Identity;
 using Modulix.Modules.Crm;

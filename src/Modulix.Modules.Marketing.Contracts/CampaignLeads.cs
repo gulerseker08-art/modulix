@@ -1,4 +1,4 @@
-namespace Modulix.Core.Contracts.Marketing;
+namespace Modulix.Modules.Marketing.Contracts;
 
 // Kampanya yanıtından lead (ADR-0025, dilim 7). Pazarlama modülü CRM'in alanlarını bilmez: gönderim anında çözülen kişi bilgisini bu sözleşmeyle verir, lead'i
 // lead alanını sağlayan modül (CRM) açar.

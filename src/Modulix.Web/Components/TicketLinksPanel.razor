@@ -4,7 +4,7 @@
 @inject SessionState Session
 
 <section aria-labelledby="links-title">
-    <h2 id="links-title">İlişkili kayıtlar</h2>
+    <h2 id="links-title">@Texts.Get("support.linksPanel.title")</h2>
     <Notice Text="@message" Failed="@failed" />
     @if (links is null)
     {
@@ -12,7 +12,7 @@
     }
     else if (links.Count == 0)
     {
-        <EmptyState Compact="true" Title="İlişkili sözleşme, sipariş ya da teslimat yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("support.linksPanel.none")" />
     }
     else
     {
@@ -23,10 +23,10 @@
                     <span class="badge stage-open">@Kind(l.EntityKey)</span>
                     @if (Href(l) is { } href && Session.IsModuleEnabled(ModuleOf(l.EntityKey))) { <a href="@href">@l.Label</a> }
                     else { <span>@l.Label</span> }
-                    <small class="text-muted"> · @CrmLabels.Time(l.CreatedAt) · bağlandığı andaki bilgi</small>
+                    <small class="text-muted"> · @CrmLabels.Time(l.CreatedAt) · @Texts.Get("support.linksPanel.snapshot")</small>
                     @if (CanWrite)
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" disabled="@busy" @onclick="() => RemoveAsync(l)">Kaldır</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" disabled="@busy" @onclick="() => RemoveAsync(l)">@Texts.Get("support.linksPanel.remove")</button>
                     }
                 </li>
             }
@@ -37,32 +37,32 @@
     {
         @if (Ticket.PartyId is null)
         {
-            <p class="small text-muted">İlişkili kayıt bağlamak için önce talebe müşteri bağlayın.</p>
+            <p class="small text-muted">@Texts.Get("support.linksPanel.needCustomer")</p>
         }
         else if (Kinds.Count > 0)
         {
             <form class="record-form" novalidate @onsubmit="AddAsync" @onsubmit:preventDefault>
                 <fieldset disabled="@busy">
-                    <legend class="h6">Kayıt bağla</legend>
-                    <p class="small text-muted">Yalnızca bu müşterinin ve sizin görebildiğiniz kayıtlar listelenir. Sözleşme bağlamak, o sözleşmeye bağlı bir SLA politikası varsa talebin SLA hedefini değiştirir.</p>
+                    <legend class="h6">@Texts.Get("support.linksPanel.add")</legend>
+                    <p class="small text-muted">@Texts.Get("support.linksPanel.help")</p>
                     <div class="form-grid">
                         <div class="span-4">
-                            <label class="form-label" for="link-kind">Tür</label>
+                            <label class="form-label" for="link-kind">@Texts.Get("common.field.kind")</label>
                             <select id="link-kind" class="form-select" @bind="kind" @bind:after="LoadOptionsAsync">
                                 @foreach (var k in Kinds) { <option value="@k.Key">@k.Label</option> }
                             </select>
                         </div>
                         <div class="span-8">
-                            <label class="form-label" for="link-record">Kayıt</label>
+                            <label class="form-label" for="link-record">@Texts.Get("support.linksPanel.record")</label>
                             <select id="link-record" class="form-select" @bind="recordId" aria-invalid="@(Has("recordId") ? "true" : null)">
-                                <option value="">@(options is null ? "Yükleniyor…" : options.Count == 0 ? "Bağlanabilir kayıt yok" : "Kayıt seçin")</option>
+                                <option value="">@(options is null ? Texts.Get("common.loading") : options.Count == 0 ? Texts.Get("support.linksPanel.noOptions") : Texts.Get("support.linksPanel.choose"))</option>
                                 @foreach (var o in options ?? []) { <option value="@o.Id">@o.Label</option> }
                             </select>
                             <FieldError Field="recordId" Errors="errors" />
                         </div>
                     </div>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrEmpty(recordId))">Bağla</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrEmpty(recordId))">@Texts.Get("crm.opp.link")</button></div>
             </form>
         }
     }
@@ -96,11 +96,11 @@
         get
         {
             var list = new List<(string, string)>();
-            if (Session.IsModuleEnabled(ContractsAccess.ModuleKey) && Session.Can(ContractsAccess.ContractsRead)) { list.Add(("contracts.contract", "Sözleşme")); }
+            if (Session.IsModuleEnabled(ContractsAccess.ModuleKey) && Session.Can(ContractsAccess.ContractsRead)) { list.Add(("contracts.contract", Kind("contracts.contract"))); }
             if (Session.IsModuleEnabled(OrdersAccess.ModuleKey) && Session.Can(OrdersAccess.OrdersRead))
             {
-                list.Add(("orders.order", "Sipariş"));
-                list.Add(("orders.delivery", "Teslimat"));
+                list.Add(("orders.order", Kind("orders.order")));
+                list.Add(("orders.delivery", Kind("orders.delivery")));
             }
 
             return list;
@@ -155,7 +155,7 @@
         var result = await Api.PostAsync<List<TicketLinkDto>>($"/api/support/tickets/{Ticket.Id}/links", new AddTicketLinkRequest(kind, id));
         busy = false;
         failed = !result.IsSuccess;
-        message = result.IsSuccess ? "Kayıt bağlandı." : result.Error;
+        message = result.IsSuccess ? Texts.Get("support.linksPanel.added") : result.Error;
         errors = result.FieldErrors;
         if (result.IsSuccess)
         {
@@ -173,7 +173,7 @@
         var result = await Api.DeleteAsync($"/api/support/tickets/{Ticket.Id}/links/{link.Id}");
         busy = false;
         failed = !result.IsSuccess;
-        message = result.IsSuccess ? "Bağlantı kaldırıldı." : result.Error;
+        message = result.IsSuccess ? Texts.Get("support.linksPanel.removed") : result.Error;
         if (result.IsSuccess)
         {
             links = (await Api.GetAsync<List<TicketLinkDto>>($"/api/support/tickets/{Ticket.Id}/links")).Value ?? [];
@@ -182,7 +182,13 @@
         }
     }
 
-    private static string Kind(string entityKey) => entityKey switch { "contracts.contract" => "Sözleşme", "orders.order" => "Sipariş", "orders.delivery" => "Teslimat", _ => entityKey };
+    private static string Kind(string entityKey) => entityKey switch
+    {
+        "contracts.contract" => Texts.Get("support.linksPanel.kind.contract"),
+        "orders.order" => Texts.Get("support.linksPanel.kind.order"),
+        "orders.delivery" => Texts.Get("support.linksPanel.kind.delivery"),
+        _ => entityKey,
+    };
 
     private static string ModuleOf(string entityKey) => entityKey.StartsWith("contracts.", StringComparison.Ordinal) ? ContractsAccess.ModuleKey : OrdersAccess.ModuleKey;
 

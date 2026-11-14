@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 using Modulix.Modules.Crm.Contracts.Activities;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Communication;
-using Modulix.Core.Contracts.Marketing;
+using Modulix.Modules.Marketing.Contracts;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;

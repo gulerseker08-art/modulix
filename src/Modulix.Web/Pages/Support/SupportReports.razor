@@ -3,40 +3,39 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Destek raporları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("support.reports.title") · Modulix</PageTitle>
 
 <AuthGate Module="@SupportAccess.ModuleKey" Permission="@SupportAccess.ReportsRead">
     <div class="page-header">
         <div>
-            <h1>Destek raporları</h1>
+            <h1>@Texts.Get("support.reports.title")</h1>
             <p class="text-muted mb-0">
-                Veriler yetkiniz ve veri kapsamınızla sınırlıdır; her sayı, aynı süzgeçle talep listesine açılır. Dönem, <strong>dönemde açılan</strong> talepleri kapsar; günler Türkiye saatine göredir.
-                Süre istatistikleri yalnızca ilgili aşamaya ulaşmış talepleri sayar, örneklem büyüklüğü her satırda yazılıdır.
+                @Texts.Strong("support.reports.intro", Texts.Get("support.reports.introOpened"))
             </p>
         </div>
-        <div class="header-actions"><a class="btn btn-outline-secondary" href="destek/sikayetler">Şikâyet inceleme</a></div>
+        <div class="header-actions"><a class="btn btn-outline-secondary" href="destek/sikayetler">@Texts.Get("nav.app.support.complaints")</a></div>
     </div>
 
-    <form class="filters" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="Rapor süzgeçleri">
-        <label class="visually-hidden" for="rp-from">Başlangıç</label>
+    <form class="filters" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="@Texts.Get("support.reports.filters")">
+        <label class="visually-hidden" for="rp-from">@Texts.Get("support.reports.from")</label>
         <input id="rp-from" type="date" class="form-control form-control-sm filter-select" @bind="from" />
-        <label class="visually-hidden" for="rp-to">Bitiş</label>
+        <label class="visually-hidden" for="rp-to">@Texts.Get("support.reports.to")</label>
         <input id="rp-to" type="date" class="form-control form-control-sm filter-select" @bind="to" />
-        <label class="visually-hidden" for="rp-gran">Gruplama</label>
+        <label class="visually-hidden" for="rp-gran">@Texts.Get("support.reports.granularity")</label>
         <select id="rp-gran" class="form-select form-select-sm filter-select" @bind="granularity">
             @foreach (var g in new[] { "day", "week", "month" }) { <option value="@g">@ReportLabels.Granularity(g)</option> }
         </select>
-        <label class="visually-hidden" for="rp-type">Tür</label>
+        <label class="visually-hidden" for="rp-type">@Texts.Get("common.field.kind")</label>
         <select id="rp-type" class="form-select form-select-sm filter-select" @bind="typeKey">
-            <option value="">Tüm türler</option>
+            <option value="">@Texts.Get("crm.act.allTypes")</option>
             @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList)) { <option value="@t.Key">@t.Label</option> }
         </select>
-        <label class="visually-hidden" for="rp-priority">Öncelik</label>
+        <label class="visually-hidden" for="rp-priority">@Texts.Get("crm.leads.col.priority")</label>
         <select id="rp-priority" class="form-select form-select-sm filter-select" @bind="priority">
-            <option value="">Tüm öncelikler</option>
+            <option value="">@Texts.Get("crm.act.allPriorities")</option>
             @foreach (var p in SupportLabels.Priorities) { <option value="@p.Key">@p.Label</option> }
         </select>
-        <button type="submit" class="btn btn-sm btn-outline-secondary" disabled="@busy">Raporu getir</button>
+        <button type="submit" class="btn btn-sm btn-outline-secondary" disabled="@busy">@Texts.Get("support.reports.load")</button>
     </form>
 
     <Notice Text="@error" Failed="true" />
@@ -48,98 +47,97 @@
     else if (report is not null)
     {
         <p class="small text-muted" role="status">
-            @report.Meta.From.ToString("dd.MM.yyyy") – @report.Meta.To.ToString("dd.MM.yyyy") · <strong>@report.Meta.TicketCount</strong> talep · @ReportLabels.Granularity(report.Meta.Granularity) · hesaplandı @CrmLabels.Time(report.Meta.GeneratedAt)
+            @report.Meta.From.ToString("dd.MM.yyyy") – @report.Meta.To.ToString("dd.MM.yyyy") · @Texts.Strong("support.reports.ticketCount", report.Meta.TicketCount.ToString()) · @ReportLabels.Granularity(report.Meta.Granularity) · @Texts.Get("support.reports.generatedAt", CrmLabels.Time(report.Meta.GeneratedAt))
         </p>
         @if (report.Meta.Truncated)
         {
-            <div class="alert alert-warning" role="alert">Talep sayısı rapor üst sınırını (10.000) aştı; sayılar eksiktir. Dönemi ya da süzgeci daraltın.</div>
+            <div class="alert alert-warning" role="alert">@Texts.Get("support.reports.truncated")</div>
         }
 
-        <section aria-labelledby="rp-volume"><h2 id="rp-volume">Hacim</h2>
-            <p>Dönemde açılan: <strong><a href="@ReportLabels.Drill(report.Volume.DrillDown)">@report.Volume.Total</a></strong></p>
+        <section aria-labelledby="rp-volume"><h2 id="rp-volume">@Texts.Get("support.reports.volume")</h2>
+            <p>@Texts.Get("support.reports.openedInPeriod") <strong><a href="@ReportLabels.Drill(report.Volume.DrillDown)">@report.Volume.Total</a></strong></p>
             @{ var max = Math.Max(1, report.Volume.Series.Max(p => p.Created)); }
             <table class="table record-table">
-                <caption class="visually-hidden">Açılan talep serisi</caption>
-                <thead><tr><th scope="col">@ReportLabels.Granularity(report.Meta.Granularity) başlangıç</th><th scope="col">Açılan</th><th scope="col">Dağılım</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("support.reports.seriesCaption")</caption>
+                <thead><tr><th scope="col">@Texts.Get("support.reports.col.bucketStart", ReportLabels.Granularity(report.Meta.Granularity))</th><th scope="col">@Texts.Get("support.reports.col.opened")</th><th scope="col">@Texts.Get("support.reports.col.distribution")</th></tr></thead>
                 <tbody>
                     @foreach (var point in report.Volume.Series)
                     {
-                        <tr><td data-label="Başlangıç">@point.Bucket.ToString("dd.MM.yyyy")</td><td data-label="Açılan">@point.Created</td><td data-label="Dağılım"><progress value="@point.Created" max="@max" aria-label="@point.Created talep"></progress></td></tr>
+                        <tr><td data-label="@Texts.Get("support.reports.from")">@point.Bucket.ToString("dd.MM.yyyy")</td><td data-label="@Texts.Get("support.reports.col.opened")">@point.Created</td><td data-label="@Texts.Get("support.reports.col.distribution")"><progress value="@point.Created" max="@max" aria-label="@Texts.Get("support.reports.tickets", point.Created)"></progress></td></tr>
                     }
                 </tbody>
             </table>
             <div class="form-grid">
-                <div class="span-3"><h3 class="h6">Duruma göre</h3><ul class="plain-list">@foreach (var c in report.Volume.ByStatus) { <li><a href="@ReportLabels.Drill(c.DrillDown)">@SupportLabels.Label(SupportLabels.Statuses, c.Key)</a>: @c.Count</li> }</ul></div>
-                <div class="span-3"><h3 class="h6">Türe göre</h3><ul class="plain-list">@foreach (var c in report.Volume.ByType) { <li><a href="@ReportLabels.Drill(c.DrillDown)">@Lookups.Label(SupportLabels.TicketTypeList, c.Key)</a>: @c.Count</li> }</ul></div>
-                <div class="span-3"><h3 class="h6">Kanala göre</h3><ul class="plain-list">@foreach (var c in report.Volume.ByChannel) { <li><a href="@ReportLabels.Drill(c.DrillDown)">@SupportLabels.Label(SupportLabels.Channels, c.Key)</a>: @c.Count</li> }</ul></div>
-                <div class="span-3"><h3 class="h6">Önceliğe göre</h3><ul class="plain-list">@foreach (var c in report.Volume.ByPriority) { <li><a href="@ReportLabels.Drill(c.DrillDown)">@SupportLabels.Label(SupportLabels.Priorities, c.Key)</a>: @c.Count</li> }</ul></div>
+                <div class="span-3"><h3 class="h6">@Texts.Get("support.reports.byStatus")</h3><ul class="plain-list">@foreach (var c in report.Volume.ByStatus) { <li><a href="@ReportLabels.Drill(c.DrillDown)">@SupportLabels.Label(SupportLabels.Statuses, c.Key)</a>: @c.Count</li> }</ul></div>
+                <div class="span-3"><h3 class="h6">@Texts.Get("support.reports.byType")</h3><ul class="plain-list">@foreach (var c in report.Volume.ByType) { <li><a href="@ReportLabels.Drill(c.DrillDown)">@Lookups.Label(SupportLabels.TicketTypeList, c.Key)</a>: @c.Count</li> }</ul></div>
+                <div class="span-3"><h3 class="h6">@Texts.Get("support.reports.byChannel")</h3><ul class="plain-list">@foreach (var c in report.Volume.ByChannel) { <li><a href="@ReportLabels.Drill(c.DrillDown)">@SupportLabels.Label(SupportLabels.Channels, c.Key)</a>: @c.Count</li> }</ul></div>
+                <div class="span-3"><h3 class="h6">@Texts.Get("support.reports.byPriority")</h3><ul class="plain-list">@foreach (var c in report.Volume.ByPriority) { <li><a href="@ReportLabels.Drill(c.DrillDown)">@SupportLabels.Label(SupportLabels.Priorities, c.Key)</a>: @c.Count</li> }</ul></div>
             </div>
         </section>
 
-        <section aria-labelledby="rp-backlog"><h2 id="rp-backlog">Birikim yaşı (şu an)</h2>
-            <p class="small text-muted">Dönemden bağımsız, çalışılan talepler; çözülmüş (teyit bekleyen) talep birikimde sayılmaz.</p>
-            <p><strong>@report.Backlog.Open</strong> açık talep · @report.Backlog.Unassigned atanmamış · en eski @(report.Backlog.OldestDays is { } oldest ? $"{oldest:0.#} gün" : "—")</p>
+        <section aria-labelledby="rp-backlog"><h2 id="rp-backlog">@Texts.Get("support.reports.backlog")</h2>
+            <p class="small text-muted">@Texts.Get("support.reports.backlogHelp")</p>
+            <p>@Texts.Strong("support.reports.backlogOpen", report.Backlog.Open.ToString()) · @Texts.Get("support.reports.backlogUnassigned", report.Backlog.Unassigned) · @Texts.Get("support.reports.oldest", report.Backlog.OldestDays is { } oldest ? Texts.Get("support.reports.days", oldest.ToString("0.#")) : "—")</p>
             <table class="table record-table">
-                <caption class="visually-hidden">Yaşa göre açık talepler</caption>
-                <thead><tr><th scope="col">Yaş</th><th scope="col">Talep</th></tr></thead>
-                <tbody>@foreach (var b in report.Backlog.Buckets) { <tr><td data-label="Yaş">@b.Label</td><td data-label="Talep"><a href="@ReportLabels.Drill(b.DrillDown)">@b.Count</a></td></tr> }</tbody>
+                <caption class="visually-hidden">@Texts.Get("support.reports.backlogCaption")</caption>
+                <thead><tr><th scope="col">@Texts.Get("support.tickets.col.age")</th><th scope="col">@Texts.Get("support.tickets.col.ticket")</th></tr></thead>
+                <tbody>@foreach (var b in report.Backlog.Buckets) { <tr><td data-label="@Texts.Get("support.tickets.col.age")">@b.Label</td><td data-label="@Texts.Get("support.tickets.col.ticket")"><a href="@ReportLabels.Drill(b.DrillDown)">@b.Count</a></td></tr> }</tbody>
             </table>
         </section>
 
-        <section aria-labelledby="rp-times"><h2 id="rp-times">Süreler</h2>
+        <section aria-labelledby="rp-times"><h2 id="rp-times">@Texts.Get("support.reports.times")</h2>
             <p class="small text-muted">
-                <strong>Takvim süresi</strong>: açılıştan olaya geçen gerçek süre. <strong>İş süresi</strong>: SLA örneğinin harcanan süresi (iş takvimine göre, duraklatmalar hariç); yalnızca SLA politikası uygulanan talepler.
-                Yüzdelikler "en yakın sıra" yöntemiyle gerçek değerlerden alınır. Çözüm süresi son çözümedir (yeniden açılan talepte iş süresi son döngünün süresidir).
+                @Texts.Strong("support.reports.timesHelp", Texts.Get("support.reports.calendarTime"), Texts.Get("support.reports.businessTime"))
             </p>
             <table class="table record-table">
-                <caption class="visually-hidden">Süre istatistikleri</caption>
-                <thead><tr><th scope="col">Ölçüm</th><th scope="col">Örneklem</th><th scope="col">Ortalama</th><th scope="col">Medyan</th><th scope="col">%90</th><th scope="col">%95</th><th scope="col">En kısa / en uzun</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("support.reports.timesCaption")</caption>
+                <thead><tr><th scope="col">@Texts.Get("support.reports.col.measure")</th><th scope="col">@Texts.Get("support.reports.col.sample")</th><th scope="col">@Texts.Get("support.reports.col.mean")</th><th scope="col">@Texts.Get("support.reports.col.median")</th><th scope="col">@Texts.Get("support.percent", 90)</th><th scope="col">@Texts.Get("support.percent", 95)</th><th scope="col">@Texts.Get("support.reports.col.minMax")</th></tr></thead>
                 <tbody>
                     @foreach (var (label, d) in DurationRows())
                     {
-                        <tr><td data-label="Ölçüm">@label</td><td data-label="Örneklem">@d.Count</td><td data-label="Ortalama">@ReportLabels.Minutes(d.Mean)</td><td data-label="Medyan">@ReportLabels.Minutes(d.Median)</td>
-                            <td data-label="%90">@ReportLabels.Minutes(d.P90)</td><td data-label="%95">@ReportLabels.Minutes(d.P95)</td><td data-label="En kısa / en uzun">@ReportLabels.Minutes(d.Min) / @ReportLabels.Minutes(d.Max)</td></tr>
+                        <tr><td data-label="@Texts.Get("support.reports.col.measure")">@label</td><td data-label="@Texts.Get("support.reports.col.sample")">@d.Count</td><td data-label="@Texts.Get("support.reports.col.mean")">@ReportLabels.Minutes(d.Mean)</td><td data-label="@Texts.Get("support.reports.col.median")">@ReportLabels.Minutes(d.Median)</td>
+                            <td data-label="@Texts.Get("support.percent", 90)">@ReportLabels.Minutes(d.P90)</td><td data-label="@Texts.Get("support.percent", 95)">@ReportLabels.Minutes(d.P95)</td><td data-label="@Texts.Get("support.reports.col.minMax")">@ReportLabels.Minutes(d.Min) / @ReportLabels.Minutes(d.Max)</td></tr>
                     }
                 </tbody>
             </table>
-            <p class="small text-muted">İlk yanıtı henüz verilmeyen: @report.Times.NotYetResponded · henüz çözülmeyen: @report.Times.NotYetResolved (süre istatistiklerine girmez).</p>
+            <p class="small text-muted">@Texts.Get("support.reports.notYet", report.Times.NotYetResponded, report.Times.NotYetResolved)</p>
         </section>
 
-        <section aria-labelledby="rp-sla"><h2 id="rp-sla">SLA uyumu</h2>
-            <p class="small text-muted">Pay: hedefinde tamamlananlar. Payda: sonuçlanmışlar (hedefinde tamamlanan + hedef aşılarak tamamlanan + hedefi aşılmış açık). Devam eden ve iptal edilenler paydada yoktur.</p>
+        <section aria-labelledby="rp-sla"><h2 id="rp-sla">@Texts.Get("support.reports.sla")</h2>
+            <p class="small text-muted">@Texts.Get("support.reports.slaHelp")</p>
             <table class="table record-table">
-                <caption class="visually-hidden">SLA uyumu</caption>
-                <thead><tr><th scope="col">Ölçüt</th><th scope="col">Hedefinde</th><th scope="col">Aşılarak tamamlandı</th><th scope="col">Aşıldı (açık)</th><th scope="col">Payda</th><th scope="col">Uyum</th><th scope="col">Devam eden</th><th scope="col">İptal</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("support.reports.sla")</caption>
+                <thead><tr><th scope="col">@Texts.Get("support.reports.col.metric")</th><th scope="col">@Texts.Get("support.reports.col.met")</th><th scope="col">@Texts.Get("support.reports.col.missed")</th><th scope="col">@Texts.Get("support.reports.col.breached")</th><th scope="col">@Texts.Get("support.reports.col.decided")</th><th scope="col">@Texts.Get("support.reports.col.compliance")</th><th scope="col">@Texts.Get("support.reports.col.inProgress")</th><th scope="col">@Texts.Get("common.cancel")</th></tr></thead>
                 <tbody>
                     @foreach (var s in report.Sla)
                     {
-                        <tr><td data-label="Ölçüt">@ReportLabels.Metric(s.Metric)</td><td data-label="Hedefinde">@s.Counts.Met</td><td data-label="Aşılarak tamamlandı">@s.Counts.Missed</td>
-                            <td data-label="Aşıldı (açık)">@s.Counts.Breached</td><td data-label="Payda">@s.Counts.Decided</td>
-                            <td data-label="Uyum"><strong>@ReportLabels.Percent(s.CompliancePercent)</strong> <small class="text-muted">(@s.Counts.Met / @s.Counts.Decided)</small></td>
-                            <td data-label="Devam eden">@s.Counts.InProgress</td><td data-label="İptal">@s.Counts.Cancelled</td></tr>
+                        <tr><td data-label="@Texts.Get("support.reports.col.metric")">@ReportLabels.Metric(s.Metric)</td><td data-label="@Texts.Get("support.reports.col.met")">@s.Counts.Met</td><td data-label="@Texts.Get("support.reports.col.missed")">@s.Counts.Missed</td>
+                            <td data-label="@Texts.Get("support.reports.col.breached")">@s.Counts.Breached</td><td data-label="@Texts.Get("support.reports.col.decided")">@s.Counts.Decided</td>
+                            <td data-label="@Texts.Get("support.reports.col.compliance")"><strong>@ReportLabels.Percent(s.CompliancePercent)</strong> <small class="text-muted">(@s.Counts.Met / @s.Counts.Decided)</small></td>
+                            <td data-label="@Texts.Get("support.reports.col.inProgress")">@s.Counts.InProgress</td><td data-label="@Texts.Get("common.cancel")">@s.Counts.Cancelled</td></tr>
                     }
                 </tbody>
             </table>
-            <a class="small" href="@ReportLabels.Drill(report.Sla[0].DrillDown)">Hedefi aşılmış açık talepler</a>
+            <a class="small" href="@ReportLabels.Drill(report.Sla[0].DrillDown)">@Texts.Get("support.reports.breachedOpen")</a>
         </section>
 
-        <section aria-labelledby="rp-reopen"><h2 id="rp-reopen">Yeniden açılma</h2>
-            <p><strong>@ReportLabels.Percent(report.Reopen.RatePercent)</strong> <small class="text-muted">(@report.Reopen.Reopened yeniden açılan / @report.Reopen.Resolved çözülen)</small> · toplam @report.Reopen.TotalReopens yeniden açma ·
-                <a href="@ReportLabels.Drill(report.Reopen.DrillDown)">talepleri göster</a></p>
+        <section aria-labelledby="rp-reopen"><h2 id="rp-reopen">@Texts.Get("support.detail.reopens")</h2>
+            <p><strong>@ReportLabels.Percent(report.Reopen.RatePercent)</strong> <small class="text-muted">@Texts.Get("support.reports.reopenRatio", report.Reopen.Reopened, report.Reopen.Resolved)</small> · @Texts.Get("support.reports.reopenTotal", report.Reopen.TotalReopens) ·
+                <a href="@ReportLabels.Drill(report.Reopen.DrillDown)">@Texts.Get("support.reports.showTickets")</a></p>
         </section>
 
-        <section aria-labelledby="rp-csat"><h2 id="rp-csat">Memnuniyet</h2>
+        <section aria-labelledby="rp-csat"><h2 id="rp-csat">@Texts.Get("support.reports.csat")</h2>
             @if (report.Csat.SmallSample)
             {
-                <div class="alert alert-warning" role="status">Yanıt sayısı az (@report.Csat.Answered &lt; 30): ortalama güvenilir bir genelleme sayılmamalıdır.</div>
+                <div class="alert alert-warning" role="status">@Texts.Get("support.reports.smallSample", report.Csat.Answered)</div>
             }
             <p>
-                Gönderilen anket: <strong>@report.Csat.Sent</strong>@(report.Csat.NotSent > 0 ? $" (gönderilemeyen: {report.Csat.NotSent})" : null) · yanıt: <strong>@report.Csat.Answered</strong>
-                · yanıt oranı <strong>@ReportLabels.Percent(report.Csat.ResponseRatePercent)</strong> · ortalama puan <strong>@(report.Csat.AverageRating is { } avg ? avg.ToString("0.##") : "—")</strong> / 5
-                · düşük puan (≤2): <a href="@ReportLabels.Drill(report.Csat.DrillDown)">@report.Csat.Low</a>
+                @(report.Csat.NotSent > 0 ? Texts.Strong("support.reports.sentWithFailed", report.Csat.Sent.ToString(), report.Csat.NotSent.ToString()) : Texts.Strong("support.reports.sent", report.Csat.Sent.ToString())) · @Texts.Strong("support.reports.answered", report.Csat.Answered.ToString())
+                · @Texts.Strong("support.reports.responseRate", ReportLabels.Percent(report.Csat.ResponseRatePercent)) · @Texts.Strong("support.reports.averageRating", report.Csat.AverageRating is { } avg ? avg.ToString("0.##") : "—")
+                · @Texts.Get("support.reports.lowRating") <a href="@ReportLabels.Drill(report.Csat.DrillDown)">@report.Csat.Low</a>
             </p>
-            <ul class="plain-list">@foreach (var d in report.Csat.Distribution) { <li>@d.Key puan: @d.Count</li> }</ul>
-            <p class="small text-muted">Yorum metinleri raporda yer almaz; talep ekranında görülür.</p>
+            <ul class="plain-list">@foreach (var d in report.Csat.Distribution) { <li>@Texts.Get("support.reports.ratingCount", d.Key, d.Count)</li> }</ul>
+            <p class="small text-muted">@Texts.Get("support.reports.comments")</p>
         </section>
     }
 </AuthGate>
@@ -166,10 +164,10 @@
 
     private IEnumerable<(string Label, ReportDurationDto Stats)> DurationRows()
     {
-        yield return ("İlk yanıt (takvim)", report!.Times.FirstResponseCalendar);
-        yield return ("İlk yanıt (iş süresi)", report.Times.FirstResponseBusiness);
-        yield return ("Çözüm (takvim)", report.Times.ResolutionCalendar);
-        yield return ("Çözüm (iş süresi)", report.Times.ResolutionBusiness);
+        yield return (Texts.Get("support.reports.firstResponseCalendar"), report!.Times.FirstResponseCalendar);
+        yield return (Texts.Get("support.reports.firstResponseBusiness"), report.Times.FirstResponseBusiness);
+        yield return (Texts.Get("support.reports.resolutionCalendar"), report.Times.ResolutionCalendar);
+        yield return (Texts.Get("support.reports.resolutionBusiness"), report.Times.ResolutionBusiness);
     }
 
     private async Task LoadAsync()
