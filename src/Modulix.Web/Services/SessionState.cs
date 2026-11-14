@@ -180,11 +180,14 @@ public sealed class SessionState(ApiClient api, IJSRuntime? js = null)
 
         if (User?.ActiveTenantId is not null && !TwoFactorRequired)
         {
-            var access = await api.GetAsync<MyAccessResponse>("/api/tenant/access");
+            // Erişim ile bölgesel ayarlar birbirinden bağımsızdır; birlikte istenir.
+            var accessTask = api.GetAsync<MyAccessResponse>("/api/tenant/access");
+            var settingsTask = api.GetAsync<SettingsResponse>("/api/settings");
+            var access = await accessTask;
             Access = access.IsSuccess ? access.Value : null;
 
             // Bölgesel ayarlar ve logo: ekranlar saatleri, biçimleri ve para birimini buradan alır.
-            var settings = await api.GetAsync<SettingsResponse>("/api/settings");
+            var settings = await settingsTask;
             Regional.Apply(settings.Value?.Settings);
             UiLanguage.Apply(User.PreferredLanguage, settings.Value?.Settings, fallbackLanguage);
             Logo = settings.Value?.Logo;
