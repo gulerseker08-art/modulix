@@ -3,30 +3,28 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Sözleşme panosu · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.contracts.dashboard.menu") · Modulix</PageTitle>
 
 <AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsRead">
     <div class="page-header">
-        <h1>Sözleşme panosu</h1>
+        <h1>@Texts.Get("nav.app.contracts.dashboard.menu")</h1>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="sozlesmeler">Sözleşme listesi</a>
-            <a class="btn btn-outline-secondary" href="sozlesmeler/yenileme">Yenileme takvimi</a>
+            <a class="btn btn-outline-secondary" href="sozlesmeler">@Texts.Get("contracts.dashboard.list")</a>
+            <a class="btn btn-outline-secondary" href="sozlesmeler/yenileme">@Texts.Get("contracts.renewals.calendar")</a>
         </div>
     </div>
-    <p class="text-muted">
-        Yalnızca görebildiğiniz sözleşmeler sayılır; her kutu tıklanınca aynı süzgeçle listeyi açar. Tutarlar para birimine göre ayrı gösterilir, kur ile toplanmaz.
-    </p>
+    <p class="text-muted">@Texts.Get("contracts.dashboard.intro")</p>
 
     <Notice Text="@error" Failed="true" />
 
     @if (data is null && error is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
     }
     else if (data is not null)
     {
         <section aria-labelledby="counts-title">
-            <h2 id="counts-title" class="visually-hidden">Sayaçlar</h2>
+            <h2 id="counts-title" class="visually-hidden">@Texts.Get("contracts.dashboard.counters")</h2>
             <div class="stat-grid">
                 @foreach (var (key, label) in ViewLabels.Counters)
                 {
@@ -41,76 +39,76 @@
 
         <div class="chart-grid">
             <section class="chart-card" aria-labelledby="type-title">
-                <h2 id="type-title">Yürürlükteki sözleşmeler · türe göre</h2>
+                <h2 id="type-title">@Texts.Get("contracts.dashboard.byType")</h2>
                 @if (data.ByType.Count == 0)
                 {
-                    <p class="text-muted">Yürürlükte sözleşme yok.</p>
+                    <p class="text-muted">@Texts.Get("contracts.dashboard.noneActive")</p>
                 }
                 else
                 {
-                    <BarChart Slices="TypeSlices" Title="Yürürlükteki sözleşmelerin türe göre dağılımı" />
+                    <BarChart Slices="TypeSlices" Title="@Texts.Get("contracts.dashboard.byTypeChart")" />
                 }
                 @if (data.Truncated)
                 {
-                    <p class="small text-muted">Dağılım yürürlükteki ilk 2000 sözleşmeye dayanır.</p>
+                    <p class="small text-muted">@Texts.Get("contracts.dashboard.truncated")</p>
                 }
             </section>
 
             <section class="chart-card" aria-labelledby="money-title">
-                <h2 id="money-title">Yürürlükteki sözleşme tutarı · para birimine göre</h2>
+                <h2 id="money-title">@Texts.Get("contracts.dashboard.byCurrency")</h2>
                 @if (data.Money is null)
                 {
-                    <p class="text-muted">Tutarları görmek için “Sözleşme tutarları” izni gerekir.</p>
+                    <p class="text-muted">@Texts.Get("contracts.dashboard.moneyPermission")</p>
                 }
                 else if (data.Money.Count == 0)
                 {
-                    <p class="text-muted">Yürürlükte sözleşme yok.</p>
+                    <p class="text-muted">@Texts.Get("contracts.dashboard.noneActive")</p>
                 }
                 else
                 {
                     <table class="table record-table">
-                        <caption class="visually-hidden">Para birimine göre tek seferlik sözleşme toplamları</caption>
-                        <thead><tr><th scope="col">Para birimi</th><th scope="col" class="text-end">Sözleşme</th><th scope="col" class="text-end">Net</th><th scope="col" class="text-end">Genel toplam</th></tr></thead>
+                        <caption class="visually-hidden">@Texts.Get("contracts.dashboard.moneyCaption")</caption>
+                        <thead><tr><th scope="col">@Texts.Get("contracts.field.currency")</th><th scope="col" class="text-end">@Texts.Get("contracts.list.col.contract")</th><th scope="col" class="text-end">@Texts.Get("contracts.field.net")</th><th scope="col" class="text-end">@Texts.Get("contracts.field.grosstotal")</th></tr></thead>
                         <tbody>
                             @foreach (var m in data.Money)
                             {
                                 <tr>
-                                    <td data-label="Para birimi" class="primary">@m.Currency</td>
-                                    <td data-label="Sözleşme" class="text-end">@m.Count</td>
-                                    <td data-label="Net" class="text-end">@ContractLabels.Money(m.NetTotal, m.Currency)</td>
-                                    <td data-label="Genel toplam" class="text-end">@ContractLabels.Money(m.GrossTotal, m.Currency)</td>
+                                    <td data-label="@Texts.Get("contracts.field.currency")" class="primary">@m.Currency</td>
+                                    <td data-label="@Texts.Get("contracts.list.col.contract")" class="text-end">@m.Count</td>
+                                    <td data-label="@Texts.Get("contracts.field.net")" class="text-end">@ContractLabels.Money(m.NetTotal, m.Currency)</td>
+                                    <td data-label="@Texts.Get("contracts.field.grosstotal")" class="text-end">@ContractLabels.Money(m.GrossTotal, m.Currency)</td>
                                 </tr>
                             }
                         </tbody>
                     </table>
-                    <p class="small text-muted">Yalnızca tek seferlik toplamlar; dönemsel kalemler sözleşme detayında özetlenir.</p>
+                    <p class="small text-muted">@Texts.Get("contracts.dashboard.oneTimeOnly")</p>
                 }
             </section>
         </div>
 
         <section aria-labelledby="upcoming-title">
-            <h2 id="upcoming-title">Yaklaşan kritik tarihler (90 gün)</h2>
+            <h2 id="upcoming-title">@Texts.Get("contracts.dashboard.upcoming")</h2>
             @if (data.Upcoming.Count == 0)
             {
-                <p class="text-muted">Önümüzdeki 90 günde son bildirim ya da bitiş tarihi gelen yürürlükteki sözleşme yok.</p>
+                <p class="text-muted">@Texts.Get("contracts.dashboard.noUpcoming")</p>
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Yaklaşan kritik tarihler</caption>
-                    <thead><tr><th scope="col">Sözleşme</th><th scope="col">Tarih</th><th scope="col">Kalan</th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("contracts.dashboard.upcomingCaption")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("contracts.list.col.contract")</th><th scope="col">@Texts.Get("contracts.dashboard.col.date")</th><th scope="col">@Texts.Get("contracts.dashboard.col.left")</th></tr></thead>
                     <tbody>
                         @foreach (var d in data.Upcoming)
                         {
                             <tr>
-                                <td data-label="Sözleşme" class="primary"><a href="sozlesmeler/@d.ContractId">@d.Title</a> <small class="text-muted">@d.Number</small></td>
-                                <td data-label="Tarih">@(d.Kind == "notice" ? "Son bildirim" : "Bitiş"): @ContractLabels.Date(d.Date)</td>
-                                <td data-label="Kalan">@RenewalLabels.Days(d.DaysLeft)</td>
+                                <td data-label="@Texts.Get("contracts.list.col.contract")" class="primary"><a href="sozlesmeler/@d.ContractId">@d.Title</a> <small class="text-muted">@d.Number</small></td>
+                                <td data-label="@Texts.Get("contracts.dashboard.col.date")">@(d.Kind == "notice" ? Texts.Get("contracts.dashboard.noticeOn", ContractLabels.Date(d.Date)) : Texts.Get("contracts.dashboard.endOn", ContractLabels.Date(d.Date)))</td>
+                                <td data-label="@Texts.Get("contracts.dashboard.col.left")">@RenewalLabels.Days(d.DaysLeft)</td>
                             </tr>
                         }
                     </tbody>
                 </table>
-                <p class="small"><a href="sozlesmeler/yenileme">Yenileme takvimini aç</a></p>
+                <p class="small"><a href="sozlesmeler/yenileme">@Texts.Get("contracts.dashboard.openCalendar")</a></p>
             }
         </section>
     }
@@ -121,7 +119,7 @@
     private string? error;
 
     private IReadOnlyList<ChartSlice> TypeSlices =>
-        [.. (data?.ByType ?? []).Select(t => new ChartSlice(t.Key == "—" ? "Türsüz" : Lookups.Label(ContractsAccess.ContractTypeList, t.Key), t.Count))];
+        [.. (data?.ByType ?? []).Select(t => new ChartSlice(t.Key == "—" ? Texts.Get("contracts.dashboard.noType") : Lookups.Label(ContractsAccess.ContractTypeList, t.Key), t.Count))];
 
     protected override async Task OnInitializedAsync()
     {
