@@ -7,13 +7,13 @@
 @switch (check?.Status)
 {
     case "Found":
-        <small class="text-muted d-block">Katalog (@check.VersionName): @check.Description</small>
+        <small class="text-muted d-block">@Texts.Get("warehouse.gtipHint.found", check.VersionName, check.Description)</small>
         break;
     case "PrefixOnly":
-        <div class="alert alert-info mt-2" role="status">Bu kod katalogda yalnızca daha uzun kodların başı olarak var (@check.VersionName); tam kodu girmeniz önerilir.</div>
+        <div class="alert alert-info mt-2" role="status">@Texts.Get("warehouse.gtipHint.prefixOnly", check.VersionName)</div>
         break;
     case "NotFound":
-        <div class="alert alert-warning mt-2" role="status">Bu kod yürürlükteki GTİP kataloğunda (@check.VersionName) bulunamadı. Kayıt engellenmez; kodu kontrol edin.</div>
+        <div class="alert alert-warning mt-2" role="status">@Texts.Get("warehouse.gtipHint.notFound", check.VersionName)</div>
         break;
 }
 
