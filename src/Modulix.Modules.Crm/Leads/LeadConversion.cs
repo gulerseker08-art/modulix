@@ -393,6 +393,12 @@ internal sealed class LeadConversion(
             values["ownerId"] = owner;
         }
 
+        // Kampanya bağı (ADR-0025): talebi getiren kampanya fırsata geçer; dönüşüm iş akışı yazımı olduğundan görünürlük yeniden denetlenmez.
+        if (Text(lead, "campaignId") is { } campaign)
+        {
+            values["campaignId"] = campaign;
+        }
+
         // Hizmet kapsamı (ADR-0029 Dilim F2): talebin kapsamı fırsata olduğu gibi geçer; fırsatta sonradan düzenlenebilir.
         if (lead.Values["serviceScope"] is JsonArray { Count: > 0 } serviceScope)
         {

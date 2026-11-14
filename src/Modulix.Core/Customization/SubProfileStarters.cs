@@ -12,7 +12,8 @@ public sealed record SubProfileStarter(
     string Name,
     string Description,
     string? ActivityCode,
-    IReadOnlyList<SubProfileOptionInput> Options);
+    IReadOnlyList<SubProfileOptionInput> Options,
+    IReadOnlyList<SubProfileFeatureInput>? Features = null);
 
 /// <summary>Hazır alt profiller; açılışta tanımlar modül kataloğuna göre doğrulanır (bilinmeyen kayıt türü, liste, kategori, tekrar eden seçenek).</summary>
 public sealed class SubProfileStarterCatalog
@@ -64,6 +65,27 @@ public sealed class SubProfileStarterCatalog
             throw Fails("seçenek yok");
         }
 
+        var seenFeatures = new List<SubProfileFeature>();
+        foreach (var feature in starter.Features ?? [])
+        {
+            SubProfileFeatureInput normalizedFeature;
+            try
+            {
+                normalizedFeature = SubProfileRules.NormalizeFeature(feature);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new InvalidOperationException($"Geçersiz hazır alt profil '{starter.Key}': özellik '{feature.Group}: {feature.Value}' ({exception.Message}).", exception);
+            }
+
+            if (SubProfileRules.IsDuplicateFeature(normalizedFeature, seenFeatures))
+            {
+                throw Fails($"özellik tekrar ediyor '{feature.Group}: {feature.Value}'");
+            }
+
+            seenFeatures.Add(new SubProfileFeature(Guid.Empty, normalizedFeature.Group, normalizedFeature.Value, 0));
+        }
+
         var seen = new List<SubProfileOption>();
         var required = new List<string>();
         foreach (var option in starter.Options)
@@ -104,5 +126,6 @@ public sealed record SubProfileStarterView(
     string Description,
     string? ActivityName,
     IReadOnlyList<string> OptionLabels,
+    IReadOnlyList<string> FeatureLabels,
     IReadOnlyList<string> MissingModules,
     bool Added);

@@ -210,6 +210,8 @@ Harici kullanım ücreti yoktur ama maliyet sıfır değildir: kural değerlendi
 
 ## AI'a açık bırakılan noktalar (kod yazılmadan)
 
+> Bu noktaların nasıl kullanılacağı ve ajan kuralları [ADR-0047](0047-yapay-zeka-ajan-kurallari.md) taslağındadır.
+
 1. `AutomationCallContext.Kind = Agent`: aksiyon sözleşmesi çağıran kimliği dışarıdan alır; AI ajanı aynı kaydı kullanır, yetkisi kullanıcının yetkisiyle sınırlıdır (CLAUDE.md: AI yalnızca tenant ve kullanıcı yetkisi içinde, modül servisleri üzerinden).
 2. `AutomationSideEffect` ve `SupportsDryRun`: AI aracı "önce planla, sonra onayla" akışını bu alanlardan kurar; `Write` aksiyonları insan onayına bağlanabilir.
 3. `ExecutionSource.AiTool` zaten denetim kaydında vardır; AI çağrısı yapılırsa aynı denetim yolu kullanılır.
@@ -411,6 +413,7 @@ Tasarımdan ayrılan / netleşen noktalar:
 - **Uç noktalar:** `GET /api/automation/templates` (`core.automation.read`; modülü bu firmada kapalı şablonlar listede yoktur, kullanılamayanlar `issues` ile gelir) ve `POST /api/automation/templates/{key}/use` (`core.automation.manage`; bilinmeyen / modülü kapalı şablon 404, kullanılamayan 400, başarıda 201 + taslak kural).
 - **CRM şablonları** (`CrmAutomationTemplates`, hepsi yalnızca takip aktivitesi açar; mesaj göndermez, kayıt değiştirmez): hareketsiz müşteri adayı (7 gün), hareketsiz fırsat (14 gün), kapanış tarihine 3 gün kalan açık fırsat, satın alma tarihine 7 gün kalan açık müşteri adayı.
 - **Demo** bu dilimde yoktur: gerçek veride toplu otomasyon kapsam dışıdır, şablon taslak teslim edilir. Demo ancak ekran (Dilim 5) ile birlikte anlamlıdır.
+- **Ek (14 Kasım 2026): firmaya bırakılan parametre.** Şablon, firmaya özgü olduğu için kodda sabitlenemeyen zorunlu bir aksiyon parametresini (ör. "Bildirim gönder"in alıcısı) `AutomationTemplateDefinition.ToComplete` (`AutomationTemplateBlank`: adım kimliği + parametre adı) ile bilerek boş bırakabilir. Bu eksik şablonu "kullanılamıyor" yapmaz; taslak açılır, eksik parametre taslağın doğrulama sorunu olarak görünür ve doldurulmadan kural **yayınlanamaz** (yayın doğrulaması değişmedi). Katalog açılışta boşluğun var olan bir adımı ve şablonda verilmemiş, zorunlu bir parametreyi gösterdiğini denetler; böylece yalnızca o parametrenin "zorunlu" sorunu süzülür, izin / modül / başka eksik sorunları şablonu yine kullanılamaz yapar (yetki yükseltme yok). İlk kullanan Lojistik şablonlarıdır (ADR-0038 bölüm 23).
 
 ### Test sonuçları (Dilim 3b)
 

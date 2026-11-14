@@ -26,15 +26,23 @@ public static class EventEndpoints
 
         events.MapGet("/deliveries", async (
             Guid? tenantId, string? subscription, string? eventType, EventDeliveryStateDto? state, DateOnly? from, DateOnly? to,
-            int? page, int? pageSize, IEventAdministration admin, CancellationToken ct) =>
+            int? page, int? pageSize, string? sort, IEventAdministration admin, CancellationToken ct) =>
         {
+            // Başlığa göre sıralama (ADR-0036): yalnızca bilinen anahtarlar kabul edilir.
+            if (!string.IsNullOrEmpty(sort) && !EventDeliveryQuery.SortKeys.Contains(sort))
+            {
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]> { ["sort"] = ["Geçersiz sıralama."] }, statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+
             var query = Query(new EventDeliveryFilterDto(tenantId, subscription, eventType, state, from, to)) with
             {
                 Page = page ?? 1,
                 PageSize = pageSize ?? 50,
+                Sort = string.IsNullOrEmpty(sort) ? null : sort,
             };
             var result = await admin.ListAsync(query, ct);
-            return new EventDeliveryPageResponse([.. result.Items.Select(ToDto)], result.Page, result.PageSize, result.TotalCount);
+            return Results.Ok(new EventDeliveryPageResponse([.. result.Items.Select(ToDto)], result.Page, result.PageSize, result.TotalCount));
         });
 
         events.MapPost("/deliveries/retry", (EventDeliveryActionRequest request, ClaimsPrincipal user, IEventAdministration admin, CancellationToken ct) =>

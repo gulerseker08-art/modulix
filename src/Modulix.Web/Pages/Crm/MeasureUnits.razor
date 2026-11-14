@@ -75,7 +75,15 @@
     else
     {
         <table class="table record-table">
-            <thead><tr><th>@Texts.Get("crm.products.col.code")</th><th>@Texts.Get("common.field.name")</th><th>@Texts.Get("crm.measureUnits.col.group")</th><th>@Texts.Get("crm.measureUnits.col.factor")</th><th></th></tr></thead>
+            <thead>
+                <tr>
+                    <th scope="col"><SortHeader Label="@Texts.Get("crm.products.col.code")" ColumnIcon="hash" Asc="code" Desc="-code" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("common.field.name")" ColumnIcon="type" Asc="name" Desc="-name" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("crm.measureUnits.col.group")" ColumnIcon="tag" Asc="groupKey" Desc="-groupKey" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("crm.measureUnits.col.factor")" ColumnIcon="percent" Asc="factorToBase" Desc="-factorToBase" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
+                </tr>
+            </thead>
             <tbody>
                 @foreach (var unit in page.Items)
                 {
@@ -84,10 +92,12 @@
                         <td data-label="@Texts.Get("common.field.name")">@unit.Name</td>
                         <td data-label="@Texts.Get("crm.measureUnits.col.group")">@CatalogLabels.Label(CatalogLabels.UnitGroups, unit.GroupKey)</td>
                         <td data-label="@Texts.Get("crm.measureUnits.col.factor")">@unit.FactorToBase.ToString("0.######")</td>
-                        <td class="actions">
+                        <td class="row-menu-cell">
                             @if (Session.Can(CrmAccess.ProductsWrite))
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(unit)">@Texts.Get("common.edit")</button>
+                                <RowMenu Label="@Texts.Get("common.rowActionsOf", unit.Name)">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Edit(unit)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
+                                </RowMenu>
                             }
                         </td>
                     </tr>
@@ -118,9 +128,18 @@
 
     private async Task LoadAsync(int pageNumber)
     {
-        var result = await Api.GetAsync<CrmPage<MeasureUnitDto>>($"{Url}?page={pageNumber}&pageSize={ListPaging.Size}");
+        var result = await Api.GetAsync<CrmPage<MeasureUnitDto>>($"{Url}?page={pageNumber}&pageSize={ListPaging.Size}{(sort.Length == 0 ? "" : "&sort=" + Uri.EscapeDataString(sort))}");
         page = result.Value;
         message = result.Error;
+    }
+
+    // Sıralama sunucudadır (MeasureUnitRecordStore.SortKeys); boş değer varsayılan sıradır (grup, kod).
+    private string sort = "";
+
+    private async Task SortAsync(string value)
+    {
+        sort = value;
+        await LoadAsync(1);
     }
 
     private void Edit(MeasureUnitDto unit)

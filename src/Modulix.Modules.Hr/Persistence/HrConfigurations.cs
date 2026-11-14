@@ -34,6 +34,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(e => e.EmployeeNumber).HasMaxLength(Employee.EmployeeNumberMaxLength);
         builder.Property(e => e.JobTitle).HasMaxLength(Employee.JobTitleMaxLength);
         builder.Property(e => e.DepartmentKey).HasMaxLength(100);
+        builder.HasIndex(e => new { e.TenantId, e.BusinessUnitId }).HasDatabaseName("IX_Employees_BusinessUnit");
         builder.Property(e => e.EmploymentType).HasMaxLength(20).IsUnicode(false).IsRequired();
         builder.Property(e => e.WorkLocation).HasMaxLength(Employee.WorkLocationMaxLength);
         builder.Property(e => e.Status).HasMaxLength(20).IsUnicode(false).IsRequired();
@@ -349,5 +350,19 @@ internal sealed class PhotoAlbumConfiguration : IEntityTypeConfiguration<PhotoAl
         builder.Property(a => a.Title).HasMaxLength(PhotoAlbum.TitleMaxLength).IsRequired();
         builder.Property(a => a.Description).HasMaxLength(PhotoAlbum.DescriptionMaxLength);
         builder.HasIndex(a => new { a.TenantId, a.IsPublished, a.EventDate }).HasDatabaseName("IX_PhotoAlbums_Published");
+    }
+}
+
+internal sealed class EmployeePositionConfiguration : IEntityTypeConfiguration<EmployeePosition>
+{
+    public void Configure(EntityTypeBuilder<EmployeePosition> builder)
+    {
+        HrTables.ConfigureCommon(builder, "EmployeePositions");
+        builder.Property(p => p.JobTitle).HasMaxLength(Employee.JobTitleMaxLength);
+        builder.Property(p => p.DepartmentKey).HasMaxLength(100);
+        builder.Property(p => p.EmploymentType).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.HasOne<Employee>().WithMany().HasForeignKey(p => new { p.TenantId, p.EmployeeId })
+            .HasPrincipalKey(e => new { e.TenantId, e.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(p => new { p.TenantId, p.EmployeeId, p.StartDate }).HasDatabaseName("IX_EmployeePositions_Employee");
     }
 }

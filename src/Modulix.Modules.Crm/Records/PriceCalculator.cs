@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Persistence;
-using Modulix.Core.Pricing;
+using Modulix.Core.Contracts.Pricing;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Pricing;
 

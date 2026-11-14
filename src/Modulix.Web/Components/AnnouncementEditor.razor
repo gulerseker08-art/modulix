@@ -56,16 +56,19 @@
                         <label class="form-check-label" for="announcement-pinned">@f.Label</label>
                     </div>
                     break;
-                case "audienceDepartmentKey":
+                case "audienceBusinessUnitId":
                     <label class="@f.LabelClass()" for="announcement-audience">@f.Label</label>
-                    <select id="announcement-audience" class="form-select" @bind="form.AudienceDepartmentKey">
-                        <option value="">Bütün çalışanlar</option>
-                        @foreach (var department in Lookups.Choices(HrAccess.DepartmentList, form.AudienceDepartmentKey))
-                        {
-                            <option value="@department.Key">@department.Label</option>
-                        }
-                    </select>
-                    <FieldError Field="audienceDepartmentKey" Errors="errors" />
+                    <HrBusinessUnitSelect Id="announcement-audience" EmptyLabel="Bütün çalışanlar" Value="form.AudienceBusinessUnitId" ValueChanged="AudienceChanged"
+                                          Invalid="@(errors?.ContainsKey("audienceBusinessUnitId") == true)" />
+                    <FieldError Field="audienceBusinessUnitId" Errors="errors" />
+                    @if (!form.AudienceTouched && form.AudienceBusinessUnitId is null && form.LegacyAudience is { Length: > 0 } legacy)
+                    {
+                        <small class="text-muted">Eski İK departmanına hedefli: @Lookups.Label(HrAccess.DepartmentList, legacy). Departman seçilince Core departmanına geçer.</small>
+                    }
+                    else
+                    {
+                        <small class="text-muted">Alt departmanlardakiler de dahildir.</small>
+                    }
                     break;
                 case "publishOn":
                     <label class="@f.LabelClass()" for="announcement-publish">@f.Label</label>
@@ -110,7 +113,8 @@
             ? new AnnouncementForm
             {
                 Id = a.Id, Version = a.Version, Title = WarehouseLabels.Text(a, "title"), Body = WarehouseLabels.Text(a, "body"),
-                AudienceDepartmentKey = WarehouseLabels.Text(a, "audienceDepartmentKey"), IsPinned = WarehouseLabels.Flag(a, "isPinned"),
+                AudienceBusinessUnitId = WarehouseLabels.Id(a, "audienceBusinessUnitId"),
+                LegacyAudience = WarehouseLabels.Text(a, "audienceDepartmentKey"), IsPinned = WarehouseLabels.Flag(a, "isPinned"),
                 IsPublished = WarehouseLabels.Flag(a, "isPublished"), PublishOn = FleetLabels.Day(WarehouseLabels.Text(a, "publishOn")),
                 ExpiresOn = FleetLabels.Day(WarehouseLabels.Text(a, "expiresOn")), Custom = a.Values["custom"]?.DeepClone().AsObject() ?? [],
             }
@@ -119,22 +123,39 @@
         layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
     }
 
+    // Hedef Core departmanıdır (bölüm 22). Eski İK departman hedefi olan kayıtta hedef değiştirilmedikçe alan gönderilmez (sunucu eski hedefi korur).
+    private void AddAudience(JsonObject values)
+    {
+        if (form.AudienceTouched || string.IsNullOrEmpty(form.LegacyAudience))
+        {
+            values["audienceBusinessUnitId"] = form.AudienceBusinessUnitId?.ToString();
+        }
+    }
+
+    private void AudienceChanged(Guid? unit)
+    {
+        form.AudienceBusinessUnitId = unit;
+        form.AudienceTouched = true;
+        dirty = true;
+    }
+
     private async Task SaveAsync()
     {
         busy = true;
         message = null;
         errors = null;
-        var request = new RecordWriteRequest(new JsonObject
+        var values = new JsonObject
         {
             ["title"] = string.IsNullOrWhiteSpace(form.Title) ? null : form.Title.Trim(),
             ["body"] = string.IsNullOrWhiteSpace(form.Body) ? null : form.Body.Trim(),
-            ["audienceDepartmentKey"] = string.IsNullOrEmpty(form.AudienceDepartmentKey) ? null : form.AudienceDepartmentKey,
             ["isPinned"] = form.IsPinned,
             ["isPublished"] = form.IsPublished,
             ["publishOn"] = form.PublishOn?.ToString("yyyy-MM-dd"),
             ["expiresOn"] = form.ExpiresOn?.ToString("yyyy-MM-dd"),
             ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
-        }, form.Version);
+        };
+        AddAudience(values);
+        var request = new RecordWriteRequest(values, form.Version);
         var url = "/api/records/" + EntityKey;
         var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{url}/{id}", request) : await Api.PostAsync<RecordResponse>(url, request);
         busy = false;
@@ -162,7 +183,12 @@
 
         public string? Body { get; set; }
 
-        public string? AudienceDepartmentKey { get; set; }
+        public Guid? AudienceBusinessUnitId { get; set; }
+
+        /// <summary>Eski İK departman hedefi (Core'a eşlenmemiş kayıtta); hedef değiştirilmedikçe korunur.</summary>
+        public string? LegacyAudience { get; init; }
+
+        public bool AudienceTouched { get; set; }
 
         public bool IsPinned { get; set; }
 

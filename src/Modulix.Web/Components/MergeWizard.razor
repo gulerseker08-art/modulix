@@ -38,7 +38,7 @@ else
         </form>
         @if (found is { Count: 0 })
         {
-            <p class="text-muted">@Texts.Get("common.noneFound")</p>
+            <EmptyState Compact="true" Title="@Texts.Get("common.noneFound")" />
         }
         else if (found is not null)
         {
@@ -79,7 +79,7 @@ else
             <h2>@Texts.Get("crm.merge.fields")</h2>
             @if (preview.Fields.Count == 0)
             {
-                <p class="text-muted">@Texts.Get("crm.merge.fieldsNone")</p>
+                <EmptyState Compact="true" Title="@Texts.Get("crm.merge.fieldsNone")" />
             }
             else
             {

@@ -27,7 +27,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Şu an size yönelik duyuru yok.</p>
+        <EmptyState Compact="true" Title="Şu an size yönelik duyuru yok." />
     }
     else
     {
@@ -48,7 +48,7 @@
                         }
                     </div>
                     <p class="text-muted mb-2">
-                        @HrLabels.Date(WarehouseLabels.Text(announcement, "publishOn"))@(WarehouseLabels.Text(announcement, "audienceDepartmentKey") is { Length: > 0 } dep ? $" · {Lookups.Label(HrAccess.DepartmentList, dep)}" : "")
+                        @HrLabels.Date(WarehouseLabels.Text(announcement, "publishOn"))@(HrLabels.Audience(announcement, Lookups) is var audience && audience != HrLabels.Everyone ? $" · {audience}" : "")
                     </p>
                     @if (open)
                     {

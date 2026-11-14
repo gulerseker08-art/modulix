@@ -124,3 +124,20 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 - Ana sayfa (`Pages/Home.razor`): `PageHeader` ("Hoş geldiniz, {ad}"), ilgili listeye bağlanan özet kutuları (`stat-grid`), solda satış hunisi (`BarChart`), sağda kullanıcının bugünkü işleri (`TodayActivities`). Aynı veri iki grafikle yinelenmez; özet kutuları zaten bağlantı olduğu için ayrıca kısayol kartı (`tiles`) çizilmez.
 - `ViewTabs` çubuğu içerik panelini genişletmez (`contain: inline-size`): sekmeler sığmayınca çubuk kendi içinde yatay kayar. Telefonda sayfa yatay taşmamalıdır; yeni ekranın görsel denetiminde 390 px genişlikte `scrollWidth` kontrol edilir.
 
+## Sıralama: sunucuda mı istemcide mi (14.11.2026)
+
+- **Sayfalanan liste** sunucuda sıralanır: kayıt deposu `SortKeys` + `Order(source, sort)` tanımlar, başlık `SortHeader`/`GridHeader` ile bu anahtarları gönderir; bilinmeyen anahtar reddedilir. Her yeni `sort` anahtarı dört testle gelir (yön, geçersiz anahtar, tenant izolasyonu, yetki). Örnek: `MeasureUnitSortTests`, `SalesTargetSortTests`.
+- **Tamamı yüklü küçük liste** (sayfalanmayan: platform planları, sektörler, onay bekleyenler) istemcide `ClientSort.Apply(liste, sort, sütunlar)` ile sıralanır; Türkçe sıra, boş değerler sonda, eşit satırlar yerinde kalır. Sayfalanan listede `ClientSort` kullanılmaz (yalnızca görünen sayfayı sıralar, yanıltır).
+- **Günlükler** (denetim kaydı, otomasyon çalışma geçmişi, olay teslimleri) varsayılan olarak en yeni önce gelir ve sunucuda sıralanır: sorgu kaydı `SortKeys` taşır (`AuditQuery`, `AutomationRunQuery`, `EventDeliveryQuery`), uç nokta bilinmeyen anahtarı 422 ile reddeder. `SortHeader`'ın `Default` değeri varsayılan azalan anahtardır (ör. `-occurredAt`); başka tablodan çözülen ad sütunları da sıralanır (`user`, `rule`, `tenant`): ad sorguda çözülür; denetim kaydında adı ekranda gösterilmeyenler (sistem, firma üyesi olmayan platform yöneticisi) gerçek adlarıyla sıralanmaz, her iki yönde de sonda kalır.
+- **Sıralanmayan listeler (bilinçli istisna):** durum raporu tabloları (platform sağlığı) ve kod sırasıyla gezilen kataloglar (GTİP) başlığa göre sıralanmaz.
+
+## Silme onayı (14.11.2026)
+
+- `ConfirmBox`: yıkıcı eylem ayrı adımda onaylanır. `Text` (soru), isteğe bağlı `ConfirmLabel` (varsayılan "Sil"), `Busy`, `Confirm`, `Cancel`. Kutu `alert alert-warning confirm` + `role="alertdialog"`; onay düğmesi `btn-danger`, yanında "Vazgeç". Açılınca odak "Vazgeç"tedir, Escape kapatır.
+- Liste satırında (`ul.item-list`) menüdeki "Sil" satırın yerinde `ConfirmBox` açar; silme başarılıysa toast ("Silindi.") gösterilir. Onaysız tek tıkla silme yazılmaz. Örnek: `AddressesSection`, `ContactPointsSection`.
+
+## Özet kutusunda dönem karşılaştırması (14.11.2026)
+
+- Ana sayfa özet kutuları toplamın altında son 30 günde eklenen kayıt sayısını gösterir: `small.stat-trend` içinde `dash-delta` rozeti (işaretli sayı + ok ikonu; önceki 30 güne göre azaldıysa `is-down`, aynıysa `is-flat`) ve "son 30 günde yeni" etiketi. Yön yalnızca renkle anlatılmaz; ekran okuyucuya iki dönemin sayıları tam cümleyle okunur (`visually-hidden`).
+- Sayılar liste uçlarının `createdSince` (dahil) ve `createdBefore` (hariç) süzgeçleriyle alınır (ISO 8601 an; firma, kişi, fırsat, aktivite). Kapsam ve yetki sunucudadır; yüklenemeyen kutuda karşılaştırma çizilmez. Hesap `PeriodChange` ile yapılır.
+

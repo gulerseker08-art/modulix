@@ -347,3 +347,69 @@ Dilimlerin "bilerek yapılmadı" listelerinden kalanlar öncelik sırasına konu
 | `dotnet test tests/Modulix.ArchitectureTests` | 78/78 geçti |
 | `dotnet test tests/Modulix.Core.Tests` | 971/971 geçti |
 | `HrImportTests` (entegrasyon, 3 test: demirbaş + izin hakkı + tatil; tekrar, küsuratlı yıl ve bilinmeyen sicil no satır hatası; başka firmanın sicil numarası çözülmez ve izinsiz kullanıcı demirbaş türünü görmez) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+
+## 20. Sonraya kalanlar, öncelik 2b: görev geçmişi (14 Kasım 2026)
+
+Yol haritası M4.2 (tarihli görev geçmişi). Çalışanın unvan, departman, yönetici ve çalışma şekli bir başlangıç gününden itibaren geçerli **dönemler** olarak tutulur.
+
+- **Tablo** `hr.EmployeePositions` (çalışan, başlangıç, bitiş, unvan, departman, yönetici, çalışma şekli, değiştiren); migration `HrEmployeePositions` + `TenantIsolationSql.AddTable`. Kayıt türü `hr.employee-position` yalnızca okunur (oluşturma, değiştirme ve silme 409); görünürlüğü çalışan kartınınkidir (`hr.employees.read`).
+- **Satırları çalışan kartı yazar**, kartla aynı işlemde (sözleşme geçmişi `ContractEvent` ile aynı kalıp; değişikliğin kendisi kartın denetim kaydındadır): kart açılınca işe giriş gününden ilk dönem; bu dört alandan biri değişince önceki dönem kapanır ve yenisi **geçerlilik gününden** açılır; ayrılınca son dönem ayrılış günüyle kapanır, yeniden çalışınca açılır. İlgisiz değişiklik (ör. not) dönem açmaz.
+- **Geçerlilik günü** kartta saklanmayan bir giriş alanıdır (`positionEffectiveDate`, form düzeninde "Görev ve organizasyon" bölümünde; yalnızca kayıtlı kartta görünür). Boşsa bugün; önceki dönemin başından sonra ve ayrılış tarihinden önce olmalıdır (422). Bir kapsamda birden çok kart yazılabileceği için (içe aktarma) her yazmadan sonra sıfırlanır.
+- **Eski kartlar:** bu bölümden önce açılmış kartın geçmişi yoktur; ilk görev değişikliğinde kartın önceki değerleri işe giriş gününden başlayan dönem olarak yazılır. Migration'da geriye dönük doldurma yapılmadı (RLS altında migration kullanıcısıyla toplu yazma ayrı bir karardır).
+- **Arayüz:** çalışan kartında "Görev geçmişi" paneli (dönem, unvan, departman, yönetici, çalışma şekli; en yeni üstte; `LoadingState`/`EmptyState`). Yeni CSS sınıfı yok.
+
+**Bilerek yapılmadı:** geçmiş dönemin sonradan düzeltilmesi (dönemler kayıt değişikliğinden türer; yanlış dönem yeni bir değişiklikle düzeltilir), maaş/ücret geçmişi (bordro D4), departman → iş birimi eşlemesi (öncelik 2c).
+
+### Test sonuçları (bölüm 20)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 42/42 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 83/83 geçti |
+| `HrEmployeePositionTests` (entegrasyon, 3 test: dönem açma/kapama, ayrılış ve yeniden başlama; geçerlilik günü kuralları ve geçmişe doğrudan yazma 409; tenant izolasyonu, izinsiz kullanıcı ve salt okur) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web` derlemesi | Yeni bileşen ve editör değişikliği hatasız derleniyor; ekran görüntüsü alınamadı (yerelde uygulama çalışmıyor) |
+
+## 21. Çalışan kartı içe aktarma: seçenek (a) (14 Kasım 2026)
+
+Bölüm 19'daki karar (a) olarak verildi (kullanıcı kararı, 14 Kasım 2026): Core'a kişi içe aktarması için ayrı bir izin ve tanım; çalışan kartı kişiye e-postayla bağlanır.
+
+- **Core:** yeni izin `core.people.import` ("İçe aktarma" grubu; Yönetici rolü bütün izinleri taşıdığından onda vardır) ve `core.person` içe aktarma tanımı (ad, soyad zorunlu; e-posta, telefon, unvan). Aynı e-postalı kişi **olası mükerrerdir** (uyarı; kişiler otomatik birleştirilmez, ADR-0013). Kişinin yazma izni kişiyi kullanan modüllerden geldiği için (`SharedRecordAccess`) içe aktarıcı ayrıca bunlardan birine (ör. `hr.employees.write`) sahip olmalıdır; kayıt boru hattı bunu her satırda denetler. Katalog kuralı (tanım modülün kendi kayıt türü, izin modülün kendi izni) değişmedi: tanım Core'da, izin Core'un.
+- **İK:** `hr.employee` içe aktarma tanımı (`hr.employees.write`): kişi e-postası (zorunlu, `core.person` e-posta süzgeciyle), sicil no, işe giriş (zorunlu), unvan, departman, yönetici sicil no (`hr.employee` sicil no süzgeciyle), çalışma şekli, çalışma yeri, kullanıcı hesabı (e-posta), durum, ayrılış, özlük alanları (izni olmayan içe aktarıcıda dolu hücre satır hatasıdır), notlar. Sicil no ve kişi kesin eşleşmedir (dosyada tekrar eden satır hatası; kayıtlı kişinin ikinci kartı depo kuralıyla reddedilir). Görev geçmişinin ilk dönemi içe aktarmada da açılır (bölüm 20).
+- **Yönetici bağlantısı:** satırlar sırayla yazılır ve bağlantı yazma anında çözülür; yönetici dosyada astından önce gelirse bulunur. Kuru çalışmada satırlar yazılmadığından aynı dosyadaki yöneticiye bağlantı çözülmez; "hepsi ya da hiç" kipi hatasız kuru çalışma istediği için bu kipte yöneticiler ayrı (önceki) bir dosyayla yüklenmelidir.
+- Sıra: kişiler → çalışan kartları → izin hakları.
+
+### Test sonuçları (bölüm 21)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 43/43 geçti (gerçek katalogla çalışan ve kişi tanımları) |
+| `dotnet test tests/Modulix.Core.Tests` | 996/996 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 91/91 geçti |
+| `HrImportTests` (entegrasyon, +2 test: kişiler sonra kartlar, e-posta ve yönetici bağlantısı, görev geçmişi; bilinmeyen e-posta, aynı kişiye ikinci kart, olası mükerrer kişi uyarısı, kişi içe aktarma izni, başka firmanın kişisi) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+
+## 22. Departmanlar Core'a bağlandı (öncelik 2c, 14 Kasım 2026)
+
+Karar (kullanıcı, 14 Kasım 2026: "Core'a bağla"): İK'nın departmanı ayrı bir seçim listesi (`hr.department`) değil, Core'un departman ağacıdır (ADR-0026). Tek kaynak Yönetim › Departmanlar'dır; İK departman açmaz, adlandırmaz.
+
+- **Core sözleşmesi:** `IBusinessUnitDirectory` (`Core.Contracts.Tenancy`): etkin tenant'ın departmanları (ağaç yolu adı ve kimlikleri, derinlik, etkin mi) ve kullanıcıların departmanı (etkin/pasif üyeliğin bağlı olduğu birim). Uygulaması Infrastructure'da, istek başına önbellekli. İK Core tablolarına doğrudan erişmez; yalnızca bu arayüzü kullanır.
+- **Çalışan kartı:** `businessUnitId` (Core departmanı), okunurken `businessUnitName` (ağaç yolu). Hesabı **bağlı** çalışanın departmanı kullanıcının Core departmanıdır: kart kaydedilirken oradan alınır, farklı bir değer gönderilirse alan hatası (departman değişikliği kayıt görünürlüğünü etkilediği için Core'un "Departmanı değiştir" akışıyla yapılır; ADR-0026 dilim 4). `businessUnitFromAccount` arayüze bunu söyler (seçici kapalı). Hesabı olmayan çalışanda departman ağaçtan seçilir; bulunmayan departman ve yeni seçimde kapalı departman reddedilir. Görev geçmişi (bölüm 20) dönem değişikliğini Core departmanına göre yapar ve `businessUnitName`'i gösterir. Liste süzgeci `businessUnitId`; departman adı İK tablosunda olmadığından o sütuna göre sunucuda sıralanmaz (sütun sıralanamaz).
+- **Duyuru ve anket hedefi:** `audienceBusinessUnitId` (okunurken `audienceName`). Okurun departmanı kullanıcının Core departmanıdır (üyelikte departman yoksa kartındaki); hedef departman okurun departman yolundaysa içerik ona yöneliktir, yani üst departmana hedeflenen içerik alt departmanlardakilere de görünür. Hedef seçimi eski İK hedefini temizler; hedef değiştirilmedikçe editör alanı göndermez (eski hedef korunur).
+- **Geçiş (geriye uyumlu, kesintisiz):** migration `HrCoreDepartments` yalnızca boş kolon ekler (`Employees.BusinessUnitId` + `(TenantId, BusinessUnitId)` indeksi, `EmployeePositions.BusinessUnitId`, `Announcements/Surveys.AudienceBusinessUnitId`); yeni tablo yok. Eski `DepartmentKey` / `AudienceDepartmentKey` kolonları ve `hr.department` listesi durur: eşlenmemiş eski hedef, okurun kartındaki eski departmana göre çalışmaya devam eder. **Eşleme aracı** (Çalışanlar ekranında, `hr.employees.write`): `GET /api/hr/department-mapping` eski değerin adını Core'da aynı adlı (ya da aynı ağaç yollu) tek etkin departmanla eşler ve henüz Core departmanı olmayan çalışan/duyuru/anket sayılarını gösterir; eşleşmeyen ya da belirsiz değer listelenir (Core'da departman açılıp yeniden denenir). `POST` eşleşenleri kayıt boru hattıyla yazar (yetki, denetim kaydı, olay): hesabı olmayan karta eşleşen departman, hesabı bağlı karta kullanıcının departmanı; duyuru/anket hedefleri yalnızca onları yönetme izni olan uygulayınca.
+- **İçe aktarma:** çalışan kartı "Departman" sütunu Core departmanının adı ya da ağaç yoludur (yolun başı yazılmayabilir: "Satış › İstanbul"; ayraç "›", ">" ya da "/"); bulunmayan ya da birden çok departmana uyan ad satır hatasıdır.
+- **Arayüz:** ortak `HrBusinessUnitSelect` seçicisi (seçenek ağaç yolu; kapalı departman yalnızca kayıtta seçiliyse "(kapalı)" ekiyle) çalışan formunda, Çalışanlar ve Rehber süzgecinde, organizasyon şemasında (vurgu alt departmanları kapsar), duyuru ve anket editöründe. Eşleme paneli yalnızca bekleyen kayıt varken görünür (`btn-tonal`, toast). Yeni CSS sınıfı ya da token yok; organizasyon şemasındaki düz boş metin `EmptyState`'e çevrildi.
+
+**Sonraki adımlar (bilerek bu bölümde yapılmadı):**
+
+- **22b:** Core, kullanıcının departmanı değişince bir olay yayınlamıyor (bugün yalnızca denetim kaydı). Hesabı bağlı kart bu yüzden kullanıcı taşındıktan sonra ilk kaydında (ya da eşleme aracıyla) yeni departmanı alır; okurun duyuru/anket hedefi ise her istekte üyelikten okunduğu için hemen doğrudur. Core'a "üyelik departmanı değişti" olayı eklenip İK kartı ve görev geçmişi (değişiklik gününden) onu dinleyecek.
+- **22c:** bütün firmalar eşlemeyi uyguladıktan sonra `DepartmentKey`/`AudienceDepartmentKey` kolonlarının ve `hr.department` listesinin kaldırılması (ayrı, geri alınamaz migration; önce kullanım sayısı ölçülür).
+
+### Test sonuçları (bölüm 22)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 57/57 geçti (+14: departmanı adla bulma: kendi adı, ağaç yolu, yolun sonu, Türkçe harf, belirsiz ad, kapalı departman, üst departman kapsamı) |
+| `dotnet test tests/Modulix.Core.Tests` | 996/996 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 91/91 geçti |
+| `dotnet ef migrations has-pending-model-changes` | Bekleyen model değişikliği yok |
+| `HrDepartmentTests` (entegrasyon, 4 test: seçici, hesabı olmayan/bağlı kart, kullanıcı taşınınca kart ve görev geçmişi, süzgeç; eski değerlerin adla eşlenmesi ve eşlenmemiş eski duyurunun görünmeye devam etmesi; bulunmayan/kapalı/çakışan departman; tenant izolasyonu ve yetki); ayrıca `HrAnnouncementTests` ve `HrSurveyTests` güncellendi (hedef Core departmanı, üst departman kapsamı, bulunmayan ve kapalı departman), `HrImportTests` (departman adı/ağaç yolu, bulunmayan departman) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web` derlemesi | Yeni bileşenler ve ekran değişiklikleri hatasız derleniyor (bilinen 210 hatalık taban dışında hata yok); ekran görüntüsü alınamadı (yerelde uygulama çalışmıyor) |

@@ -143,7 +143,7 @@
             <h3>@Texts.Get("crm.opportunityReport.postponed")</h3>
             @if (report.Postponed.Count == 0)
             {
-                <p class="text-muted">@Texts.Get("crm.opportunityReport.none")</p>
+                <EmptyState Compact="true" Title="@Texts.Get("crm.opportunityReport.none")" />
             }
             else
             {

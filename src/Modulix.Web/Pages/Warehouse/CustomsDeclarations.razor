@@ -61,7 +61,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">@Texts.Get("warehouse.declarations.empty")</p>
+        <EmptyState Compact="true" Title="@Texts.Get("warehouse.declarations.empty")" />
     }
     else
     {

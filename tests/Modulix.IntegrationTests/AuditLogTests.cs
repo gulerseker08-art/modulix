@@ -8,6 +8,7 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Shared.Account;
 using Modulix.Shared.Audit;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Crm;
@@ -164,6 +165,84 @@ public class AuditLogTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         Assert.Equal("Firma bilgileri", item.EntityName);
         var status = Assert.Single(item.Changes);
         Assert.Equal(("Kapalı", "Açık"), (status.Old, status.New));
+    }
+
+    [Fact]
+    public async Task Sorting_by_a_column_orders_the_log_in_both_directions()
+    {
+        var (_, editor, _) = await TenantWithCompanyChangeAsync();
+        using var client = await LoginAsync(editor);
+
+        Assert.Equal([AuditOperation.Created, AuditOperation.Updated], await ActionsAsync(client, "occurredAt"));
+        Assert.Equal([AuditOperation.Updated, AuditOperation.Created], await ActionsAsync(client, "-occurredAt"));
+        Assert.Equal([AuditOperation.Updated, AuditOperation.Created], await ActionsAsync(client, null));
+        Assert.Equal((await ActionsAsync(client, "action")).AsEnumerable().Reverse(), await ActionsAsync(client, "-action"));
+    }
+
+    [Fact]
+    public async Task An_unknown_sort_key_is_rejected_and_filters_still_work_together_with_sorting()
+    {
+        var (_, editor, _) = await TenantWithCompanyChangeAsync();
+        using var client = await LoginAsync(editor);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await client.GetAsync("/api/audit?sort=password")).StatusCode);
+        Assert.Equal([AuditOperation.Created], await ActionsAsync(client, "occurredAt", "&action=Created"));
+    }
+
+    [Fact]
+    public async Task A_sorted_log_never_shows_another_tenants_entries()
+    {
+        var (_, editorA, companyA) = await TenantWithCompanyChangeAsync();
+        var (_, editorB, companyB) = await TenantWithCompanyChangeAsync();
+        using var clientA = await LoginAsync(editorA);
+        using var clientB = await LoginAsync(editorB);
+
+        var pageA = await clientA.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company&sort=occurredAt");
+        var pageB = await clientB.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company&sort=-entityKey");
+
+        Assert.All(pageA!.Items, e => Assert.Equal(companyA, e.RecordId));
+        Assert.All(pageB!.Items, e => Assert.Equal(companyB, e.RecordId));
+        Assert.Equal((2, 2), (pageA.TotalCount, pageB.TotalCount));
+    }
+
+    [Fact]
+    public async Task Without_audit_permission_a_sorted_log_is_forbidden()
+    {
+        var (tenant, _, _) = await TenantWithCompanyChangeAsync();
+        var outsider = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [CompaniesRead], outsider);
+        using var client = await LoginAsync(outsider);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/audit?sort=occurredAt")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Sorting_by_user_orders_by_display_name_in_both_directions()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var zeki = await factory.CreateUserAsync(tenant);
+        var ayla = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [CompaniesRead, CompaniesWrite, ReadAudit], zeki, ayla);
+        using var zekiClient = await LoginAsync(zeki);
+        using var aylaClient = await LoginAsync(ayla);
+        Assert.Equal(HttpStatusCode.OK, (await zekiClient.PutAsJsonAsync("/api/account/profile", new UpdateProfileRequest("Zeki Demir"))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await aylaClient.PutAsJsonAsync("/api/account/profile", new UpdateProfileRequest("Ayla Kaya"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await zekiClient.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Zeki'nin Firması"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await aylaClient.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Ayla'nın Firması"))).StatusCode);
+
+        var ascending = await aylaClient.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company&sort=user");
+        var descending = await aylaClient.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company&sort=-user");
+
+        Assert.Equal(["Ayla Kaya", "Zeki Demir"], ascending!.Items.Select(e => e.UserName));
+        Assert.Equal(["Zeki Demir", "Ayla Kaya"], descending!.Items.Select(e => e.UserName));
+    }
+
+    private static async Task<List<AuditOperation>> ActionsAsync(HttpClient client, string? sort, string extra = "")
+    {
+        var page = await client.GetFromJsonAsync<AuditPageResponse>(
+            $"/api/audit?entityKey=crm.company{(sort is null ? "" : "&sort=" + Uri.EscapeDataString(sort))}{extra}");
+        return [.. page!.Items.Select(e => e.Action)];
     }
 
     /// <summary>CRM açık firma; yönetici bir firma oluşturur ve durumunu değiştirir (iki denetim kaydı).</summary>

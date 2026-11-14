@@ -85,6 +85,8 @@ public partial class CampaignRunTests
         var lead = (await s.Responder.GetFromJsonAsync<LeadDto>($"/api/crm/leads/{converted.LeadId}"))!;
         Assert.Equal(("kampanya", "email", s.World.Campaign.Code), (lead.UtmSource, lead.UtmMedium, lead.UtmCampaign));
         Assert.Equal($"Kampanya: {s.World.Campaign.Name}", lead.SourceDetail);
+        // Kampanya bağı: yanıttan açılan müşteri adayı kampanyaya kayıt olarak da bağlanır (yanıtlayıcının kampanya okuma izni aranmaz).
+        Assert.Equal(s.World.Campaign.Id, lead.CampaignId);
         Assert.Contains(lead.Email, new[] { "ok1@a.test", "ok2@b.test" });
         Assert.EndsWith("Tekstil", lead.CompanyName);
         Assert.Equal("Fiyat bilgisi istiyoruz", lead.Description);

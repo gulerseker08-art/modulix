@@ -42,7 +42,7 @@
                 <h2 id="type-title">@Texts.Get("contracts.dashboard.byType")</h2>
                 @if (data.ByType.Count == 0)
                 {
-                    <p class="text-muted">@Texts.Get("contracts.dashboard.noneActive")</p>
+                    <EmptyState Compact="true" Title="@Texts.Get("contracts.dashboard.noneActive")" />
                 }
                 else
                 {

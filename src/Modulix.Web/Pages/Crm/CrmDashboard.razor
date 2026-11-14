@@ -161,7 +161,7 @@
                 <div class="dash-card-head"><h2 id="dash-trend">Son @r.Trend.Count dönemin gerçekleşeni</h2></div>
                 @if (r.Trend.All(t => t.Realized == 0 && t.WonCount == 0))
                 {
-                    <p class="text-muted mb-0">Bu dönemlerde kazanılan fırsat yok.</p>
+                    <EmptyState Compact="true" Title="Bu dönemlerde kazanılan fırsat yok." />
                 }
                 else
                 {
@@ -180,7 +180,7 @@
                 </div>
                 @if (r.ByStage.Count == 0)
                 {
-                    <p class="text-muted mb-0">Açık fırsat yok.</p>
+                    <EmptyState Compact="true" Title="Açık fırsat yok." />
                 }
                 else
                 {
@@ -216,7 +216,7 @@
                 </div>
                 @if (r.Overdue.Count == 0)
                 {
-                    <p class="text-muted mb-0">Beklenen kapanışı geçmiş açık fırsat yok.</p>
+                    <EmptyState Compact="true" Title="Beklenen kapanışı geçmiş açık fırsat yok." />
                 }
                 else
                 {

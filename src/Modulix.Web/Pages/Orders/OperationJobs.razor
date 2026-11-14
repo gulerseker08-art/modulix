@@ -57,7 +57,7 @@
     }
     else if (page is not null && page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">@Texts.Get("orders.opjobs.empty")</p>
+        <EmptyState Compact="true" Title="@Texts.Get("orders.opjobs.empty")" />
     }
     else if (page is not null)
     {

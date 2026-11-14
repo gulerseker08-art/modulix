@@ -1,0 +1,34 @@
+@* Yıkıcı eylem onayı (docs/design-system/component-catalog.md → ConfirmBox): eylem ayrı bir adımda onaylanır. Kutu, satırın
+   ya da düğmenin yerinde açılır; onay düğmesi düz kırmızıdır (btn-danger), "Vazgeç" kutuyu kapatır. Açılınca odak
+   "Vazgeç"e gelir: Enter'a yanlışlıkla basmak silmez. *@
+<div class="alert alert-warning confirm" role="alertdialog" aria-label="@Text" @onkeydown="OnKeyDown">
+    <p>@Text</p>
+    <button type="button" class="btn btn-danger" disabled="@Busy" aria-busy="@(Busy ? "true" : "false")" @onclick="Confirm">@(ConfirmLabel ?? Texts.Get("common.delete"))</button>
+    <button type="button" class="btn btn-outline-secondary" disabled="@Busy" @ref="cancel" @onclick="Cancel">@Texts.Get("common.confirm.cancel")</button>
+</div>
+
+@code {
+    private ElementReference cancel;
+
+    /// <summary>Soru metni (ör. "… silinsin mi?").</summary>
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+
+    /// <summary>Onay düğmesinin metni; verilmezse "Sil".</summary>
+    [Parameter] public string? ConfirmLabel { get; set; }
+
+    [Parameter] public bool Busy { get; set; }
+
+    [Parameter] public EventCallback Confirm { get; set; }
+
+    [Parameter] public EventCallback Cancel { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await cancel.FocusAsync();
+        }
+    }
+
+    private Task OnKeyDown(KeyboardEventArgs e) => e.Key == "Escape" && !Busy ? Cancel.InvokeAsync() : Task.CompletedTask;
+}

@@ -51,7 +51,7 @@
         <AnalyticsFrame T="DataQualityDto" Report="r">
             @if (d.OpenCount == 0)
             {
-                <p class="text-muted">@Texts.Get("crm.dataQuality.empty")</p>
+                <EmptyState Compact="true" Title="@Texts.Get("crm.dataQuality.empty")" />
             }
             else
             {

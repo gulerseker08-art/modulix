@@ -63,7 +63,7 @@
         <AnalyticsFrame T="List<TeamPerformanceRowDto>" Report="r">
             @if (r.Data.Count == 0)
             {
-                <p class="text-muted">@Texts.Get("crm.salesTeam.empty")</p>
+                <EmptyState Compact="true" Title="@Texts.Get("crm.salesTeam.empty")" />
             }
             else
             {

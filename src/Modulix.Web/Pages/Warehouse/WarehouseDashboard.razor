@@ -72,7 +72,7 @@
                         <div class="dash-card-head"><h2 id="wh-movements">@Texts.Get("nav.app.warehouse.stock-movements")</h2><span class="small text-muted">@Texts.Get("warehouse.dashboard.movements.subtitle", d.Days)</span></div>
                         @if (m.Daily.All(x => x.Inbound == 0 && x.Outbound == 0 && x.Transfer == 0 && x.Adjustment == 0))
                         {
-                            <p class="text-muted mb-0">@Texts.Get("warehouse.dashboard.movements.none")</p>
+                            <EmptyState Compact="true" Title="@Texts.Get("warehouse.dashboard.movements.none")" />
                         }
                         else
                         {
@@ -126,7 +126,7 @@
                         <div class="dash-card-head"><h2 id="wh-recent">@Texts.Get("warehouse.dashboard.recent.title")</h2></div>
                         @if (recent.Recent.Count == 0)
                         {
-                            <p class="text-muted mb-0">@Texts.Get("warehouse.dashboard.recent.none")</p>
+                            <EmptyState Compact="true" Title="@Texts.Get("warehouse.dashboard.recent.none")" />
                         }
                         else
                         {
@@ -159,7 +159,7 @@
                         </div>
                         @if (total == 0)
                         {
-                            <p class="text-muted mb-0">@Texts.Get("warehouse.dashboard.declarations.none")</p>
+                            <EmptyState Compact="true" Title="@Texts.Get("warehouse.dashboard.declarations.none")" />
                         }
                         else
                         {
@@ -187,7 +187,7 @@
                     <div class="dash-card-head"><h2 id="wh-attention" class="dash-card-title"><AppIcon Name="alert-circle" Size="18" /> @Texts.Get("warehouse.dashboard.attention.title")</h2></div>
                     @if (Attention(d).Count == 0)
                     {
-                        <p class="text-muted mb-0">@Texts.Get("warehouse.dashboard.attention.none")</p>
+                        <EmptyState Compact="true" Title="@Texts.Get("warehouse.dashboard.attention.none")" />
                     }
                     else
                     {

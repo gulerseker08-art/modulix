@@ -111,7 +111,7 @@
                                 }
                                 else
                                 {
-                                    <p class="text-muted small">@Texts.Get("admin.companies.noBranches")</p>
+                                    <EmptyState Compact="true" Title="@Texts.Get("admin.companies.noBranches")" />
                                 }
                                 <div class="branch-add">
                                     <input class="form-control form-control-sm" maxlength="200" placeholder="@Texts.Get("admin.companies.newBranch")" @bind="newBranchName" @bind:event="oninput" />

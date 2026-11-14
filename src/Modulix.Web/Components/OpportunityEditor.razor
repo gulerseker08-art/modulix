@@ -105,6 +105,11 @@
                     </select>
                     <FieldError Field="source" Errors="errors" />
                     break;
+                case "campaignId":
+                    <label class="@f.LabelClass()" for="campaignId">@f.Label</label>
+                    <LookupPicker Id="campaignId" LookupKey="crm.opportunity.campaign" @bind-Value="form.CampaignId" Required="f.Required" Placeholder="—" Invalid="@(errors?.ContainsKey("campaignId") == true)" />
+                    <FieldError Field="campaignId" Errors="errors" />
+                    break;
                 case "ownerId":
                     <label class="@f.LabelClass()" for="ownerId">@f.Label</label>
                     <LookupPicker Id="ownerId" LookupKey="crm.opportunity.owner" @bind-Value="form.OwnerId" Required="f.Required" Placeholder="@(Opportunity is null ? "Ben" : "—")" Invalid="@(errors?.ContainsKey("ownerId") == true)" />
@@ -283,7 +288,7 @@
                 Id = o.Id, Version = o.Version, Title = o.Title, CompanyId = o.CompanyId, ContactId = o.ContactId, Stage = o.Stage,
                 Probability = o.Probability, Amount = o.Amount, Currency = o.Currency, ExpectedCloseDate = o.ExpectedCloseDate,
                 LostReason = o.LostReason, OwnerId = o.OwnerId, Notes = o.Notes,
-                Description = o.Description, Priority = o.Priority, Type = o.Type, Source = o.Source, CustomerBudget = o.CustomerBudget,
+                Description = o.Description, Priority = o.Priority, Type = o.Type, Source = o.Source, CampaignId = o.CampaignId, CustomerBudget = o.CustomerBudget,
                 BudgetStatus = o.BudgetStatus, NeedDescription = o.NeedDescription, CurrentProblem = o.CurrentProblem,
                 ExpectedBenefit = o.ExpectedBenefit, Scope = o.Scope, ServiceScope = [.. o.ServiceScope ?? []], SuccessCriteria = o.SuccessCriteria, Risks = o.Risks,
                 DecisionProcess = o.DecisionProcess, TargetDecisionDate = o.TargetDecisionDate, NextAction = o.NextAction, NextActionDate = o.NextActionDate,
@@ -310,7 +315,7 @@
             CustomerBudget: form.CustomerBudget, BudgetStatus: form.BudgetStatus, NeedDescription: form.NeedDescription,
             CurrentProblem: form.CurrentProblem, ExpectedBenefit: form.ExpectedBenefit, Scope: form.Scope, SuccessCriteria: form.SuccessCriteria,
             Risks: form.Risks, DecisionProcess: form.DecisionProcess, TargetDecisionDate: form.TargetDecisionDate,
-            NextAction: form.NextAction, NextActionDate: form.NextActionDate, ServiceScope: form.ServiceScope);
+            NextAction: form.NextAction, NextActionDate: form.NextActionDate, ServiceScope: form.ServiceScope, CampaignId: form.CampaignId);
         var result = form.Id is { } id
             ? await Api.PutAsync<OpportunityDto>($"{Url}/{id}", request)
             : await Api.PostAsync<OpportunityDto>(Url, request);
@@ -395,6 +400,8 @@
         public string? Scope { get; set; }
 
         public List<string> ServiceScope { get; set; } = [];
+
+        public Guid? CampaignId { get; set; }
 
         public string? SuccessCriteria { get; set; }
 

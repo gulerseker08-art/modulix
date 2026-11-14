@@ -21,7 +21,7 @@
         }
         @if (!Items.Any())
         {
-            <p class="text-muted">@Texts.Get("crm.act.cal.empty")</p>
+            <EmptyState Compact="true" Title="@Texts.Get("crm.act.cal.empty")" />
         }
     }
     else if (Mode is CalendarMode.Week or CalendarMode.Day)

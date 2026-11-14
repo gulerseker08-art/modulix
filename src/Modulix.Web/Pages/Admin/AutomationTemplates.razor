@@ -27,7 +27,7 @@
     }
     else if (templates.Count == 0)
     {
-        <p class="text-muted" role="status">@Texts.Get("admin.automationTemplates.empty")</p>
+        <EmptyState Compact="true" Title="@Texts.Get("admin.automationTemplates.empty")" Text="@Texts.Get("admin.automationTemplates.empty.text")" />
     }
     else
     {

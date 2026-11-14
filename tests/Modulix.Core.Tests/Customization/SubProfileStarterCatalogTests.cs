@@ -61,6 +61,20 @@ public class SubProfileStarterCatalogTests
             [new("a", "A", "", null, [Field("crm.deal", "Alan")]), new("a", "B", "", null, [Field("crm.deal", "Alan")])], Modules));
     }
 
+    [Fact]
+    public void Starter_features_are_optional_but_must_be_valid_and_unique()
+    {
+        var options = new[] { Field("crm.deal", "Alan") };
+        var withFeatures = new SubProfileStarter("a", "A", "", null, options, [new("Taşıma türü", "Komple"), new("Taşıma türü", "Parsiyel")]);
+        Assert.Same(withFeatures, new SubProfileStarterCatalog([withFeatures], Modules).Find("a"));
+        Assert.NotNull(new SubProfileStarterCatalog([new SubProfileStarter("b", "B", "", null, options)], Modules).Find("b"));
+
+        Assert.Throws<InvalidOperationException>(() => new SubProfileStarterCatalog([new SubProfileStarter("a", "A", "", null, options, [new("", "Komple")])], Modules));
+        Assert.Throws<InvalidOperationException>(() => new SubProfileStarterCatalog([new SubProfileStarter("a", "A", "", null, options, [new("Kapsam", " ")])], Modules));
+        Assert.Throws<InvalidOperationException>(() => new SubProfileStarterCatalog(
+            [new SubProfileStarter("a", "A", "", null, options, [new("Kapsam", "Yurt içi"), new("KAPSAM", "yurt içi")])], Modules));
+    }
+
     private sealed class CrmLike : IModule
     {
         public string Key => "crm";
