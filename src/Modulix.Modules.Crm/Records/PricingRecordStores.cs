@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Records;
-using Modulix.Core.Pricing;
+using Modulix.Core.Contracts.Pricing;
 using Modulix.Modules.Crm.Domain;
 
 namespace Modulix.Modules.Crm.Records;
