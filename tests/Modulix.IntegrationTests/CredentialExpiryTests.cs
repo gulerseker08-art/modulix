@@ -32,7 +32,8 @@ public class CredentialExpiryTests(CrmAutomationFixture fixture) : IClassFixture
     private const string Drivers = "/api/records/logistics.driver";
     private const string People = "/api/records/core.person";
 
-    private DateOnly Today => DateOnly.FromDateTime(fixture.Time.GetUtcNow().UtcDateTime);
+    // Sunucu günü şirket saat diliminde (varsayılan Europe/Istanbul) hesaplar; UTC günü 21:00–24:00 arasında bir gün geride kalır.
+    private DateOnly Today => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(fixture.Time.GetUtcNow(), TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul")).DateTime);
 
     private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

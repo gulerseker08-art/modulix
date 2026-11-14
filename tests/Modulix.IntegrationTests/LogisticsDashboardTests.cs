@@ -26,7 +26,8 @@ public class LogisticsDashboardTests(ModulixApiFactory factory) : IClassFixture<
     private const string Stops = "/api/records/logistics.trip-stop";
     private const string Drivers = "/api/records/logistics.driver";
 
-    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+    // Sunucu günü şirket saat diliminde (varsayılan Europe/Istanbul) hesaplar; UTC günü 21:00–24:00 arasında bir gün geride kalır.
+    private static DateOnly Today => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul")).DateTime);
 
     private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
