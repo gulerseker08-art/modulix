@@ -68,26 +68,63 @@ public sealed class CrmLookups(ApiClient api, SessionState session)
             : value.Category == CrmLists.StageCategories.Open ? "qualified" : value.Category ?? "custom";
     }
 
-    public async Task LoadAsync(bool contacts = false, bool opportunities = false)
+    // Aynı örnekte sürmekte olan yüklemeler (ör. ana sayfa iki bölüm için aynı anda ister): ikinci çağrı yeni istek atmaz,
+    // sürenini bekler. Biten yükleme listeden çıkar; sonraki çağrı (kayıttan sonra yenileme) yine sunucudan okur.
+    private readonly Dictionary<(bool Contacts, bool Opportunities), Task> running = [];
+
+    public Task LoadAsync(bool contacts = false, bool opportunities = false)
     {
-        CustomFields = (await api.GetAsync<List<CustomFieldDto>>("/api/custom-fields")).Value ?? [];
-        ChoiceLists = (await api.GetAsync<List<ChoiceListDto>>("/api/choice-lists")).Value ?? [];
-        Members = (await api.GetAsync<List<TenantMemberResponse>>("/api/tenant/members")).Value ?? [];
-        AssignableMembers = (await api.GetAsync<List<TenantMemberResponse>>($"/api/tenant/members?assignable=true&entityKey={AssignableEntityKey}")).Value ?? [];
-
-        if (session.Can(CrmAccess.CompaniesRead))
+        var key = (contacts, opportunities);
+        if (running.TryGetValue(key, out var pending))
         {
-            Companies = (await api.GetAsync<CrmPage<CompanyDto>>($"/api/crm/companies?pageSize={Size}")).Value?.Items ?? [];
+            return pending;
         }
 
-        if (contacts && session.Can(CrmAccess.ContactsRead))
+        var task = LoadCoreAsync(contacts, opportunities);
+        if (!task.IsCompleted)
         {
-            Contacts = (await api.GetAsync<CrmPage<ContactDto>>($"/api/crm/contacts?pageSize={Size}")).Value?.Items ?? [];
+            running[key] = task;
+            _ = task.ContinueWith(_ => running.Remove(key), TaskScheduler.Default);
         }
 
-        if (opportunities && session.Can(CrmAccess.OpportunitiesRead))
+        return task;
+    }
+
+    // İstekler birbirinden bağımsızdır; sırayla değil birlikte gönderilir (her biri sunucuda ayrı yetki/kapsam sorgusu taşır).
+    private async Task LoadCoreAsync(bool contacts, bool opportunities)
+    {
+        var customFields = api.GetAsync<List<CustomFieldDto>>("/api/custom-fields");
+        var choiceLists = api.GetAsync<List<ChoiceListDto>>("/api/choice-lists");
+        var members = api.GetAsync<List<TenantMemberResponse>>("/api/tenant/members");
+        var assignable = api.GetAsync<List<TenantMemberResponse>>($"/api/tenant/members?assignable=true&entityKey={AssignableEntityKey}");
+        var companies = session.Can(CrmAccess.CompaniesRead)
+            ? api.GetAsync<CrmPage<CompanyDto>>($"/api/crm/companies?pageSize={Size}")
+            : null;
+        var contactPage = contacts && session.Can(CrmAccess.ContactsRead)
+            ? api.GetAsync<CrmPage<ContactDto>>($"/api/crm/contacts?pageSize={Size}")
+            : null;
+        var opportunityPage = opportunities && session.Can(CrmAccess.OpportunitiesRead)
+            ? api.GetAsync<CrmPage<OpportunityDto>>($"/api/crm/opportunities?pageSize={Size}")
+            : null;
+
+        CustomFields = (await customFields).Value ?? [];
+        ChoiceLists = (await choiceLists).Value ?? [];
+        Members = (await members).Value ?? [];
+        AssignableMembers = (await assignable).Value ?? [];
+
+        if (companies is not null)
         {
-            Opportunities = (await api.GetAsync<CrmPage<OpportunityDto>>($"/api/crm/opportunities?pageSize={Size}")).Value?.Items ?? [];
+            Companies = (await companies).Value?.Items ?? [];
+        }
+
+        if (contactPage is not null)
+        {
+            Contacts = (await contactPage).Value?.Items ?? [];
+        }
+
+        if (opportunityPage is not null)
+        {
+            Opportunities = (await opportunityPage).Value?.Items ?? [];
         }
     }
 
