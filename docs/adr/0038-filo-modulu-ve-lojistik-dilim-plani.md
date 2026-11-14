@@ -566,6 +566,7 @@ Lojistik, kural altyapısına (ADR-0027) kayıt türlerini ve alanlarını dilim
 - **Yalnızca bildirim:** hepsi Core'un "Bildirim gönder" aksiyonunu (`core.notify`) kullanır; kayıt değiştirmez, durum ilerletmez, dışarıya ileti göndermez. İleti kayıt değişkenlidir (yük tanımı, güzergâh, sefer numarası, tarih).
 - **Alıcı firmaya bırakılır:** lojistik kayıtlarında sorumlu kullanıcı alanı yoktur ve kimin uyarılacağı firmaya özgüdür; bu yüzden şablon alıcıyı boş bırakır (ADR-0027 Dilim 3b eki, `ToComplete`). "Kullan" taslak açar, firma alıcıyı seçmeden kural yayınlanamaz. Alıcı kaydı kendi yetkisiyle göremiyorsa Core bildirimi göndermez.
 - **Teslim iş olayları kurala açıldı:** `logistics.shipment.delivered` ve `logistics.shipment.delivery-failed` otomasyon olayı olarak beyan edildi; kuralda "İş olayı" tetikleyicisiyle seçilir (şablonların ikisi bunu kullanır).
+- **Düzenleyicide alıcı seçimi:** kural düzenleyici kayıt seçimi türündeki aksiyon parametresini (bildirimin "Kime"si) düz metin kutusuyla çiziyordu, firma kullanıcı kimliğini elle yazmak zorundaydı. Artık ortak `LookupPicker` (ADR-0016) ile seçilir. Tarayıcıda doğrulandı (açık ve koyu tema): şablondan taslak, "Kime zorunlu" uyarısı ve kapalı yayın düğmeleri, alıcı seçimi, kaydet, kapalı yayınla.
 - **Migration yok:** şablon kodda beyandır (ADR-0027 Dilim 3b).
 
 ### Bilerek yapılmadı
