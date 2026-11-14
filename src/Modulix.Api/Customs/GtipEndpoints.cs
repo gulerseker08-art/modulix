@@ -25,10 +25,17 @@ public static class GtipEndpoints
             .WithTags("Platform");
         platform.MapGet("/versions", async (IGtipCatalogAdmin catalog, CancellationToken ct) =>
             (await catalog.ListVersionsAsync(ct)).Select(ToDto).ToList());
-        platform.MapGet("/versions/{id:guid}/entries", (Guid id, string? search, int? page, int? pageSize, IGtipCatalogAdmin catalog, CancellationToken ct) =>
+        platform.MapGet("/versions/{id:guid}/entries", (Guid id, string? search, int? page, int? pageSize, string? sort, IGtipCatalogAdmin catalog, CancellationToken ct) =>
             Run(async () =>
             {
-                var result = await catalog.SearchEntriesAsync(id, search, page ?? 1, pageSize ?? 50, ct);
+                // Başlığa göre sıralama (ADR-0036): yalnızca bilinen anahtarlar kabul edilir.
+                if (!string.IsNullOrEmpty(sort) && !GtipEntrySort.Keys.Contains(sort))
+                {
+                    return Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["sort"] = ["Geçersiz sıralama."] }, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
+
+                var result = await catalog.SearchEntriesAsync(id, search, page ?? 1, pageSize ?? 50, ct, string.IsNullOrEmpty(sort) ? null : sort);
                 return Results.Ok(new GtipEntryPageDto([.. result.Items.Select(e => new GtipEntryDto(e.Code, e.Description, e.Unit))], result.TotalCount, result.Page, result.PageSize));
             }));
 
