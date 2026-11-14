@@ -5,19 +5,19 @@
 
 <Notice Text="@message" Failed="@failed" />
 <div class="alert alert-warning" role="note">
-    Gönderim sağlayıcısı ayarlanmadıkça gerçek gönderim bloklıdır; test sağlayıcısı iletiyi hiçbir yere göndermez. Her gönderimden hemen önce adres yeniden çözülür, izin ve engel yeniden denetlenir ve günlük ileti sınırı uygulanır.
-    Otomatik işçi bu sürümde yoktur: çalışan bir çalıştırmayı "Sıradaki grubu işle" ile ilerletirsiniz.
+    @Texts.Get("marketing.runsPanel.warning")
+    @Texts.Get("marketing.runsPanel.noWorker")
 </div>
 
 <section aria-labelledby="content-title">
-    <h2 id="content-title" class="h5">İçerik sürümleri</h2>
+    <h2 id="content-title" class="h5">@Texts.Get("marketing.runsPanel.contents")</h2>
     @if (contents is null)
     {
         <LoadingState />
     }
     else if (contents.Count == 0)
     {
-        <EmptyState Compact="true" Title="Henüz içerik yok." Text="İçerik düz metindir; bağlantılar yalnızca http/https olabilir. Yayımlanan sürüm değişmez, değişiklik yeni sürümdür." />
+        <p class="text-muted">@Texts.Get("marketing.runsPanel.noContents")</p>
     }
     else
     {
@@ -26,11 +26,11 @@
             {
                 <li>
                     <details>
-                        <summary>v@(c.VersionNo) — @(c.Subject ?? "(konusuz)")</summary>
+                        <summary>v@(c.VersionNo) — @(c.Subject ?? Texts.Get("marketing.runsPanel.noSubject"))</summary>
                         <pre class="cond-json">@c.Body</pre>
                         @if (CanWrite && Campaign.Channel == "Email")
                         {
-                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => TestSendAsync(c)">Kendime test gönder</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => TestSendAsync(c)">@Texts.Get("marketing.runsPanel.testSend")</button>
                         }
                     </details>
                 </li>
@@ -42,59 +42,59 @@
     {
         <form class="record-form" novalidate @onsubmit="AddContentAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
-                <legend class="h6">Yeni içerik sürümü</legend>
+                <legend class="h6">@Texts.Get("marketing.runsPanel.newContent")</legend>
                 <div class="form-grid">
                     <div class="span-12">
-                        <label class="form-label" for="ct-subject">Konu</label>
+                        <label class="form-label" for="ct-subject">@Texts.Get("marketing.runsPanel.subject")</label>
                         <input id="ct-subject" class="form-control" maxlength="200" @bind="subject" />
                         <FieldError Field="subject" Errors="contentErrors" />
                     </div>
                     <div class="span-12">
-                        <label class="form-label" for="ct-body">Metin</label>
+                        <label class="form-label" for="ct-body">@Texts.Get("marketing.runsPanel.body")</label>
                         <textarea id="ct-body" class="form-control" rows="5" maxlength="10000" @bind="body" aria-describedby="ct-vars"></textarea>
                         <small id="ct-vars" class="text-muted">
-                            Kişiye özel değişkenler: <code>{{ad|Değerli müşterimiz}}</code>, <code>{{soyad|…}}</code>, <code>{{ad_soyad|…}}</code>, <code>{{firma|…}}</code>.
-                            Çubuktan sonraki yedek metin zorunludur (değer yoksa o yazılır). Konuda da kullanılabilir.
+                            @((MarkupString)Texts.Get("marketing.runsPanel.variables", "<code>{{ad|Değerli müşterimiz}}</code>", "<code>{{soyad|…}}</code>", "<code>{{ad_soyad|…}}</code>", "<code>{{firma|…}}</code>"))
+                            @Texts.Get("marketing.runsPanel.variablesHelp")
                         </small>
                         <FieldError Field="body" Errors="contentErrors" />
                     </div>
                 </div>
             </fieldset>
-            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Sürüm ekle</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">@Texts.Get("marketing.runsPanel.addVersion")</button></div>
         </form>
     }
 </section>
 
 <section aria-labelledby="runs-title">
-    <h2 id="runs-title" class="h5">Çalıştırmalar</h2>
+    <h2 id="runs-title" class="h5">@Texts.Get("marketing.runsPanel.runs")</h2>
     @if (runs is null)
     {
         <LoadingState />
     }
     else if (runs.Count == 0)
     {
-        <EmptyState Compact="true" Title="Henüz çalıştırma yok." Text="Çalıştırma, dondurulmuş bir hedef kitleyi bir içerik sürümüyle gönderir." />
+        <p class="text-muted">@Texts.Get("marketing.runsPanel.noRuns")</p>
     }
     else
     {
         @foreach (var r in runs)
         {
-            <article class="sla-card" aria-label="Çalıştırma">
+            <article class="sla-card" aria-label="@Texts.Get("marketing.runsPanel.run")">
                 <header>
-                    <strong>Çalıştırma …@r.Id.ToString()[^6..]</strong>
+                    <strong>@Texts.Get("marketing.runsPanel.runTitle", r.Id.ToString()[^6..])</strong>
                     <span class="badge stage-@MarketingLabels.RunBadge(r.Status)">@MarketingLabels.Label(MarketingLabels.RunStatuses, r.Status)</span>
                 </header>
                 <p class="mb-1 small">
-                    Hedef kitle: @(SnapshotText(r.SnapshotId)) · İçerik: @(ContentText(r.ContentId)) · Planlanan: @(r.ScheduledAt is { } at ? CrmLabels.Time(at) : "hemen (onaydan sonra)")
-                    @(r.Note is null ? null : " · Gerekçe: " + r.Note)
+                    @Texts.Get("marketing.runsPanel.runLine", SnapshotText(r.SnapshotId), ContentText(r.ContentId), r.ScheduledAt is { } at ? CrmLabels.Time(at) : Texts.Get("marketing.runsPanel.immediately"))
+                    @(r.Note is null ? null : " · " + Texts.Get("marketing.runsPanel.note", r.Note))
                 </p>
                 @if (summaries.TryGetValue(r.Id, out var s))
                 {
                     <p class="mb-1 small" role="status">
-                        @s.Total teslimat —
+                        @Texts.Get("marketing.runsPanel.deliveries", s.Total) —
                         @string.Join(", ", s.Statuses.Select(x => $"{MarketingLabels.DeliveryStatus(x.Key)}: {x.Value}"))
-                        @(s.ProviderConfigured ? null : " · sağlayıcı yapılandırılmamış")
-                        @(s.UnsubscribeLinkAvailable ? null : " · abonelikten çıkma bağlantısı üretilemiyor (genel adres ayarlı değil)")
+                        @(s.ProviderConfigured ? null : " · " + Texts.Get("marketing.runsPanel.noProvider"))
+                        @(s.UnsubscribeLinkAvailable ? null : " · " + Texts.Get("marketing.runsPanel.noUnsubscribe"))
                     </p>
                     @if (s.Codes.Count > 0)
                     {
@@ -105,33 +105,33 @@
                 }
 
                 <div class="filters">
-                    @if (r.Status == "Draft" && CanWrite) { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "submit")'>Onaya gönder</button> }
+                    @if (r.Status == "Draft" && CanWrite) { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "submit")'>@Texts.Get("marketing.runsPanel.submit")</button> }
                     @if (r.Status == "PendingApproval" && CanApprove)
                     {
-                        <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "approve")'>Onayla</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "reject", true)'>Reddet</button>
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "approve")'>@Texts.Get("crm.quoteApprovals.approve")</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "reject", true)'>@Texts.Get("crm.quoteApprovals.reject")</button>
                     }
-                    @if (r.Status is "PendingApproval" or "Approved" && CanWrite) { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "reopen", true)'>Taslağa al</button> }
-                    @if (r.Status == "Approved" && CanSend) { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "start")'>Başlat</button> }
+                    @if (r.Status is "PendingApproval" or "Approved" && CanWrite) { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "reopen", true)'>@Texts.Get("marketing.runsPanel.toDraft")</button> }
+                    @if (r.Status == "Approved" && CanSend) { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "start")'>@Texts.Get("marketing.runsPanel.start")</button> }
                     @if (r.Status == "Running" && CanSend)
                     {
-                        <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick="() => ProcessAsync(r)">Sıradaki grubu işle</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "pause")'>Duraklat</button>
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick="() => ProcessAsync(r)">@Texts.Get("marketing.runsPanel.process")</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "pause")'>@Texts.Get("marketing.runsPanel.pause")</button>
                     }
-                    @if (r.Status == "Paused" && CanSend) { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "resume")'>Sürdür</button> }
+                    @if (r.Status == "Paused" && CanSend) { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "resume")'>@Texts.Get("support.action.resume")</button> }
                     @if (r.Status is "Draft" or "PendingApproval" or "Approved" or "Running" or "Paused" && (CanSend || CanWrite))
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "cancel", true)'>İptal et</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "cancel", true)'>@Texts.Get("marketing.runsPanel.cancel")</button>
                     }
-                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => LoadSummaryAsync(r)">Özeti yenile</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => LoadSummaryAsync(r)">@Texts.Get("marketing.runsPanel.refreshSummary")</button>
                 </div>
                 @if (askReason == r.Id)
                 {
                     <div class="filters">
-                        <label class="visually-hidden" for="run-reason">Gerekçe</label>
-                        <input id="run-reason" class="form-control" maxlength="500" placeholder="Gerekçe (zorunlu)" @bind="reason" />
-                        <button type="button" class="btn btn-sm btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" @onclick="ConfirmReasonAsync">Onayla</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => askReason = null">Vazgeç</button>
+                        <label class="visually-hidden" for="run-reason">@Texts.Get("crm.quoteApprovals.reasonLabel")</label>
+                        <input id="run-reason" class="form-control" maxlength="500" placeholder="@Texts.Get("orders.change.reason")" @bind="reason" />
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" @onclick="ConfirmReasonAsync">@Texts.Get("crm.quoteApprovals.approve")</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => askReason = null">@Texts.Get("common.dismiss")</button>
                     </div>
                 }
             </article>
@@ -142,33 +142,33 @@
     {
         <form class="record-form" novalidate @onsubmit="CreateRunAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
-                <legend class="h6">Yeni çalıştırma</legend>
+                <legend class="h6">@Texts.Get("marketing.runsPanel.newRun")</legend>
                 <div class="form-grid">
                     <div class="span-4">
-                        <label class="form-label" for="rn-snapshot">Dondurulmuş hedef kitle</label>
+                        <label class="form-label" for="rn-snapshot">@Texts.Get("marketing.runsPanel.snapshot")</label>
                         <select id="rn-snapshot" class="form-select" @bind="snapshotChoice">
-                            <option value="">Seçin</option>
-                            @foreach (var s in snapshots ?? []) { <option value="@s.Id">@CrmLabels.Time(s.TakenAt) — @s.EligibleCount uygun alıcı</option> }
+                            <option value="">@Texts.Get("support.choose")</option>
+                            @foreach (var s in snapshots ?? []) { <option value="@s.Id">@Texts.Get("marketing.runsPanel.snapshotOption", CrmLabels.Time(s.TakenAt), s.EligibleCount)</option> }
                         </select>
                         <FieldError Field="snapshotId" Errors="runErrors" />
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="rn-content">İçerik sürümü</label>
+                        <label class="form-label" for="rn-content">@Texts.Get("marketing.runsPanel.content")</label>
                         <select id="rn-content" class="form-select" @bind="contentChoice">
-                            <option value="">Seçin</option>
-                            @foreach (var c in contents ?? []) { <option value="@c.Id">v@(c.VersionNo) — @(c.Subject ?? "(konusuz)")</option> }
+                            <option value="">@Texts.Get("support.choose")</option>
+                            @foreach (var c in contents ?? []) { <option value="@c.Id">v@(c.VersionNo) — @(c.Subject ?? Texts.Get("marketing.runsPanel.noSubject"))</option> }
                         </select>
                         <FieldError Field="contentId" Errors="runErrors" />
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="rn-at">Planlanan zaman (isteğe bağlı)</label>
+                        <label class="form-label" for="rn-at">@Texts.Get("marketing.runsPanel.scheduledAt")</label>
                         <input id="rn-at" class="form-control" type="datetime-local" @bind="scheduledLocal" />
-                        <small class="text-muted">Yerel saatinizle girilir, UTC saklanır.</small>
+                        <small class="text-muted">@Texts.Get("marketing.runsPanel.scheduledHelp")</small>
                         <FieldError Field="scheduledAt" Errors="runErrors" />
                     </div>
                 </div>
             </fieldset>
-            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Taslak çalıştırma oluştur</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">@Texts.Get("marketing.runsPanel.createRun")</button></div>
         </form>
     }
 </section>
@@ -225,9 +225,9 @@
         if (result.IsSuccess) { summaries[run.Id] = result.Value!; }
     }
 
-    private string SnapshotText(Guid? id) => id is null ? "yok" : snapshots?.FirstOrDefault(s => s.Id == id) is { } s ? $"{CrmLabels.Time(s.TakenAt)} ({s.EligibleCount} uygun)" : "…" + id.ToString()![^8..];
+    private string SnapshotText(Guid? id) => id is null ? Texts.Get("common.noneLower") : snapshots?.FirstOrDefault(s => s.Id == id) is { } s ? Texts.Get("marketing.runsPanel.snapshotText", CrmLabels.Time(s.TakenAt), s.EligibleCount) : "…" + id.ToString()![^8..];
 
-    private string ContentText(Guid? id) => id is null ? "yok" : contents?.FirstOrDefault(c => c.Id == id) is { } c ? $"v{c.VersionNo}" : "…" + id.ToString()![^8..];
+    private string ContentText(Guid? id) => id is null ? Texts.Get("common.noneLower") : contents?.FirstOrDefault(c => c.Id == id) is { } c ? $"v{c.VersionNo}" : "…" + id.ToString()![^8..];
 
     private async Task AddContentAsync()
     {
@@ -236,7 +236,7 @@
         var result = await Api.PostAsync<CampaignContentDto>("/api/marketing/campaign-contents",
             new SaveCampaignContentRequest(CampaignId: Campaign.Id, Subject: string.IsNullOrWhiteSpace(subject) ? null : subject.Trim(), Body: body));
         busy = false;
-        if (result.IsSuccess) { subject = string.Empty; body = string.Empty; Report($"İçerik v{result.Value!.VersionNo} eklendi.", false); await LoadAllAsync(); }
+        if (result.IsSuccess) { subject = string.Empty; body = string.Empty; Report(Texts.Get("marketing.runsPanel.contentAdded", result.Value!.VersionNo), false); await LoadAllAsync(); }
         else { contentErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }
     }
 
@@ -247,7 +247,7 @@
         var result = await Api.PostAsync<TestSendResultDto>($"/api/marketing/campaign-contents/{content.Id}/test-send", new { });
         busy = false;
         Report(result.IsSuccess
-            ? result.Value!.Outcome == "Accepted" ? "Test iletisi sağlayıcıya verildi (hesap e-postanıza)." : $"Test sonucu: {result.Value.Outcome}{(result.Value.Code is null ? null : " (" + result.Value.Code + ")")}"
+            ? result.Value!.Outcome == "Accepted" ? Texts.Get("marketing.runsPanel.testAccepted") : result.Value.Code is null ? Texts.Get("marketing.runsPanel.testResult", result.Value.Outcome) : Texts.Get("marketing.runsPanel.testResultCode", result.Value.Outcome, result.Value.Code)
             : result.Error, !result.IsSuccess || result.Value!.Outcome != "Accepted");
     }
 
@@ -261,7 +261,7 @@
             ContentId: Guid.TryParse(contentChoice, out var c) ? c : null,
             ScheduledAt: scheduledLocal is { } at ? new DateTimeOffset(DateTime.SpecifyKind(at, DateTimeKind.Local)).ToUniversalTime() : null));
         busy = false;
-        if (result.IsSuccess) { snapshotChoice = string.Empty; contentChoice = string.Empty; scheduledLocal = null; Report("Taslak çalıştırma oluşturuldu.", false); await LoadAllAsync(); }
+        if (result.IsSuccess) { snapshotChoice = string.Empty; contentChoice = string.Empty; scheduledLocal = null; Report(Texts.Get("marketing.runsPanel.runCreated"), false); await LoadAllAsync(); }
         else { runErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }
     }
 
@@ -297,7 +297,7 @@
             return;
         }
 
-        Report("İşlem yapıldı.", false);
+        Report(Texts.Get("marketing.runsPanel.done"), false);
         await LoadAllAsync();
     }
 
@@ -308,7 +308,7 @@
         busy = false;
         if (!result.IsSuccess) { Report(result.Error, true); return; }
         var p = result.Value!;
-        Report($"{p.Processed} teslimat işlendi: {p.Accepted} kabul edildi, {p.Skipped} atlandı, {p.Failed} başarısız, {p.Unknown} belirsiz, {p.Requeued} yeniden sıraya alındı. Kalan: {p.Remaining}{(p.Completed ? " — çalıştırma tamamlandı." : ".")}", false);
+        Report(Texts.Get(p.Completed ? "marketing.runsPanel.processedCompleted" : "marketing.runsPanel.processed", p.Processed, p.Accepted, p.Skipped, p.Failed, p.Unknown, p.Requeued, p.Remaining), false);
         await LoadAllAsync();
     }
 

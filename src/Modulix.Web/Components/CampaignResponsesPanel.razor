@@ -5,52 +5,52 @@
 
 <Notice Text="@message" Failed="@failed" />
 <div class="alert alert-info" role="note">
-    Yanıtı siz kaydedersiniz; sağlayıcıdan otomatik yanıt gelmez. "İletişim istemiyorum" yanıtının çıkışı <strong>kendiliğinden uygulanmaz</strong>: yanıtı açıp "Çıkışı uygula" demeniz gerekir.
-    Ret, çıkış ve şikâyet yanıtları müşteri adayına dönüşmez.
+    @Texts.Strong("marketing.responsesPanel.info", Texts.Get("marketing.responsesPanel.notAutomatic"))
+    @Texts.Get("marketing.responsesPanel.noConvert")
 </div>
 
 <section aria-labelledby="resp-title">
-    <h2 id="resp-title" class="h5">Yanıtlar</h2>
+    <h2 id="resp-title" class="h5">@Texts.Get("marketing.campaignDetail.tab.responses")</h2>
     @if (responses is null)
     {
         <LoadingState />
     }
     else if (responses.Count == 0)
     {
-        <EmptyState Compact="true" Title="Henüz yanıt yok." Text="Yanıt, kampanyadan gönderilmiş bir iletiye kaydedilir." />
+        <EmptyState Compact="true" Title="@Texts.Get("marketing.responsesPanel.empty")" />
     }
     else
     {
         @foreach (var r in responses)
         {
-            <article class="run-card" aria-label="Yanıt">
+            <article class="run-card" aria-label="@Texts.Get("marketing.responsesPanel.response")">
                 <h3 class="h6">@MarketingLabels.ResponseKind(r.Kind) · @MarketingLabels.ResponseStatus(r.Status)</h3>
                 <p class="mb-1 small text-muted">
                     @CrmLabels.Time(r.ReceivedAt)
-                    @(r.LeadId is null ? null : " · Müşteri adayı açıldı")
-                    @(r.ActivityId is null ? null : " · aktivite açıldı")
-                    @(r.OptOutAppliedAt is null ? null : " · çıkış uygulandı")
+                    @(r.LeadId is null ? null : " · " + Texts.Get("marketing.responsesPanel.leadOpened"))
+                    @(r.ActivityId is null ? null : " · " + Texts.Get("marketing.responsesPanel.activityOpened"))
+                    @(r.OptOutAppliedAt is null ? null : " · " + Texts.Get("marketing.responsesPanel.optOutApplied"))
                     @(r.ClosedReason is null ? null : " · " + r.ClosedReason)
                 </p>
                 @if (!string.IsNullOrWhiteSpace(r.Note)) { <p class="mb-1">@r.Note</p> }
                 @if (CanWrite)
                 {
                     <div class="form-actions">
-                        @if (r.Status == "New") { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "take")'>Üstlen</button> }
-                        @if (r.Status is "New" or "InProgress" && r.Kind is "Interested" or "Question" or "MeetingRequest") { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "convert-to-lead")'>Müşteri adayı aç</button> }
-                        @if (r.Status != "Closed" && r.ActivityId is null) { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "create-activity")'>Takip aktivitesi aç</button> }
-                        @if (r.Status != "Closed" && r.Kind == "OptOut") { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "apply-opt-out")'>Çıkışı uygula</button> }
-                        @if (r.Status != "Closed") { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => AskReason(r, "close")'>Kapat</button> }
-                        @if (r.Status == "Closed") { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => AskReason(r, "reopen")'>Yeniden aç</button> }
+                        @if (r.Status == "New") { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "take")'>@Texts.Get("marketing.responsesPanel.take")</button> }
+                        @if (r.Status is "New" or "InProgress" && r.Kind is "Interested" or "Question" or "MeetingRequest") { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "convert-to-lead")'>@Texts.Get("marketing.responsesPanel.convert")</button> }
+                        @if (r.Status != "Closed" && r.ActivityId is null) { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => ActAsync(r, "create-activity")'>@Texts.Get("marketing.responsesPanel.createActivity")</button> }
+                        @if (r.Status != "Closed" && r.Kind == "OptOut") { <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick='() => ActAsync(r, "apply-opt-out")'>@Texts.Get("marketing.responsesPanel.applyOptOut")</button> }
+                        @if (r.Status != "Closed") { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => AskReason(r, "close")'>@Texts.Get("common.close")</button> }
+                        @if (r.Status == "Closed") { <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick='() => AskReason(r, "reopen")'>@Texts.Get("support.action.reopen")</button> }
                     </div>
                 }
                 @if (askReason == r.Id)
                 {
                     <div class="filters">
-                        <label class="visually-hidden" for="resp-reason">Gerekçe</label>
-                        <input id="resp-reason" class="form-control" maxlength="500" placeholder="Gerekçe (zorunlu)" @bind="reason" />
-                        <button type="button" class="btn btn-sm btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" @onclick="ConfirmReasonAsync">Onayla</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => askReason = null">Vazgeç</button>
+                        <label class="visually-hidden" for="resp-reason">@Texts.Get("crm.quoteApprovals.reasonLabel")</label>
+                        <input id="resp-reason" class="form-control" maxlength="500" placeholder="@Texts.Get("orders.change.reason")" @bind="reason" />
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" @onclick="ConfirmReasonAsync">@Texts.Get("crm.quoteApprovals.approve")</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => askReason = null">@Texts.Get("common.dismiss")</button>
                     </div>
                 }
             </article>
@@ -61,32 +61,32 @@
     {
         <form class="record-form" novalidate @onsubmit="RegisterAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
-                <legend class="h6">Yanıt kaydet</legend>
+                <legend class="h6">@Texts.Get("marketing.responsesPanel.register")</legend>
                 <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label" for="rs-delivery">Yanıtlanan ileti</label>
+                        <label class="form-label" for="rs-delivery">@Texts.Get("marketing.responsesPanel.delivery")</label>
                         <select id="rs-delivery" class="form-select" @bind="deliveryChoice" @onfocus="LoadDeliveriesAsync">
-                            <option value="">Seçin</option>
+                            <option value="">@Texts.Get("support.choose")</option>
                             @foreach (var d in deliveries ?? []) { <option value="@d.Id">@d.Label</option> }
                         </select>
-                        <small class="text-muted">Yalnızca sağlayıcıya verilmiş iletiler listelenir; alıcı listesi için alıcıları görme izni gerekir.</small>
+                        <small class="text-muted">@Texts.Get("marketing.responsesPanel.deliveryHelp")</small>
                         <FieldError Field="deliveryId" Errors="errors" />
                     </div>
                     <div class="span-3">
-                        <label class="form-label" for="rs-kind">Yanıt türü</label>
+                        <label class="form-label" for="rs-kind">@Texts.Get("marketing.responsesPanel.kind")</label>
                         <select id="rs-kind" class="form-select" @bind="kind">
                             @foreach (var k in MarketingLabels.ResponseKinds) { <option value="@k.Key">@k.Label</option> }
                         </select>
                         <FieldError Field="kind" Errors="errors" />
                     </div>
                     <div class="span-12">
-                        <label class="form-label" for="rs-note">Not (isteğe bağlı)</label>
+                        <label class="form-label" for="rs-note">@Texts.Get("marketing.responsesPanel.noteOptional")</label>
                         <textarea id="rs-note" class="form-control" rows="2" maxlength="2000" @bind="note"></textarea>
                         <FieldError Field="note" Errors="errors" />
                     </div>
                 </div>
             </fieldset>
-            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || deliveryChoice.Length == 0)">Yanıtı kaydet</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || deliveryChoice.Length == 0)">@Texts.Get("marketing.responsesPanel.save")</button></div>
         </form>
     }
 </section>
@@ -146,8 +146,11 @@
                 foreach (var d in page.Value?.Items ?? [])
                 {
                     index++;
-                    var who = labels.GetValueOrDefault(d.TargetId) ?? $"Alıcı {index}";
-                    list.Add(new DeliveryChoice(d.Id, $"{who} — {(run.StartedAt is { } at ? CrmLabels.Time(at) : "başlangıç belirsiz")}{(status == "Unknown" ? " (sonuç belirsiz)" : string.Empty)}"));
+                    var who = labels.GetValueOrDefault(d.TargetId) ?? Texts.Get("marketing.responsesPanel.recipientNo", index);
+                    var started = run.StartedAt is { } at ? CrmLabels.Time(at) : Texts.Get("marketing.responsesPanel.startUnknown");
+                    list.Add(new DeliveryChoice(d.Id, status == "Unknown"
+                        ? Texts.Get("marketing.responsesPanel.deliveryOptionUnknown", who, started)
+                        : Texts.Get("marketing.responsesPanel.deliveryOption", who, started)));
                 }
             }
         }
@@ -163,7 +166,7 @@
         var result = await Api.PostAsync<CampaignResponseDto>("/api/marketing/campaign-responses",
             new RegisterCampaignResponseRequest(deliveryId, kind, string.IsNullOrWhiteSpace(note) ? null : note.Trim()));
         busy = false;
-        if (result.IsSuccess) { note = string.Empty; deliveryChoice = string.Empty; Report("Yanıt kaydedildi.", false); await LoadAsync(); }
+        if (result.IsSuccess) { note = string.Empty; deliveryChoice = string.Empty; Report(Texts.Get("marketing.responsesPanel.saved"), false); await LoadAsync(); }
         else { errors = result.FieldErrors.Count == 0 ? null : result.FieldErrors; Report(result.Error, true); }
     }
 
@@ -190,7 +193,7 @@
         busy = true;
         var result = await Api.PostAsync<CampaignResponseDto>($"/api/marketing/campaign-responses/{response.Id}/{action}", new ResponseActionRequest(response.Version, why));
         busy = false;
-        Report(result.IsSuccess ? "İşlem tamamlandı." : result.Error, !result.IsSuccess);
+        Report(result.IsSuccess ? Texts.Get("marketing.responsesPanel.done") : result.Error, !result.IsSuccess);
         await LoadAsync();
     }
 
