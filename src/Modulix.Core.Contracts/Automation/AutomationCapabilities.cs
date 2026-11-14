@@ -158,7 +158,18 @@ public sealed record AutomationActionRegistration(AutomationActionDefinition Def
 /// kayıt türüdür. Tanım katalogla birlikte açılışta kontrol edilir, tam doğrulama kullanan kimliğin yetkisiyle yapılır.
 /// </summary>
 public sealed record AutomationTemplateDefinition(
-    string Key, string DisplayName, string Description, string EntityKey, AutomationDefinition Definition);
+    string Key, string DisplayName, string Description, string EntityKey, AutomationDefinition Definition)
+{
+    /// <summary>
+    /// Şablonun bilerek boş bıraktığı, firmanın taslakta dolduracağı zorunlu parametreler (ör. bildirimin alıcısı: kimin uyarılacağı firmaya
+    /// özgüdür, kodda sabitlenemez). Bu parametrelerin eksikliği şablonu "kullanılamıyor" yapmaz; taslak açılır, eksik parametre taslağın
+    /// doğrulama sorunu olarak görünür ve doldurulmadan kural yayınlanamaz. Başka hiçbir sorun bu yolla bastırılmaz.
+    /// </summary>
+    public IReadOnlyList<AutomationTemplateBlank> ToComplete { get; init; } = [];
+}
+
+/// <summary>Şablonda boş bırakılan parametre: adımın kimliği (<see cref="AutomationActionStep.Id"/>) ve aksiyonun parametre adı.</summary>
+public sealed record AutomationTemplateBlank(string StepId, string Parameter);
 
 /// <summary>Modülün kural altyapısına beyan ettiği tüm yetenekler. Boş beyan geçerlidir.</summary>
 public sealed record AutomationCapabilities
