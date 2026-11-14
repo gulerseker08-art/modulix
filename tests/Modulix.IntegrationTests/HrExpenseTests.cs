@@ -239,7 +239,7 @@ public class HrExpenseTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
 
         // Okuma ve indirme sürer: sahibi ve onaylayan fişleri görür.
         Assert.Equal(2, (await manager.GetFromJsonAsync<List<StoredFileDto>>($"{Files}?entityKey=hr.expense-line&recordId={line.Id}"))!.Count);
-        Assert.Equal(Pdf, await manager.GetByteArrayAsync($"{Files}/{hrReceipt.Id}/content"));
+        Assert.Equal(Content("ek.pdf"), await manager.GetByteArrayAsync($"{Files}/{hrReceipt.Id}/content"));
 
         // İzinsiz kullanıcı ve başka tenant fişe ulaşamaz.
         Assert.NotEqual(HttpStatusCode.OK, (await outsider.GetAsync($"{Files}/{receipt.Id}/content")).StatusCode);
@@ -251,9 +251,12 @@ public class HrExpenseTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
 
     private static readonly byte[] Pdf = Encoding.ASCII.GetBytes("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n");
 
+    // Aynı kayda aynı içerik ikinci kez eklenemez (ADR-0040); içerik dosya adıyla ayrılır.
+    private static byte[] Content(string fileName) => [.. Pdf, .. Encoding.ASCII.GetBytes(fileName)];
+
     private static Task<HttpResponseMessage> PostFileAsync(HttpClient client, Guid lineId, string fileName)
     {
-        var file = new ByteArrayContent([.. Pdf, .. Encoding.ASCII.GetBytes(fileName)]);
+        var file = new ByteArrayContent(Content(fileName));
         file.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         var form = new MultipartFormDataContent
         {
