@@ -6982,6 +6982,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("AssignedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("CampaignId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("City")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -7188,6 +7191,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("IndustryCode");
+
+                    b.HasIndex("TenantId", "CampaignId")
+                        .HasFilter("[CampaignId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "CompanyId");
 
@@ -7463,6 +7469,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<Guid?>("CampaignId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("CloseDateChangeCount")
                         .HasColumnType("int");
 
@@ -7649,6 +7658,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsFixedLength();
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CampaignId")
+                        .HasFilter("[CampaignId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "CompanyId");
 

@@ -267,7 +267,8 @@ internal sealed class CampaignResponses(
             $"Kampanya: {campaign.Name}",
             source,
             medium,
-            name), cancellationToken);
+            name,
+            campaign.Id), cancellationToken);
         if (result.IsCreated)
         {
             return (result.LeadId, null);

@@ -7,9 +7,9 @@ namespace Modulix.Modules.Crm.Records;
 
 /// <summary>
 /// Kampanya yanıtından lead açma sözleşmesinin CRM uygulaması (ADR-0025, dilim 7): lead kayıt boru hattından, çağıranın kimliği ve yetkisiyle açılır (lead oluşturma izni,
-/// veri kapsamı, audit, olay). Kaynak bilgisi kaynak ayrıntısı ve UTM alanlarına yazılır; kaynak listesi firmaya özgü olduğundan "kaynak" seçimi yapılmaz.
+/// veri kapsamı, audit, olay). Kaynak bilgisi kaynak ayrıntısı ve UTM alanlarına, kampanya kimliği <c>campaignId</c> bağına yazılır; kaynak listesi firmaya özgü olduğundan "kaynak" seçimi yapılmaz.
 /// </summary>
-internal sealed class CrmCampaignLeads(IRecordPipeline pipeline) : ICampaignLeads
+internal sealed class CrmCampaignLeads(IRecordPipeline pipeline, CampaignLinkTrust trust) : ICampaignLeads
 {
     public async Task<CampaignLeadResult> CreateAsync(CampaignLeadRequest request, CancellationToken cancellationToken)
     {
@@ -30,6 +30,13 @@ internal sealed class CrmCampaignLeads(IRecordPipeline pipeline) : ICampaignLead
         if (request.OwnerId is { } owner)
         {
             values["ownerId"] = owner.ToString();
+        }
+
+        // Kampanya bağı: kimliği kampanyanın sahibi modül verdi; yanıtı işleyenin kampanya okuma izni olmasa da bağ yazılır (CampaignLinkTrust).
+        using var allowed = request.CampaignId is { } campaign ? trust.Allow(campaign) : null;
+        if (request.CampaignId is { } campaignId)
+        {
+            values["campaignId"] = campaignId.ToString();
         }
 
         var created = await pipeline.CreateAsync(new RecordCommand(CrmModule.Entities.Lead, null, values), cancellationToken);

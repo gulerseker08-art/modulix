@@ -25,6 +25,7 @@ N→1 alanlar (lookup'a dönüştürüldü). "Zorunlu" sunucu tanımındaki duru
 | `crm.opportunity.company` | Fırsat.companyId → Firma | Evet | Fırsat formu; firma detayında sabit (gizli) | Dönüştürüldü |
 | `crm.opportunity.contact` | Fırsat.contactId → Kişi (**bağımlı**: firma) | Hayır | Fırsat formu | Dönüştürüldü |
 | `crm.lead.company` / `crm.lead.contact` | Lead.companyId/contactId → mevcut Firma/Kişi (bağımlı) | Hayır | Lead formu, Lead dönüştürme paneli | Dönüştürüldü |
+| `crm.lead.campaign` / `crm.opportunity.campaign` | Lead.campaignId / Fırsat.campaignId → Kampanya (**başka modülün kaydı**: `marketing.campaign`; yabancı anahtar yok, kayıt sırasında boru hattından doğrulanır) | Evet | Lead formu, Fırsat formu | Lookup ile eklendi (14 Kasım 2026) |
 | `crm.activity.company` / `.contact` / `.opportunity` | Aktivite → Firma / Kişi / Fırsat (kişi ve fırsat **bağımlı**: firma) | Hayır | Aktivite formu (firma detayında firma sabit) | Dönüştürüldü |
 | `crm.location.contact` | Lokasyon.contactId → Kişi (bağımlı: firma) | Hayır | Firma detayı → Lokasyonlar | Dönüştürüldü |
 | `crm.company-contact.contact` | Kişi-firma ilişkisi.contactId → Kişi | Evet | Firma detayı → Kişiler | Dönüştürüldü |
