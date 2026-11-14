@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using Modulix.Core.Contracts.Marketing;
+using Modulix.Modules.Marketing.Contracts;
 using Modulix.Modules.Marketing;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Marketing;

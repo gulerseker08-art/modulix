@@ -1,4 +1,4 @@
-using Modulix.Core.Contracts.Marketing;
+using Modulix.Modules.Marketing.Contracts;
 using Modulix.Modules.Marketing.Segments;
 
 namespace Modulix.Modules.Marketing.Tests;

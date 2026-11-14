@@ -1155,10 +1155,10 @@ public sealed class CrmModule : IModule
         services.AddScoped<IRecordStore, ActivityRecordStore>();
         services.AddScoped<IRecordStore, ActivityLinkRecordStore>();
         services.AddScoped<IRecordStore, ActivityParticipantRecordStore>();
-        services.AddScoped<Modulix.Core.Contracts.Marketing.ISegmentFieldSource, CrmSegmentFieldSource>();
-        services.AddScoped<Modulix.Core.Contracts.Marketing.ICampaignLeads, CrmCampaignLeads>();
-        services.AddScoped<Modulix.Core.Contracts.Marketing.IRecipientResolver, CrmRecipientResolver>();
-        services.AddScoped<Modulix.Core.Contracts.Marketing.IAddressLookup>(sp => (CrmRecipientResolver)sp.GetRequiredService<Modulix.Core.Contracts.Marketing.IRecipientResolver>());
+        services.AddScoped<Modulix.Modules.Marketing.Contracts.ISegmentFieldSource, CrmSegmentFieldSource>();
+        services.AddScoped<Modulix.Modules.Marketing.Contracts.ICampaignLeads, CrmCampaignLeads>();
+        services.AddScoped<Modulix.Modules.Marketing.Contracts.IRecipientResolver, CrmRecipientResolver>();
+        services.AddScoped<Modulix.Modules.Marketing.Contracts.IAddressLookup>(sp => (CrmRecipientResolver)sp.GetRequiredService<Modulix.Modules.Marketing.Contracts.IRecipientResolver>());
         services.AddScoped<IActivityLinkTarget, CompanyLinkTarget>();
         services.AddScoped<IActivityLinkTarget, ContactLinkTarget>();
         services.AddScoped<IActivityLinkTarget, OpportunityLinkTarget>();

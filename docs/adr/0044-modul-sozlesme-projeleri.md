@@ -1,6 +1,6 @@
 # ADR-0044: Modül sözleşme projeleri (modüller arası sözleşmeler Core'dan çıkar)
 
-- **Durum:** Uygulanıyor, 13 Kasım 2026. Dilim 1 (Fleet) ve Dilim 2 (Crm: `Sales`, `Activities`) teslim edildi; açık sorular 1-4 hâlâ karar bekliyor ve ilgili dilimlerden (4, 5) önce yanıtlanmalı.
+- **Durum:** Uygulanıyor, 13 Kasım 2026. Dilim 1 (Fleet), Dilim 2 (Crm: `Sales`, `Activities`) ve Dilim 3 (Marketing) teslim edildi; açık sorular 1-4 hâlâ karar bekliyor ve ilgili dilimlerden (4, 5) önce yanıtlanmalı.
 - **Karar (öneri):** Bir modülün başka modüllere açtığı arayüzler ve veri tipleri `Modulix.Core.Contracts` yerine o modülün kendi sözleşme projesinde (`Modulix.Modules.<Ad>.Contracts`) durur. Bir modül başka bir modülün yalnızca sözleşme projesine başvurabilir; bu bağımlılık mimari test tablosunda açıkça yazılır. `Modulix.Core.Contracts` yalnızca bütün modüllerin ortak kullandığı çekirdek sözleşmeleri tutar ve içine modüle özel alan adı eklenmesi testle engellenir.
 
 > Numara notu: 0043 numarası açık dallarda iki ayrı ADR tarafından kullanılıyor (`0043-firma-sektor-katalogu`, `0043-sevkiyatta-ulke-ve-uluslararasi-tasima`). Bu taslak 0044 aldı; birleştirmeden önce numara yeniden kontrol edilmeli.
@@ -52,7 +52,7 @@ Sonuçları:
 ### Sözleşme hangi modülde durur
 
 - **Sağlanan hizmet:** kavramın sahibi olan modülde. `IVehicleDirectory` Fleet'te, `IAcceptedQuoteSource` ve `IFollowUpActivities` Crm'de.
-- **Genişleme noktası:** bir modülün "bana şunu sağlayan olursa kullanırım" dediği arayüz, onu tanımlayan modülde. Marketing'in alıcı çözümleme ve segment alanı arayüzleri Marketing'de kalır; Crm bunları uygulamak için `Modulix.Modules.Marketing.Contracts`'a başvurur. (Hangi arayüzü kimin uyguladığı taşıma diliminde tek tek doğrulanacak.)
+- **Genişleme noktası:** bir modülün "bana şunu sağlayan olursa kullanırım" dediği arayüz, onu tanımlayan modülde. Marketing'in alıcı çözümleme ve segment alanı arayüzleri Marketing'de kalır; Crm bunları uygulamak için `Modulix.Modules.Marketing.Contracts`'a başvurur. (Dilim 3'te doğrulandı: `ISegmentFieldSource`, `IRecipientResolver`, `IAddressLookup` ve `ICampaignLeads` arayüzlerini Crm uygular; `IMessageProvider` şimdilik Marketing içindeki sahte sağlayıcıyla uygulanır.)
 
 ### Modül yokken davranış
 

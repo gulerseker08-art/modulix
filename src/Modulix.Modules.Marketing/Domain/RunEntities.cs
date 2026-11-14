@@ -163,7 +163,7 @@ public sealed class CampaignTestSend : IJournalEntity, ICompanyShared
 
     public Guid UserId { get; set; }
 
-    /// <summary>Sağlayıcı sonucu (<see cref="Modulix.Core.Contracts.Marketing.ProviderOutcome"/> adı).</summary>
+    /// <summary>Sağlayıcı sonucu (<see cref="Modulix.Modules.Marketing.Contracts.ProviderOutcome"/> adı).</summary>
     public string Outcome { get; set; } = string.Empty;
 
     public string? Code { get; set; }

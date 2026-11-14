@@ -1,6 +1,6 @@
 using Modulix.Core.Contracts.Communication;
 
-namespace Modulix.Core.Contracts.Marketing;
+namespace Modulix.Modules.Marketing.Contracts;
 
 // Alıcı çözümleme sözleşmesi (ADR-0025, dilim 4): hedef kitle "firma" ya da "kişi" kimlikleridir; bir kanalda ulaşılacak kişi ve iletişim
 // noktası ise iletişim noktalarını tutan modülün işidir. Pazarlama modülü CRM tablolarına dokunmaz; bu sözleşmeyle ister, sonucu
