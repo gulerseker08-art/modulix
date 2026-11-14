@@ -35,6 +35,10 @@
                         <strong>@starter.Name</strong>
                         <span>@starter.Description</span>
                         <span class="text-muted">@starter.Options.Count seçenek: @string.Join(", ", starter.Options)</span>
+                        @if (starter.Features.Count > 0)
+                        {
+                            <span class="text-muted">Özellikler: @string.Join(" · ", starter.Features)</span>
+                        }
                         @if (starter.Added)
                         {
                             <span class="badge category">Eklendi</span>
@@ -95,16 +99,36 @@
         }
         else
         {
-            <table class="table record-table">
+            @if (FeatureChoices.Count > 0)
+            {
+                <div class="list-toolbar">
+                    <label class="form-label" for="featureFilter">Hizmet özelliği</label>
+                    <select id="featureFilter" class="form-select" @bind="featureFilter">
+                        <option value="">Tümü</option>
+                        @foreach (var choice in FeatureChoices)
+                        {
+                            <option value="@choice">@choice</option>
+                        }
+                    </select>
+                </div>
+            }
+
+            @if (VisibleProfiles.Count == 0)
+            {
+                <p class="text-muted">Bu özelliğe sahip alt profil yok.</p>
+            }
+
+            <table class="table record-table" hidden="@(VisibleProfiles.Count == 0)">
                 <thead>
-                    <tr><th>Alt profil</th><th>Bağlı faaliyet</th><th>Seçenekler</th><th>Durum</th><th></th></tr>
+                    <tr><th>Alt profil</th><th>Bağlı faaliyet</th><th>Hizmet özellikleri</th><th>Seçenekler</th><th>Durum</th><th></th></tr>
                 </thead>
                 <tbody>
-                    @foreach (var profile in profiles)
+                    @foreach (var profile in VisibleProfiles)
                     {
                         <tr class="@(current?.Id == profile.Id ? "is-selected" : null)">
                             <td data-label="Alt profil" class="primary">@profile.Name</td>
                             <td data-label="Bağlı faaliyet">@(profile.ActivityName ?? "—")</td>
+                            <td data-label="Hizmet özellikleri">@(FeatureSummary(profile.Features) is { Length: > 0 } summary ? summary : "—")</td>
                             <td data-label="Seçenekler">
                                 @profile.OptionCount
                                 @if (profile.PendingCount > 0)
@@ -156,6 +180,60 @@
                         </div>
                     </section>
                 }
+
+                <h3>Hizmet özellikleri</h3>
+                <p class="text-muted">
+                    Bu alt profilin nasıl çalıştığını anlatan etiketler (ör. Taşıma türü: Komple, Parsiyel). Hiçbir şeyi uygulamaz; her durumda eklenip kaldırılır.
+                </p>
+                @if (current.Features.Count == 0)
+                {
+                    <p class="text-muted">Bu alt profilde henüz hizmet özelliği yok.</p>
+                }
+                else
+                {
+                    <table class="table record-table">
+                        <thead>
+                            <tr><th>Özellik</th><th>Değer</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var feature in current.Features)
+                            {
+                                <tr>
+                                    <td data-label="Özellik" class="primary">@feature.Group</td>
+                                    <td data-label="Değer">@feature.Value</td>
+                                    <td class="actions">
+                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="@($"{feature.Group}: {feature.Value} özelliğini kaldır")"
+                                                @onclick="() => RemoveFeatureAsync(feature)">Kaldır</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+
+                <form novalidate @onsubmit="AddFeatureAsync" @onsubmit:preventDefault>
+                    <div class="form-grid">
+                        <div>
+                            <label class="form-label" for="featureGroup">Özellik</label>
+                            <input id="featureGroup" class="form-control" maxlength="60" list="featureGroups" placeholder="ör. Taşıma türü" @bind="featureGroup" @bind:event="oninput" />
+                            <datalist id="featureGroups">
+                                @foreach (var group in FeatureGroups)
+                                {
+                                    <option value="@group"></option>
+                                }
+                            </datalist>
+                            <FieldError Field="group" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="featureValue">Değer</label>
+                            <input id="featureValue" class="form-control" maxlength="100" placeholder="ör. Komple" @bind="featureValue" @bind:event="oninput" />
+                            <FieldError Field="value" Errors="errors" />
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-tonal" aria-busy="@(busy ? "true" : "false")" disabled="@(busy || string.IsNullOrWhiteSpace(featureGroup) || string.IsNullOrWhiteSpace(featureValue))">Özellik ekle</button>
+                    </div>
+                </form>
 
                 <h3>Seçenekler</h3>
                 @if (current.Options.Count == 0)
@@ -303,6 +381,24 @@
 @code {
     private List<SubProfileDto>? profiles;
     private List<SubProfileStarterDto> starters = [];
+    private string featureFilter = string.Empty;
+    private string featureGroup = string.Empty;
+    private string featureValue = string.Empty;
+
+    // Süzgeç seçenekleri: bütün alt profillerdeki "Özellik: Değer" çiftleri (tekrarsız, sıralı); yalnızca var olanlar listelenir.
+    private List<string> FeatureChoices =>
+        [.. (profiles ?? []).SelectMany(p => p.Features).Select(f => $"{f.Group}: {f.Value}").Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCulture)];
+
+    private List<string> FeatureGroups =>
+        [.. (profiles ?? []).SelectMany(p => p.Features).Select(f => f.Group).Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCulture)];
+
+    private List<SubProfileDto> VisibleProfiles =>
+        string.IsNullOrEmpty(featureFilter)
+            ? profiles ?? []
+            : [.. (profiles ?? []).Where(p => p.Features.Any(f => string.Equals($"{f.Group}: {f.Value}", featureFilter, StringComparison.CurrentCultureIgnoreCase)))];
+
+    private static string FeatureSummary(IReadOnlyList<SubProfileFeatureDto> features) =>
+        string.Join(" · ", features.GroupBy(f => f.Group, StringComparer.CurrentCultureIgnoreCase).Select(g => $"{g.First().Group}: {string.Join(", ", g.Select(f => f.Value))}"));
     private SubProfileDto? current;
     private ProfilePlanDto? plan;
     private List<ActivityOptionDto> activities = [];
@@ -335,6 +431,31 @@
         profiles = all.Value ?? profiles;
         message = all.Error;
         starters = (await Api.GetAsync<List<SubProfileStarterDto>>("/api/customization/sub-profiles/starters")).Value ?? starters;
+    }
+
+    private async Task AddFeatureAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<SubProfileDto>($"/api/customization/sub-profiles/{current!.Id}/features", new SaveSubProfileFeatureRequest(featureGroup, featureValue));
+        busy = false;
+        errors = result.FieldErrors;
+        message = result.FieldErrors.Count > 0 ? null : result.Error;
+        if (result.IsSuccess)
+        {
+            current = result.Value;
+            featureValue = string.Empty;
+            await ReloadAsync();
+        }
+    }
+
+    private async Task RemoveFeatureAsync(SubProfileFeatureDto feature)
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"/api/customization/sub-profiles/{current!.Id}/features/{feature.Id}");
+        busy = false;
+        message = result.Error;
+        await OpenAsync(current.Id);
+        await ReloadAsync();
     }
 
     private async Task AddStarterAsync(string key)

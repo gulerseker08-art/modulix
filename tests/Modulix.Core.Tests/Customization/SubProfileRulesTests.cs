@@ -140,6 +140,43 @@ public class SubProfileRulesTests
     }
 
     [Fact]
+    public void Feature_is_trimmed_and_both_parts_are_required_and_bounded()
+    {
+        var normalized = SubProfileRules.NormalizeFeature(new SubProfileFeatureInput("  Taşıma türü ", " Komple "));
+        Assert.Equal(("Taşıma türü", "Komple"), (normalized.Group, normalized.Value));
+
+        Assert.Equal("group", Assert.Throws<ArgumentException>(() => SubProfileRules.NormalizeFeature(new SubProfileFeatureInput(" ", "Komple"))).ParamName);
+        Assert.Equal("group", Assert.Throws<ArgumentException>(() => SubProfileRules.NormalizeFeature(new SubProfileFeatureInput(new string('a', 61), "Komple"))).ParamName);
+        Assert.Equal("value", Assert.Throws<ArgumentException>(() => SubProfileRules.NormalizeFeature(new SubProfileFeatureInput("Kapsam", ""))).ParamName);
+        Assert.Equal("value", Assert.Throws<ArgumentException>(() => SubProfileRules.NormalizeFeature(new SubProfileFeatureInput("Kapsam", new string('a', 101)))).ParamName);
+        // Sınırdaki uzunluklar geçerlidir.
+        var atLimit = SubProfileRules.NormalizeFeature(new SubProfileFeatureInput(new string('a', 60), new string('b', 100)));
+        Assert.Equal((60, 100), (atLimit.Group.Length, atLimit.Value.Length));
+    }
+
+    [Fact]
+    public void Duplicate_feature_is_same_group_and_value_in_any_case_but_the_same_value_under_another_group_is_fine()
+    {
+        var existing = new SubProfileFeature(Guid.NewGuid(), "Taşıma türü", "Komple", 0);
+
+        Assert.True(SubProfileRules.IsDuplicateFeature(new SubProfileFeatureInput("taşıma TÜRÜ", "komple"), [existing]));
+        Assert.False(SubProfileRules.IsDuplicateFeature(new SubProfileFeatureInput("Kapsam", "Komple"), [existing]));
+        Assert.False(SubProfileRules.IsDuplicateFeature(new SubProfileFeatureInput("Taşıma türü", "Parsiyel"), [existing]));
+    }
+
+    [Fact]
+    public void Group_labels_collect_values_under_their_group_in_first_seen_order()
+    {
+        var labels = SubProfileRules.GroupLabels(
+        [
+            new("Taşıma türü", "Komple"), new("Kapsam", "Yurt içi"), new("taşıma türü", "Parsiyel"), new("Kapsam", "Uluslararası"),
+        ]);
+
+        Assert.Equal(["Taşıma türü: Komple, Parsiyel", "Kapsam: Yurt içi, Uluslararası"], labels);
+        Assert.Empty(SubProfileRules.GroupLabels([]));
+    }
+
+    [Fact]
     public void Customization_limits_are_unlimited_by_default()
     {
         var limits = new CustomizationLimits();

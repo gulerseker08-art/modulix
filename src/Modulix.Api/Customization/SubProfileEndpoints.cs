@@ -26,7 +26,7 @@ public static class SubProfileEndpoints
         group.MapGet("/", async (ISubProfileService service, ModuleCatalog modules, CancellationToken ct) =>
             (await service.ListAsync(ct)).Select(p => ToDto(p, modules)).ToList());
         group.MapGet("/starters", async (ISubProfileService service, CancellationToken ct) =>
-            (await service.ListStartersAsync(ct)).Select(s => new SubProfileStarterDto(s.Key, s.Name, s.Description, s.ActivityName, s.OptionLabels, s.MissingModules, s.Added)).ToList());
+            (await service.ListStartersAsync(ct)).Select(s => new SubProfileStarterDto(s.Key, s.Name, s.Description, s.ActivityName, s.OptionLabels, s.FeatureLabels, s.MissingModules, s.Added)).ToList());
         group.MapPost("/starters/{key}", (string key, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>
         {
             if (await service.CreateFromStarterAsync(key, ct) is not { } created)
@@ -60,6 +60,10 @@ public static class SubProfileEndpoints
             await service.PreviewApplyAsync(id, ct) is { } plan ? Results.Ok(SectorProfileEndpoints.ToDto(plan, modules)) : NotFound()));
         group.MapPost("/{id:guid}/apply", (Guid id, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>
             await service.ApplyPendingAsync(id, ct) is { } view ? Results.Ok(ToDto(view, modules)) : NotFound()));
+        group.MapPost("/{id:guid}/features", (Guid id, SaveSubProfileFeatureRequest request, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>
+            await service.AddFeatureAsync(id, new SubProfileFeatureInput(request.Group ?? string.Empty, request.Value ?? string.Empty), ct) is { } view ? Results.Ok(ToDto(view, modules)) : NotFound()));
+        group.MapDelete("/{id:guid}/features/{featureId:guid}", (Guid id, Guid featureId, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>
+            await service.RemoveFeatureAsync(id, featureId, ct) is { } view ? Results.Ok(ToDto(view, modules)) : NotFound()));
         group.MapPost("/{id:guid}/options", (Guid id, SaveSubProfileOptionRequest request, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>
             await service.AddOptionAsync(id, ToInput(request), ct) is { } view ? Results.Ok(ToDto(view, modules)) : NotFound()));
         group.MapPut("/{id:guid}/options/{optionId:guid}", (Guid id, Guid optionId, SaveSubProfileOptionRequest request, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>
@@ -134,7 +138,8 @@ public static class SubProfileEndpoints
             o.ShowInList,
             o.Choices,
             o.Category,
-            o.AppliedAt))]);
+            o.AppliedAt))],
+        [.. v.Features.Select(f => new SubProfileFeatureDto(f.Id, f.Group, f.Value))]);
 
     private static IResult NotFound() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Alt profil ya da seçenek bulunamadı.");
 }
