@@ -4,6 +4,8 @@
   "common.deleted": "Silindi.",
   "common.confirm.deleteOf": "\"{0}\" silinsin mi?",
   "common.confirm.cancel": "Vazgeç",
+  "common.confirm.sure": "Emin misiniz?",
+  "common.confirm.delete": "Bu kayıt silinsin mi?",
   "common.email": "E-posta",
   "common.password": "Şifre",
   "common.loading": "Yükleniyor…",

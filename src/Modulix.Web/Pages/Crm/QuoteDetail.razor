@@ -352,7 +352,7 @@
                                         @if (Draft && Session.Can(CrmAccess.QuotesWrite))
                                         {
                                             <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditLine(line)" aria-label="@Texts.Get("crm.quoteDetail.editLineOf", line.Name)">@Texts.Get("common.edit")</button>
-                                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => DeleteLineAsync(line)" aria-label="@Texts.Get("crm.quoteDetail.deleteLineOf", line.Name)">@Texts.Get("common.delete")</button>
+                                            <ConfirmAction Disabled="@busy" AriaLabel="@Texts.Get("crm.quoteDetail.deleteLineOf", line.Name)" OnConfirm="() => DeleteLineAsync(line)">@Texts.Get("common.delete")</ConfirmAction>
                                         }
                                     </td>
                                 </tr>

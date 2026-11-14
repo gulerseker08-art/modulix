@@ -38,7 +38,7 @@
                         <td class="actions">
                             @if (CanWrite)
                             {
-                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(file)">Sil</button>
+                                <ConfirmAction Disabled="@busy" OnConfirm="() => DeleteAsync(file)">Sil</ConfirmAction>
                             }
                         </td>
                     </tr>

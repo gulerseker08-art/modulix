@@ -113,7 +113,7 @@
                             }
                             else if (CanWrite && Planning)
                             {
-                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveStopAsync(stop)">Kaldır</button>
+                                <ConfirmAction Disabled="@busy" OnConfirm="() => RemoveStopAsync(stop)">Kaldır</ConfirmAction>
                             }
                             else if (CanWrite && InProgress && arrived is null)
                             {

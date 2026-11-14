@@ -26,7 +26,7 @@
                     <small class="text-muted"> · @CrmLabels.Time(l.CreatedAt) · @Texts.Get("support.linksPanel.snapshot")</small>
                     @if (CanWrite)
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" disabled="@busy" @onclick="() => RemoveAsync(l)">@Texts.Get("support.linksPanel.remove")</button>
+                        <ConfirmAction Class="btn btn-sm btn-outline-secondary ms-2" Disabled="@busy" OnConfirm="() => RemoveAsync(l)">@Texts.Get("support.linksPanel.remove")</ConfirmAction>
                     }
                 </li>
             }

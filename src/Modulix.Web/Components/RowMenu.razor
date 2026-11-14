@@ -8,11 +8,19 @@
                 aria-label="@LabelText" @onclick="Toggle">
             <AppIcon Name="more-horizontal" Size="18" />
         </button>
-        @if (open)
+        @if (pending is { } ask)
+        {
+            @* Onay kutusu menünün yerinde açılır; menü dışına tıklamak vazgeçmektir. *@
+            <div class="view-selector-backdrop" aria-hidden="true" @onclick="Dismiss"></div>
+            <div class="view-menu row-menu-list row-menu-confirm">
+                <ConfirmBox Text="@ask.Text" ConfirmLabel="@ask.Label" Busy="running" Confirm="RunAsync" Cancel="Dismiss" />
+            </div>
+        }
+        else if (open)
         {
             <div class="view-selector-backdrop" aria-hidden="true" @onclick="Close"></div>
             <div class="view-menu row-menu-list" role="menu" aria-label="@LabelText" @onclick="Close">
-                @ChildContent
+                <CascadingValue Value="this" IsFixed="true">@ChildContent</CascadingValue>
             </div>
         }
     </div>
@@ -28,6 +36,46 @@
     private string LabelText => Label ?? Texts.Get("common.rowActions");
 
     private void Toggle() => open = !open;
+
+    private sealed record Pending(string Text, string Label, EventCallback Action);
+
+    private Pending? pending;
+    private bool running;
+
+    /// <summary>Menü öğesinden çağrılır (RowMenuDelete): menü kapanır, yerinde onay kutusu açılır.</summary>
+    public void Ask(string text, string label, EventCallback action)
+    {
+        pending = new Pending(text, label, action);
+        open = false;
+        StateHasChanged();
+    }
+
+    private void Dismiss()
+    {
+        if (!running)
+        {
+            pending = null;
+        }
+    }
+
+    private async Task RunAsync()
+    {
+        if (pending is not { } ask)
+        {
+            return;
+        }
+
+        running = true;
+        try
+        {
+            await ask.Action.InvokeAsync();
+        }
+        finally
+        {
+            running = false;
+            pending = null;
+        }
+    }
 
     private void Close() => open = false;
 

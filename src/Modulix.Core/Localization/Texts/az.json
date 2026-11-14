@@ -4,6 +4,8 @@
   "common.deleted": "Silindi.",
   "common.confirm.deleteOf": "\"{0}\" silinsin?",
   "common.confirm.cancel": "İmtina et",
+  "common.confirm.sure": "Əminsiniz?",
+  "common.confirm.delete": "Bu qeyd silinsin?",
   "common.email": "E-poçt",
   "common.password": "Şifrə",
   "common.loading": "Yüklənir…",
