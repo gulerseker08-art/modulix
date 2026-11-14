@@ -3,9 +3,12 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Authorization;
 using Modulix.Infrastructure.Identity;
+using Modulix.Infrastructure.Persistence;
+using Modulix.Modules.Hr.Domain;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Hr;
 using Modulix.Shared.Records;
@@ -162,6 +165,71 @@ public class HrSurveyTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         Assert.Equal(3, responses.Count);
         Assert.All(responses, r => Assert.Null(Text(r, "respondentUserId")));
         Assert.Empty(await ListAsync(hr, Answers, $"questionId={rating.Id}"));
+    }
+
+    /// <summary>
+    /// Bölüm 24: tam anonim anket. Kimliği gizli ankette cevap ne katılım satırına ne yazma anına bağlıdır: cevapta katılım kimliği yok, pusula
+    /// kimliği rastgele ve başka yerde yok, satır kimliği rastgele (v4), zamanı anketin açıldığı gün; cevabın denetim satırı kişisiz, kayıtsız,
+    /// değersiz ve iz kimliksiz; olay yok; cevap metni denetim kaydının hiçbir yerinde yok. Katılım (kim yanıtladı) tutulur ve tekrar yanıt
+    /// engellenir. Kimliği açık ankette cevap katılıma bağlı ve denetim kaydı kişiseldir.
+    /// </summary>
+    [Fact]
+    public async Task Anonymous_answers_are_linked_to_no_one_in_the_database_audit_log_or_events()
+    {
+        var s = await SetUpAsync();
+        using var hr = await LoginAsync(s.Hr);
+        using var staff = await LoginAsync(s.Staff);
+
+        var anonymous = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "Gizli nabız", ["isAnonymous"] = true });
+        var rating = await QuestionAsync(hr, anonymous.Id, "Puanınız", "rating", null, required: true);
+        var comment = await QuestionAsync(hr, anonymous.Id, "Görüşünüz", "text", null, required: false);
+        await ActAsync(hr, anonymous.Id, "open");
+        await SubmitAsync(staff, anonymous.Id, new SurveyAnswerItem(rating.Id, 5, null, null), new SurveyAnswerItem(comment.Id, null, null, "cok gizli dusunce 7f3a"));
+        Assert.Equal(HttpStatusCode.Conflict, (await PostResponseAsync(staff, anonymous.Id, new SurveyAnswerItem(rating.Id, 1, null, null))).StatusCode);
+
+        var open = await GetAsync(hr, $"{Surveys}/{anonymous.Id}");
+        var named = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "Açık anket" });
+        var namedQuestion = await QuestionAsync(hr, named.Id, "Puan", "rating", null, required: true);
+        await ActAsync(hr, named.Id, "open");
+        await SubmitAsync(staff, named.Id, new SurveyAnswerItem(namedQuestion.Id, 3, null, null));
+
+        using var scope = factory.OpenScope(s.TenantId);
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var participation = await db.Set<SurveyResponse>().AsNoTracking().SingleAsync(r => r.SurveyId == anonymous.Id);
+        Assert.Equal(s.Staff.Id, participation.RespondentUserId);
+
+        var answers = await db.Set<SurveyAnswer>().AsNoTracking().Where(a => a.SurveyId == anonymous.Id).ToListAsync();
+        Assert.Equal(2, answers.Count);
+        Assert.All(answers, a => Assert.Null(a.ResponseId));
+        Assert.Single(answers.Select(a => a.BallotId).Distinct());
+        var ballot = answers[0].BallotId;
+        Assert.NotEqual(participation.Id, ballot);
+        Assert.False(await db.Set<SurveyResponse>().AsNoTracking().AnyAsync(r => r.Id == ballot));
+        Assert.All(answers, a => Assert.Equal(4, a.Id.Version));
+        var openedDay = DateTimeOffset.Parse(Text(open, "openedAt")!).UtcDateTime.Date;
+        Assert.All(answers, a => Assert.Equal(openedDay, a.CreatedAt.UtcDateTime));
+
+        // Denetim kaydı: anonim cevabın satırı kişisiz, kayıtsız, değersiz, iz kimliksiz ve gün hassasiyetinde; cevap ve metni hiçbir satırda yok.
+        var answerAudit = await db.AuditLog.AsNoTracking().Where(a => a.EntityKey == "hr.survey-answer").ToListAsync();
+        var anonymousAudit = answerAudit.Where(a => a.UserId == Guid.Empty).ToList();
+        Assert.Equal(2, anonymousAudit.Count);
+        Assert.All(anonymousAudit, a => Assert.Equal((Guid.Empty, "{}", (string?)null, TimeSpan.Zero),
+            (a.RecordId, a.Changes, a.CorrelationId, a.OccurredAt.UtcDateTime.TimeOfDay)));
+        Guid[] answerIds = [.. answers.Select(a => a.Id)];
+        Assert.False(await db.AuditLog.AsNoTracking().AnyAsync(a => answerIds.Contains(a.RecordId) || a.RecordId == ballot));
+        Assert.False(await db.AuditLog.AsNoTracking().AnyAsync(a => a.Changes.Contains("cok gizli dusunce 7f3a")));
+        Assert.False(await db.OutboxMessages.AsNoTracking().AnyAsync(o => o.TenantId == s.TenantId && o.EntityKey == "hr.survey-answer"
+            && (answerIds.Contains(o.RecordId) || o.RecordId == Guid.Empty)));
+
+        // Kimliği açık ankette cevap katılıma bağlıdır ve denetim satırı kişiseldir.
+        var namedAnswer = await db.Set<SurveyAnswer>().AsNoTracking().SingleAsync(a => a.SurveyId == named.Id);
+        var namedParticipation = await db.Set<SurveyResponse>().AsNoTracking().SingleAsync(r => r.SurveyId == named.Id);
+        Assert.Equal((namedParticipation.Id, namedParticipation.Id), (namedAnswer.ResponseId, namedAnswer.BallotId));
+        Assert.Contains(answerAudit, a => a.RecordId == namedAnswer.Id && a.UserId == s.Staff.Id);
+
+        // Sonuç sayımı pusulaya göre: kimliği gizli ankette yanıt az olduğu için sonuç gizli, açık ankette bir cevaplayan.
+        var namedResults = (await hr.GetFromJsonAsync<SurveyResultsDto>($"/api/hr/surveys/{named.Id}/results"))!;
+        Assert.Equal(1, Assert.Single(namedResults.Questions).AnswerCount);
     }
 
     [Fact]

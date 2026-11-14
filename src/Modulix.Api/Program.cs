@@ -28,6 +28,7 @@ using Modulix.Api.Warehouse;
 using Modulix.Api.Sectors;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Customization;
@@ -76,6 +77,7 @@ builder.Services.AddModulixPersistence(
 // Özelleştirme sınırları (ADR-0041 K7): yapılandırma verilmezse sınırsız; sınır gerekirse "Customization:Limits" altına yazılır.
 builder.Services.AddSingleton(builder.Configuration.GetSection("Customization:Limits").Get<Modulix.Core.Customization.CustomizationLimits>()
     ?? new Modulix.Core.Customization.CustomizationLimits());
+builder.Services.AddModulixDataProtection(builder.Configuration);
 builder.Services.AddModulixAuth();
 builder.Services.AddModulixTenancy();
 
@@ -153,8 +155,10 @@ builder.Services.Configure<PublicLinkOptions>(builder.Configuration.GetSection(P
 
 // Hesap güvenliği (Y7a): "Şifremi unuttum" sınırları "Account" bölümünde.
 builder.Services.Configure<AccountOptions>(builder.Configuration.GetSection(AccountOptions.SectionName));
+// Sağlık uçları: /health/live yalnızca sürecin ayakta olduğunu söyler (yeniden başlatma kararı, bağımlılık denetlenmez);
+// /health/ready trafik alabilir mi sorusudur (veritabanı); /health bütün denetimleri (olay birikimi dahil) gösterir.
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<ModulixDbContext>("database")
+    .AddDbContextCheck<ModulixDbContext>("database", tags: [ReadyTag])
     .AddCheck<EventHealthCheck>("events");
 
 var app = builder.Build();
@@ -218,8 +222,15 @@ app.UseModulixForwardedHeaders();
 
 if (!app.Environment.IsDevelopment())
 {
+    // İşlenmeyen hata gövdesiz 500 yerine ProblemDetails döner (ayrıntı sızdırmadan); geliştirmede hata sayfası kalır.
+    app.UseExceptionHandler();
     app.UseHsts();
 }
+
+DataProtectionSetup.WarnIfKeysUnprotected(app);
+
+// Gövdesiz API hata yanıtları (401, 403, 404, 405, 429…) da ProblemDetails taşır; arayüz sayfaları etkilenmez.
+app.UseWhen(context => context.Request.Path.StartsWithSegments("/api"), api => api.UseStatusCodePages());
 
 app.UseHttpsRedirection();
 app.UseModulixSecurityHeaders();
@@ -228,14 +239,17 @@ app.UseModulixSecurityHeaders();
 app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
 
-app.UseRateLimiter();
+// Hız sınırı kimlik doğrulamadan sonra çalışır: genel sınır oturumdaki kişi ve firmaya göre bölümlenir.
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseMiddleware<TenantContextMiddleware>();
 app.UseMiddleware<CompanyContextMiddleware>();
 app.UseMiddleware<Modulix.Api.Observability.RequestLogScopeMiddleware>();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains(ReadyTag) });
 app.MapAuthEndpoints();
 app.MapAccountEndpoints();
 app.MapTenantEndpoints();
@@ -301,7 +315,11 @@ static string RequiredConnectionString(IConfiguration configuration, string name
             $"ConnectionStrings:{name} bulunamadı. Önce scripts\\db-up.ps1 çalıştırın.");
 
 /// <summary>Entegrasyon testleri (WebApplicationFactory) için.</summary>
-public partial class Program;
+public partial class Program
+{
+    /// <summary>Hazır olma denetimine (<c>/health/ready</c>) giren sağlık denetimlerinin etiketi.</summary>
+    internal const string ReadyTag = "ready";
+}
 
 /// <summary>
 /// Uygulamanın modülleri. Yeni bir modül eklemek için IModule uygulamasını listeye ekleyin; API, migration

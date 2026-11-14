@@ -22,6 +22,10 @@
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.*" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Data Protection anahtarlarının veritabanında saklanması (çok örnekli çalışma, yeniden başlatmada oturum korunur). -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.*" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- SMTP gönderimi (Email/SmtpEmailTransport). -->
     <PackageReference Include="MailKit" Version="4.18.*" />
   </ItemGroup>

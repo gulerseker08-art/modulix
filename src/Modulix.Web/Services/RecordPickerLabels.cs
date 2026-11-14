@@ -29,5 +29,5 @@ public static class RecordPickerLabels
     }
 
     /// <summary>Kimliğin ilk sekiz karakteri ("Kayıt 3f9a1c2e").</summary>
-    public static string ShortId(Guid id) => $"Kayıt {id.ToString("N")[..8]}";
+    public static string ShortId(Guid id) => $"{Texts.GetOr("admin.recordPicker.record", "Kayıt")} {id.ToString("N")[..8]}";
 }

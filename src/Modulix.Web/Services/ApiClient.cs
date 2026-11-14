@@ -9,7 +9,7 @@ namespace Modulix.Web.Services;
 /// API ile konuşmanın tek yolu. Oturum çerezi tarayıcı tarafından eklenir (aynı adres). Hatalar istisna
 /// değil sonuç olarak döner: ekran alan hatalarını alanın altında, diğerlerini sayfanın üstünde gösterir.
 /// </summary>
-public sealed class ApiClient(HttpClient http)
+public sealed class ApiClient(HttpClient http, SessionExpiry? expiry = null)
 {
     private static readonly JsonSerializerOptions Json = JsonSerializerOptions.Web;
 
@@ -43,7 +43,7 @@ public sealed class ApiClient(HttpClient http)
 
     public Task<ApiResult<bool>> DeleteAsync(string url) => SendAsync<bool>(() => http.DeleteAsync(url));
 
-    private static async Task<ApiResult<T>> SendAsync<T>(Func<Task<HttpResponseMessage>> send)
+    private async Task<ApiResult<T>> SendAsync<T>(Func<Task<HttpResponseMessage>> send)
     {
         HttpResponseMessage response;
         try
@@ -73,6 +73,12 @@ public sealed class ApiClient(HttpClient http)
             }
 
             var problem = await ReadProblemAsync(response);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                // Oturum sunucuda geçersiz: ekranlar tek tek uyarı göstermek yerine girişe yönlendirilir.
+                expiry?.Notify();
+            }
+
             var message = response.StatusCode switch
             {
                 HttpStatusCode.Unauthorized => "Oturumunuz kapanmış. Lütfen yeniden giriş yapın.",

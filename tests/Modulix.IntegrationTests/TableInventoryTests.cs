@@ -24,6 +24,7 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
         ["platform.UserLogins"] = "Kimlik (ASP.NET Identity).",
         ["platform.UserTokens"] = "Kimlik (ASP.NET Identity).",
         ["platform.UserSessions"] = "Oturumlar kişiye aittir, firmaya değil (Y7a).",
+        ["platform.DataProtectionKeys"] = "Uygulamanın Data Protection anahtar halkası; firma verisi değildir, bütün örnekler paylaşır.",
         ["platform.Memberships"] = "TenantId: üyelik, firma seçilmeden önce (giriş, firma listesi) doğrulanır.",
         ["platform.PlatformAuditLog"] = "Platform işlemlerinin firmalar arası kaydı (ADR-0028); ekleme-yalnız, firma silinse de saklanır. TargetTenantId firma verisi değildir.",
         ["platform.ModuleEntitlements"] ="TenantId: modül hakkını platform yöneticisi yönetir; firma yazamaz.",

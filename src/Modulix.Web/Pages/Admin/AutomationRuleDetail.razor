@@ -3,12 +3,12 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>@(detail?.Rule.Name ?? "Otomasyon kuralı") · Modulix</PageTitle>
+<PageTitle>@(detail?.Rule.Name ?? Texts.Get("admin.automationRule.title")) · Modulix</PageTitle>
 
 @* Otomasyon kuralı ayrıntısı (ADR-0027, Dilim 5a): yayınlanmış sürüm ve taslak, doğrulama sorunları; yayınla, aç/kapat, taslağı at.
    Yayın ve açma core.automation.publish, taslağı atma core.automation.manage ister. Düğmeleri gizlemek yetki değildir. *@
 <AuthGate Permission="@CoreAccess.ReadAutomation">
-    <a class="back-link" href="yonetim/otomasyon">← Otomasyon kuralları</a>
+    <a class="back-link" href="yonetim/otomasyon">← @Texts.Get("admin.automationRules.title")</a>
 
     @if (detail is null)
     {
@@ -28,22 +28,22 @@
             <span class="badge stage-@AutomationLabels.StatusBadge(rule.Status)">@AutomationLabels.Status(rule.Status)</span>
             @if (Session.Can(CoreAccess.ReadAutomationLogs) && detail.Published is not null)
             {
-                <a class="btn btn-ghost" href="yonetim/otomasyon/calismalar?kural=@rule.Id">Çalışmaları</a>
+                <a class="btn btn-ghost" href="yonetim/otomasyon/calismalar?kural=@rule.Id">@Texts.Get("admin.automationRule.runs")</a>
             }
             @if (Session.Can(CoreAccess.ManageAutomation))
             {
-                <a class="btn btn-outline-secondary" href="yonetim/otomasyon/@rule.Id/duzenle">Düzenle</a>
+                <a class="btn btn-outline-secondary" href="yonetim/otomasyon/@rule.Id/duzenle">@Texts.Get("common.edit")</a>
             }
             @if (CanPublish && detail.Published is not null)
             {
                 <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => SetActiveAsync(rule.Status != AutomationLabels.Active)">
-                    @(rule.Status == AutomationLabels.Active ? "Kapat" : "Aç")
+                    @(rule.Status == AutomationLabels.Active ? Texts.Get("admin.automationRule.turnOff") : Texts.Get("admin.automationRule.turnOn"))
                 </button>
             }
             @if (CanPublish && detail.Draft is not null)
             {
-                <button type="button" class="btn btn-outline-secondary" disabled="@(busy || detail.DraftIssues.Count > 0)" @onclick="() => PublishAsync(false)">Yayınla (kapalı kalsın)</button>
-                <button type="button" class="btn btn-primary" disabled="@(busy || detail.DraftIssues.Count > 0)" @onclick="() => confirming = Confirm.PublishAndOpen">Yayınla ve aç</button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@(busy || detail.DraftIssues.Count > 0)" @onclick="() => PublishAsync(false)">@Texts.Get("admin.automationRule.publishOff")</button>
+                <button type="button" class="btn btn-primary" disabled="@(busy || detail.DraftIssues.Count > 0)" @onclick="() => confirming = Confirm.PublishAndOpen">@Texts.Get("admin.automationRule.publishOn")</button>
             }
         </PageHeader>
 
@@ -64,37 +64,36 @@
 
         @if (confirming == Confirm.PublishAndOpen)
         {
-            <div class="alert alert-warning confirm" role="alertdialog" aria-label="Yayın onayı">
+            <div class="alert alert-warning confirm" role="alertdialog" aria-label="@Texts.Get("admin.automationRule.publishConfirmLabel")">
                 <p>
-                    Kural yayınlanıp açılınca koşula uyan kayıtlarda işini kendisi yapar (ör. takip aktivitesi açar).
-                    Yayından önce özeti ve sorunları kontrol ettiniz mi?
+                    @Texts.Get("admin.automationRule.publishConfirm")
                 </p>
-                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => PublishAsync(true)">Yayınla ve aç</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = Confirm.None">Vazgeç</button>
+                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => PublishAsync(true)">@Texts.Get("admin.automationRule.publishOn")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = Confirm.None">@Texts.Get("common.dismiss")</button>
             </div>
         }
 
         @if (detail.Draft is { } draft)
         {
-            <FormSection Title="Taslak" Icon="clipboard-list"
-                         Description="Henüz yayınlanmadı; yayınlanana kadar hiçbir şey çalıştırmaz.">
+            <FormSection Title="@Texts.Get("admin.automationRule.draft")" Icon="clipboard-list"
+                         Description="@Texts.Get("admin.automationRule.draftHelp")">
                 <Actions>
                     @if (Session.Can(CoreAccess.ManageAutomation))
                     {
-                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => confirming = Confirm.Discard">Taslağı at</button>
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => confirming = Confirm.Discard">@Texts.Get("admin.automationRule.discard")</button>
                     }
                 </Actions>
                 <ChildContent>
                     @if (confirming == Confirm.Discard)
                     {
-                        <div class="alert alert-warning confirm" role="alertdialog" aria-label="Taslağı atma onayı">
+                        <div class="alert alert-warning confirm" role="alertdialog" aria-label="@Texts.Get("admin.automationRule.discardConfirmLabel")">
                             <p>
                                 @(detail.Published is null
-                                    ? "Bu kural hiç yayınlanmadı; taslağı atarsanız kural da silinir."
-                                    : "Taslak atılır, yayınlanmış sürüm olduğu gibi kalır.")
+                                    ? Texts.Get("admin.automationRule.discardNeverPublished")
+                                    : Texts.Get("admin.automationRule.discardKeepsPublished"))
                             </p>
-                            <button type="button" class="btn btn-danger" disabled="@busy" @onclick="DiscardAsync">Taslağı at</button>
-                            <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = Confirm.None">Vazgeç</button>
+                            <button type="button" class="btn btn-danger" disabled="@busy" @onclick="DiscardAsync">@Texts.Get("admin.automationRule.discard")</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = Confirm.None">@Texts.Get("common.dismiss")</button>
                         </div>
                     }
                     <VersionView Version="draft" Issues="detail.DraftIssues" />
@@ -104,34 +103,34 @@
 
         @if (detail.Published is { } published)
         {
-            <FormSection Title="@($"Yayınlanmış sürüm (v{published.VersionNo})")" Icon="check"
-                         Description="@(rule.Status == AutomationLabels.Active ? "Şu an çalışan sürüm." : "Kapalı; çalışmıyor.")">
+            <FormSection Title="@Texts.Get("admin.automationRule.published", published.VersionNo)" Icon="check"
+                         Description="@(rule.Status == AutomationLabels.Active ? Texts.Get("admin.automationRule.publishedRunning") : Texts.Get("admin.automationRule.publishedOff"))">
                 <VersionView Version="published" Issues="detail.PublishedIssues" />
             </FormSection>
 
             @if (CanRun && rule.Status == AutomationLabels.Active && IsManual(published))
             {
-                <FormSection Title="Elle çalıştır" Icon="zap"
-                             Description="Bu kuralın tetikleyicisi elle çalıştırmadır. Seçtiğiniz kayıt için gerçekten çalışır; yalnızca okuma yetkinizin kapsadığı kayıtlar seçilebilir.">
+                <FormSection Title="@Texts.Get("admin.automationRule.manual")" Icon="zap"
+                             Description="@Texts.Get("admin.automationRule.manualHelp")">
                     <div class="form-grid">
                         <div class="span-6">
-                            <label class="form-label" for="manualRecord">Kayıt</label>
+                            <label class="form-label" for="manualRecord">@Texts.Get("admin.automationRule.record")</label>
                             <RecordPicker Id="manualRecord" EntityKey="@rule.EntityKey" LabelField="@LabelFieldOf(rule.EntityKey)"
-                                          AccessibleName="Çalıştırılacak kayıt" @bind-Value="manualRecordId" />
+                                          AccessibleName="@Texts.Get("admin.automationRule.recordToRun")" @bind-Value="manualRecordId" />
                         </div>
                     </div>
                     @if (confirming == Confirm.Run)
                     {
-                        <div class="alert alert-warning confirm" role="alertdialog" aria-label="Elle çalıştırma onayı">
-                            <p>Kural seçilen kayıt için hemen çalışır ve etkisi (ör. aktivite açılması) geri alınmaz. Devam edilsin mi?</p>
-                            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="RunManuallyAsync">Çalıştır</button>
-                            <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = Confirm.None">Vazgeç</button>
+                        <div class="alert alert-warning confirm" role="alertdialog" aria-label="@Texts.Get("admin.automationRule.runConfirmLabel")">
+                            <p>@Texts.Get("admin.automationRule.runConfirm")</p>
+                            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="RunManuallyAsync">@Texts.Get("admin.automationRule.run")</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = Confirm.None">@Texts.Get("common.dismiss")</button>
                         </div>
                     }
                     else
                     {
                         <div class="form-actions">
-                            <button type="button" class="btn btn-primary" disabled="@(busy || manualRecordId is null)" @onclick="() => confirming = Confirm.Run">Bu kayıt için çalıştır</button>
+                            <button type="button" class="btn btn-primary" disabled="@(busy || manualRecordId is null)" @onclick="() => confirming = Confirm.Run">@Texts.Get("admin.automationRule.runForRecord")</button>
                         </div>
                     }
                 </FormSection>
@@ -232,13 +231,13 @@
         await RunAsync(
             () => Api.PostAsync<AutomationRuleDetailDto>(
                 $"/api/automation/rules/{RuleId}/publish", new PublishAutomationRuleRequest(activate, detail.Rule.Version)),
-            activate ? "Kural yayınlandı ve açıldı." : "Kural yayınlandı; kapalı.");
+            activate ? Texts.Get("admin.automationRule.publishedOnDone") : Texts.Get("admin.automationRule.publishedOffDone"));
     }
 
     private Task SetActiveAsync(bool active) =>
         RunAsync(
             () => Api.PutAsync<AutomationRuleDetailDto>($"/api/automation/rules/{RuleId}/active", new SetAutomationRuleActiveRequest(active)),
-            active ? "Kural açıldı." : "Kural kapatıldı.");
+            active ? Texts.Get("admin.automationRule.turnedOn") : Texts.Get("admin.automationRule.turnedOff"));
 
     private async Task DiscardAsync()
     {
@@ -260,7 +259,7 @@
             return;
         }
 
-        notice = "Taslak atıldı.";
+        notice = Texts.Get("admin.automationRule.discarded");
         message = null;
         await LoadAsync();
     }

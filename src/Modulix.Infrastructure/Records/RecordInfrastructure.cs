@@ -28,7 +28,9 @@ public sealed class AuditLogEntry : ITenantEntity, ICompanyShared
 
     public AuditLogEntry(AuditEntry entry)
     {
-        Id = Guid.CreateVersion7();
+        // Anonim yazmanın satırı (ADR-0042 bölüm 24): sıralı kimlik ve saniyeli zaman yazma anını belli ederdi; kimlik rastgele, zaman gündür.
+        var now = DateTimeOffset.UtcNow;
+        Id = entry.Anonymous ? Guid.NewGuid() : Guid.CreateVersion7();
         TenantId = entry.TenantId;
         UserId = entry.UserId;
         EntityKey = entry.EntityKey;
@@ -38,7 +40,7 @@ public sealed class AuditLogEntry : ITenantEntity, ICompanyShared
         Source = entry.Source;
         CorrelationId = entry.CorrelationId;
         Subscription = entry.Subscription;
-        OccurredAt = DateTimeOffset.UtcNow;
+        OccurredAt = entry.Anonymous ? new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero) : now;
     }
 
     public Guid Id { get; private set; }

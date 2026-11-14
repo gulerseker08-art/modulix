@@ -314,14 +314,18 @@ internal sealed class SurveyAnswerRecordStore(HrStoreContext context) : HrRecord
 
     protected override string? ImmutableMessage => "Gönderilmiş yanıt değiştirilmez.";
 
+    /// <summary>Kimliği gizli anketin cevabı anonim yazılır (bölüm 24); kayıt kuralı aşağıda kimliği gizli ankete sınırlar.</summary>
+    public override bool AllowsAnonymousWrites => true;
+
     protected override IReadOnlyList<RecordField<SurveyAnswer>> Fields { get; } =
     [
-        Field.Reference<SurveyAnswer, SurveyResponse>("responseId", "Yanıt bulunamadı.", a => a.ResponseId, (a, v) => a.ResponseId = v!.Value, required: true, createOnly: true),
+        Field.Reference<SurveyAnswer, SurveyResponse>("responseId", "Yanıt bulunamadı.", a => a.ResponseId, (a, v) => a.ResponseId = v, createOnly: true),
+        Field.Reference<SurveyAnswer, Survey>("surveyId", "Anket bulunamadı.", a => a.SurveyId, (a, v) => a.SurveyId = v ?? Guid.Empty, createOnly: true),
+        Field.Id<SurveyAnswer>("ballotId", a => a.BallotId, (a, v) => a.BallotId = v ?? Guid.Empty),
         Field.Reference<SurveyAnswer, SurveyQuestion>("questionId", "Soru bulunamadı.", a => a.QuestionId, (a, v) => a.QuestionId = v!.Value, required: true, createOnly: true),
         Field.Integer<SurveyAnswer>("rating", a => a.Rating, (a, v) => a.Rating = v, 1, 5, createOnly: true),
         Field.Text<SurveyAnswer>("choice", SurveyQuestion.OptionMaxLength, a => a.Choice, (a, v) => a.Choice = v, createOnly: true),
         Field.Text<SurveyAnswer>("text", SurveyAnswer.TextMaxLength, a => a.TextValue, (a, v) => a.TextValue = v, createOnly: true),
-        Field.Computed<SurveyAnswer>("surveyId", a => a.SurveyId.ToString()),
     ];
 
     protected override IReadOnlyDictionary<string, RecordFilter<SurveyAnswer>> Filters { get; } = new Dictionary<string, RecordFilter<SurveyAnswer>>
@@ -346,8 +350,37 @@ internal sealed class SurveyAnswerRecordStore(HrStoreContext context) : HrRecord
         return Task.FromResult(source.Where(a => !anonymous.Contains(a.SurveyId)));
     }
 
-    protected override async Task AppliedAsync(SurveyAnswer entity, JsonObject values, bool isNew, CancellationToken cancellationToken) =>
-        entity.SurveyId = await Context.Data.Set<SurveyResponse>().AsNoTracking().Where(r => r.Id == entity.ResponseId).Select(r => r.SurveyId).SingleAsync(cancellationToken);
+    /// <summary>
+    /// Kimliği açık ankette cevap katılıma bağlanır (pusula = katılım). Kimliği gizli ankette (bölüm 24) cevap katılıma bağlanmaz: anket ve rastgele
+    /// pusula kimliği verilir, satırın kimliği rastgele ve zamanı anketin açıldığı gündür; böylece cevap ne katılım satırıyla ne yazma anıyla kişiye
+    /// bağlanır.
+    /// </summary>
+    protected override async Task AppliedAsync(SurveyAnswer entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
+    {
+        if (entity.ResponseId is { } response)
+        {
+            var survey = await Context.Data.Set<SurveyResponse>().AsNoTracking().Where(r => r.Id == response)
+                .Join(Context.Data.Set<Survey>(), r => r.SurveyId, s => s.Id, (r, s) => new { s.Id, s.IsAnonymous })
+                .SingleAsync(cancellationToken);
+            if (survey.IsAnonymous)
+            {
+                throw new RecordValidationException([new RecordFieldError("responseId", "Kimliği gizli anketin cevabı katılıma bağlanmaz.")]);
+            }
+
+            entity.SurveyId = survey.Id;
+            entity.BallotId = response;
+            return;
+        }
+
+        var anonymous = await Context.Data.Set<Survey>().AsNoTracking().Where(s => s.Id == entity.SurveyId)
+            .Select(s => new { s.IsAnonymous, s.OpenedAt }).SingleOrDefaultAsync(cancellationToken);
+        if (anonymous is not { IsAnonymous: true } || entity.BallotId == Guid.Empty)
+        {
+            throw new RecordValidationException([new RecordFieldError("responseId", "Kimliği açık anketin cevabı katılıma bağlanır.")]);
+        }
+
+        entity.Anonymize(anonymous.OpenedAt ?? DateTimeOffset.UtcNow);
+    }
 }
 
 /// <summary>Yanıt formundaki tek bir sorunun cevabı; sorunun türüne göre puan, seçenek, seçenekler (çoklu seçim) ya da metin.</summary>
@@ -471,6 +504,7 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
             return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Bu anketi daha önce yanıtladınız.");
         }
 
+        var anonymous = survey.Value.Values["isAnonymous"]?.GetValue<bool>() == true;
         var questions = await context.Data.Set<SurveyQuestion>().AsNoTracking().Where(q => q.SurveyId == surveyId).ToListAsync(cancellationToken);
         var (clean, errors) = Validate(questions, answers);
         if (errors.Count > 0)
@@ -491,17 +525,24 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
                     return response;
                 }
 
-                // Çoklu seçimde seçilen her seçenek ayrı bir cevap satırıdır (sonuçta seçenek başına sayılır).
+                // Çoklu seçimde seçilen her seçenek ayrı bir cevap satırıdır (sonuçta seçenek başına sayılır). Kimliği gizli ankette (bölüm 24)
+                // cevaplar katılıma bağlanmaz: rastgele pusula kimliğiyle ve anonim yazılır (denetim satırı kişisiz, kayıtsız, değersiz).
+                var ballot = anonymous ? Guid.NewGuid() : response.Value!.Id;
                 foreach (var answer in clean.SelectMany(a => a.Choices is { } many ? many.Select(c => a with { Choice = c, Choices = null }) : [a]))
                 {
                     var written = await pipeline.CreateAsync(new RecordCommand(HrModule.Entities.SurveyAnswer, null, new JsonObject
                     {
-                        ["responseId"] = response.Value!.Id.ToString(),
+                        ["responseId"] = anonymous ? null : response.Value!.Id.ToString(),
+                        ["surveyId"] = anonymous ? surveyId.ToString() : null,
+                        ["ballotId"] = anonymous ? ballot.ToString() : null,
                         ["questionId"] = answer.QuestionId.ToString(),
                         ["rating"] = answer.Rating,
                         ["choice"] = answer.Choice,
                         ["text"] = answer.Text,
-                    }), ct);
+                    })
+                    {
+                        Anonymous = anonymous,
+                    }, ct);
                     if (!written.IsSuccess)
                     {
                         return written;
@@ -536,7 +577,7 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
         var questions = await context.Data.Set<SurveyQuestion>().AsNoTracking().Where(q => q.SurveyId == surveyId)
             .OrderBy(q => q.Sequence).ThenBy(q => q.CreatedAt).ToListAsync(cancellationToken);
         var answers = await context.Data.Set<SurveyAnswer>().AsNoTracking().Where(a => a.SurveyId == surveyId)
-            .Select(a => new { a.ResponseId, a.QuestionId, a.Rating, a.Choice, a.TextValue }).ToListAsync(cancellationToken);
+            .Select(a => new { a.BallotId, a.QuestionId, a.Rating, a.Choice, a.TextValue }).ToListAsync(cancellationToken);
         var byQuestion = answers.ToLookup(a => a.QuestionId);
         var results = questions.Select(q =>
         {
@@ -549,7 +590,7 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
             };
             var ratings = mine.Where(a => a.Rating is not null).Select(a => (decimal)a.Rating!.Value).ToList();
             // Cevap sayısı soruyu cevaplayan kişi sayısıdır (çoklu seçimde bir kişinin birden çok satırı olur).
-            return new SurveyQuestionResult(q.Id, q.Sequence, q.Text, q.QuestionType, mine.Select(a => a.ResponseId).Distinct().Count(),
+            return new SurveyQuestionResult(q.Id, q.Sequence, q.Text, q.QuestionType, mine.Select(a => a.BallotId).Distinct().Count(),
                 ratings.Count == 0 ? null : Math.Round(ratings.Average(), 2),
                 counts, [.. mine.Where(a => a.TextValue is not null).Select(a => a.TextValue!).Order(StringComparer.Ordinal)]);
         }).ToList();

@@ -21,6 +21,9 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
 
     public abstract string EntityKey { get; }
 
+    /// <summary>Anonim oluşturmayı kabul eder mi (<see cref="RecordCommand.Anonymous"/>; yalnızca tam anonim anket cevabı).</summary>
+    public virtual bool AllowsAnonymousWrites => false;
+
     /// <summary>Lisans kontrolü modül düzeyindedir: modül tenant için açıksa tüm kayıtları kullanılabilir.</summary>
     public string FeatureKey => EntityKey;
 
