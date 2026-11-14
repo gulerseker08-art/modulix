@@ -13,7 +13,8 @@ namespace Modulix.Modules.Hr.Records;
 /// Çalışan kartları (ADR-0042 K2, dilim 1). Kişi yalnızca oluştururken seçilir ve bir kişinin tek kartı olur; ad, iş e-postası ve iş telefonu
 /// kişi kaydından okunur (yalnızca okunur hesaplanan alanlar: rehber ve organizasyon şeması tek istekle çizilir). Sicil numarası, bağlı
 /// kullanıcı ve T.C. kimlik numarası verilirse tenant içinde benzersizdir. Yönetici başka bir çalışandır, kendisi ya da astı olamaz.
-/// "Ayrıldı" durumunda ayrılış tarihi zorunludur ve işe giriş tarihinden önce olamaz. Kart silinmez (K9).
+/// "Ayrıldı" durumunda ayrılış tarihi zorunludur ve işe giriş tarihinden önce olamaz. Kart silinmez (K9). Unvan, departman, yönetici ve çalışma şekli
+/// değişiklikleri görev geçmişine dönem olarak yazılır (<see cref="EmployeePositions"/>, bölüm 20).
 /// </summary>
 internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRecordStore<Employee>(context), IRecordLabelProvider
 {
@@ -21,6 +22,7 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
     private const int MaxChainDepth = 100;
 
     private readonly Dictionary<Guid, PersonInfo> people = [];
+    private DateOnly? positionEffectiveDate;
 
     public override string EntityKey => HrModule.Entities.Employee;
 
@@ -57,6 +59,9 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
         Field.Text<Employee>("emergencyContactPhone", Employee.PhoneMaxLength, e => e.EmergencyContactPhone, (e, v) => e.EmergencyContactPhone = v),
         Field.Text<Employee>("iban", 34, e => e.Iban, (e, v) => e.Iban = v, upperCase: true),
         Field.Text<Employee>("notes", Employee.NotesMaxLength, e => e.Notes, (e, v) => e.Notes = v),
+
+        // Görev geçmişi (bölüm 20): unvan, departman, yönetici ya da çalışma şekli değişince yeni dönemin başladığı gün; kartta saklanmaz.
+        Field.Date<Employee>("positionEffectiveDate", _ => null, (_, v) => positionEffectiveDate = v),
 
         // Kişi kaydından okunur (PrepareAsync ile toplu yüklenir); genel uçtan gelen değer yok sayılır. Kişi kaydına buradan yazılmaz.
         Field.Computed<Employee>("firstName", e => Person(e)?.FirstName),
@@ -209,6 +214,11 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
         {
             throw new RecordValidationException(errors);
         }
+
+        // Aynı kapsamda birden çok kart yazılabilir (ör. içe aktarma): geçerlilik günü yalnızca bu yazma içindir.
+        var effective = positionEffectiveDate;
+        positionEffectiveDate = null;
+        await EmployeePositions.RecordAsync(Context, entity, isNew, effective, cancellationToken);
     }
 
     protected override Task BeforeDeleteAsync(Employee entity, CancellationToken cancellationToken) =>

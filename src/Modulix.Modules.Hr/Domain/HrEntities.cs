@@ -825,3 +825,29 @@ public sealed class PhotoAlbum : HrEntity
 
     public Guid? AuthorUserId { get; internal set; }
 }
+
+/// <summary>
+/// Çalışanın görev dönemi (ADR-0042 bölüm 20, yol haritası M4.2): unvan, departman, yönetici ve çalışma şekli bir başlangıç gününden itibaren geçerlidir.
+/// Satırları yalnızca çalışan kartı yazar (kart açılınca ilk dönem, bu alanlardan biri değişince önceki dönem kapanır ve yenisi açılır; ayrılınca son dönem
+/// ayrılış günüyle kapanır). Elle yazılmaz, değişmez, silinmez; değişikliğin kendisi çalışan kartının denetim kaydındadır. Görünürlüğü çalışan kartınınkidir.
+/// </summary>
+public sealed class EmployeePosition : HrEntity
+{
+    public Guid EmployeeId { get; internal set; }
+
+    public DateOnly StartDate { get; internal set; }
+
+    /// <summary>Dönemin son günü; açık dönemde boş.</summary>
+    public DateOnly? EndDate { get; internal set; }
+
+    public string? JobTitle { get; internal set; }
+
+    public string? DepartmentKey { get; internal set; }
+
+    public Guid? ManagerEmployeeId { get; internal set; }
+
+    public string EmploymentType { get; internal set; } = Employee.EmploymentTypes.FullTime;
+
+    /// <summary>Dönemi açan değişikliği yapan kullanıcı.</summary>
+    public Guid? ChangedByUserId { get; internal set; }
+}

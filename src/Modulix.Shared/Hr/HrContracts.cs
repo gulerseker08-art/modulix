@@ -35,6 +35,7 @@ public static class HrAccess
     public const string GalleryManage = "hr.gallery.manage";
 
     public const string EmployeeEntityKey = "hr.employee";
+    public const string EmployeePositionEntityKey = "hr.employee-position";
     public const string LeaveRequestEntityKey = "hr.leave-request";
     public const string LeaveBalanceEntityKey = "hr.leave-balance";
     public const string HolidayEntityKey = "hr.holiday";

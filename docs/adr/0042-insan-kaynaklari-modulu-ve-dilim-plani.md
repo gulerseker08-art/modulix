@@ -347,3 +347,24 @@ Dilimlerin "bilerek yapılmadı" listelerinden kalanlar öncelik sırasına konu
 | `dotnet test tests/Modulix.ArchitectureTests` | 78/78 geçti |
 | `dotnet test tests/Modulix.Core.Tests` | 971/971 geçti |
 | `HrImportTests` (entegrasyon, 3 test: demirbaş + izin hakkı + tatil; tekrar, küsuratlı yıl ve bilinmeyen sicil no satır hatası; başka firmanın sicil numarası çözülmez ve izinsiz kullanıcı demirbaş türünü görmez) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+
+## 20. Sonraya kalanlar, öncelik 2b: görev geçmişi (14 Kasım 2026)
+
+Yol haritası M4.2 (tarihli görev geçmişi). Çalışanın unvan, departman, yönetici ve çalışma şekli bir başlangıç gününden itibaren geçerli **dönemler** olarak tutulur.
+
+- **Tablo** `hr.EmployeePositions` (çalışan, başlangıç, bitiş, unvan, departman, yönetici, çalışma şekli, değiştiren); migration `HrEmployeePositions` + `TenantIsolationSql.AddTable`. Kayıt türü `hr.employee-position` yalnızca okunur (oluşturma, değiştirme ve silme 409); görünürlüğü çalışan kartınınkidir (`hr.employees.read`).
+- **Satırları çalışan kartı yazar**, kartla aynı işlemde (sözleşme geçmişi `ContractEvent` ile aynı kalıp; değişikliğin kendisi kartın denetim kaydındadır): kart açılınca işe giriş gününden ilk dönem; bu dört alandan biri değişince önceki dönem kapanır ve yenisi **geçerlilik gününden** açılır; ayrılınca son dönem ayrılış günüyle kapanır, yeniden çalışınca açılır. İlgisiz değişiklik (ör. not) dönem açmaz.
+- **Geçerlilik günü** kartta saklanmayan bir giriş alanıdır (`positionEffectiveDate`, form düzeninde "Görev ve organizasyon" bölümünde; yalnızca kayıtlı kartta görünür). Boşsa bugün; önceki dönemin başından sonra ve ayrılış tarihinden önce olmalıdır (422). Bir kapsamda birden çok kart yazılabileceği için (içe aktarma) her yazmadan sonra sıfırlanır.
+- **Eski kartlar:** bu bölümden önce açılmış kartın geçmişi yoktur; ilk görev değişikliğinde kartın önceki değerleri işe giriş gününden başlayan dönem olarak yazılır. Migration'da geriye dönük doldurma yapılmadı (RLS altında migration kullanıcısıyla toplu yazma ayrı bir karardır).
+- **Arayüz:** çalışan kartında "Görev geçmişi" paneli (dönem, unvan, departman, yönetici, çalışma şekli; en yeni üstte; `LoadingState`/`EmptyState`). Yeni CSS sınıfı yok.
+
+**Bilerek yapılmadı:** geçmiş dönemin sonradan düzeltilmesi (dönemler kayıt değişikliğinden türer; yanlış dönem yeni bir değişiklikle düzeltilir), maaş/ücret geçmişi (bordro D4), departman → iş birimi eşlemesi (öncelik 2c).
+
+### Test sonuçları (bölüm 20)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 42/42 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 83/83 geçti |
+| `HrEmployeePositionTests` (entegrasyon, 3 test: dönem açma/kapama, ayrılış ve yeniden başlama; geçerlilik günü kuralları ve geçmişe doğrudan yazma 409; tenant izolasyonu, izinsiz kullanıcı ve salt okur) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web` derlemesi | Yeni bileşen ve editör değişikliği hatasız derleniyor; ekran görüntüsü alınamadı (yerelde uygulama çalışmıyor) |

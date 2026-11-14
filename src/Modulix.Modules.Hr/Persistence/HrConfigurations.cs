@@ -351,3 +351,17 @@ internal sealed class PhotoAlbumConfiguration : IEntityTypeConfiguration<PhotoAl
         builder.HasIndex(a => new { a.TenantId, a.IsPublished, a.EventDate }).HasDatabaseName("IX_PhotoAlbums_Published");
     }
 }
+
+internal sealed class EmployeePositionConfiguration : IEntityTypeConfiguration<EmployeePosition>
+{
+    public void Configure(EntityTypeBuilder<EmployeePosition> builder)
+    {
+        HrTables.ConfigureCommon(builder, "EmployeePositions");
+        builder.Property(p => p.JobTitle).HasMaxLength(Employee.JobTitleMaxLength);
+        builder.Property(p => p.DepartmentKey).HasMaxLength(100);
+        builder.Property(p => p.EmploymentType).HasMaxLength(20).IsUnicode(false).IsRequired();
+        builder.HasOne<Employee>().WithMany().HasForeignKey(p => new { p.TenantId, p.EmployeeId })
+            .HasPrincipalKey(e => new { e.TenantId, e.Id }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(p => new { p.TenantId, p.EmployeeId, p.StartDate }).HasDatabaseName("IX_EmployeePositions_Employee");
+    }
+}

@@ -35,6 +35,7 @@ public static class HrForms
             new("departmentKey", "Departman", "gorev", 6),
             new("managerEmployeeId", "Yönetici", "gorev", 6),
             new("workLocation", "Çalışma yeri", "gorev", 6),
+            new("positionEffectiveDate", "Görev değişikliğinin geçerlilik günü", "gorev", 6),
             new("employmentType", "Çalışma şekli", "istihdam", 6),
             new("terminationDate", "Ayrılış tarihi", "istihdam", 6),
             new("nationalId", "T.C. kimlik numarası", "kisisel", 6),

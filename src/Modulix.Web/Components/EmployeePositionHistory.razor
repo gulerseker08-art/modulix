@@ -1,0 +1,76 @@
+@* Görev geçmişi (ADR-0042 bölüm 20): çalışanın unvan, departman, yönetici ve çalışma şekli dönemleri, en yeni üstte. Satırları sunucu çalışan kartı
+   güncellenince yazar; burada yalnızca okunur. *@
+@inject ApiClient Api
+
+<section class="settings-group" aria-label="Görev geçmişi">
+    <h3>Görev geçmişi</h3>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (positions is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" Rows="3" />
+    }
+    else if (positions.Count == 0)
+    {
+        <EmptyState Compact="true" Icon="history" Title="Görev geçmişi yok" Text="Unvan, departman, yönetici ya da çalışma şekli değişince dönemler burada görünür." />
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Görev geçmişi</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><span class="th-label"><AppIcon Name="calendar" Size="14" /> Dönem</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="briefcase" Size="14" /> Unvan</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="building" Size="14" /> Departman</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="user" Size="14" /> Yönetici</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> Çalışma şekli</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var position in positions)
+                {
+                    <tr>
+                        <td data-label="Dönem" class="primary">
+                            @HrLabels.Date(WarehouseLabels.Text(position, "startDate")) – @(WarehouseLabels.Text(position, "endDate") is { Length: > 0 } end ? HrLabels.Date(end) : "devam ediyor")
+                        </td>
+                        <td data-label="Unvan">@(WarehouseLabels.Text(position, "jobTitle") is { Length: > 0 } title ? title : "—")</td>
+                        <td data-label="Departman">@(WarehouseLabels.Text(position, "departmentKey") is { Length: > 0 } dep ? Lookups.Label(HrAccess.DepartmentList, dep) : "—")</td>
+                        <td data-label="Yönetici">@(WarehouseLabels.Id(position, "managerEmployeeId") is { } manager && managers.TryGetValue(manager, out var name) ? name : "—")</td>
+                        <td data-label="Çalışma şekli">@HrLabels.EmploymentType(WarehouseLabels.Text(position, "employmentType"))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+@code {
+    private List<RecordResponse>? positions;
+    private readonly Dictionary<Guid, string> managers = [];
+    private string? message;
+
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<RecordPageResponse>($"/api/records/{HrAccess.EmployeePositionEntityKey}?employeeId={EmployeeId}&pageSize=100");
+        positions = result.Value?.Items.ToList() ?? [];
+        message = result.Error;
+
+        // Yönetici adları: çalışan kartlarından (görünürlük çalışan okuma iznidir).
+        foreach (var id in positions.Select(p => WarehouseLabels.Id(p, "managerEmployeeId")).OfType<Guid>().Distinct())
+        {
+            if ((await Api.GetAsync<RecordResponse>($"/api/records/{HrAccess.EmployeeEntityKey}/{id}")).Value is { } manager)
+            {
+                managers[id] = HrLabels.Name(manager);
+            }
+        }
+    }
+}

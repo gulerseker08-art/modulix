@@ -19,6 +19,7 @@
         <EmployeeEditor Employee="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
         @if (selected is not null)
         {
+            <EmployeePositionHistory @key="(selected.Id, selected.Version)" EmployeeId="selected.Id" Lookups="Lookups" />
             <CredentialsPanel OwnerEntityKey="@HrAccess.EmployeeEntityKey" OwnerId="selected.Id" Category="@CredentialAccess.Employee" Lookups="Lookups"
                               CanWrite="@Session.Can(HrAccess.EmployeesWrite)" Title="Özlük belgeleri"
                               EmptyText="Bu çalışana henüz belge eklenmedi (iş sözleşmesi, sağlık raporu, diploma, sertifika…)." />

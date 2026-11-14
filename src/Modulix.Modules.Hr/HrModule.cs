@@ -72,6 +72,7 @@ public sealed class HrModule : IModule
         public const string SurveyAnswer = "hr.survey-answer";
         public const string BlogPost = "hr.blog-post";
         public const string PhotoAlbum = "hr.photo-album";
+        public const string EmployeePosition = "hr.employee-position";
     }
 
     public static class Lists
@@ -548,6 +549,7 @@ public sealed class HrModule : IModule
         services.AddScoped<ISurveyService, SurveyService>();
         services.AddScoped<IRecordStore, BlogPostRecordStore>();
         services.AddScoped<IRecordStore, PhotoAlbumRecordStore>();
+        services.AddScoped<IRecordStore, EmployeePositionRecordStore>();
         services.AddScoped<HrAutomationRecordSource>();
         services.AddScoped<Automation.StartChecklistAction>();
     }

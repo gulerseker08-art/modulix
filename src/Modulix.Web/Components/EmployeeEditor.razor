@@ -172,6 +172,15 @@
                             <input id="employee-location" class="form-control" maxlength="150" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.WorkLocation" />
                             <FieldError Field="workLocation" Errors="errors" />
                             break;
+                        case "positionEffectiveDate":
+                            @if (form.Id is not null)
+                            {
+                                <label class="@f.LabelClass()" for="employee-position-day">@f.Label</label>
+                                <input id="employee-position-day" class="form-control" type="date" @bind="form.PositionEffectiveDate" />
+                                <FieldError Field="positionEffectiveDate" Errors="errors" />
+                                <small class="text-muted">Unvan, departman, yönetici ya da çalışma şekli değişirse yeni dönem bu günden başlar; boşsa bugün.</small>
+                            }
+                            break;
                         case "employmentType":
                             <label class="@f.LabelClass()" for="employee-type">@f.Label</label>
                             <select id="employee-type" class="form-select" @bind="form.EmploymentType">
@@ -375,6 +384,7 @@
             ["workLocation"] = Optional(form.WorkLocation),
             ["hireDate"] = form.HireDate?.ToString("yyyy-MM-dd"),
             ["terminationDate"] = form.TerminationDate?.ToString("yyyy-MM-dd"),
+            ["positionEffectiveDate"] = form.Id is null ? null : form.PositionEffectiveDate?.ToString("yyyy-MM-dd"),
             ["status"] = form.Status,
             ["notes"] = Optional(form.Notes),
             ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
@@ -454,6 +464,9 @@
         public DateOnly? HireDate { get; set; }
 
         public DateOnly? TerminationDate { get; set; }
+
+        /// <summary>Görev geçmişi için yeni dönemin başladığı gün (kartta saklanmaz, her açılışta boştur).</summary>
+        public DateOnly? PositionEffectiveDate { get; set; }
 
         public string Status { get; set; } = "active";
 
