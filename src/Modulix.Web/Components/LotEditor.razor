@@ -9,7 +9,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Lot is null ? "Yeni parti" : "Parti kartı")</h2>
+            <h2>@(Lot is null ? Texts.Get("warehouse.lots.new") : Texts.Get("warehouse.lotEditor.card"))</h2>
             @if (Lot is not null)
             {
                 <p>@form.LotNo</p>
@@ -17,13 +17,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : "false")">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -38,22 +38,22 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Parti özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("warehouse.lotEditor.summary")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true"><AppIcon Name="package" Size="24" /></span>
-                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.LotNo) ? "Parti no" : form.LotNo)</strong>
-                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.Description) ? "Parti" : form.Description)</span>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.LotNo) ? Texts.Get("warehouse.lotNo") : form.LotNo)</strong>
+                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.Description) ? Texts.Get("warehouse.lot") : form.Description)</span>
                 </div>
-                <h3 class="summary-heading">Parti özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("warehouse.lotEditor.summary")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Durum</dt><dd>@(form.IsActive ? "Etkin" : "Pasif")</dd></div>
+                    <div><dt>@Texts.Get("common.field.status")</dt><dd>@WarehouseLabels.ActiveText(form.IsActive)</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Parti formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("warehouse.lotEditor.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
@@ -61,21 +61,21 @@
                             <label class="@f.LabelClass()" for="lot-no">@f.Label</label>
                             <input id="lot-no" class="form-control" maxlength="50" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.LotNo" />
                             <FieldError Field="lotNo" Errors="errors" />
-                            <small class="text-muted">Harf, rakam ve - _ . / karakterleri; büyük harfe çevrilir, firma içinde benzersizdir.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.identifierHelp")</small>
                             break;
                         case "stockItemId":
                             <label class="@f.LabelClass()" for="lot-stock-item">@f.Label</label>
-                            <LookupPicker Id="lot-stock-item" LookupKey="@WarehouseAccess.LotStockItemLookup" @bind-Value="form.StockItemId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="Stok kartı seçin…" Invalid="@(errors?.ContainsKey("stockItemId") == true)" />
+                            <LookupPicker Id="lot-stock-item" LookupKey="@WarehouseAccess.LotStockItemLookup" @bind-Value="form.StockItemId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="@Texts.Get("warehouse.chooseStockItem")" Invalid="@(errors?.ContainsKey("stockItemId") == true)" />
                             <FieldError Field="stockItemId" Errors="errors" />
                             break;
                         case "ownerPartyId":
                             <label class="@f.LabelClass()" for="lot-owner">@f.Label</label>
-                            <LookupPicker Id="lot-owner" LookupKey="@WarehouseAccess.LotOwnerLookup" @bind-Value="form.OwnerPartyId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="Malik seçin…" Invalid="@(errors?.ContainsKey("ownerPartyId") == true)" />
+                            <LookupPicker Id="lot-owner" LookupKey="@WarehouseAccess.LotOwnerLookup" @bind-Value="form.OwnerPartyId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="@Texts.Get("warehouse.chooseOwner")" Invalid="@(errors?.ContainsKey("ownerPartyId") == true)" />
                             <FieldError Field="ownerPartyId" Errors="errors" />
                             break;
                         case "billToPartyId":
                             <label class="@f.LabelClass()" for="lot-bill-to">@f.Label</label>
-                            <LookupPicker Id="lot-bill-to" LookupKey="@WarehouseAccess.LotBillToLookup" @bind-Value="form.BillToPartyId" Required="f.Required" Placeholder="Malikle aynı" Invalid="@(errors?.ContainsKey("billToPartyId") == true)" />
+                            <LookupPicker Id="lot-bill-to" LookupKey="@WarehouseAccess.LotBillToLookup" @bind-Value="form.BillToPartyId" Required="f.Required" Placeholder="@Texts.Get("warehouse.sameAsOwner")" Invalid="@(errors?.ContainsKey("billToPartyId") == true)" />
                             <FieldError Field="billToPartyId" Errors="errors" />
                             break;
                         case "isActive":
@@ -92,11 +92,11 @@
             </LayoutForm>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </div>
@@ -133,7 +133,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir parti verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
