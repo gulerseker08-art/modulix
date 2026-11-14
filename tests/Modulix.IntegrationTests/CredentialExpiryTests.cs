@@ -32,7 +32,7 @@ public class CredentialExpiryTests(CrmAutomationFixture fixture) : IClassFixture
     private const string Drivers = "/api/records/logistics.driver";
     private const string People = "/api/records/core.person";
 
-    private DateOnly Today => DateOnly.FromDateTime(fixture.Time.GetUtcNow().UtcDateTime);
+    private DateOnly Today => TenantToday.At(fixture.Time.GetUtcNow());
 
     private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
