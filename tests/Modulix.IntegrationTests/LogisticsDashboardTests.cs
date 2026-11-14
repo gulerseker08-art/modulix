@@ -26,7 +26,7 @@ public class LogisticsDashboardTests(ModulixApiFactory factory) : IClassFixture<
     private const string Stops = "/api/records/logistics.trip-stop";
     private const string Drivers = "/api/records/logistics.driver";
 
-    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+    private static DateOnly Today => TenantToday.At(DateTimeOffset.UtcNow);
 
     private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

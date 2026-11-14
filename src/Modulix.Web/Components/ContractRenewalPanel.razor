@@ -8,50 +8,50 @@
 
 <section class="detail-section" aria-labelledby="renewal-title">
     <div class="section-header">
-        <h2 id="renewal-title">Dönem, yenileme ve fesih</h2>
+        <h2 id="renewal-title">@Texts.Get("contracts.renewalPanel.title")</h2>
     </div>
 
     <Notice Text="@notice" Failed="@noticeFailed" />
 
     @if (loading)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
     }
     else if (overview is null)
     {
-        <p class="text-muted">Yenileme bilgisi yüklenemedi.</p>
+        <p class="text-muted">@Texts.Get("contracts.renewalPanel.loadFailed")</p>
     }
     else
     {
         <dl class="detail-list">
-            <div><dt>Yürürlük durumu</dt><dd>@ContractLabels.Label(ContractLabels.Effectives, overview.EffectiveStatus)</dd></div>
-            <div><dt>Dönem bitişi</dt><dd>@(overview.IsIndefinite ? "Belirsiz süreli" : ContractLabels.Date(overview.EndDate))@if (!overview.IsIndefinite && overview.DaysToEnd is { } toEnd) { <small class="text-muted"> · @RenewalLabels.Days(toEnd)</small> }</dd></div>
+            <div><dt>@Texts.Get("contracts.list.effectiveFilter")</dt><dd>@ContractLabels.Label(ContractLabels.Effectives, overview.EffectiveStatus)</dd></div>
+            <div><dt>@Texts.Get("contracts.renewalPanel.periodEnd")</dt><dd>@(overview.IsIndefinite ? Texts.Get("contracts.indefinite") : ContractLabels.Date(overview.EndDate))@if (!overview.IsIndefinite && overview.DaysToEnd is { } toEnd) { <small class="text-muted"> · @RenewalLabels.Days(toEnd)</small> }</dd></div>
             <div>
-                <dt>Son bildirim tarihi</dt>
+                <dt>@Texts.Get("contracts.field.noticedeadline")</dt>
                 <dd>
                     @ContractLabels.Date(overview.NoticeDeadline)
                     @if (overview.DaysToNotice is { } toNotice) { <small class="@(toNotice < 0 && overview.CurrentDecision is null ? "text-danger" : "text-muted")"> · @RenewalLabels.Days(toNotice)</small> }
-                    @if (overview.NoticePeriodDays is { } noticeDays) { <small class="text-muted"> (bitişten @noticeDays gün önce)</small> }
+                    @if (overview.NoticePeriodDays is { } noticeDays) { <small class="text-muted"> @Texts.Get("contracts.renewalPanel.noticeBefore", noticeDays)</small> }
                 </dd>
             </div>
-            <div><dt>Yenileme yöntemi</dt><dd>@ContractLabels.Label(ContractLabels.RenewalModes, overview.RenewalMode)@(overview.RenewalPeriodMonths is { } months ? $" · {months} ay" : string.Empty)</dd></div>
+            <div><dt>@Texts.Get("contracts.field.renewalmode")</dt><dd>@ContractLabels.Label(ContractLabels.RenewalModes, overview.RenewalMode)@(overview.RenewalPeriodMonths is { } months ? " · " + Texts.Get("contracts.renewalPanel.months", months) : string.Empty)</dd></div>
             <div>
-                <dt>Otomatik uzatma</dt>
-                <dd>@(overview.AutoRenewalBlockedReason is null ? "Koşullar sağlanınca zamanlanmış iş uzatır." : overview.AutoRenewalBlockedReason)</dd>
+                <dt>@Texts.Get("contracts.renewalPanel.autoRenewal")</dt>
+                <dd>@(overview.AutoRenewalBlockedReason is null ? Texts.Get("contracts.renewalPanel.autoRenewalReady") : overview.AutoRenewalBlockedReason)</dd>
             </div>
-            <div><dt>Hatırlatma eşikleri</dt><dd>@string.Join(", ", overview.Thresholds.Select(t => t + " gün"))</dd></div>
+            <div><dt>@Texts.Get("contracts.renewalPanel.thresholds")</dt><dd>@string.Join(", ", overview.Thresholds.Select(t => Texts.Get("crm.sales.days", t)))</dd></div>
             @if (overview.TerminationDate is { } terminationDate)
             {
-                <div><dt>Fesih</dt><dd>@ContractLabels.Date(terminationDate) · @overview.TerminationReason</dd></div>
+                <div><dt>@Texts.Get("contracts.renewalPanel.termination")</dt><dd>@ContractLabels.Date(terminationDate) · @overview.TerminationReason</dd></div>
             }
             @if (overview.CurrentDecision is { } current)
             {
                 <div>
-                    <dt>Bu dönem için karar</dt>
+                    <dt>@Texts.Get("contracts.renewalPanel.currentDecision")</dt>
                     <dd>
                         <span class="badge stage-@RenewalLabels.Badge(current.Outcome)">@RenewalLabels.Label(RenewalLabels.Outcomes, current.Outcome)</span>
                         @if (current.Reason is not null) { <span> · @RenewalLabels.Label(RenewalLabels.Reasons, current.Reason)</span> }
-                        @if (current.ResultContractId is { } resultId) { <span> · <a href="sozlesmeler/@resultId">taslağı aç</a></span> }
+                        @if (current.ResultContractId is { } resultId) { <span> · <a href="sozlesmeler/@resultId">@Texts.Get("contracts.renewals.openDraft")</a></span> }
                     </dd>
                 </div>
             }
@@ -62,12 +62,12 @@
             <div class="header-actions">
                 @if (CanManage && overview.CurrentDecision is null && !overview.IsIndefinite)
                 {
-                    <button type="button" class="btn btn-primary btn-sm" disabled="@busy" @onclick='() => Open("draft")'>Yenileme taslağı oluştur</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => Open("decline")'>Yenilememe kararı ver</button>
+                    <button type="button" class="btn btn-primary btn-sm" disabled="@busy" @onclick='() => Open("draft")'>@Texts.Get("contracts.renewalPanel.createDraft")</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => Open("decline")'>@Texts.Get("contracts.renewalPanel.decline")</button>
                 }
                 @if (CanTerminate && overview.TerminationDate is null)
                 {
-                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick='() => Open("terminate")'>Feshet</button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick='() => Open("terminate")'>@Texts.Get("contracts.renewalPanel.terminate")</button>
                 }
             </div>
         }
@@ -80,24 +80,23 @@
         @if (action == "draft")
         {
             <form class="record-form" novalidate @onsubmit="DraftAsync" @onsubmit:preventDefault>
-                <h3>Yenileme taslağı</h3>
+                <h3>@Texts.Get("contracts.renewalPanel.draftTitle")</h3>
                 <p class="small text-muted">
-                    Bu sözleşmenin kopyası taslak olarak açılır (kalemler, taraflar ve koşullar kopyalanır; önceki sözleşme bağı kurulur). Fiyat ya da koşul değişikliğini taslakta yapın;
-                    taslak normal onay ve imza sürecinden geçer. Aynı dönem için ikinci taslak açılmaz.
+                    @Texts.Get("contracts.renewalPanel.draftIntro")
                 </p>
                 <div class="form-grid">
                     <div>
-                        <label class="form-label" for="rn-start">Yeni dönem başlangıcı (boş = bitişin ertesi günü)</label>
+                        <label class="form-label" for="rn-start">@Texts.Get("contracts.renewalPanel.draftStart")</label>
                         <input id="rn-start" class="form-control" type="date" @bind="draftStart" />
                     </div>
                     <div>
-                        <label class="form-label" for="rn-months">Süre (ay; boş = yenileme süresi)</label>
+                        <label class="form-label" for="rn-months">@Texts.Get("contracts.renewalPanel.draftMonths")</label>
                         <input id="rn-months" class="form-control" type="number" min="1" max="120" @bind="draftMonths" />
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@busy">Taslağı oluştur</button>
-                    <button type="button" class="btn btn-link" @onclick="Close">Vazgeç</button>
+                    <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("contracts.renewalPanel.createDraftSubmit")</button>
+                    <button type="button" class="btn btn-link" @onclick="Close">@Texts.Get("common.dismiss")</button>
                 </div>
             </form>
         }
@@ -105,24 +104,24 @@
         @if (action == "decline")
         {
             <form class="record-form" novalidate @onsubmit="DeclineAsync" @onsubmit:preventDefault>
-                <h3>Yenilememe kararı</h3>
-                <p class="small text-muted">Karar bu dönem için verilir: otomatik uzatma ve yenileme hatırlatmaları durur. Sözleşme dönem bitince süresi dolar.</p>
+                <h3>@Texts.Get("contracts.renewalPanel.declineTitle")</h3>
+                <p class="small text-muted">@Texts.Get("contracts.renewalPanel.declineIntro")</p>
                 <div class="form-grid">
                     <div>
-                        <label class="form-label" for="dc-reason">Neden *</label>
+                        <label class="form-label" for="dc-reason">@Texts.Get("contracts.renewalPanel.reasonRequired")</label>
                         <select id="dc-reason" class="form-select" @bind="declineReason">
-                            <option value="">Seçin…</option>
+                            <option value="">@Texts.Get("common.choose")</option>
                             @foreach (var r in RenewalLabels.Reasons) { <option value="@r.Key">@r.Label</option> }
                         </select>
                     </div>
                     <div class="wide">
-                        <label class="form-label" for="dc-note">Not</label>
+                        <label class="form-label" for="dc-note">@Texts.Get("contracts.field.notes")</label>
                         <input id="dc-note" class="form-control" maxlength="1000" @bind="declineNote" />
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-danger" disabled="@busy">Kararı kaydet</button>
-                    <button type="button" class="btn btn-link" @onclick="Close">Vazgeç</button>
+                    <button type="submit" class="btn btn-danger" disabled="@busy">@Texts.Get("contracts.renewalPanel.saveDecision")</button>
+                    <button type="button" class="btn btn-link" @onclick="Close">@Texts.Get("common.dismiss")</button>
                 </div>
             </form>
         }
@@ -130,90 +129,89 @@
         @if (action == "terminate")
         {
             <form class="record-form" novalidate @onsubmit="TerminateAsync" @onsubmit:preventDefault>
-                <h3>Sözleşmeyi feshet</h3>
+                <h3>@Texts.Get("contracts.renewalPanel.terminateTitle")</h3>
                 <p class="small text-muted">
-                    Bugün ya da geçmiş bir tarih seçilirse fesih hemen etkili olur; gelecek tarih seçilirse planlanır ve tarih gelince zamanlanmış iş uygular. Etkin taahhütler kapatılır.
-                    Fesih tazminat ya da ceza hesaplamaz; bunlar ayrıca takip edilir.
+                    @Texts.Get("contracts.renewalPanel.terminateIntro")
                 </p>
                 <div class="form-grid">
                     <div>
-                        <label class="form-label" for="tm-date">Fesih tarihi *</label>
+                        <label class="form-label" for="tm-date">@Texts.Get("contracts.renewalPanel.terminationDateRequired")</label>
                         <input id="tm-date" class="form-control" type="date" @bind="terminateDate" />
                     </div>
                     <div class="wide">
-                        <label class="form-label" for="tm-reason">Gerekçe *</label>
+                        <label class="form-label" for="tm-reason">@Texts.Get("crm.act.reasonRequired")</label>
                         <input id="tm-reason" class="form-control" maxlength="500" @bind="terminateReason" />
                     </div>
                     @if (needsShortNoticeConfirmation)
                     {
                         <div class="wide form-check">
                             <input id="tm-short" class="form-check-input" type="checkbox" @bind="confirmShortNotice" />
-                            <label class="form-check-label" for="tm-short">Seçilen tarih sözleşmedeki bildirim süresinden kısa; yine de feshetmek istiyorum.</label>
+                            <label class="form-check-label" for="tm-short">@Texts.Get("contracts.renewalPanel.confirmShortNotice")</label>
                         </div>
                     }
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-danger" disabled="@busy">Feshet</button>
-                    <button type="button" class="btn btn-link" @onclick="Close">Vazgeç</button>
+                    <button type="submit" class="btn btn-danger" disabled="@busy">@Texts.Get("contracts.renewalPanel.terminate")</button>
+                    <button type="button" class="btn btn-link" @onclick="Close">@Texts.Get("common.dismiss")</button>
                 </div>
             </form>
         }
 
-        <h3>Karar geçmişi</h3>
+        <h3>@Texts.Get("contracts.renewalPanel.history")</h3>
         @if (overview.History.Count == 0)
         {
-            <p class="text-muted">Bu sözleşmede henüz yenileme kararı yok.</p>
+            <p class="text-muted">@Texts.Get("contracts.renewalPanel.historyEmpty")</p>
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">Yenileme kararları</caption>
-                <thead><tr><th scope="col">Dönem bitişi</th><th scope="col">Karar</th><th scope="col">Yeni bitiş / taslak</th><th scope="col">Kaynak</th><th scope="col">Tarih</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("contracts.renewalPanel.historyCaption")</caption>
+                <thead><tr><th scope="col">@Texts.Get("contracts.renewalPanel.periodEnd")</th><th scope="col">@Texts.Get("contracts.renewals.col.decision")</th><th scope="col">@Texts.Get("contracts.renewalPanel.col.newEnd")</th><th scope="col">@Texts.Get("contracts.renewalPanel.col.source")</th><th scope="col">@Texts.Get("contracts.dashboard.col.date")</th></tr></thead>
                 <tbody>
                     @foreach (var d in overview.History)
                     {
                         <tr>
-                            <td data-label="Dönem bitişi" class="primary">@ContractLabels.Date(d.PeriodEnd)</td>
-                            <td data-label="Karar">
+                            <td data-label="@Texts.Get("contracts.renewalPanel.periodEnd")" class="primary">@ContractLabels.Date(d.PeriodEnd)</td>
+                            <td data-label="@Texts.Get("contracts.renewals.col.decision")">
                                 <span class="badge stage-@RenewalLabels.Badge(d.Outcome)">@RenewalLabels.Label(RenewalLabels.Outcomes, d.Outcome)</span>
                                 @if (d.Reason is not null) { <div class="small">@RenewalLabels.Label(RenewalLabels.Reasons, d.Reason)</div> }
                                 @if (d.Note is not null) { <div class="small text-muted">@d.Note</div> }
                             </td>
-                            <td data-label="Yeni bitiş / taslak">
+                            <td data-label="@Texts.Get("contracts.renewalPanel.col.newEnd")">
                                 @if (d.NewEndDate is { } newEnd) { <span>@ContractLabels.Date(newEnd)</span> }
-                                @if (d.ResultContractId is { } resultId) { <a href="sozlesmeler/@resultId">taslağı aç</a> }
+                                @if (d.ResultContractId is { } resultId) { <a href="sozlesmeler/@resultId">@Texts.Get("contracts.renewals.openDraft")</a> }
                                 @if (d.NewEndDate is null && d.ResultContractId is null) { <span class="text-muted">—</span> }
                             </td>
-                            <td data-label="Kaynak">@RenewalLabels.Label(RenewalLabels.Sources, d.Source)@(d.DecidedBy is { } by ? " · " + Lookups.MemberName(by) : string.Empty)</td>
-                            <td data-label="Tarih">@d.At.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                            <td data-label="@Texts.Get("contracts.renewalPanel.col.source")">@RenewalLabels.Label(RenewalLabels.Sources, d.Source)@(d.DecidedBy is { } by ? " · " + Lookups.MemberName(by) : string.Empty)</td>
+                            <td data-label="@Texts.Get("contracts.dashboard.col.date")">@d.At.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
                         </tr>
                     }
                 </tbody>
             </table>
         }
 
-        <h3>Hatırlatmalar</h3>
+        <h3>@Texts.Get("contracts.renewalPanel.reminders")</h3>
         @if (overview.Reminders.Count == 0)
         {
-            <p class="text-muted">Henüz hatırlatma üretilmedi. Zamanlanmış iş, son bildirim tarihine eşik günleri kala sorumluya takip aktivitesi açar.</p>
+            <p class="text-muted">@Texts.Get("contracts.renewalPanel.remindersEmpty")</p>
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">Yenileme hatırlatmaları</caption>
-                <thead><tr><th scope="col">Dönem</th><th scope="col">Tür</th><th scope="col">Eşik</th><th scope="col">Durum</th><th scope="col">Tarih</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("contracts.renewalPanel.remindersCaption")</caption>
+                <thead><tr><th scope="col">@Texts.Get("contracts.commitments.col.period")</th><th scope="col">@Texts.Get("contracts.field.type")</th><th scope="col">@Texts.Get("contracts.renewalPanel.col.threshold")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("contracts.dashboard.col.date")</th></tr></thead>
                 <tbody>
                     @foreach (var r in overview.Reminders.OrderByDescending(x => x.PeriodKey).ThenByDescending(x => x.At))
                     {
                         <tr>
-                            <td data-label="Dönem" class="primary">@ContractLabels.Date(r.PeriodKey)</td>
-                            <td data-label="Tür">@RenewalLabels.Label(RenewalLabels.ReminderKinds, r.Kind)</td>
-                            <td data-label="Eşik">@(r.ThresholdDays > 0 ? r.ThresholdDays + " gün" : "—")</td>
-                            <td data-label="Durum">
+                            <td data-label="@Texts.Get("contracts.commitments.col.period")" class="primary">@ContractLabels.Date(r.PeriodKey)</td>
+                            <td data-label="@Texts.Get("contracts.field.type")">@RenewalLabels.Label(RenewalLabels.ReminderKinds, r.Kind)</td>
+                            <td data-label="@Texts.Get("contracts.renewalPanel.col.threshold")">@(r.ThresholdDays > 0 ? Texts.Get("crm.sales.days", r.ThresholdDays) : "—")</td>
+                            <td data-label="@Texts.Get("common.field.status")">
                                 @RenewalLabels.Label(RenewalLabels.ReminderStatuses, r.Status)
                                 @if (r.Note is not null) { <div class="small text-muted">@r.Note</div> }
                             </td>
-                            <td data-label="Tarih">@r.At.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                            <td data-label="@Texts.Get("contracts.dashboard.col.date")">@r.At.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
                         </tr>
                     }
                 </tbody>
@@ -222,7 +220,7 @@
 
         @if (chain.Count > 1)
         {
-            <h3>Yenileme zinciri</h3>
+            <h3>@Texts.Get("contracts.renewalPanel.chain")</h3>
             <ol class="chain-list">
                 @foreach (var item in chain)
                 {
@@ -334,7 +332,7 @@
         busy = true;
         var result = await Api.PostAsync<RenewalOverviewDto>($"/api/contracts/contracts/{Contract.Id}/renewal/decline", new DeclineRenewalRequest(declineReason, Blank(declineNote)));
         busy = false;
-        await AfterAsync(result, "Yenilememe kararı kaydedildi.");
+        await AfterAsync(result, Texts.Get("contracts.renewalPanel.declined"));
     }
 
     private async Task TerminateAsync()
@@ -350,7 +348,7 @@
             needsShortNoticeConfirmation = true;
         }
 
-        await AfterAsync(result, terminateDate is { } d && DateOnly.FromDateTime(d) > DateOnly.FromDateTime(DateTime.Today) ? "Fesih planlandı." : "Sözleşme feshedildi.");
+        await AfterAsync(result, terminateDate is { } d && DateOnly.FromDateTime(d) > DateOnly.FromDateTime(DateTime.Today) ? Texts.Get("contracts.renewalPanel.terminationScheduled") : Texts.Get("contracts.renewalPanel.terminated"));
     }
 
     private async Task AfterAsync(ApiResult<RenewalOverviewDto> result, string success)
