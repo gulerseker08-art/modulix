@@ -4,7 +4,7 @@
 @inject CrmLookups Lookups
 
 <section aria-labelledby="change-title">
-    <h2 id="change-title">Değişiklik talepleri</h2>
+    <h2 id="change-title">@Texts.Get("orders.change.title")</h2>
     <Notice Text="@message" Failed="@failed" />
 
     @if (requests is null)
@@ -17,17 +17,17 @@
         {
             @if (!creating)
             {
-                <button type="button" class="btn btn-outline-primary mb-2" @onclick="StartCreate">Değişiklik talebi aç</button>
+                <button type="button" class="btn btn-outline-primary mb-2" @onclick="StartCreate">@Texts.Get("orders.change.open")</button>
             }
             else
             {
                 <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
                     <fieldset disabled="@busy">
-                        <legend class="visually-hidden">Yeni değişiklik talebi</legend>
-                        <p class="text-muted">Onaylanmış siparişin fiyat ve müşteri bilgisi değişmez. Yalnızca planlama, adres, koşul ve notlar ile kalem miktarının azaltılması talep edilebilir; miktar artırılamaz, teslim edilen miktarın altına inilemez.</p>
+                        <legend class="visually-hidden">@Texts.Get("orders.change.new")</legend>
+                        <p class="text-muted">@Texts.Get("orders.change.new-note")</p>
                         <div class="form-grid">
                             <div class="span-12">
-                                <label class="form-label" for="cr-reason">Gerekçe (zorunlu)</label>
+                                <label class="form-label" for="cr-reason">@Texts.Get("orders.change.reason")</label>
                                 <textarea id="cr-reason" class="form-control" rows="2" maxlength="500" @bind="reason"></textarea>
                                 <FieldError Field="reason" Errors="errors" />
                             </div>
@@ -47,20 +47,20 @@
                                 </div>
                             }
                         </div>
-                        <h3 class="h6 mt-3">Kalem miktarı (yalnızca azaltma; 0 kalemi iptal eder)</h3>
+                        <h3 class="h6 mt-3">@Texts.Get("orders.change.quantities")</h3>
                         <table class="table record-table">
-                            <caption class="visually-hidden">Kalem miktar değişikliği</caption>
-                            <thead><tr><th scope="col">Kalem</th><th scope="col" class="text-end">Etkin miktar</th><th scope="col" class="text-end">Teslim edilen</th><th scope="col" class="text-end">Yeni miktar</th></tr></thead>
+                            <caption class="visually-hidden">@Texts.Get("orders.change.quantities-caption")</caption>
+                            <thead><tr><th scope="col">@Texts.Get("orders.change.col.line")</th><th scope="col" class="text-end">@Texts.Get("orders.change.col.effective")</th><th scope="col" class="text-end">@Texts.Get("orders.change.col.delivered")</th><th scope="col" class="text-end">@Texts.Get("orders.change.col.new")</th></tr></thead>
                             <tbody>
                                 @foreach (var line in Lines.Where(l => !l.IsCancelled))
                                 {
                                     <tr>
-                                        <td data-label="Kalem" class="primary"><label for="cr-q-@line.Id">@line.Name</label></td>
-                                        <td data-label="Etkin miktar" class="text-end">@OrderLabels.Quantity(line.Quantity - line.CancelledQuantity, line.UnitName)</td>
-                                        <td data-label="Teslim edilen" class="text-end">@OrderLabels.Quantity(line.DeliveredQuantity, line.UnitName)</td>
-                                        <td data-label="Yeni miktar" class="text-end">
+                                        <td data-label="@Texts.Get("orders.change.col.line")" class="primary"><label for="cr-q-@line.Id">@line.Name</label></td>
+                                        <td data-label="@Texts.Get("orders.change.col.effective")" class="text-end">@OrderLabels.Quantity(line.Quantity - line.CancelledQuantity, line.UnitName)</td>
+                                        <td data-label="@Texts.Get("orders.change.col.delivered")" class="text-end">@OrderLabels.Quantity(line.DeliveredQuantity, line.UnitName)</td>
+                                        <td data-label="@Texts.Get("orders.change.col.new")" class="text-end">
                                             <input id="cr-q-@line.Id" type="number" min="@line.DeliveredQuantity.ToString(System.Globalization.CultureInfo.InvariantCulture)" max="@((line.Quantity - line.CancelledQuantity).ToString(System.Globalization.CultureInfo.InvariantCulture))"
-                                                   step="any" class="form-control form-control-sm text-end" placeholder="değişmez" value="@quantities.GetValueOrDefault(line.Id)" @onchange="e => quantities[line.Id] = e.Value?.ToString() ?? string.Empty" />
+                                                   step="any" class="form-control form-control-sm text-end" placeholder="@Texts.Get("orders.change.unchanged")" value="@quantities.GetValueOrDefault(line.Id)" @onchange="e => quantities[line.Id] = e.Value?.ToString() ?? string.Empty" />
                                         </td>
                                     </tr>
                                 }
@@ -73,27 +73,27 @@
                         @if (preview is not null)
                         {
                             <div class="alert alert-info" role="status" aria-live="polite">
-                                <strong>Etki özeti</strong>
+                                <strong>@Texts.Get("orders.change.impact")</strong>
                                 <ImpactLists Operations="preview.Operations" Deliveries="preview.Deliveries" Contracts="preview.Contracts" NetDelta="preview.NetDelta" TaxDelta="preview.TaxDelta" Currency="@Order.Currency" />
                             </div>
                         }
                     </fieldset>
                     <div class="form-actions">
-                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="PreviewAsync">Etkiyi göster</button>
-                        <button type="submit" class="btn btn-primary" disabled="@busy">Talebi aç</button>
-                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => creating = false">Vazgeç</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="PreviewAsync">@Texts.Get("orders.change.preview")</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("orders.change.submit")</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => creating = false">@Texts.Get("common.dismiss")</button>
                     </div>
                 </form>
             }
         }
         else if (Order.Status != "Approved" && Session.Can(OrdersAccess.OrdersWrite))
         {
-            <p class="text-muted">Değişiklik talebi yalnızca onaylanmış sipariş için açılır; taslak sipariş doğrudan düzenlenir.</p>
+            <p class="text-muted">@Texts.Get("orders.change.only-approved")</p>
         }
 
         @if (requests.Count == 0)
         {
-            <p class="text-muted">Bu siparişte değişiklik talebi yok.</p>
+            <p class="text-muted">@Texts.Get("orders.change.none")</p>
         }
         else
         {
@@ -101,34 +101,34 @@
                 @foreach (var r in requests)
                 {
                     <li>
-                        <strong>Talep #@r.Sequence</strong>
+                        <strong>@Texts.Get("orders.change.request", r.Sequence)</strong>
                         <span class="badge stage-@OrderLabels.ChangeBadge(r.Status)">@OrderLabels.Label(OrderLabels.ChangeStatuses, r.Status)</span>
                         <span class="text-muted"> · @CrmLabels.Time(r.CreatedAt) · @(Lookups.MemberName(r.RequestedBy) is { Length: > 0 } who ? who : "—")</span>
                         <div>@r.Reason</div>
                         <ImpactLists Operations="r.Operations" Deliveries="r.Deliveries" Contracts="r.Contracts" NetDelta="r.NetDelta" TaxDelta="r.TaxDelta" Currency="@Order.Currency" />
                         @if (r.DecidedAt is { } decidedAt)
                         {
-                            <div class="text-muted small">Karar: @CrmLabels.Time(decidedAt) · @(Lookups.MemberName(r.DecidedBy) is { Length: > 0 } decider ? decider : "sistem")@(string.IsNullOrEmpty(r.DecisionNote) ? null : " · " + r.DecisionNote)</div>
+                            <div class="text-muted small">@Texts.Get("orders.change.decision", CrmLabels.Time(decidedAt), Lookups.MemberName(r.DecidedBy) is { Length: > 0 } decider ? decider : Texts.Get("orders.change.system"), string.IsNullOrEmpty(r.DecisionNote) ? string.Empty : " · " + r.DecisionNote)</div>
                         }
                         @if (r.Status == "Pending")
                         {
                             <div class="header-actions mt-1">
                                 @if (Session.Can(OrdersAccess.OrdersApprove))
                                 {
-                                    <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick="() => DecideAsync(r, true)">Onayla ve uygula</button>
-                                    <button type="button" class="btn btn-sm btn-outline-danger" disabled="@busy" @onclick="() => StartReject(r)">Reddet</button>
+                                    <button type="button" class="btn btn-sm btn-primary" disabled="@busy" @onclick="() => DecideAsync(r, true)">@Texts.Get("orders.change.approve")</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" disabled="@busy" @onclick="() => StartReject(r)">@Texts.Get("orders.change.reject")</button>
                                 }
                                 @if (Session.Can(OrdersAccess.OrdersWrite))
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => WithdrawAsync(r)">Geri çek</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => WithdrawAsync(r)">@Texts.Get("orders.change.withdraw")</button>
                                 }
                             </div>
                             @if (rejecting == r.Id)
                             {
                                 <form class="record-form" novalidate @onsubmit="() => DecideAsync(r, false)" @onsubmit:preventDefault>
-                                    <label class="form-label" for="reject-note-@r.Id">Ret gerekçesi (zorunlu)</label>
+                                    <label class="form-label" for="reject-note-@r.Id">@Texts.Get("orders.change.reject-reason")</label>
                                     <input id="reject-note-@r.Id" class="form-control" maxlength="500" @bind="rejectNote" />
-                                    <div class="form-actions"><button type="submit" class="btn btn-danger btn-sm" disabled="@busy">Reddet</button></div>
+                                    <div class="form-actions"><button type="submit" class="btn btn-danger btn-sm" disabled="@busy">@Texts.Get("orders.change.reject")</button></div>
                                 </form>
                             }
                         }
@@ -249,7 +249,7 @@
         }
 
         failed = false;
-        message = "Değişiklik talebi açıldı; onaylanana kadar sipariş değişmez.";
+        message = Texts.Get("orders.change.created");
         creating = false;
         await LoadAsync();
         await Changed.InvokeAsync();
@@ -267,7 +267,7 @@
         if (!approve && string.IsNullOrWhiteSpace(rejectNote))
         {
             failed = true;
-            message = "Reddetmek için gerekçe zorunludur.";
+            message = Texts.Get("orders.change.reject-required");
             return;
         }
 
@@ -284,7 +284,7 @@
         }
 
         failed = false;
-        message = approve ? "Talep onaylandı ve sipariş güncellendi." : "Talep reddedildi.";
+        message = Texts.Get(approve ? "orders.change.approved" : "orders.change.rejected");
         rejecting = null;
         await LoadAsync();
         await Changed.InvokeAsync();
@@ -298,7 +298,7 @@
         var result = await Api.PostAsync<OrderChangeRequestDto>($"/api/orders/change-requests/{request.Id}/withdraw", new WithdrawOrderChangeRequest(request.Version));
         busy = false;
         failed = !result.IsSuccess;
-        message = result.IsSuccess ? "Talep geri çekildi." : result.Error;
+        message = result.IsSuccess ? Texts.Get("orders.change.withdrawn") : result.Error;
         await LoadAsync();
     }
 }

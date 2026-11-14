@@ -3,25 +3,22 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Sözleşme onay kuralları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.contracts.approval-rules.menu") · Modulix</PageTitle>
 
 <AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ApprovalsManage">
     <div class="page-header">
-        <h1>Sözleşme onay kuralları</h1>
+        <h1>@Texts.Get("nav.app.contracts.approval-rules.menu")</h1>
         @if (form is null && delegationForm is null)
         {
             <div class="header-actions">
-                <button type="button" class="btn btn-primary" @onclick="NewRule">Yeni kural</button>
-                <button type="button" class="btn btn-outline-primary" @onclick="NewDelegation">Yeni vekâlet</button>
+                <button type="button" class="btn btn-primary" @onclick="NewRule">@Texts.Get("crm.quoteRules.new")</button>
+                <button type="button" class="btn btn-outline-primary" @onclick="NewDelegation">@Texts.Get("crm.quoteDelegations.new")</button>
             </div>
         }
     </div>
 
     <p class="text-muted">
-        Bir kuralın girilen <strong>tüm koşulları birlikte</strong> sağlanırsa sözleşme iç onay ister; <strong>kurallardan biri</strong> yeterlidir. Tür ve para birimi yalnızca
-        daraltır; en az bir ölçüt (tutar, indirim, süre, standart dışı madde ya da risk) girilmelidir. Küçük adımlar önce tamamlanır; aynı adımdaki adlı onaylayıcıların hepsi
-        onaylamalıdır. Hiçbir kural eşleşmezse onay izni olan herhangi biri onaylar. Her onaya gönderimde eşleşen kuralların adı ve sürümü sözleşmeye dondurulur;
-        sonradan değişen kural bekleyen onayı etkilemez.
+        @Texts.Strong("contracts.approvalRules.intro", Texts.Get("crm.quoteRules.introAll"), Texts.Get("crm.quoteRules.introAny"))
     </p>
 
     <Notice Text="@message" Failed="@failed" />
@@ -29,87 +26,87 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveRuleAsync" @onsubmit:preventDefault>
-            <h2>@(form.Id is null ? "Yeni kural" : "Kuralı düzenle")</h2>
-            <FormTabs Title="Kural bilgileri" Label="Onay kuralı formu bölümleri">
+            <h2>@(form.Id is null ? Texts.Get("crm.quoteRules.new") : Texts.Get("crm.quoteRules.edit"))</h2>
+            <FormTabs Title="@Texts.Get("crm.quoteRules.info")" Label="@Texts.Get("contracts.approvalRules.formSections")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="r-name">Ad *</label>
+                    <label class="form-label" for="r-name">@Texts.Get("common.field.nameRequired")</label>
                     <input id="r-name" class="form-control" maxlength="150" @bind="form.Name" />
                     <FieldError Field="name" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="r-step">Onay adımı (1-9)</label>
+                    <label class="form-label" for="r-step">@Texts.Get("crm.quoteRules.field.step")</label>
                     <input id="r-step" class="form-control" type="number" min="1" max="9" @bind="form.Step" />
                     <FieldError Field="step" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="r-priority">Öncelik (küçük önce)</label>
+                    <label class="form-label" for="r-priority">@Texts.Get("crm.quoteRules.field.priority")</label>
                     <input id="r-priority" class="form-control" type="number" min="0" @bind="form.Priority" />
                     <FieldError Field="priority" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="r-type">Sözleşme türü (boş = hepsi)</label>
+                    <label class="form-label" for="r-type">@Texts.Get("contracts.approvalRules.field.type")</label>
                     <select id="r-type" class="form-select" @bind="form.ContractType">
-                        <option value="">Hepsi</option>
+                        <option value="">@Texts.Get("crm.quoteRules.field.currencyAll")</option>
                         @foreach (var type in Lookups.Choices(ContractsAccess.ContractTypeList, form.ContractType)) { <option value="@type.Key">@type.Label</option> }
                     </select>
                     <FieldError Field="contractType" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="r-gross">Toplam eşiği — aşılırsa</label>
+                    <label class="form-label" for="r-gross">@Texts.Get("contracts.approvalRules.field.gross")</label>
                     <input id="r-gross" class="form-control" type="number" step="0.01" min="0" @bind="form.MinGrossTotal" />
                     <FieldError Field="minGrossTotal" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="r-currency">Para birimi (tutar için)</label>
-                    <input id="r-currency" class="form-control" maxlength="3" placeholder="Hepsi" @bind="form.Currency" />
+                    <label class="form-label" for="r-currency">@Texts.Get("crm.quoteRules.field.currency")</label>
+                    <input id="r-currency" class="form-control" maxlength="3" placeholder="@Texts.Get("crm.quoteRules.field.currencyAll")" @bind="form.Currency" />
                     <FieldError Field="currency" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="r-discount">Kalem indirimi eşiği (%) — aşılırsa</label>
+                    <label class="form-label" for="r-discount">@Texts.Get("contracts.approvalRules.field.discount")</label>
                     <input id="r-discount" class="form-control" type="number" step="any" min="0" max="99.99" @bind="form.MinDiscountPercent" />
                     <FieldError Field="minDiscountPercent" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="r-term">Süre eşiği (ay) — aşılırsa</label>
+                    <label class="form-label" for="r-term">@Texts.Get("contracts.approvalRules.field.term")</label>
                     <input id="r-term" class="form-control" type="number" min="0" max="1200" @bind="form.MinTermMonths" />
                     <FieldError Field="minTermMonths" Errors="errors" />
-                    <div class="form-text">Belirsiz süreli sözleşme bu koşulu sağlar.</div>
+                    <div class="form-text">@Texts.Get("contracts.approvalRules.field.termHelp")</div>
                 </div>
                 <div>
-                    <label class="form-label" for="r-risk">Risk düzeyi en az</label>
+                    <label class="form-label" for="r-risk">@Texts.Get("contracts.approvalRules.field.risk")</label>
                     <select id="r-risk" class="form-select" @bind="form.MinRiskLevel">
-                        <option value="">Koşul yok</option>
+                        <option value="">@Texts.Get("contracts.approvalRules.noCondition")</option>
                         @foreach (var level in ContractLabels.RiskLevels) { <option value="@level.Key">@level.Label</option> }
                     </select>
                     <FieldError Field="minRiskLevel" Errors="errors" />
                 </div>
                 <div class="form-check">
                     <input id="r-nonstd" class="form-check-input" type="checkbox" @bind="form.RequiresNonStandardTerms" />
-                    <label class="form-check-label" for="r-nonstd">Standart dışı madde işaretliyse</label>
+                    <label class="form-check-label" for="r-nonstd">@Texts.Get("contracts.approvalRules.field.nonStandard")</label>
                 </div>
                 <div>
-                    <label class="form-label" for="approverId">Onaylayıcı (isteğe bağlı)</label>
-                    <LookupPicker Id="approverId" LookupKey="contracts.approval-rule.approver" @bind-Value="form.ApproverId" Placeholder="Onay izni olan herkes"
+                    <label class="form-label" for="approverId">@Texts.Get("contracts.approvalRules.field.approver")</label>
+                    <LookupPicker Id="approverId" LookupKey="contracts.approval-rule.approver" @bind-Value="form.ApproverId" Placeholder="@Texts.Get("crm.quoteRules.anyApprover")"
                                   Invalid="@(errors?.ContainsKey("approverId") == true)" />
                     <FieldError Field="approverId" Errors="errors" />
                 </div>
                 <div class="form-check">
                     <input id="r-active" class="form-check-input" type="checkbox" @bind="form.IsActive" />
-                    <label class="form-check-label" for="r-active">Kural etkin</label>
+                    <label class="form-check-label" for="r-active">@Texts.Get("crm.quoteRules.field.active")</label>
                 </div>
                 <div class="wide">
-                    <label class="form-label" for="r-description">Açıklama</label>
+                    <label class="form-label" for="r-description">@Texts.Get("common.field.description")</label>
                     <textarea id="r-description" class="form-control" rows="2" maxlength="500" @bind="form.Description"></textarea>
                 </div>
             </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="CancelRule">Vazgeç</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="CancelRule">@Texts.Get("common.dismiss")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteRuleAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteRuleAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </form>
@@ -118,79 +115,79 @@
     @if (delegationForm is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveDelegationAsync" @onsubmit:preventDefault>
-            <h2>@(delegationForm.Id is null ? "Yeni vekâlet" : "Vekâleti düzenle")</h2>
-            <p class="text-muted">Vekil, vekâlet verenin yerine onay verebilir; onay iznine kendisi de sahip olmalıdır. Karar vekâleten işaretlenir ve geçmişte kalır.</p>
-            <FormTabs Title="Vekâlet bilgileri" Label="Onay vekâleti formu bölümleri">
+            <h2>@(delegationForm.Id is null ? Texts.Get("crm.quoteDelegations.new") : Texts.Get("crm.quoteDelegations.edit"))</h2>
+            <p class="text-muted">@Texts.Get("contracts.approvalRules.delegationIntro")</p>
+            <FormTabs Title="@Texts.Get("crm.quoteDelegations.info")" Label="@Texts.Get("contracts.approvalRules.delegationSections")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="fromUserId">Vekâlet veren *</label>
+                    <label class="form-label" for="fromUserId">@Texts.Get("crm.quoteDelegations.field.from")</label>
                     <LookupPicker Id="fromUserId" LookupKey="contracts.approval-delegation.from" @bind-Value="delegationForm.FromUserId" Required="true"
                                   Invalid="@(delegationErrors?.ContainsKey("fromUserId") == true)" />
                     <FieldError Field="fromUserId" Errors="delegationErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="toUserId">Vekil *</label>
+                    <label class="form-label" for="toUserId">@Texts.Get("crm.quoteDelegations.field.to")</label>
                     <LookupPicker Id="toUserId" LookupKey="contracts.approval-delegation.to" @bind-Value="delegationForm.ToUserId" Required="true"
                                   Invalid="@(delegationErrors?.ContainsKey("toUserId") == true)" />
                     <FieldError Field="toUserId" Errors="delegationErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="d-start">Başlangıç</label>
+                    <label class="form-label" for="d-start">@Texts.Get("crm.quoteDelegations.field.start")</label>
                     <input id="d-start" class="form-control" type="datetime-local" @bind="delegationForm.StartsAt" />
                     <FieldError Field="startsAt" Errors="delegationErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="d-end">Bitiş (boş = süresiz)</label>
+                    <label class="form-label" for="d-end">@Texts.Get("crm.quoteDelegations.field.end")</label>
                     <input id="d-end" class="form-control" type="datetime-local" @bind="delegationForm.EndsAt" />
                     <FieldError Field="endsAt" Errors="delegationErrors" />
                 </div>
                 <div class="form-check">
                     <input id="d-active" class="form-check-input" type="checkbox" @bind="delegationForm.IsActive" />
-                    <label class="form-check-label" for="d-active">Etkin</label>
+                    <label class="form-check-label" for="d-active">@Texts.Get("crm.quoteDelegations.active")</label>
                 </div>
                 <div class="wide">
-                    <label class="form-label" for="d-note">Not</label>
+                    <label class="form-label" for="d-note">@Texts.Get("crm.quoteDelegations.field.note")</label>
                     <input id="d-note" class="form-control" maxlength="300" @bind="delegationForm.Note" />
                 </div>
             </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="() => delegationForm = null">Vazgeç</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => delegationForm = null">@Texts.Get("common.dismiss")</button>
                 @if (delegationForm.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteDelegationAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteDelegationAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </form>
     }
 
     <section aria-labelledby="rules-title">
-        <h2 id="rules-title">Kurallar</h2>
+        <h2 id="rules-title">@Texts.Get("contracts.approvalRules.rules")</h2>
         @if (rules is null)
         {
             <LoadingState Kind="LoadingKind.Table" />
         }
         else if (rules.Count == 0)
         {
-            <EmptyState Title="Kural yok; onaya gönderilen sözleşmeyi onay izni olan herhangi biri onaylar." />
+            <EmptyState Title="@Texts.Get("contracts.approvalRules.none")" />
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">Sözleşme onay kuralları</caption>
-                <thead><tr><th scope="col">Kural</th><th scope="col">Adım</th><th scope="col">Koşullar (hepsi)</th><th scope="col">Onaylayıcı</th><th scope="col">Durum</th><th scope="col"></th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("nav.app.contracts.approval-rules.menu")</caption>
+                <thead><tr><th scope="col">@Texts.Get("crm.quoteRules.col.rule")</th><th scope="col">@Texts.Get("crm.quoteRules.col.step")</th><th scope="col">@Texts.Get("crm.quoteRules.col.conditionsAll")</th><th scope="col">@Texts.Get("contracts.approvalRules.col.approver")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col"></th></tr></thead>
                 <tbody>
                     @foreach (var rule in rules)
                     {
                         <tr>
-                            <td data-label="Kural" class="primary">@rule.Name <small class="text-muted">öncelik @rule.Priority · sürüm @rule.Version</small>
+                            <td data-label="@Texts.Get("crm.quoteRules.col.rule")" class="primary">@rule.Name <small class="text-muted">@Texts.Get("crm.quoteRules.priorityVersion", rule.Priority, rule.Version)</small>
                                 @if (!string.IsNullOrWhiteSpace(rule.Description)) { <div class="small text-muted">@rule.Description</div> }</td>
-                            <td data-label="Adım">@rule.Step</td>
-                            <td data-label="Koşullar">@Conditions(rule)</td>
-                            <td data-label="Onaylayıcı">@(rule.ApproverId is null ? "Onay izni olan herkes" : Lookups.MemberName(rule.ApproverId))</td>
-                            <td data-label="Durum">@(rule.IsActive ? "Etkin" : "Pasif")</td>
-                            <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditRule(rule)">Düzenle</button></td>
+                            <td data-label="@Texts.Get("crm.quoteRules.col.step")">@rule.Step</td>
+                            <td data-label="@Texts.Get("crm.quoteRules.col.conditions")">@Conditions(rule)</td>
+                            <td data-label="@Texts.Get("contracts.approvalRules.col.approver")">@(rule.ApproverId is null ? Texts.Get("crm.quoteRules.anyApprover") : Lookups.MemberName(rule.ApproverId))</td>
+                            <td data-label="@Texts.Get("common.field.status")">@(rule.IsActive ? Texts.Get("crm.quoteRules.active") : Texts.Get("common.inactive"))</td>
+                            <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditRule(rule)">@Texts.Get("common.edit")</button></td>
                         </tr>
                     }
                 </tbody>
@@ -199,29 +196,29 @@
     </section>
 
     <section aria-labelledby="delegations-title">
-        <h2 id="delegations-title">Vekâletler</h2>
+        <h2 id="delegations-title">@Texts.Get("contracts.approvalRules.delegations")</h2>
         @if (delegations is null)
         {
             <LoadingState Kind="LoadingKind.Table" />
         }
         else if (delegations.Count == 0)
         {
-            <EmptyState Title="Vekâlet yok." />
+            <EmptyState Title="@Texts.Get("contracts.approvalRules.noDelegations")" />
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">Sözleşme onay vekâletleri</caption>
-                <thead><tr><th scope="col">Vekâlet veren</th><th scope="col">Vekil</th><th scope="col">Süre</th><th scope="col">Durum</th><th scope="col"></th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("contracts.approvalRules.delegationsCaption")</caption>
+                <thead><tr><th scope="col">@Texts.Get("crm.quoteDelegations.col.from")</th><th scope="col">@Texts.Get("crm.quoteDelegations.col.to")</th><th scope="col">@Texts.Get("contracts.approvalRules.col.period")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col"></th></tr></thead>
                 <tbody>
                     @foreach (var item in delegations)
                     {
                         <tr>
-                            <td data-label="Vekâlet veren" class="primary">@Lookups.MemberName(item.FromUserId) @if (!string.IsNullOrWhiteSpace(item.Note)) { <div class="small text-muted">@item.Note</div> }</td>
-                            <td data-label="Vekil">@Lookups.MemberName(item.ToUserId)</td>
-                            <td data-label="Süre">@CrmLabels.Time(item.StartsAt) – @(item.EndsAt is { } end ? CrmLabels.Time(end) : "süresiz")</td>
-                            <td data-label="Durum">@DelegationState(item)</td>
-                            <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditDelegation(item)">Düzenle</button></td>
+                            <td data-label="@Texts.Get("crm.quoteDelegations.col.from")" class="primary">@Lookups.MemberName(item.FromUserId) @if (!string.IsNullOrWhiteSpace(item.Note)) { <div class="small text-muted">@item.Note</div> }</td>
+                            <td data-label="@Texts.Get("crm.quoteDelegations.col.to")">@Lookups.MemberName(item.ToUserId)</td>
+                            <td data-label="@Texts.Get("contracts.approvalRules.col.period")">@CrmLabels.Time(item.StartsAt) – @(item.EndsAt is { } end ? CrmLabels.Time(end) : Texts.Get("crm.quoteDelegations.openEnded"))</td>
+                            <td data-label="@Texts.Get("common.field.status")">@DelegationState(item)</td>
+                            <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditDelegation(item)">@Texts.Get("common.edit")</button></td>
                         </tr>
                     }
                 </tbody>
@@ -266,19 +263,23 @@
     private string Conditions(ContractApprovalRuleDto rule)
     {
         var parts = new List<string>();
-        if (rule.MinGrossTotal is { } gross) { parts.Add($"toplam > {gross:N2} {rule.Currency ?? "(her para birimi)"}"); }
-        if (rule.MinDiscountPercent is { } percent) { parts.Add($"kalem indirimi > %{percent:0.##}"); }
-        if (rule.MinTermMonths is { } term) { parts.Add($"süre > {term} ay"); }
-        if (rule.RequiresNonStandardTerms) { parts.Add("standart dışı madde"); }
-        if (rule.MinRiskLevel is { Length: > 0 } risk) { parts.Add($"risk ≥ {ContractLabels.Label(ContractLabels.RiskLevels, risk)}"); }
-        if (rule.ContractType is { Length: > 0 } type) { parts.Add($"tür: {Lookups.Label(ContractsAccess.ContractTypeList, type)}"); }
-        return string.Join(" ve ", parts);
+        // Tutar ve yüzde önceki gibi biçimlenip metne verilir; koşullar "{0} ve {1}" ile birleşir.
+        if (rule.MinGrossTotal is { } gross) { parts.Add(Texts.Get("contracts.approvalRules.cond.gross", gross.ToString("N2"), rule.Currency ?? Texts.Get("crm.quoteRules.anyCurrency"))); }
+        if (rule.MinDiscountPercent is { } percent) { parts.Add(Texts.Get("contracts.approvalRules.cond.discount", percent.ToString("0.##"))); }
+        if (rule.MinTermMonths is { } term) { parts.Add(Texts.Get("contracts.approvalRules.cond.term", term)); }
+        if (rule.RequiresNonStandardTerms) { parts.Add(Texts.Get("contracts.approvalRules.cond.nonStandard")); }
+        if (rule.MinRiskLevel is { Length: > 0 } risk) { parts.Add(Texts.Get("contracts.approvalRules.cond.risk", ContractLabels.Label(ContractLabels.RiskLevels, risk))); }
+        if (rule.ContractType is { Length: > 0 } type) { parts.Add(Texts.Get("contracts.approvalRules.cond.type", Lookups.Label(ContractsAccess.ContractTypeList, type))); }
+        return parts.Count == 0 ? string.Empty : parts.Aggregate((left, right) => Texts.Get("crm.quoteRules.cond.both", left, right));
     }
 
     private static string DelegationState(ContractApprovalDelegationDto item)
     {
         var now = DateTimeOffset.UtcNow;
-        return !item.IsActive ? "Pasif" : item.StartsAt > now ? "Başlamadı" : item.EndsAt is { } end && end <= now ? "Süresi doldu" : "Geçerli";
+        return !item.IsActive ? Texts.Get("common.inactive")
+            : item.StartsAt > now ? Texts.Get("contracts.approvalRules.notStarted")
+            : item.EndsAt is { } end && end <= now ? Texts.Get("crm.quoteDelegations.expired")
+            : Texts.Get("contracts.approvalRules.valid");
     }
 
     private void NewRule()
@@ -322,13 +323,13 @@
         {
             form = null;
             errors = null;
-            Notify("Kural kaydedildi.", false);
+            Notify(Texts.Get("crm.quoteRules.saved"), false);
             await LoadAsync();
             return;
         }
 
         errors = result.FieldErrors;
-        Notify(result.Status == System.Net.HttpStatusCode.Conflict ? $"{result.Error} Sayfayı yenileyip tekrar deneyin." : result.Error, true);
+        Notify(result.Status == System.Net.HttpStatusCode.Conflict ? Texts.Get("crm.quoteDetail.conflictRetry", result.Error) : result.Error, true);
     }
 
     private async Task DeleteRuleAsync()
@@ -337,7 +338,7 @@
         busy = true;
         var result = await Api.DeleteAsync($"{RulesUrl}/{form.Id}?version={form.Version}");
         busy = false;
-        Notify(result.IsSuccess ? "Kural silindi." : result.Error, !result.IsSuccess);
+        Notify(result.IsSuccess ? Texts.Get("crm.quoteRules.deleted") : result.Error, !result.IsSuccess);
         if (result.IsSuccess)
         {
             form = null;
@@ -379,7 +380,7 @@
         {
             delegationForm = null;
             delegationErrors = null;
-            Notify("Vekâlet kaydedildi.", false);
+            Notify(Texts.Get("crm.quoteDelegations.saved"), false);
             await LoadAsync();
             return;
         }
@@ -394,7 +395,7 @@
         busy = true;
         var result = await Api.DeleteAsync($"{DelegationsUrl}/{delegationForm.Id}?version={delegationForm.Version}");
         busy = false;
-        Notify(result.IsSuccess ? "Vekâlet silindi." : result.Error, !result.IsSuccess);
+        Notify(result.IsSuccess ? Texts.Get("crm.quoteDelegations.deleted") : result.Error, !result.IsSuccess);
         if (result.IsSuccess)
         {
             delegationForm = null;

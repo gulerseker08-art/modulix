@@ -2,19 +2,18 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Sipariş panosu · Modulix</PageTitle>
+<PageTitle>@Texts.Get("orders.dashboard.title") · Modulix</PageTitle>
 
 <AuthGate Module="@OrdersAccess.ModuleKey" Permission="@OrdersAccess.OrdersRead">
     <div class="page-header">
-        <h1>Sipariş panosu</h1>
+        <h1>@Texts.Get("orders.dashboard.title")</h1>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="siparisler">Sipariş listesi</a>
-            <a class="btn btn-outline-secondary" href="siparisler/isler">Operasyon işleri</a>
+            <a class="btn btn-outline-secondary" href="siparisler">@Texts.Get("orders.dashboard.list-link")</a>
+            <a class="btn btn-outline-secondary" href="siparisler/isler">@Texts.Get("orders.jobs.title")</a>
         </div>
     </div>
     <p class="text-muted">
-        Yalnızca görebildiğiniz siparişler ve işler sayılır; kutular tıklanınca aynı süzgeçle listeyi açar. Göstergeler sayıdır: sipariş tutarı toplanmaz,
-        gelir ya da tahsilat sayılmaz.
+        @Texts.Get("orders.dashboard.intro")
     </p>
 
     <Notice Text="@error" Failed="true" />
@@ -26,58 +25,58 @@
     else if (summary is not null)
     {
         <section aria-labelledby="orders-counts-title">
-            <h2 id="orders-counts-title">Siparişler</h2>
+            <h2 id="orders-counts-title">@Texts.Get("orders.dashboard.orders")</h2>
             <div class="stat-grid">
-                <a class="stat-card" href="siparisler?gorunum=handover" aria-label="Devir bekleyen sipariş: @summary.HandoverPending"><span>Devir bekleyen</span><strong>@Count(summary.HandoverPending)</strong></a>
-                <a class="stat-card" href="siparisler?durum=PendingApproval" aria-label="Onay bekleyen sipariş: @summary.PendingApproval"><span>Onay bekleyen</span><strong>@Count(summary.PendingApproval)</strong></a>
-                <a class="stat-card" href="siparisler?gorunum=partial" aria-label="Kısmen gerçekleşen sipariş: @summary.PartiallyFulfilled"><span>Kısmen gerçekleşen</span><strong>@Count(summary.PartiallyFulfilled)</strong></a>
-                <a class="stat-card" href="siparisler?gorunum=overdue" aria-label="Geciken sipariş: @summary.OverdueOrders"><span>Geciken (planlanan teslim geçti)</span><strong>@Count(summary.OverdueOrders)</strong></a>
+                <a class="stat-card" href="siparisler?gorunum=handover" aria-label="@Texts.Get("orders.dashboard.aria.handover", summary.HandoverPending)"><span>@Texts.Get("orders.dashboard.stat.handover")</span><strong>@Count(summary.HandoverPending)</strong></a>
+                <a class="stat-card" href="siparisler?durum=PendingApproval" aria-label="@Texts.Get("orders.dashboard.aria.pending", summary.PendingApproval)"><span>@Texts.Get("orders.dashboard.stat.pending")</span><strong>@Count(summary.PendingApproval)</strong></a>
+                <a class="stat-card" href="siparisler?gorunum=partial" aria-label="@Texts.Get("orders.dashboard.aria.partial", summary.PartiallyFulfilled)"><span>@Texts.Get("orders.dashboard.stat.partial")</span><strong>@Count(summary.PartiallyFulfilled)</strong></a>
+                <a class="stat-card" href="siparisler?gorunum=overdue" aria-label="@Texts.Get("orders.dashboard.aria.overdue", summary.OverdueOrders)"><span>@Texts.Get("orders.dashboard.stat.overdue")</span><strong>@Count(summary.OverdueOrders)</strong></a>
             </div>
             <p class="mt-2">
-                <strong>Ortalama devir kabul süresi:</strong>&nbsp;
+                <strong>@Texts.Get("orders.dashboard.handover-time")</strong>&nbsp;
                 @if (summary.AverageHandoverAcceptanceHours is { } hours)
                 {
-                    <span>@FormatHours(hours) <span class="text-muted">(ilk gönderimden kabule; son @summary.HandoverAcceptanceSample kabul edilen devir)</span></span>
+                    <span>@FormatHours(hours) <span class="text-muted">@Texts.Get("orders.dashboard.handover-time-note", summary.HandoverAcceptanceSample)</span></span>
                 }
                 else
                 {
-                    <span class="text-muted">Henüz kabul edilen devir yok.</span>
+                    <span class="text-muted">@Texts.Get("orders.dashboard.no-handover")</span>
                 }
             </p>
         </section>
 
         <section aria-labelledby="ops-counts-title">
-            <h2 id="ops-counts-title">Operasyon</h2>
+            <h2 id="ops-counts-title">@Texts.Get("orders.dashboard.operations")</h2>
             <div class="stat-grid">
-                <a class="stat-card" href="siparisler/isler?gorunum=unassigned" aria-label="Atanmamış iş: @summary.UnassignedJobs"><span>Atanmamış iş</span><strong>@Count(summary.UnassignedJobs)</strong></a>
-                <a class="stat-card" href="siparisler/isler?gorunum=overdue" aria-label="Geciken iş: @summary.OverdueJobs"><span>Geciken iş</span><strong>@Count(summary.OverdueJobs)</strong></a>
-                <div class="stat-card" role="group" aria-label="Açık teslimat: @summary.OpenDeliveries"><span>Açık (planlı) teslimat</span><strong>@Count(summary.OpenDeliveries)</strong></div>
-                <div class="stat-card" role="group" aria-label="Geciken teslimat: @summary.OverdueDeliveries"><span>Geciken teslimat</span><strong>@Count(summary.OverdueDeliveries)</strong></div>
-                <div class="stat-card" role="group" aria-label="Geciken hizmet başlangıcı: @summary.OverdueServiceStarts"><span>Geciken hizmet başlangıcı</span><strong>@Count(summary.OverdueServiceStarts)</strong></div>
+                <a class="stat-card" href="siparisler/isler?gorunum=unassigned" aria-label="@Texts.Get("orders.dashboard.aria.unassigned", summary.UnassignedJobs)"><span>@Texts.Get("orders.dashboard.stat.unassigned")</span><strong>@Count(summary.UnassignedJobs)</strong></a>
+                <a class="stat-card" href="siparisler/isler?gorunum=overdue" aria-label="@Texts.Get("orders.dashboard.aria.overdue-jobs", summary.OverdueJobs)"><span>@Texts.Get("orders.dashboard.stat.overdue-jobs")</span><strong>@Count(summary.OverdueJobs)</strong></a>
+                <div class="stat-card" role="group" aria-label="@Texts.Get("orders.dashboard.aria.open-deliveries", summary.OpenDeliveries)"><span>@Texts.Get("orders.dashboard.stat.open-deliveries")</span><strong>@Count(summary.OpenDeliveries)</strong></div>
+                <div class="stat-card" role="group" aria-label="@Texts.Get("orders.dashboard.aria.overdue-deliveries", summary.OverdueDeliveries)"><span>@Texts.Get("orders.dashboard.stat.overdue-deliveries")</span><strong>@Count(summary.OverdueDeliveries)</strong></div>
+                <div class="stat-card" role="group" aria-label="@Texts.Get("orders.dashboard.aria.overdue-services", summary.OverdueServiceStarts)"><span>@Texts.Get("orders.dashboard.stat.overdue-services")</span><strong>@Count(summary.OverdueServiceStarts)</strong></div>
             </div>
         </section>
 
         <section aria-labelledby="late-title">
-            <h2 id="late-title">Geciken teslimat ve hizmet başlangıçları</h2>
+            <h2 id="late-title">@Texts.Get("orders.dashboard.late-title")</h2>
             @if (lateDeliveries.Count == 0 && lateServices.Count == 0)
             {
-                <p class="text-muted">Geciken teslimat ya da hizmet başlangıcı yok.</p>
+                <p class="text-muted">@Texts.Get("orders.dashboard.late-none")</p>
             }
             else
             {
                 <ul>
                     @foreach (var d in lateDeliveries)
                     {
-                        <li><a href="siparisler/@d.OrderId/teslimat">Teslimat @d.Number</a> <span class="text-muted">· planlanan @OrderLabels.Date(d.PlannedDate)</span></li>
+                        <li><a href="siparisler/@d.OrderId/teslimat">@Texts.Get("orders.dashboard.late-delivery", d.Number)</a> <span class="text-muted">@Texts.Get("orders.dashboard.late-planned", OrderLabels.Date(d.PlannedDate), string.Empty)</span></li>
                     }
                     @foreach (var s in lateServices)
                     {
-                        <li><a href="siparisler/@s.OrderId/teslimat">Hizmet başlangıcı</a> <span class="text-muted">· planlanan @OrderLabels.Date(s.PlannedStartDate)@(string.IsNullOrEmpty(s.DelayReason) ? null : " · " + s.DelayReason)</span></li>
+                        <li><a href="siparisler/@s.OrderId/teslimat">@Texts.Get("orders.dashboard.late-service")</a> <span class="text-muted">@Texts.Get("orders.dashboard.late-planned", OrderLabels.Date(s.PlannedStartDate), string.IsNullOrEmpty(s.DelayReason) ? string.Empty : " · " + s.DelayReason)</span></li>
                     }
                 </ul>
                 @if (summary.OverdueDeliveries > lateDeliveries.Count || summary.OverdueServiceStarts > lateServices.Count)
                 {
-                    <p class="small text-muted">Her türden en gecikmiş ilk @Limit kayıt gösterilir.</p>
+                    <p class="small text-muted">@Texts.Get("orders.dashboard.late-limit", Limit)</p>
                 }
             }
         </section>
@@ -100,7 +99,7 @@
         var result = await Api.GetAsync<OrderSummaryDto>("/api/orders/summary");
         if (!result.IsSuccess)
         {
-            error = result.Error ?? "Özet yüklenemedi.";
+            error = result.Error ?? Texts.Get("orders.dashboard.load-failed");
             return;
         }
 
@@ -114,5 +113,5 @@
     private static string Count(int value) => value.ToString("N0", Regional.Numbers);
 
     private static string FormatHours(double hours) =>
-        hours < 48 ? $"{hours.ToString("0.#", Regional.Numbers)} saat" : $"{(hours / 24).ToString("0.#", Regional.Numbers)} gün";
+        hours < 48 ? Texts.Get("orders.dashboard.hours", hours.ToString("0.#", Regional.Numbers)) : Texts.Get("orders.dashboard.days", (hours / 24).ToString("0.#", Regional.Numbers));
 }

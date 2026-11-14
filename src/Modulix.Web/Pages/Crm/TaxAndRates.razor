@@ -2,11 +2,11 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Vergi ve kur · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.taxAndRates.pageTitle") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.PricesRead">
     <div class="page-header">
-        <h1>Vergi oranları ve döviz kurları</h1>
+        <h1>@Texts.Get("crm.taxAndRates.title")</h1>
     </div>
 
     @if (message is not null)
@@ -16,56 +16,56 @@
 
     <section class="record-form">
         <div class="page-header">
-            <h2>Vergi oranları</h2>
+            <h2>@Texts.Get("crm.taxAndRates.taxes")</h2>
             @if (Session.Can(CrmAccess.PricesWrite) && taxForm is null)
             {
-                <button type="button" class="btn btn-primary btn-sm" @onclick="() => taxForm = new()">Yeni oran</button>
+                <button type="button" class="btn btn-primary btn-sm" @onclick="() => taxForm = new()">@Texts.Get("crm.taxAndRates.newTax")</button>
             }
         </div>
-        <p class="text-muted">Ürünün "vergi kategorisi" bu kodla eşleşir. Oranlar tarih aralığıyla tutulur; aynı kod için aralıklar çakışamaz, yeni oran eskisinin bitiş tarihinde başlar.</p>
+        <p class="text-muted">@Texts.Get("crm.taxAndRates.taxIntro")</p>
 
         @if (taxForm is not null)
         {
-            <FormTabs Title="Vergi oranı" Label="Vergi oranı formu bölümleri">
+            <FormTabs Title="@Texts.Get("crm.taxAndRates.taxForm")" Label="@Texts.Get("crm.taxAndRates.taxFormSections")">
             <form class="form-grid" novalidate @onsubmit="SaveTaxAsync" @onsubmit:preventDefault>
                 <div>
-                    <label class="form-label" for="taxCode">Kod *</label>
+                    <label class="form-label" for="taxCode">@Texts.Get("crm.products.field.code")</label>
                     <input id="taxCode" class="form-control" maxlength="30" @bind="taxForm.Code" />
                     <FieldError Field="code" Errors="taxErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="taxName">Ad *</label>
+                    <label class="form-label" for="taxName">@Texts.Get("common.field.nameRequired")</label>
                     <input id="taxName" class="form-control" maxlength="100" @bind="taxForm.Name" />
                     <FieldError Field="name" Errors="taxErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="taxRate">Oran (%) *</label>
+                    <label class="form-label" for="taxRate">@Texts.Get("crm.taxAndRates.field.rate")</label>
                     <input id="taxRate" class="form-control" type="number" step="any" min="0" max="100" @bind="taxForm.Rate" />
                     <FieldError Field="ratePercent" Errors="taxErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="taxFrom">Geçerlilik başı *</label>
+                    <label class="form-label" for="taxFrom">@Texts.Get("crm.taxAndRates.field.validFrom")</label>
                     <input id="taxFrom" class="form-control" type="date" @bind="taxForm.ValidFrom" />
                     <FieldError Field="validFrom" Errors="taxErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="taxTo">Geçerlilik sonu (hariç)</label>
+                    <label class="form-label" for="taxTo">@Texts.Get("crm.taxAndRates.field.validTo")</label>
                     <input id="taxTo" class="form-control" type="date" @bind="taxForm.ValidTo" />
                     <FieldError Field="validTo" Errors="taxErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="taxActive">Durum</label>
+                    <label class="form-label" for="taxActive">@Texts.Get("common.field.status")</label>
                     <select id="taxActive" class="form-select" @bind="taxForm.IsActive">
-                        <option value="True">Aktif</option>
-                        <option value="False">Pasif</option>
+                        <option value="True">@Texts.Get("common.active")</option>
+                        <option value="False">@Texts.Get("common.inactive")</option>
                     </select>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => taxForm = null">Vazgeç</button>
+                    <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => taxForm = null">@Texts.Get("common.dismiss")</button>
                     @if (taxForm.Id is not null)
                     {
-                        <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteTaxAsync">Sil</button>
+                        <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteTaxAsync">@Texts.Get("common.delete")</button>
                     }
                 </div>
             </form>
@@ -78,25 +78,25 @@
         }
         else if (taxes.Count == 0)
         {
-            <EmptyState Title="Vergi oranı yok." />
+            <EmptyState Title="@Texts.Get("crm.taxAndRates.noTaxes")" />
         }
         else
         {
             <table class="table record-table">
-                <thead><tr><th>Kod</th><th>Ad</th><th>Oran</th><th>Geçerlilik</th><th>Durum</th><th></th></tr></thead>
+                <thead><tr><th>@Texts.Get("crm.products.col.code")</th><th>@Texts.Get("common.field.name")</th><th>@Texts.Get("crm.taxAndRates.col.rate")</th><th>@Texts.Get("crm.priceLists.col.period")</th><th>@Texts.Get("common.field.status")</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var tax in taxes)
                     {
                         <tr>
-                            <td data-label="Kod" class="primary">@tax.Code</td>
-                            <td data-label="Ad">@tax.Name</td>
-                            <td data-label="Oran">%@tax.RatePercent</td>
-                            <td data-label="Geçerlilik">@tax.ValidFrom.ToString("yyyy-MM-dd") → @(tax.ValidTo?.ToString("yyyy-MM-dd") ?? "süresiz")</td>
-                            <td data-label="Durum">@(tax.IsActive ? "Aktif" : "Pasif")</td>
+                            <td data-label="@Texts.Get("crm.products.col.code")" class="primary">@tax.Code</td>
+                            <td data-label="@Texts.Get("common.field.name")">@tax.Name</td>
+                            <td data-label="@Texts.Get("crm.taxAndRates.col.rate")">%@tax.RatePercent</td>
+                            <td data-label="@Texts.Get("crm.priceLists.col.period")">@tax.ValidFrom.ToString("yyyy-MM-dd") → @(tax.ValidTo?.ToString("yyyy-MM-dd") ?? Texts.Get("crm.taxAndRates.openEnded"))</td>
+                            <td data-label="@Texts.Get("common.field.status")">@(tax.IsActive ? Texts.Get("common.active") : Texts.Get("common.inactive"))</td>
                             <td class="actions">
                                 @if (Session.Can(CrmAccess.PricesWrite))
                                 {
-                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditTax(tax)">Düzenle</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditTax(tax)">@Texts.Get("common.edit")</button>
                                 }
                             </td>
                         </tr>
@@ -108,40 +108,40 @@
 
     <section class="record-form">
         <div class="page-header">
-            <h2>Döviz kurları</h2>
+            <h2>@Texts.Get("crm.taxAndRates.rates")</h2>
             @if (Session.Can(CrmAccess.PricesWrite) && rateForm is null)
             {
-                <button type="button" class="btn btn-primary btn-sm" @onclick="() => rateForm = new()">Yeni kur</button>
+                <button type="button" class="btn btn-primary btn-sm" @onclick="() => rateForm = new()">@Texts.Get("crm.taxAndRates.newRate")</button>
             }
         </div>
-        <p class="text-muted">1 kaynak birim = kur × hedef birim. Kur, geçerli olduğu günden itibaren uygulanır; belgelerde kullanılan kur belgede saklanır, sonradan girilen kur eski belgeyi değiştirmez. Kur yoksa dönüşüm yapılmaz.</p>
+        <p class="text-muted">@Texts.Get("crm.taxAndRates.rateIntro")</p>
 
         @if (rateForm is not null)
         {
-            <FormTabs Title="Döviz kuru" Label="Döviz kuru formu bölümleri">
+            <FormTabs Title="@Texts.Get("crm.taxAndRates.rateForm")" Label="@Texts.Get("crm.taxAndRates.rateFormSections")">
             <form class="form-grid" novalidate @onsubmit="SaveRateAsync" @onsubmit:preventDefault>
                 <div>
-                    <label class="form-label" for="rateFrom">Kaynak para birimi *</label>
+                    <label class="form-label" for="rateFrom">@Texts.Get("crm.taxAndRates.field.from")</label>
                     <input id="rateFrom" class="form-control" maxlength="3" @bind="rateForm.From" />
                     <FieldError Field="fromCurrency" Errors="rateErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="rateTo">Hedef para birimi *</label>
+                    <label class="form-label" for="rateTo">@Texts.Get("crm.taxAndRates.field.to")</label>
                     <input id="rateTo" class="form-control" maxlength="3" @bind="rateForm.To" />
                     <FieldError Field="toCurrency" Errors="rateErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="rateValue">Kur *</label>
+                    <label class="form-label" for="rateValue">@Texts.Get("crm.taxAndRates.field.rateValue")</label>
                     <input id="rateValue" class="form-control" type="number" step="any" min="0" @bind="rateForm.Rate" />
                     <FieldError Field="rate" Errors="rateErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="rateDay">Geçerli gün *</label>
+                    <label class="form-label" for="rateDay">@Texts.Get("crm.taxAndRates.field.validOn")</label>
                     <input id="rateDay" class="form-control" type="date" @bind="rateForm.ValidOn" />
                     <FieldError Field="validOn" Errors="rateErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="rateSource">Kaynak</label>
+                    <label class="form-label" for="rateSource">@Texts.Get("crm.taxAndRates.col.source")</label>
                     <select id="rateSource" class="form-select" @bind="rateForm.Source">
                         @foreach (var source in PricingLabels.RateSources)
                         {
@@ -150,16 +150,16 @@
                     </select>
                 </div>
                 <div>
-                    <label class="form-label" for="rateNote">Not</label>
+                    <label class="form-label" for="rateNote">@Texts.Get("crm.taxAndRates.col.note")</label>
                     <input id="rateNote" class="form-control" maxlength="500" @bind="rateForm.Note" />
                     <FieldError Field="note" Errors="rateErrors" />
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => rateForm = null">Vazgeç</button>
+                    <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => rateForm = null">@Texts.Get("common.dismiss")</button>
                     @if (rateForm.Id is not null)
                     {
-                        <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteRateAsync">Sil</button>
+                        <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteRateAsync">@Texts.Get("common.delete")</button>
                     }
                 </div>
             </form>
@@ -172,25 +172,25 @@
         }
         else if (rates.Count == 0)
         {
-            <EmptyState Title="Kur yok." />
+            <EmptyState Title="@Texts.Get("crm.taxAndRates.noRates")" />
         }
         else
         {
             <table class="table record-table">
-                <thead><tr><th>Çift</th><th>Kur</th><th>Gün</th><th>Kaynak</th><th>Not</th><th></th></tr></thead>
+                <thead><tr><th>@Texts.Get("crm.taxAndRates.col.pair")</th><th>@Texts.Get("crm.taxAndRates.col.rateValue")</th><th>@Texts.Get("crm.taxAndRates.col.day")</th><th>@Texts.Get("crm.taxAndRates.col.source")</th><th>@Texts.Get("crm.taxAndRates.col.note")</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var rate in rates)
                     {
                         <tr>
-                            <td data-label="Çift" class="primary">@rate.FromCurrency → @rate.ToCurrency</td>
-                            <td data-label="Kur">@rate.Rate</td>
-                            <td data-label="Gün">@rate.ValidOn.ToString("yyyy-MM-dd")</td>
-                            <td data-label="Kaynak">@PricingLabels.Label(PricingLabels.RateSources, rate.Source)</td>
-                            <td data-label="Not">@rate.Note</td>
+                            <td data-label="@Texts.Get("crm.taxAndRates.col.pair")" class="primary">@rate.FromCurrency → @rate.ToCurrency</td>
+                            <td data-label="@Texts.Get("crm.taxAndRates.col.rateValue")">@rate.Rate</td>
+                            <td data-label="@Texts.Get("crm.taxAndRates.col.day")">@rate.ValidOn.ToString("yyyy-MM-dd")</td>
+                            <td data-label="@Texts.Get("crm.taxAndRates.col.source")">@PricingLabels.Label(PricingLabels.RateSources, rate.Source)</td>
+                            <td data-label="@Texts.Get("crm.taxAndRates.col.note")">@rate.Note</td>
                             <td class="actions">
                                 @if (Session.Can(CrmAccess.PricesWrite))
                                 {
-                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditRate(rate)">Düzenle</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditRate(rate)">@Texts.Get("common.edit")</button>
                                 }
                             </td>
                         </tr>

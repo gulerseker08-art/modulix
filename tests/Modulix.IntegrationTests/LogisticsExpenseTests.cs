@@ -7,6 +7,7 @@ using Modulix.Infrastructure.Identity;
 using Modulix.Shared.Audit;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Logistics;
+using Modulix.Shared.Lookups;
 using Modulix.Shared.Records;
 using static Modulix.Modules.Logistics.LogisticsModule.Permissions;
 using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
@@ -241,6 +242,31 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
         // Okuma izni olmayan hiçbir şey göremez.
         Assert.Equal(HttpStatusCode.Forbidden, (await outsider.GetAsync($"{Expenses}/{expense.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await outsider.GetAsync(Expenses)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Expense_list_resolves_trip_numbers_only_for_readers_of_trips_in_the_same_tenant()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var managerA = await LoginAsync(a.Manager);
+        using var readerA = await LoginAsync(a.Reader);
+        using var managerB = await LoginAsync(b.Manager);
+        var trip = await PostAsync(managerA, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var number = trip.Values["number"]!.GetValue<string>();
+
+        async Task<string> ResolveAsync(HttpClient client)
+        {
+            var response = await client.PostAsJsonAsync($"/api/lookups/{LogisticsAccess.ExpenseTripLookup}/resolve", new ResolveLookupRequest([trip.Id]));
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            return await response.Content.ReadAsStringAsync();
+        }
+
+        // Sefer okuma izni olan kendi tenant'ında numarayı görür; yalnızca masraf okuyan ve başka tenant'ın kullanıcısı göremez.
+        var own = await ResolveAsync(managerA);
+        Assert.Contains(number, own);
+        Assert.DoesNotContain(number, await ResolveAsync(readerA));
+        Assert.DoesNotContain(number, await ResolveAsync(managerB));
     }
 
     // --- yardımcılar ---

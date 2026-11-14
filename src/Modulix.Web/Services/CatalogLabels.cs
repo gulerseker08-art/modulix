@@ -16,12 +16,16 @@ public static class CatalogLabels
     private static readonly (string Key, string Label)[] DeliveryModeSource =
         [("OnSite", "Yerinde"), ("Remote", "Uzaktan"), ("Shipped", "Sevkiyatla"), ("Digital", "Dijital")];
 
+    private static readonly (string Key, string Label)[] UnitGroupSource =
+        [("count", "Adet"), ("weight", "Ağırlık"), ("length", "Uzunluk"), ("time", "Süre"), ("volume", "Hacim"), ("area", "Alan")];
+
     // Ürün türü ve periyot adları teklif kalemi tablolarıyla aynıdır; aynı anahtarlar kullanılır (ADR-0034, dilim 8c).
     public const string KindGroup = QuoteLabels.LineKindGroup;
     public const string StatusGroup = "crm.product-status";
     public const string ChargeTypeGroup = "crm.product-charge";
     public const string RecurringPeriodGroup = QuoteLabels.PeriodGroup;
     public const string DeliveryModeGroup = "crm.product-delivery";
+    public const string UnitGroupGroup = "crm.unit-group";
 
     // Türkçe ad kaynak metindir (ADR-0034); etkin dilin sözlüğünde `{grup}.{anahtar küçük harf}` yoksa o gösterilir.
     // Özellik olarak tanımlıdır: metinler sınıf yüklenirken değil, her okunuşta çözülür (sözlük sonradan yüklenir).
@@ -35,9 +39,8 @@ public static class CatalogLabels
 
     public static IReadOnlyList<(string Key, string Label)> DeliveryModes => Translate(DeliveryModeGroup, DeliveryModeSource);
 
-    // Ölçü birimi grupları Ölçü birimleri ekranına aittir; o ekranın çeviri diliminde sözlüğe taşınacak.
-    public static IReadOnlyList<(string Key, string Label)> UnitGroups { get; } =
-        [("count", "Adet"), ("weight", "Ağırlık"), ("length", "Uzunluk"), ("time", "Süre"), ("volume", "Hacim"), ("area", "Alan")];
+    // Ölçü birimi grupları Ölçü birimleri ekranındadır (ADR-0034, dilim 9b).
+    public static IReadOnlyList<(string Key, string Label)> UnitGroups => Translate(UnitGroupGroup, UnitGroupSource);
 
     private static IReadOnlyList<(string Key, string Label)> Translate(string group, (string Key, string Label)[] source) =>
         [.. source.Select(x => (x.Key, CrmText.Of(group, x.Key, x.Label)))];

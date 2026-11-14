@@ -3,20 +3,20 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Teklif onay vekâletleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.quoteDelegations.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.QuoteRulesManage">
     <div class="page-header">
-        <h1>Teklif onay vekâletleri</h1>
+        <h1>@Texts.Get("crm.quoteDelegations.title")</h1>
         @if (form is null)
         {
-            <button type="button" class="btn btn-primary" @onclick="NewDelegation">Yeni vekâlet</button>
+            <button type="button" class="btn btn-primary" @onclick="NewDelegation">@Texts.Get("crm.quoteDelegations.new")</button>
         }
     </div>
 
     <p class="text-muted">
-        Vekil, kuralda adı geçen onaylayanın yerine onay verebilir; onay işleminde onay <strong>kendi</strong> adına değil, vekâlet veren adına sayılır.
-        Vekilin kendisinin de onay izni (<code>crm.quotes.approve</code>) olmalıdır; vekâlet izin vermez. Süreli ya da süresiz tanımlanabilir.
+        @Texts.Strong("crm.quoteDelegations.intro1", Texts.Get("crm.quoteDelegations.introOwn"))
+        @((MarkupString)Texts.Get("crm.quoteDelegations.intro2", "<code>crm.quotes.approve</code>"))
     </p>
 
     <Notice Text="@message" Failed="@failed" />
@@ -24,47 +24,47 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>@(form.Id is null ? "Yeni vekâlet" : "Vekâleti düzenle")</h2>
-            <FormTabs Title="Vekâlet bilgileri" Label="Teklif vekâleti formu bölümleri">
+            <h2>@(form.Id is null ? Texts.Get("crm.quoteDelegations.new") : Texts.Get("crm.quoteDelegations.edit"))</h2>
+            <FormTabs Title="@Texts.Get("crm.quoteDelegations.info")" Label="@Texts.Get("crm.quoteDelegations.formSections")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="fromUserId">Vekâlet veren *</label>
+                    <label class="form-label" for="fromUserId">@Texts.Get("crm.quoteDelegations.field.from")</label>
                     <LookupPicker Id="fromUserId" LookupKey="crm.quote-approval-delegation.from" @bind-Value="form.FromUserId" Required="true"
                                   Invalid="@(errors?.ContainsKey("fromUserId") == true)" />
                     <FieldError Field="fromUserId" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="toUserId">Vekil *</label>
+                    <label class="form-label" for="toUserId">@Texts.Get("crm.quoteDelegations.field.to")</label>
                     <LookupPicker Id="toUserId" LookupKey="crm.quote-approval-delegation.to" @bind-Value="form.ToUserId" Required="true"
                                   Invalid="@(errors?.ContainsKey("toUserId") == true)" />
                     <FieldError Field="toUserId" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="d-start">Başlangıç</label>
+                    <label class="form-label" for="d-start">@Texts.Get("crm.quoteDelegations.field.start")</label>
                     <input id="d-start" class="form-control" type="datetime-local" @bind="form.StartsAt" />
                     <FieldError Field="startsAt" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="d-end">Bitiş (boş = süresiz)</label>
+                    <label class="form-label" for="d-end">@Texts.Get("crm.quoteDelegations.field.end")</label>
                     <input id="d-end" class="form-control" type="datetime-local" @bind="form.EndsAt" />
                     <FieldError Field="endsAt" Errors="errors" />
                 </div>
                 <div class="form-check">
                     <input id="d-active" class="form-check-input" type="checkbox" @bind="form.IsActive" />
-                    <label class="form-check-label" for="d-active">Etkin</label>
+                    <label class="form-check-label" for="d-active">@Texts.Get("crm.quoteDelegations.active")</label>
                 </div>
                 <div class="wide">
-                    <label class="form-label" for="d-note">Not</label>
+                    <label class="form-label" for="d-note">@Texts.Get("crm.quoteDelegations.field.note")</label>
                     <input id="d-note" class="form-control" maxlength="300" @bind="form.Note" />
                 </div>
             </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </form>
@@ -76,22 +76,22 @@
     }
     else if (items.Count == 0)
     {
-        <EmptyState Title="Tanımlı vekâlet yok." />
+        <EmptyState Title="@Texts.Get("crm.quoteDelegations.none")" />
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Onay vekâletleri</caption>
-            <thead><tr><th scope="col">Vekâlet veren</th><th scope="col">Vekil</th><th scope="col">Dönem</th><th scope="col">Durum</th><th scope="col"></th></tr></thead>
+            <caption class="visually-hidden">@Texts.Get("crm.quoteDelegations.caption")</caption>
+            <thead><tr><th scope="col">@Texts.Get("crm.quoteDelegations.col.from")</th><th scope="col">@Texts.Get("crm.quoteDelegations.col.to")</th><th scope="col">@Texts.Get("crm.quoteDelegations.col.period")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col"></th></tr></thead>
             <tbody>
                 @foreach (var item in items)
                 {
                     <tr>
-                        <td data-label="Vekâlet veren" class="primary">@Lookups.MemberName(item.FromUserId)</td>
-                        <td data-label="Vekil">@Lookups.MemberName(item.ToUserId)</td>
-                        <td data-label="Dönem">@CrmLabels.Time(item.StartsAt) → @(item.EndsAt is { } end ? CrmLabels.Time(end) : "süresiz")</td>
-                        <td data-label="Durum">@(item.IsActive ? (item.EndsAt is { } e && e <= DateTimeOffset.UtcNow ? "Süresi doldu" : "Etkin") : "Pasif")</td>
-                        <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(item)">Düzenle</button></td>
+                        <td data-label="@Texts.Get("crm.quoteDelegations.col.from")" class="primary">@Lookups.MemberName(item.FromUserId)</td>
+                        <td data-label="@Texts.Get("crm.quoteDelegations.col.to")">@Lookups.MemberName(item.ToUserId)</td>
+                        <td data-label="@Texts.Get("crm.quoteDelegations.col.period")">@CrmLabels.Time(item.StartsAt) → @(item.EndsAt is { } end ? CrmLabels.Time(end) : Texts.Get("crm.quoteDelegations.openEnded"))</td>
+                        <td data-label="@Texts.Get("common.field.status")">@(item.IsActive ? (item.EndsAt is { } e && e <= DateTimeOffset.UtcNow ? Texts.Get("crm.quoteDelegations.expired") : Texts.Get("crm.quoteDelegations.active")) : Texts.Get("common.inactive"))</td>
+                        <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(item)">@Texts.Get("common.edit")</button></td>
                     </tr>
                 }
             </tbody>
@@ -160,7 +160,7 @@
         {
             form = null;
             errors = null;
-            message = "Vekâlet kaydedildi.";
+            message = Texts.Get("crm.quoteDelegations.saved");
             failed = false;
             await LoadAsync();
             return;
@@ -177,7 +177,7 @@
         busy = true;
         var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
         busy = false;
-        message = result.IsSuccess ? "Vekâlet silindi." : result.Error;
+        message = result.IsSuccess ? Texts.Get("crm.quoteDelegations.deleted") : result.Error;
         failed = !result.IsSuccess;
         if (result.IsSuccess)
         {

@@ -5,7 +5,7 @@
 
 <section class="detail-section" aria-labelledby="approval-title">
     <div class="section-header">
-        <h2 id="approval-title">İç onay</h2>
+        <h2 id="approval-title">@Texts.Get("contracts.approvalPanel.title")</h2>
         @if (approval is not null)
         {
             <span class="badge stage-@ContractLabels.ApprovalBadge(approval.Status)">@ContractLabels.Label(ContractLabels.Approvals, approval.Status)</span>
@@ -22,18 +22,18 @@
     }
     else if (approval.Status == "NotRequired" && approval.Decisions.Count == 0)
     {
-        <p class="text-muted">Bu sürüm henüz onaya gönderilmedi. Onaya gönderilirken eşleşen kurallar ve adımlar sürüme dondurulur.</p>
+        <p class="text-muted">@Texts.Get("contracts.approvalPanel.notSubmitted")</p>
     }
     else
     {
         <dl class="detail-list">
-            <div><dt>Sürüm</dt><dd>V@(approval.VersionNo)</dd></div>
-            <div><dt>Gönderen</dt><dd>@Lookups.MemberName(approval.SubmittedBy) · @(approval.SubmittedAt is { } at ? CrmLabels.Time(at) : "—")</dd></div>
+            <div><dt>@Texts.Get("contracts.approvalPanel.version")</dt><dd>@Texts.Get("contracts.versionNo", approval.VersionNo)</dd></div>
+            <div><dt>@Texts.Get("contracts.approvals.col.sender")</dt><dd>@Lookups.MemberName(approval.SubmittedBy) · @(approval.SubmittedAt is { } at ? CrmLabels.Time(at) : "—")</dd></div>
             <div>
-                <dt>Hedef süre</dt>
+                <dt>@Texts.Get("contracts.approvals.col.due")</dt>
                 <dd>
                     @(approval.DueAt is { } due ? CrmLabels.Time(due) : "—")
-                    @if (approval.IsOverdue) { <span class="badge stage-lost">Gecikti</span> }
+                    @if (approval.IsOverdue) { <span class="badge stage-lost">@Texts.Get("crm.pending.overdue")</span> }
                 </dd>
             </div>
         </dl>
@@ -41,15 +41,15 @@
         @if (approval.CanDecide)
         {
             <div class="alert alert-info" role="status">
-                Şu anki adımda karar verebilirsiniz@(approval.ActingAsDelegate ? " (vekâleten)" : string.Empty). Üstteki işlem çubuğundan onaylayın, reddedin ya da değişiklik isteyin.
+                @Texts.Get(approval.ActingAsDelegate ? "contracts.approvalPanel.canDecideDelegate" : "contracts.approvalPanel.canDecide")
             </div>
         }
         else if (approval.Status == "Pending" && approval.CannotDecideReason is not null)
         {
-            <p class="text-muted" role="status">Karar veremiyorsunuz: @approval.CannotDecideReason</p>
+            <p class="text-muted" role="status">@Texts.Get("contracts.approvalPanel.cannotDecide", approval.CannotDecideReason)</p>
         }
 
-        <h3>Eşleşen kurallar</h3>
+        <h3>@Texts.Get("contracts.approvalPanel.rules")</h3>
         @if (approval.Rules.Count == 0)
         {
             <p class="text-muted">@approval.Note</p>
@@ -59,47 +59,47 @@
             <ul>
                 @foreach (var rule in approval.Rules)
                 {
-                    <li><strong>@rule.Name</strong> <small class="text-muted">sürüm @rule.RuleVersion@(approval.Steps.Count > 1 ? $" · adım {rule.Step}" : string.Empty)</small> — @rule.Reason
-                        @if (rule.ApproverId is not null) { <span class="text-muted"> · onaylayıcı: @Lookups.MemberName(rule.ApproverId)</span> }</li>
+                    <li><strong>@rule.Name</strong> <small class="text-muted">@(approval.Steps.Count > 1 ? Texts.Get("contracts.approvalPanel.ruleVersionStep", rule.RuleVersion, rule.Step) : Texts.Get("contracts.approvalPanel.ruleVersion", rule.RuleVersion))</small> — @rule.Reason
+                        @if (rule.ApproverId is not null) { <span class="text-muted"> @Texts.Get("contracts.approvalPanel.ruleApprover", Lookups.MemberName(rule.ApproverId))</span> }</li>
                 }
             </ul>
         }
 
-        <h3>Adımlar</h3>
+        <h3>@Texts.Get("contracts.approvalPanel.steps")</h3>
         <ol class="approval-steps">
             @foreach (var step in approval.Steps)
             {
                 <li aria-current="@(step.IsCurrent ? "step" : null)">
-                    <span class="badge stage-@(step.Completed ? "won" : step.IsCurrent ? "qualified" : "open")">@(step.Completed ? "Tamamlandı" : step.IsCurrent ? "Sırada" : "Bekliyor")</span>
-                    Adım @step.Step:
-                    @if (step.Approvers.Count == 0) { <span>onay izni olan herhangi biri</span> }
+                    <span class="badge stage-@(step.Completed ? "won" : step.IsCurrent ? "qualified" : "open")">@Texts.Get(step.Completed ? "contracts.approvalPanel.stepCompleted" : step.IsCurrent ? "contracts.approvalPanel.stepCurrent" : "contracts.approvalPanel.stepWaiting")</span>
+                    @Texts.Get("contracts.approvalPanel.stepNo", step.Step)
+                    @if (step.Approvers.Count == 0) { <span>@Texts.Get("contracts.approvalPanel.anyApprover")</span> }
                     else { <span>@string.Join(", ", step.Approvers.Select(a => Lookups.MemberName(a) + (step.ApprovedBy.Contains(a) ? " ✓" : string.Empty)))</span> }
                 </li>
             }
         </ol>
 
-        <h3>Kararlar</h3>
+        <h3>@Texts.Get("contracts.approvalPanel.decisions")</h3>
         @if (approval.Decisions.Count == 0)
         {
-            <EmptyState Title="Henüz karar verilmedi." />
+            <EmptyState Title="@Texts.Get("contracts.approvalPanel.noDecisions")" />
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">Onay kararları</caption>
-                <thead><tr><th scope="col">Adım</th><th scope="col">Karar</th><th scope="col">Veren</th><th scope="col">Zaman</th><th scope="col">Gerekçe</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("contracts.approvalPanel.decisionsCaption")</caption>
+                <thead><tr><th scope="col">@Texts.Get("contracts.approvalPanel.col.step")</th><th scope="col">@Texts.Get("contracts.renewals.col.decision")</th><th scope="col">@Texts.Get("contracts.approvalPanel.col.actor")</th><th scope="col">@Texts.Get("contracts.approvalPanel.col.time")</th><th scope="col">@Texts.Get("crm.quoteApprovals.reasonLabel")</th></tr></thead>
                 <tbody>
                     @foreach (var d in approval.Decisions)
                     {
                         <tr>
-                            <td data-label="Adım">@d.StepNo</td>
-                            <td data-label="Karar"><span class="badge stage-@DecisionBadge(d.Decision)">@DecisionLabel(d.Decision)</span></td>
-                            <td data-label="Veren">
+                            <td data-label="@Texts.Get("contracts.approvalPanel.col.step")">@d.StepNo</td>
+                            <td data-label="@Texts.Get("contracts.renewals.col.decision")"><span class="badge stage-@DecisionBadge(d.Decision)">@DecisionLabel(d.Decision)</span></td>
+                            <td data-label="@Texts.Get("contracts.approvalPanel.col.actor")">
                                 @Lookups.MemberName(d.ActorId)
-                                @if (d.OnBehalfOf.Any(p => p != d.ActorId)) { <div class="small text-muted">vekâleten: @string.Join(", ", d.OnBehalfOf.Where(p => p != d.ActorId).Select(p => Lookups.MemberName(p)))</div> }
+                                @if (d.OnBehalfOf.Any(p => p != d.ActorId)) { <div class="small text-muted">@Texts.Get("contracts.approvalPanel.onBehalfOf", string.Join(", ", d.OnBehalfOf.Where(p => p != d.ActorId).Select(p => Lookups.MemberName(p))))</div> }
                             </td>
-                            <td data-label="Zaman">@CrmLabels.Time(d.At)</td>
-                            <td data-label="Gerekçe">@(d.Reason ?? "—")</td>
+                            <td data-label="@Texts.Get("contracts.approvalPanel.col.time")">@CrmLabels.Time(d.At)</td>
+                            <td data-label="@Texts.Get("crm.quoteApprovals.reasonLabel")">@(d.Reason ?? "—")</td>
                         </tr>
                     }
                 </tbody>
@@ -131,9 +131,9 @@
 
     private static string DecisionLabel(string decision) => decision switch
     {
-        "Approved" => "Onayladı",
-        "Rejected" => "Reddetti",
-        "Returned" => "Geri gönderdi",
+        "Approved" => Texts.Get("contracts.approvalPanel.decision.approved"),
+        "Rejected" => Texts.Get("contracts.approvalPanel.decision.rejected"),
+        "Returned" => Texts.Get("contracts.approvalPanel.decision.returned"),
         _ => decision,
     };
 

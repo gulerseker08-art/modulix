@@ -6,12 +6,12 @@
 
 <section class="detail-section" aria-labelledby="commitments-title">
     <div class="section-header">
-        <h2 id="commitments-title">Taahhütler</h2>
+        <h2 id="commitments-title">@Texts.Get("contracts.commitmentsPanel.title")</h2>
         <div class="header-actions">
             @if (CanWrite && form is null)
             {
-                <button type="button" class="btn btn-primary btn-sm" @onclick="NewCommitment">Taahhüt ekle</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="EvaluateAsync">Değerlendir (ihlal ve eskalasyon)</button>
+                <button type="button" class="btn btn-primary btn-sm" @onclick="NewCommitment">@Texts.Get("contracts.commitmentsPanel.add")</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="EvaluateAsync">@Texts.Get("contracts.commitmentsPanel.evaluate")</button>
             }
         </div>
     </div>
@@ -19,129 +19,128 @@
     <Notice Text="@notice" Failed="@noticeFailed" />
 
     <p class="text-muted">
-        Taahhüt, sözleşmeden doğan yükümlülüğün tanımıdır (teslimat, eğitim, kurulum, belge, raporlama, hizmet seviyesi…). Dönemsel taahhütte her dönem ayrı izlenir. Son tarih ve tolerans geçince
-        gerçekleşme ihlal olur ve sorumluya takip aktivitesi açılır. Ceza ya da finansal sonuç otomatik uygulanmaz.
+        @Texts.Get("contracts.commitmentsPanel.intro")
     </p>
 
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h3>@(form.Id is null ? "Yeni taahhüt" : "Taahhüdü düzenle")</h3>
+            <h3>@Texts.Get(form.Id is null ? "contracts.commitmentsPanel.new" : "contracts.commitmentsPanel.edit")</h3>
             @if (errors is { Count: > 0 })
             {
                 <div class="alert alert-danger" role="alert"><ul class="mb-0">@foreach (var (_, messages) in errors) { foreach (var message in messages) { <li>@message</li> } }</ul></div>
             }
             <div class="form-grid">
                 <div class="wide">
-                    <label class="form-label" for="cm-title">Başlık *</label>
+                    <label class="form-label" for="cm-title">@Texts.Get("contracts.commitmentsPanel.titleRequired")</label>
                     <input id="cm-title" class="form-control" maxlength="200" @bind="form.Title" />
                 </div>
                 <div>
-                    <label class="form-label" for="cm-cat">Kategori</label>
+                    <label class="form-label" for="cm-cat">@Texts.Get("contracts.commitmentsPanel.category")</label>
                     <select id="cm-cat" class="form-select" @bind="form.Category">
                         @foreach (var c in Lookups.Choices(ContractsAccess.CommitmentCategoryList, form.Category)) { <option value="@c.Key">@c.Label</option> }
                     </select>
                 </div>
                 <div>
-                    <label class="form-label" for="cm-obl">Yükümlü taraf</label>
+                    <label class="form-label" for="cm-obl">@Texts.Get("contracts.commitmentsPanel.obligor")</label>
                     <select id="cm-obl" class="form-select" @bind="form.Obligor">
                         @foreach (var o in CommitmentLabels.Obligors) { <option value="@o.Key">@o.Label</option> }
                     </select>
                 </div>
                 <div>
-                    <label class="form-label" for="cm-resp">Sorumlu</label>
+                    <label class="form-label" for="cm-resp">@Texts.Get("common.field.owner")</label>
                     <select id="cm-resp" class="form-select" @bind="form.ResponsibleUserId">
                         <option value="">—</option>
                         @foreach (var m in Lookups.Members) { <option value="@m.UserId">@m.DisplayName</option> }
                     </select>
                 </div>
                 <div>
-                    <label class="form-label" for="cm-kind">Tür</label>
+                    <label class="form-label" for="cm-kind">@Texts.Get("contracts.field.type")</label>
                     <select id="cm-kind" class="form-select" @bind="form.Kind" disabled="@lockedSchedule">
                         @foreach (var k in CommitmentLabels.Kinds) { <option value="@k.Key">@k.Label</option> }
                     </select>
                 </div>
                 <div>
-                    <label class="form-label" for="cm-start">Başlangıç *</label>
+                    <label class="form-label" for="cm-start">@Texts.Get("contracts.commitmentsPanel.startRequired")</label>
                     <input id="cm-start" class="form-control" type="date" @bind="form.StartDate" disabled="@lockedSchedule" />
                 </div>
                 <div>
-                    <label class="form-label" for="cm-due">@(form.Kind == "Periodic" ? "İlk son tarih *" : "Son tarih *")</label>
+                    <label class="form-label" for="cm-due">@Texts.Get(form.Kind == "Periodic" ? "contracts.commitmentsPanel.firstDueRequired" : "contracts.commitmentsPanel.dueRequired")</label>
                     <input id="cm-due" class="form-control" type="date" @bind="form.DueDate" disabled="@lockedSchedule" />
                 </div>
                 @if (form.Kind == "Periodic")
                 {
                     <div>
-                        <label class="form-label" for="cm-rec">Tekrar *</label>
+                        <label class="form-label" for="cm-rec">@Texts.Get("contracts.commitmentsPanel.recurrenceRequired")</label>
                         <select id="cm-rec" class="form-select" @bind="form.Recurrence" disabled="@lockedSchedule">
-                            <option value="">Seçin…</option>
+                            <option value="">@Texts.Get("common.choose")</option>
                             @foreach (var r in CommitmentLabels.Recurrences) { <option value="@r.Key">@r.Label</option> }
                         </select>
                     </div>
                     <div>
-                        <label class="form-label" for="cm-recend">Tekrar bitişi (boş = sözleşme bitişi)</label>
+                        <label class="form-label" for="cm-recend">@Texts.Get("contracts.commitmentsPanel.recurrenceEnd")</label>
                         <input id="cm-recend" class="form-control" type="date" @bind="form.RecurrenceEndDate" disabled="@lockedSchedule" />
                     </div>
                 }
                 <div>
-                    <label class="form-label" for="cm-grace">Tolerans süresi (gün)</label>
+                    <label class="form-label" for="cm-grace">@Texts.Get("contracts.commitmentsPanel.graceDays")</label>
                     <input id="cm-grace" class="form-control" type="number" min="0" max="365" @bind="form.GraceDays" />
                 </div>
                 <div>
-                    <label class="form-label" for="cm-esc">Eskalasyon (ihlalden gün sonra; 0 = kapalı)</label>
+                    <label class="form-label" for="cm-esc">@Texts.Get("contracts.commitmentsPanel.escalateAfter")</label>
                     <input id="cm-esc" class="form-control" type="number" min="0" max="365" @bind="form.EscalateAfterDays" />
                 </div>
                 <div>
-                    <label class="form-label" for="cm-escuser">Eskalasyon kullanıcısı</label>
+                    <label class="form-label" for="cm-escuser">@Texts.Get("contracts.commitmentsPanel.escalationUser")</label>
                     <select id="cm-escuser" class="form-select" @bind="form.EscalationUserId">
                         <option value="">—</option>
                         @foreach (var m in Lookups.Members) { <option value="@m.UserId">@m.DisplayName</option> }
                     </select>
                 </div>
                 <div>
-                    <label class="form-label" for="cm-dep">Bağımlı olduğu taahhüt</label>
+                    <label class="form-label" for="cm-dep">@Texts.Get("contracts.commitmentsPanel.dependsOn")</label>
                     <select id="cm-dep" class="form-select" @bind="form.DependsOnCommitmentId">
                         <option value="">—</option>
                         @foreach (var other in commitments.Where(c => c.Id != form.Id && c.Status == "Active")) { <option value="@other.Id">@other.Title</option> }
                     </select>
                 </div>
                 <div>
-                    <label class="form-label" for="cm-metric">Ölçüt (isteğe bağlı)</label>
-                    <input id="cm-metric" class="form-control" maxlength="100" placeholder="Ör. Aylık erişilebilirlik" @bind="form.MetricName" disabled="@lockedSchedule" />
+                    <label class="form-label" for="cm-metric">@Texts.Get("contracts.commitmentsPanel.metric")</label>
+                    <input id="cm-metric" class="form-control" maxlength="100" placeholder="@Texts.Get("contracts.commitmentsPanel.metricPlaceholder")" @bind="form.MetricName" disabled="@lockedSchedule" />
                 </div>
                 <div>
-                    <label class="form-label" for="cm-dir">Yön</label>
+                    <label class="form-label" for="cm-dir">@Texts.Get("contracts.commitmentsPanel.direction")</label>
                     <select id="cm-dir" class="form-select" @bind="form.Direction" disabled="@lockedSchedule">
                         <option value="">—</option>
                         @foreach (var d in CommitmentLabels.Directions) { <option value="@d.Key">@d.Label</option> }
                     </select>
                 </div>
                 <div>
-                    <label class="form-label" for="cm-target">Hedef</label>
+                    <label class="form-label" for="cm-target">@Texts.Get("contracts.commitmentsPanel.target")</label>
                     <input id="cm-target" class="form-control" type="number" step="any" min="0" @bind="form.TargetValue" disabled="@lockedSchedule" />
                 </div>
                 <div>
-                    <label class="form-label" for="cm-tol">Tolerans</label>
+                    <label class="form-label" for="cm-tol">@Texts.Get("contracts.commitmentsPanel.tolerance")</label>
                     <input id="cm-tol" class="form-control" type="number" step="any" min="0" @bind="form.Tolerance" disabled="@lockedSchedule" />
                 </div>
                 <div>
-                    <label class="form-label" for="cm-unit">Birim</label>
-                    <input id="cm-unit" class="form-control" maxlength="30" placeholder="%, saat, adet" @bind="form.Unit" disabled="@lockedSchedule" />
+                    <label class="form-label" for="cm-unit">@Texts.Get("contracts.field.unitname")</label>
+                    <input id="cm-unit" class="form-control" maxlength="30" placeholder="@Texts.Get("contracts.commitmentsPanel.unitPlaceholder")" @bind="form.Unit" disabled="@lockedSchedule" />
                 </div>
                 <div class="wide">
-                    <label class="form-label" for="cm-desc">Açıklama</label>
+                    <label class="form-label" for="cm-desc">@Texts.Get("contracts.field.description")</label>
                     <textarea id="cm-desc" class="form-control" rows="2" maxlength="2000" @bind="form.Description"></textarea>
                 </div>
                 <div class="wide">
-                    <label class="form-label" for="cm-cons">Sonuç maddesi atfı (yalnızca not; ceza uygulanmaz)</label>
+                    <label class="form-label" for="cm-cons">@Texts.Get("contracts.commitmentsPanel.consequence")</label>
                     <input id="cm-cons" class="form-control" maxlength="2000" @bind="form.ConsequenceNote" />
                 </div>
             </div>
-            @if (lockedSchedule) { <p class="small text-muted">Gerçekleşmesi kaydedilmiş taahhütte takvim ve ölçüm değiştirilemez; önceki kayıtlar yeniden yazılmaz.</p> }
+            @if (lockedSchedule) { <p class="small text-muted">@Texts.Get("contracts.commitmentsPanel.locked")</p> }
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Vazgeç</button>
-                @if (form.Id is not null) { <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button> }
+                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">@Texts.Get("common.dismiss")</button>
+                @if (form.Id is not null) { <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button> }
             </div>
         </form>
     }
@@ -152,7 +151,7 @@
     }
     else if (commitments.Count == 0)
     {
-        <p class="text-muted">Bu sözleşmede taahhüt yok.</p>
+        <p class="text-muted">@Texts.Get("contracts.commitmentsPanel.empty")</p>
     }
 
     @foreach (var c in commitments)
@@ -165,44 +164,44 @@
                 <small class="text-muted">@Lookups.Label(ContractsAccess.CommitmentCategoryList, c.Category) · @CommitmentLabels.Label(CommitmentLabels.Kinds, c.Kind)@(c.Recurrence is null ? string.Empty : " · " + CommitmentLabels.Label(CommitmentLabels.Recurrences, c.Recurrence))</small>
             </h3>
             <p class="small text-muted">
-                Yükümlü: @CommitmentLabels.Label(CommitmentLabels.Obligors, c.Obligor) · Sorumlu: @(c.ResponsibleUserId is null ? "—" : Lookups.MemberName(c.ResponsibleUserId))
-                · @ContractLabels.Date(c.StartDate) – @(c.RecurrenceEndDate is { } end ? ContractLabels.Date(end) : c.Kind == "Periodic" ? "açık uçlu / sözleşme bitişi" : ContractLabels.Date(c.DueDate))
-                · tolerans @c.GraceDays gün@(c.EscalateAfterDays > 0 ? $" · eskalasyon {c.EscalateAfterDays} gün sonra" : string.Empty)
-                @if (c.MetricName is not null) { <span> · Ölçüt: @CommitmentLabels.Target(c.MetricName, c.Direction, c.TargetValue, c.Tolerance, c.Unit)</span> }
-                @if (c.DependsOnCommitmentId is { } dep) { <span> · Bağımlı: @(commitments.FirstOrDefault(x => x.Id == dep)?.Title ?? "—")</span> }
-                @if (c.ConsequenceNote is not null) { <span> · Sonuç maddesi: @c.ConsequenceNote</span> }
+                @Texts.Get("contracts.commitmentsPanel.parties", CommitmentLabels.Label(CommitmentLabels.Obligors, c.Obligor), c.ResponsibleUserId is null ? "—" : Lookups.MemberName(c.ResponsibleUserId))
+                · @ContractLabels.Date(c.StartDate) – @(c.RecurrenceEndDate is { } end ? ContractLabels.Date(end) : c.Kind == "Periodic" ? Texts.Get("contracts.commitmentsPanel.openEnded") : ContractLabels.Date(c.DueDate))
+                · @Texts.Get("contracts.commitmentsPanel.graceSummary", c.GraceDays)@(c.EscalateAfterDays > 0 ? " · " + Texts.Get("contracts.commitmentsPanel.escalationSummary", c.EscalateAfterDays) : string.Empty)
+                @if (c.MetricName is not null) { <span> · @Texts.Get("contracts.commitmentsPanel.metricSummary", CommitmentLabels.Target(c.MetricName, c.Direction, c.TargetValue, c.Tolerance, c.Unit))</span> }
+                @if (c.DependsOnCommitmentId is { } dep) { <span> · @Texts.Get("contracts.commitmentsPanel.dependsSummary", commitments.FirstOrDefault(x => x.Id == dep)?.Title ?? "—")</span> }
+                @if (c.ConsequenceNote is not null) { <span> · @Texts.Get("contracts.commitmentsPanel.consequenceSummary", c.ConsequenceNote)</span> }
             </p>
             @if (!string.IsNullOrWhiteSpace(c.Description)) { <p>@c.Description</p> }
 
             <table class="table record-table">
-                <caption class="visually-hidden">@c.Title gerçekleşmeleri</caption>
-                <thead><tr><th scope="col">Dönem</th><th scope="col">Son tarih</th><th scope="col">Durum</th><th scope="col">Gerçekleşme</th><th scope="col">İşlem</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("contracts.commitmentsPanel.occurrencesCaption", c.Title)</caption>
+                <thead><tr><th scope="col">@Texts.Get("contracts.commitments.col.period")</th><th scope="col">@Texts.Get("contracts.commitments.col.due")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("contracts.commitmentsPanel.col.fulfilment")</th><th scope="col">@Texts.Get("crm.quoteApprovals.col.action")</th></tr></thead>
                 <tbody>
                     @foreach (var o in mine)
                     {
                         <tr>
-                            <td data-label="Dönem">@o.Sequence</td>
-                            <td data-label="Son tarih">@ContractLabels.Date(o.DueDate)@if (o.IsOverdue) { <div class="small text-danger">@o.DaysOverdue gün gecikti</div> }</td>
-                            <td data-label="Durum">
-                                <span class="badge stage-@CommitmentLabels.Badge(o.Status, o.IsOverdue && o.Status == "Open")">@CommitmentLabels.Label(CommitmentLabels.OccurrenceStatuses, o.Status)@(o.CompletedOn is not null && o.Status == "Breached" ? " (geç/eksik tamamlandı)" : string.Empty)</span>
+                            <td data-label="@Texts.Get("contracts.commitments.col.period")">@o.Sequence</td>
+                            <td data-label="@Texts.Get("contracts.commitments.col.due")">@ContractLabels.Date(o.DueDate)@if (o.IsOverdue) { <div class="small text-danger">@Texts.Get("contracts.commitments.daysOverdue", o.DaysOverdue)</div> }</td>
+                            <td data-label="@Texts.Get("common.field.status")">
+                                <span class="badge stage-@CommitmentLabels.Badge(o.Status, o.IsOverdue && o.Status == "Open")">@CommitmentLabels.Label(CommitmentLabels.OccurrenceStatuses, o.Status)@(o.CompletedOn is not null && o.Status == "Breached" ? " " + Texts.Get("contracts.commitmentsPanel.lateCompleted") : string.Empty)</span>
                                 @if (o.BreachReason is not null) { <div class="small text-danger">@o.BreachReason</div> }
-                                @if (o.WaiveReason is not null) { <div class="small text-muted">Muafiyet: @o.WaiveReason</div> }
-                                @if (o.Status == "Breached") { <div class="small text-muted">@CommitmentLabels.Label(CommitmentLabels.FollowUps, o.FollowUpStatus)@(o.EscalatedAt is not null ? " · eskale edildi" : string.Empty)</div> }
+                                @if (o.WaiveReason is not null) { <div class="small text-muted">@Texts.Get("contracts.commitmentsPanel.waiverSummary", o.WaiveReason)</div> }
+                                @if (o.Status == "Breached") { <div class="small text-muted">@CommitmentLabels.Label(CommitmentLabels.FollowUps, o.FollowUpStatus)@(o.EscalatedAt is not null ? " · " + Texts.Get("contracts.commitmentsPanel.escalated") : string.Empty)</div> }
                             </td>
-                            <td data-label="Gerçekleşme">
+                            <td data-label="@Texts.Get("contracts.commitmentsPanel.col.fulfilment")">
                                 @if (o.CompletedOn is { } done)
                                 {
                                     <div>@ContractLabels.Date(done) · @Lookups.MemberName(o.CompletedBy)</div>
-                                    @if (o.ActualValue is { } actual) { <div class="small">Gerçekleşen: @actual.ToString("0.######", Regional.Numbers)@(o.Unit is null ? string.Empty : " " + o.Unit) @(o.MetTarget == true ? "(hedef karşılandı)" : o.MetTarget == false ? "(hedef karşılanmadı)" : string.Empty)</div> }
+                                    @if (o.ActualValue is { } actual) { <div class="small">@Texts.Get("contracts.commitmentsPanel.actualSummary", actual.ToString("0.######", Regional.Numbers) + (o.Unit is null ? string.Empty : " " + o.Unit)) @(o.MetTarget == true ? Texts.Get("contracts.commitmentsPanel.targetMet") : o.MetTarget == false ? Texts.Get("contracts.commitmentsPanel.targetMissed") : string.Empty)</div> }
                                     @if (o.Note is not null) { <div class="small text-muted">@o.Note</div> }
-                                    @if (o.EvidenceFileId is { } fileId && CanDownload) { <div class="small"><a href="api/contracts/commitments/@c.Id/occurrences/@o.Id/files/@fileId" download>@(o.EvidenceFileName ?? "Kanıt")</a></div> }
+                                    @if (o.EvidenceFileId is { } fileId && CanDownload) { <div class="small"><a href="api/contracts/commitments/@c.Id/occurrences/@o.Id/files/@fileId" download>@(o.EvidenceFileName ?? Texts.Get("contracts.commitmentsPanel.evidence"))</a></div> }
                                 }
                                 else { <span class="text-muted">—</span> }
                             </td>
                             <td class="actions">
-                                @if (o.CanComplete && CanComplete) { <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => OpenComplete(o)">Gerçekleşmeyi kaydet</button> }
-                                else if (o.BlockedByDue is { } blocked) { <span class="small text-muted">Bağlı taahhüt (@ContractLabels.Date(blocked)) bekleniyor</span> }
-                                @if (c.Status == "Active" && CanWaive && o.Status is "Open" or "Breached" && o.CompletedOn is null) { <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => OpenWaive(o)">Muaf tut</button> }
+                                @if (o.CanComplete && CanComplete) { <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => OpenComplete(o)">@Texts.Get("contracts.commitmentsPanel.recordFulfilment")</button> }
+                                else if (o.BlockedByDue is { } blocked) { <span class="small text-muted">@Texts.Get("contracts.commitmentsPanel.blocked", ContractLabels.Date(blocked))</span> }
+                                @if (c.Status == "Active" && CanWaive && o.Status is "Open" or "Breached" && o.CompletedOn is null) { <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => OpenWaive(o)">@Texts.Get("contracts.commitmentsPanel.waive")</button> }
                             </td>
                         </tr>
                         @if (completeFor == o.Id)
@@ -210,36 +209,36 @@
                             <tr>
                                 <td colspan="5">
                                     <form class="record-form" novalidate @onsubmit="() => CompleteAsync(c, o)" @onsubmit:preventDefault>
-                                        <h4>Dönem @o.Sequence gerçekleşmesi</h4>
+                                        <h4>@Texts.Get("contracts.commitmentsPanel.occurrenceTitle", o.Sequence)</h4>
                                         @if (errors is { Count: > 0 })
                                         {
                                             <div class="alert alert-danger" role="alert"><ul class="mb-0">@foreach (var (_, messages) in errors) { foreach (var message in messages) { <li>@message</li> } }</ul></div>
                                         }
                                         <div class="form-grid">
                                             <div>
-                                                <label class="form-label" for="co-date">Tamamlanma tarihi *</label>
+                                                <label class="form-label" for="co-date">@Texts.Get("contracts.commitmentsPanel.completedOnRequired")</label>
                                                 <input id="co-date" class="form-control" type="date" @bind="completeDate" />
                                             </div>
                                             @if (o.MetricName is not null)
                                             {
                                                 <div>
-                                                    <label class="form-label" for="co-actual">Gerçekleşen değer * (@CommitmentLabels.Target(o.MetricName, o.Direction, o.TargetValue, o.Tolerance, o.Unit))</label>
+                                                    <label class="form-label" for="co-actual">@Texts.Get("contracts.commitmentsPanel.actualRequired", CommitmentLabels.Target(o.MetricName, o.Direction, o.TargetValue, o.Tolerance, o.Unit))</label>
                                                     <input id="co-actual" class="form-control" type="number" step="any" min="0" @bind="completeActual" />
                                                 </div>
                                             }
                                             <div>
-                                                <label class="form-label" for="co-file">Kanıt belgesi (PDF, PNG, JPEG; en fazla 10 MB)</label>
+                                                <label class="form-label" for="co-file">@Texts.Get("contracts.commitmentsPanel.evidenceFile")</label>
                                                 <InputFile id="co-file" class="form-control" accept="application/pdf,image/png,image/jpeg" OnChange="PickFileAsync" />
                                                 @if (completeFileName is not null) { <div class="form-text">@completeFileName</div> }
                                             </div>
                                             <div class="wide">
-                                                <label class="form-label" for="co-note">Not</label>
+                                                <label class="form-label" for="co-note">@Texts.Get("contracts.field.notes")</label>
                                                 <input id="co-note" class="form-control" maxlength="1000" @bind="completeNote" />
                                             </div>
                                         </div>
                                         <div class="form-actions">
-                                            <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                                            <button type="button" class="btn btn-link" @onclick="CloseForms">Vazgeç</button>
+                                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                                            <button type="button" class="btn btn-link" @onclick="CloseForms">@Texts.Get("common.dismiss")</button>
                                         </div>
                                     </form>
                                 </td>
@@ -250,11 +249,11 @@
                             <tr>
                                 <td colspan="5">
                                     <form class="record-form" novalidate @onsubmit="() => WaiveAsync(c, o)" @onsubmit:preventDefault>
-                                        <label class="form-label" for="wv-reason">Muafiyet gerekçesi *</label>
+                                        <label class="form-label" for="wv-reason">@Texts.Get("contracts.commitmentsPanel.waiveReasonRequired")</label>
                                         <input id="wv-reason" class="form-control" maxlength="500" @bind="reasonText" />
                                         <div class="form-actions">
-                                            <button type="submit" class="btn btn-danger" disabled="@busy">Muaf tut</button>
-                                            <button type="button" class="btn btn-link" @onclick="CloseForms">Vazgeç</button>
+                                            <button type="submit" class="btn btn-danger" disabled="@busy">@Texts.Get("contracts.commitmentsPanel.waive")</button>
+                                            <button type="button" class="btn btn-link" @onclick="CloseForms">@Texts.Get("common.dismiss")</button>
                                         </div>
                                     </form>
                                 </td>
@@ -266,17 +265,17 @@
             @if (CanWrite && c.Status == "Active")
             {
                 <div class="header-actions">
-                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(c)">Düzenle</button>
-                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => cancelFor = c.Id">Taahhüdü iptal et</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(c)">@Texts.Get("common.edit")</button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => cancelFor = c.Id">@Texts.Get("contracts.commitmentsPanel.cancel")</button>
                 </div>
                 @if (cancelFor == c.Id)
                 {
                     <form class="record-form" novalidate @onsubmit="() => CancelAsync(c)" @onsubmit:preventDefault>
-                        <label class="form-label" for="cn-reason">İptal gerekçesi *</label>
+                        <label class="form-label" for="cn-reason">@Texts.Get("contracts.commitmentsPanel.cancelReasonRequired")</label>
                         <input id="cn-reason" class="form-control" maxlength="500" @bind="reasonText" />
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-danger" disabled="@busy">İptal et</button>
-                            <button type="button" class="btn btn-link" @onclick="CloseForms">Vazgeç</button>
+                            <button type="submit" class="btn btn-danger" disabled="@busy">@Texts.Get("contracts.commitmentsPanel.cancelConfirm")</button>
+                            <button type="button" class="btn btn-link" @onclick="CloseForms">@Texts.Get("common.dismiss")</button>
                         </div>
                     </form>
                 }
@@ -383,7 +382,7 @@
         {
             form = null;
             errors = null;
-            Notify("Taahhüt kaydedildi.", false);
+            Notify(Texts.Get("contracts.commitmentsPanel.saved"), false);
             await LoadAsync();
             await Changed.InvokeAsync();
             return;
@@ -399,7 +398,7 @@
         busy = true;
         var result = await Api.DeleteAsync($"/api/contracts/commitments/{id}?version={form.Version}");
         busy = false;
-        Notify(result.IsSuccess ? "Taahhüt silindi." : result.Error, !result.IsSuccess);
+        Notify(result.IsSuccess ? Texts.Get("contracts.commitmentsPanel.deleted") : result.Error, !result.IsSuccess);
         if (result.IsSuccess) { form = null; await LoadAsync(); }
     }
 
@@ -423,7 +422,7 @@
         var file = e.File;
         if (file.Size > MaxBytes)
         {
-            errors = new Dictionary<string, string[]> { ["file"] = ["Dosya en fazla 10 MB olabilir."] };
+            errors = new Dictionary<string, string[]> { ["file"] = [Texts.Get("contracts.commitmentsPanel.fileTooLarge")] };
             return;
         }
 
@@ -442,7 +441,7 @@
         var request = new CompleteOccurrenceRequest(DateOnly.FromDateTime(completeDate ?? DateTime.Today), completeActual, Blank(completeNote), completeFileName, completeContent is null ? null : Convert.ToBase64String(completeContent));
         var result = await Api.PostAsync<CommitmentOccurrenceDto>($"/api/contracts/commitments/{c.Id}/occurrences/{o.Id}/complete", request);
         busy = false;
-        await FinishAsync(result.IsSuccess, result.Error, result.FieldErrors, result.Value?.Status == "Breached" ? "Gerçekleşme kaydedildi: İHLAL (hedef karşılanmadı ya da geç)." : "Gerçekleşme kaydedildi.");
+        await FinishAsync(result.IsSuccess, result.Error, result.FieldErrors, result.Value?.Status == "Breached" ? Texts.Get("contracts.commitmentsPanel.completedBreached") : Texts.Get("contracts.commitmentsPanel.completed"));
     }
 
     private async Task WaiveAsync(ContractCommitmentDto c, CommitmentOccurrenceDto o)
@@ -451,7 +450,7 @@
         busy = true;
         var result = await Api.PostAsync<CommitmentOccurrenceDto>($"/api/contracts/commitments/{c.Id}/occurrences/{o.Id}/waive", new SignatureReasonRequest(reasonText));
         busy = false;
-        await FinishAsync(result.IsSuccess, result.Error, result.FieldErrors, "Muafiyet kaydedildi.");
+        await FinishAsync(result.IsSuccess, result.Error, result.FieldErrors, Texts.Get("contracts.commitmentsPanel.waived"));
     }
 
     private async Task CancelAsync(ContractCommitmentDto c)
@@ -460,7 +459,7 @@
         busy = true;
         var result = await Api.PostAsync<ContractCommitmentDto>($"/api/contracts/commitments/{c.Id}/cancel", new SignatureReasonRequest(reasonText));
         busy = false;
-        await FinishAsync(result.IsSuccess, result.Error, result.FieldErrors, "Taahhüt iptal edildi.");
+        await FinishAsync(result.IsSuccess, result.Error, result.FieldErrors, Texts.Get("contracts.commitmentsPanel.cancelled"));
     }
 
     private async Task EvaluateAsync()
@@ -471,7 +470,7 @@
         busy = false;
         var v = result.Value;
         await FinishAsync(result.IsSuccess, result.Error, result.FieldErrors,
-            v is null ? "Değerlendirildi." : $"Değerlendirildi: {v.Breached} ihlal, {v.Escalated} eskalasyon, {v.FollowUpsCreated} takip aktivitesi, {v.OccurrencesCreated} yeni dönem.");
+            v is null ? Texts.Get("contracts.commitmentsPanel.evaluated") : Texts.Get("contracts.commitmentsPanel.evaluatedSummary", v.Breached, v.Escalated, v.FollowUpsCreated, v.OccurrencesCreated));
     }
 
     private async Task FinishAsync(bool success, string? error, IReadOnlyDictionary<string, string[]>? fieldErrors, string message)

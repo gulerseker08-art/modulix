@@ -3,12 +3,12 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>@(order?.Number ?? "Sipariş") · Modulix</PageTitle>
+<PageTitle>@(order?.Number ?? Texts.Get("orders.detail.title")) · Modulix</PageTitle>
 
 <AuthGate Module="@OrdersAccess.ModuleKey" Permission="@OrdersAccess.OrdersRead">
     @if (notFound)
     {
-        <div class="alert alert-warning" role="alert">Sipariş bulunamadı ya da erişim yetkiniz yok. <a href="siparisler">Siparişlere dön</a></div>
+        <div class="alert alert-warning" role="alert">@Texts.Get("orders.detail.not-found") <a href="siparisler">@Texts.Get("orders.detail.back-to-list")</a></div>
     }
     else if (order is null)
     {
@@ -27,7 +27,7 @@
                 </p>
             </div>
             <div class="header-actions">
-                <a class="btn btn-outline-secondary" href="siparisler">Siparişler</a>
+                <a class="btn btn-outline-secondary" href="siparisler">@Texts.Get("orders.list.title")</a>
             </div>
         </div>
 
@@ -36,90 +36,90 @@
         <OrderActionsPanel Order="order" Changed="OnActionAsync" />
 
         <section aria-labelledby="summary-title">
-            <h2 id="summary-title">Özet</h2>
+            <h2 id="summary-title">@Texts.Get("orders.detail.summary")</h2>
             <dl class="detail-list">
-                <dt>Müşteri</dt><dd>@(order.CustomerName ?? "—")</dd>
-                <dt>Satış sorumlusu</dt><dd>@(Lookups.MemberName(order.OwnerId) is { Length: > 0 } owner ? owner : "—")</dd>
-                <dt>Tutar</dt>
+                <dt>@Texts.Get("orders.list.col.customer")</dt><dd>@(order.CustomerName ?? "—")</dd>
+                <dt>@Texts.Get("orders.detail.owner")</dt><dd>@(Lookups.MemberName(order.OwnerId) is { Length: > 0 } owner ? owner : "—")</dd>
+                <dt>@Texts.Get("orders.col.amount")</dt>
                 <dd>
-                    Net @OrderLabels.Money(order.NetTotal, order.Currency) · Vergi @OrderLabels.Money(order.TaxTotal, order.Currency) · Genel @OrderLabels.Money(order.GrossTotal, order.Currency)
-                    <small class="text-muted">Sipariş tutarıdır; tahsilat, fatura ya da gelir değildir.</small>
+                    @Texts.Get("orders.detail.totals", OrderLabels.Money(order.NetTotal, order.Currency), OrderLabels.Money(order.TaxTotal, order.Currency), OrderLabels.Money(order.GrossTotal, order.Currency))
+                    <small class="text-muted">@Texts.Get("orders.detail.amount-note")</small>
                 </dd>
-                <dt>Planlanan başlangıç / teslim</dt><dd>@OrderLabels.Date(order.PlannedStartDate) – @OrderLabels.Date(order.PlannedDeliveryDate)</dd>
-                <dt>Lokasyon</dt><dd>@(order.Location ?? "—")</dd>
-                <dt>Teslimat adresi</dt><dd>@(order.DeliveryAddress ?? "—")</dd>
-                <dt>Fatura adresi</dt><dd>@(order.BillingAddress ?? "—")</dd>
-                <dt>Dönüşüm</dt><dd>@(order.ConversionMode == "Full" ? "Teklifin tamamı" : "Kısmi dönüşüm")</dd>
+                <dt>@Texts.Get("orders.detail.planned")</dt><dd>@OrderLabels.Date(order.PlannedStartDate) – @OrderLabels.Date(order.PlannedDeliveryDate)</dd>
+                <dt>@Texts.Get("orders.header-field.location")</dt><dd>@(order.Location ?? "—")</dd>
+                <dt>@Texts.Get("orders.header-field.deliveryaddress")</dt><dd>@(order.DeliveryAddress ?? "—")</dd>
+                <dt>@Texts.Get("orders.detail.billing-address")</dt><dd>@(order.BillingAddress ?? "—")</dd>
+                <dt>@Texts.Get("orders.detail.conversion")</dt><dd>@Texts.Get(order.ConversionMode == "Full" ? "orders.detail.conversion-full" : "orders.detail.conversion-partial")</dd>
             </dl>
         </section>
 
         <section aria-labelledby="source-title">
-            <h2 id="source-title">Kaynak teklif ve müşteri kabulü</h2>
+            <h2 id="source-title">@Texts.Get("orders.detail.source")</h2>
             <dl class="detail-list">
-                <dt>Teklif</dt><dd><a href="crm/teklifler/@order.SourceQuoteId">@order.SourceQuoteNumber · V@(order.SourceQuoteRevisionNo)</a></dd>
+                <dt>@Texts.Get("orders.list.col.quote")</dt><dd><a href="crm/teklifler/@order.SourceQuoteId">@order.SourceQuoteNumber · V@(order.SourceQuoteRevisionNo)</a></dd>
                 @if (order.SourceOpportunityId is { } opportunity)
                 {
-                    <dt>Fırsat</dt><dd><a href="crm/firsatlar/@opportunity">Fırsatı aç</a></dd>
+                    <dt>@Texts.Get("orders.detail.opportunity")</dt><dd><a href="crm/firsatlar/@opportunity">@Texts.Get("orders.detail.opportunity-open")</a></dd>
                 }
-                <dt>Sözleşme</dt><dd>@(order.ContractNumber ?? "Bağlı sözleşme yok")</dd>
-                <dt>Müşteri kabulü</dt>
+                <dt>@Texts.Get("orders.list.col.contract")</dt><dd>@(order.ContractNumber ?? Texts.Get("orders.detail.no-contract"))</dd>
+                <dt>@Texts.Get("orders.detail.acceptance")</dt>
                 <dd>
                     @OrderLabels.Label(OrderLabels.AcceptanceMethods, order.AcceptanceMethod) · @CrmLabels.Time(order.AcceptedAt)
                     @if (!string.IsNullOrEmpty(order.AcceptedByName)) { <span> · @order.AcceptedByName</span> }
-                    else if (order.AcceptedByUserId is { } user) { <span> · kaydeden: @Lookups.MemberName(user)</span> }
+                    else if (order.AcceptedByUserId is { } user) { <span> @Texts.Get("orders.detail.recorded-by", Lookups.MemberName(user))</span> }
                 </dd>
                 @if (order.AcceptanceMethod == "Manual")
                 {
-                    <dt>Kanıt</dt><dd class="text-muted">Kabul satış kullanıcısı tarafından elle kaydedildi; müşterinin imzalı belge kanıtı bu kayıtta yoktur.</dd>
+                    <dt>@Texts.Get("orders.detail.evidence")</dt><dd class="text-muted">@Texts.Get("orders.detail.evidence-note")</dd>
                 }
                 @if (order.SourceQuoteSha256 is { Length: > 12 } sha)
                 {
-                    <dt>Belge özeti</dt><dd><code title="@sha">@sha[..12]…</code></dd>
+                    <dt>@Texts.Get("orders.detail.digest")</dt><dd><code title="@sha">@sha[..12]…</code></dd>
                 }
-                <dt>Teklif geçerliliği</dt><dd>@(order.QuoteValidUntil is { } until ? CrmLabels.Time(until) : "—") <small class="text-muted">Kabul anında denetlendi.</small></dd>
-                @if (!string.IsNullOrEmpty(order.AcceptanceNote)) { <dt>Kabul notu</dt><dd>@order.AcceptanceNote</dd> }
+                <dt>@Texts.Get("orders.detail.quote-valid")</dt><dd>@(order.QuoteValidUntil is { } until ? CrmLabels.Time(until) : "—") <small class="text-muted">@Texts.Get("orders.detail.quote-valid-note")</small></dd>
+                @if (!string.IsNullOrEmpty(order.AcceptanceNote)) { <dt>@Texts.Get("orders.detail.acceptance-note")</dt><dd>@order.AcceptanceNote</dd> }
             </dl>
         </section>
 
         <section aria-labelledby="lines-title">
-            <h2 id="lines-title">Kalemler</h2>
+            <h2 id="lines-title">@Texts.Get("orders.detail.lines")</h2>
             @if (lines is null)
             {
                 <LoadingState Kind="LoadingKind.Table" />
             }
             else if (lines.Count == 0)
             {
-                <EmptyState Title="Bu siparişte kalem yok." />
+                <EmptyState Title="@Texts.Get("orders.detail.lines-empty")" />
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Sipariş kalemleri</caption>
+                    <caption class="visually-hidden">@Texts.Get("orders.detail.lines-caption")</caption>
                     <thead><tr>
-                        <th scope="col">Kalem</th><th scope="col">Tür</th><th scope="col" class="text-end">Miktar</th><th scope="col" class="text-end">Birim fiyat</th>
-                        <th scope="col" class="text-end">Net</th><th scope="col" class="text-end">Vergi</th><th scope="col" class="text-end">Toplam</th>
-                        <th scope="col" class="text-end">Teslim edilen</th>
+                        <th scope="col">@Texts.Get("orders.change.col.line")</th><th scope="col">@Texts.Get("orders.jobs.col.kind")</th><th scope="col" class="text-end">@Texts.Get("orders.detail.col.quantity")</th><th scope="col" class="text-end">@Texts.Get("orders.detail.col.unit-price")</th>
+                        <th scope="col" class="text-end">@Texts.Get("orders.detail.col.net")</th><th scope="col" class="text-end">@Texts.Get("orders.detail.col.tax")</th><th scope="col" class="text-end">@Texts.Get("orders.detail.col.total")</th>
+                        <th scope="col" class="text-end">@Texts.Get("orders.change.col.delivered")</th>
                     </tr></thead>
                     <tbody>
                         @foreach (var line in lines)
                         {
                             <tr>
-                                <td data-label="Kalem" class="primary">
+                                <td data-label="@Texts.Get("orders.change.col.line")" class="primary">
                                     @line.Name
                                     @if (line.ProductCode is not null) { <small class="text-muted">@line.ProductCode</small> }
-                                    @if (line.IsCancelled) { <span class="badge stage-cancelled">İptal</span> }
+                                    @if (line.IsCancelled) { <span class="badge stage-cancelled">@Texts.Get("orders.detail.cancelled-badge")</span> }
                                 </td>
-                                <td data-label="Tür">@OrderLabels.Label(OrderLabels.LineKinds, line.Kind)</td>
-                                <td data-label="Miktar" class="text-end">
+                                <td data-label="@Texts.Get("orders.jobs.col.kind")">@OrderLabels.Label(OrderLabels.LineKinds, line.Kind)</td>
+                                <td data-label="@Texts.Get("orders.detail.col.quantity")" class="text-end">
                                     @OrderLabels.Quantity(line.Quantity, line.UnitName)
-                                    @if (line.AcceptedQuantity != line.Quantity) { <small class="text-muted d-block">Teklifte @OrderLabels.Quantity(line.AcceptedQuantity, line.UnitName)</small> }
-                                    @if (line.CancelledQuantity > 0) { <small class="text-muted d-block">İptal/azaltılan @OrderLabels.Quantity(line.CancelledQuantity, line.UnitName) · etkin @OrderLabels.Quantity(line.Quantity - line.CancelledQuantity, line.UnitName)</small> }
+                                    @if (line.AcceptedQuantity != line.Quantity) { <small class="text-muted d-block">@Texts.Get("orders.detail.in-quote", OrderLabels.Quantity(line.AcceptedQuantity, line.UnitName))</small> }
+                                    @if (line.CancelledQuantity > 0) { <small class="text-muted d-block">@Texts.Get("orders.detail.reduced", OrderLabels.Quantity(line.CancelledQuantity, line.UnitName), OrderLabels.Quantity(line.Quantity - line.CancelledQuantity, line.UnitName))</small> }
                                 </td>
-                                <td data-label="Birim fiyat" class="text-end">@OrderLabels.Money(line.UnitPrice, order.Currency)</td>
-                                <td data-label="Net" class="text-end">@OrderLabels.Money(line.Net, order.Currency)</td>
-                                <td data-label="Vergi" class="text-end">@OrderLabels.Money(line.Tax, order.Currency)</td>
-                                <td data-label="Toplam" class="text-end">@OrderLabels.Money(line.Gross, order.Currency)</td>
-                                <td data-label="Teslim edilen" class="text-end">@(line.Kind == "Product" ? OrderLabels.Quantity(line.DeliveredQuantity, line.UnitName) : "—")</td>
+                                <td data-label="@Texts.Get("orders.detail.col.unit-price")" class="text-end">@OrderLabels.Money(line.UnitPrice, order.Currency)</td>
+                                <td data-label="@Texts.Get("orders.detail.col.net")" class="text-end">@OrderLabels.Money(line.Net, order.Currency)</td>
+                                <td data-label="@Texts.Get("orders.detail.col.tax")" class="text-end">@OrderLabels.Money(line.Tax, order.Currency)</td>
+                                <td data-label="@Texts.Get("orders.detail.col.total")" class="text-end">@OrderLabels.Money(line.Gross, order.Currency)</td>
+                                <td data-label="@Texts.Get("orders.change.col.delivered")" class="text-end">@(line.Kind == "Product" ? OrderLabels.Quantity(line.DeliveredQuantity, line.UnitName) : "—")</td>
                             </tr>
                         }
                     </tbody>
@@ -128,120 +128,120 @@
         </section>
 
         <section aria-labelledby="terms-title">
-            <h2 id="terms-title">Ticari koşullar ve notlar</h2>
+            <h2 id="terms-title">@Texts.Get("orders.detail.terms")</h2>
             @if (!editing)
             {
                 <dl class="detail-list">
-                    <dt>Ödeme koşulları</dt><dd>@(order.PaymentTerms ?? "—")</dd>
-                    <dt>Teslimat koşulları</dt><dd>@(order.DeliveryTerms ?? "—")</dd>
-                    <dt>Ticari koşullar</dt><dd>@(order.CommercialTerms ?? "—")</dd>
-                    <dt>Müşteriye verilen taahhütler</dt><dd>@(order.Commitments ?? "—")</dd>
-                    <dt>Operasyon notları</dt><dd>@(order.OperationsNotes ?? "—")</dd>
+                    <dt>@Texts.Get("orders.header-field.paymentterms")</dt><dd>@(order.PaymentTerms ?? "—")</dd>
+                    <dt>@Texts.Get("orders.header-field.deliveryterms")</dt><dd>@(order.DeliveryTerms ?? "—")</dd>
+                    <dt>@Texts.Get("orders.header-field.commercialterms")</dt><dd>@(order.CommercialTerms ?? "—")</dd>
+                    <dt>@Texts.Get("orders.header-field.commitments")</dt><dd>@(order.Commitments ?? "—")</dd>
+                    <dt>@Texts.Get("orders.header-field.operationsnotes")</dt><dd>@(order.OperationsNotes ?? "—")</dd>
                 </dl>
                 @if (CanEdit)
                 {
-                    <button type="button" class="btn btn-outline-primary" @onclick="StartEdit">Planlama ve koşulları düzenle</button>
+                    <button type="button" class="btn btn-outline-primary" @onclick="StartEdit">@Texts.Get("orders.detail.edit")</button>
                 }
                 else if (Session.Can(OrdersAccess.OrdersWrite) && order.Status != "Draft")
                 {
-                    <p class="text-muted">Taslak dışındaki siparişin ticari alanları yerinde değiştirilemez.</p>
+                    <p class="text-muted">@Texts.Get("orders.detail.edit-locked")</p>
                 }
             }
             else
             {
                 <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
                     <fieldset disabled="@busy">
-                        <legend class="visually-hidden">Taslak sipariş düzenleme</legend>
-                        <FormTabs Title="Ticari koşullar" Label="Sipariş koşulları formu bölümleri">
+                        <legend class="visually-hidden">@Texts.Get("orders.detail.edit-legend")</legend>
+                        <FormTabs Title="@Texts.Get("orders.detail.terms-short")" Label="@Texts.Get("orders.detail.form-sections")">
                         <div class="form-grid">
                             <div class="span-12">
-                                <label class="form-label" for="e-title">Başlık</label>
+                                <label class="form-label" for="e-title">@Texts.Get("orders.detail.field.title")</label>
                                 <input id="e-title" class="form-control" maxlength="200" @bind="form.Title" />
                                 <FieldError Field="title" Errors="errors" />
                             </div>
                             <div class="span-6">
-                                <label class="form-label" for="e-start">Planlanan başlangıç</label>
+                                <label class="form-label" for="e-start">@Texts.Get("orders.jobs.field.start")</label>
                                 <input id="e-start" type="date" class="form-control" @bind="form.PlannedStartDate" />
                                 <FieldError Field="plannedStartDate" Errors="errors" />
                             </div>
                             <div class="span-6">
-                                <label class="form-label" for="e-delivery">Planlanan teslim</label>
+                                <label class="form-label" for="e-delivery">@Texts.Get("orders.header-field.planneddeliverydate")</label>
                                 <input id="e-delivery" type="date" class="form-control" @bind="form.PlannedDeliveryDate" />
                                 <FieldError Field="plannedDeliveryDate" Errors="errors" />
                             </div>
                             <div class="span-6">
-                                <label class="form-label" for="e-owner">Satış sorumlusu</label>
+                                <label class="form-label" for="e-owner">@Texts.Get("orders.detail.owner")</label>
                                 <LookupPicker Id="e-owner" LookupKey="orders.order.owner" @bind-Value="form.OwnerId" Placeholder="—" />
                                 <FieldError Field="ownerId" Errors="errors" />
                             </div>
                             <div class="span-6">
-                                <label class="form-label" for="e-location">Lokasyon</label>
+                                <label class="form-label" for="e-location">@Texts.Get("orders.header-field.location")</label>
                                 <input id="e-location" class="form-control" maxlength="1000" @bind="form.Location" />
                             </div>
                             <div class="span-12">
-                                <label class="form-label" for="e-address">Teslimat adresi</label>
+                                <label class="form-label" for="e-address">@Texts.Get("orders.header-field.deliveryaddress")</label>
                                 <textarea id="e-address" class="form-control" rows="2" maxlength="1000" @bind="form.DeliveryAddress"></textarea>
                             </div>
                             <div class="span-12">
-                                <label class="form-label" for="e-payment">Ödeme koşulları</label>
+                                <label class="form-label" for="e-payment">@Texts.Get("orders.header-field.paymentterms")</label>
                                 <textarea id="e-payment" class="form-control" rows="2" maxlength="4000" @bind="form.PaymentTerms"></textarea>
                             </div>
                             <div class="span-12">
-                                <label class="form-label" for="e-delivery-terms">Teslimat koşulları</label>
+                                <label class="form-label" for="e-delivery-terms">@Texts.Get("orders.header-field.deliveryterms")</label>
                                 <textarea id="e-delivery-terms" class="form-control" rows="2" maxlength="4000" @bind="form.DeliveryTerms"></textarea>
                             </div>
                             <div class="span-12">
-                                <label class="form-label" for="e-commercial">Ticari koşullar</label>
+                                <label class="form-label" for="e-commercial">@Texts.Get("orders.header-field.commercialterms")</label>
                                 <textarea id="e-commercial" class="form-control" rows="2" maxlength="4000" @bind="form.CommercialTerms"></textarea>
                             </div>
                             <div class="span-12">
-                                <label class="form-label" for="e-commitments">Müşteriye verilen taahhütler</label>
+                                <label class="form-label" for="e-commitments">@Texts.Get("orders.header-field.commitments")</label>
                                 <textarea id="e-commitments" class="form-control" rows="2" maxlength="4000" @bind="form.Commitments"></textarea>
                             </div>
                             <div class="span-12">
-                                <label class="form-label" for="e-notes">Operasyon notları</label>
+                                <label class="form-label" for="e-notes">@Texts.Get("orders.header-field.operationsnotes")</label>
                                 <textarea id="e-notes" class="form-control" rows="2" maxlength="4000" @bind="form.OperationsNotes"></textarea>
                             </div>
                         </div>
                         </FormTabs>
                     </fieldset>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => editing = false">Vazgeç</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => editing = false">@Texts.Get("common.dismiss")</button>
                     </div>
                 </form>
             }
         </section>
 
         <section aria-labelledby="handover-title">
-            <h2 id="handover-title">Satış devri</h2>
+            <h2 id="handover-title">@Texts.Get("orders.detail.handover")</h2>
             <p>
                 <span class="badge stage-@OrderLabels.HandoverBadge(order.HandoverStatus)">@OrderLabels.Label(OrderLabels.Handovers, order.HandoverStatus)</span>
-                <span class="text-muted"> Satıştan operasyona yapılandırılmış devir: kapsam, çıktılar, taahhütler, kontrol listesi ve kabul kriterleri.</span>
+                <span class="text-muted">@Texts.Get("orders.detail.handover-note")</span>
             </p>
-            <a class="btn btn-outline-primary" href="siparisler/@order.Id/devir">@(order.HandoverStatus == "NotStarted" ? "Devri hazırla" : "Devir ekranını aç")</a>
+            <a class="btn btn-outline-primary" href="siparisler/@order.Id/devir">@Texts.Get(order.HandoverStatus == "NotStarted" ? "orders.detail.handover-prepare" : "orders.detail.handover-open")</a>
         </section>
 
         <section aria-labelledby="fulfillment-title">
-            <h2 id="fulfillment-title">Teslimat ve hizmet başlangıcı</h2>
+            <h2 id="fulfillment-title">@Texts.Get("orders.detail.fulfillment")</h2>
             <p>
                 <span class="badge stage-@OrderLabels.FulfillmentBadge(order.FulfillmentStatus)">@OrderLabels.Label(OrderLabels.Fulfillments, order.FulfillmentStatus)</span>
-                <span class="text-muted"> Ürün kalemleri kısmi teslimatla, hizmet kalemleri başlangıç kaydıyla ayrı izlenir; teslim kanıtı ve müşteri onayı kaydedilir.</span>
+                <span class="text-muted">@Texts.Get("orders.detail.fulfillment-note")</span>
             </p>
             @if (fulfillment is not null)
             {
                 <ul class="small">
                     @if (fulfillment.Products.Count > 0)
                     {
-                        <li>Ürün: @OrderLabels.Quantity(fulfillment.Products.Sum(p => p.Delivered), null) / @OrderLabels.Quantity(fulfillment.Products.Sum(p => p.Effective), null) adet teslim edildi · açık teslimat @fulfillment.Deliveries.Count(d => d.Status == "Planned")@(fulfillment.Deliveries.Any(d => d.IsOverdue) ? " (gecikmiş var)" : null)</li>
+                        <li>@Texts.Get("orders.detail.fulfillment-products", OrderLabels.Quantity(fulfillment.Products.Sum(p => p.Delivered), null), OrderLabels.Quantity(fulfillment.Products.Sum(p => p.Effective), null), fulfillment.Deliveries.Count(d => d.Status == "Planned"), fulfillment.Deliveries.Any(d => d.IsOverdue) ? Texts.Get("orders.detail.fulfillment-overdue") : string.Empty)</li>
                     }
                     @if (fulfillment.Services.Count > 0)
                     {
-                        <li>Hizmet: @fulfillment.Services.Count(s => s.Start?.Status == "Completed") tamamlandı · @fulfillment.Services.Count(s => s.Start?.Status == "Started") devam ediyor · @fulfillment.Services.Count(s => s.Start is null or { Status: "Planned" }) başlamadı</li>
+                        <li>@Texts.Get("orders.detail.fulfillment-services", fulfillment.Services.Count(s => s.Start?.Status == "Completed"), fulfillment.Services.Count(s => s.Start?.Status == "Started"), fulfillment.Services.Count(s => s.Start is null or { Status: "Planned" }))</li>
                     }
                 </ul>
             }
-            <a class="btn btn-outline-primary" href="siparisler/@order.Id/teslimat">Teslimat ekranını aç</a>
+            <a class="btn btn-outline-primary" href="siparisler/@order.Id/teslimat">@Texts.Get("orders.detail.fulfillment-open")</a>
         </section>
 
         <OrderJobsPanel Order="order" Lines="lines ?? []" />
@@ -251,39 +251,39 @@
         @if (Session.IsModuleEnabled(CrmAccess.ModuleKey) && Session.Can(CrmAccess.ActivitiesRead))
         {
             <section aria-labelledby="activities-title">
-                <h2 id="activities-title">Aktiviteler</h2>
+                <h2 id="activities-title">@Texts.Get("orders.detail.activities")</h2>
                 @if (activities is null)
                 {
                     <LoadingState />
                 }
                 else if (activities.Count == 0)
                 {
-                    <p class="text-muted">Bu siparişe bağlı aktivite yok. Devir takibi, eksik bilgi ve gecikme görevleri burada görünür.</p>
+                    <p class="text-muted">@Texts.Get("orders.detail.activities-empty")</p>
                 }
                 else
                 {
                     <ul>
                         @foreach (var a in activities)
                         {
-                            <li><strong>@a.Subject</strong> <span class="text-muted">· @(a.Status == "Completed" ? "tamamlandı" : a.DueAt is { } due ? "son tarih " + CrmLabels.Time(due) : "açık")@(a.OwnerId is null ? null : " · " + Lookups.MemberName(a.OwnerId))</span></li>
+                            <li><strong>@a.Subject</strong> <span class="text-muted">· @(a.Status == "Completed" ? Texts.Get("orders.detail.activity-done") : a.DueAt is { } due ? Texts.Get("orders.detail.activity-due", CrmLabels.Time(due)) : Texts.Get("orders.detail.activity-open"))@(a.OwnerId is null ? null : " · " + Lookups.MemberName(a.OwnerId))</span></li>
                         }
                     </ul>
-                    <a href="crm/aktiviteler">Aktivite listesi</a>
+                    <a href="crm/aktiviteler">@Texts.Get("orders.detail.activities-list")</a>
                 }
             </section>
         }
 
-        <RelatedTickets Title="İlişkili destek talepleri" LinkedEntityKey="orders.order" LinkedRecordId="order.Id" />
+        <RelatedTickets Title="@Texts.Get("orders.detail.tickets")" LinkedEntityKey="orders.order" LinkedRecordId="order.Id" />
 
         <section aria-labelledby="history-title">
-            <h2 id="history-title">İşlem geçmişi</h2>
+            <h2 id="history-title">@Texts.Get("orders.detail.history")</h2>
             @if (history is null)
             {
                 <LoadingState />
             }
             else if (history.Count == 0)
             {
-                <p class="text-muted">Kayıt yok.</p>
+                <p class="text-muted">@Texts.Get("common.noRecords")</p>
             }
             else
             {
@@ -292,7 +292,7 @@
                     {
                         <li>
                             <strong>@OrderLabels.History(item.Kind)</strong>
-                            <span class="text-muted"> · @CrmLabels.Time(item.At) · @(Lookups.MemberName(item.ActorId) is { Length: > 0 } actor ? actor : "sistem")</span>
+                            <span class="text-muted"> · @CrmLabels.Time(item.At) · @(Lookups.MemberName(item.ActorId) is { Length: > 0 } actor ? actor : Texts.Get("orders.change.system"))</span>
                             @if (!string.IsNullOrEmpty(item.Reason)) { <div>@item.Reason</div> }
                         </li>
                     }
@@ -411,7 +411,7 @@
         order = result.Value;
         editing = false;
         noticeFailed = false;
-        notice = "Sipariş kaydedildi.";
+        notice = Texts.Get("orders.detail.saved");
         await LoadAsync();
     }
 }

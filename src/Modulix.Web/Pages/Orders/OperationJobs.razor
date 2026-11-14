@@ -3,30 +3,30 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Operasyon işleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("orders.jobs.title") · Modulix</PageTitle>
 
 <AuthGate Module="@OrdersAccess.ModuleKey" Permission="@OrdersAccess.OrdersRead">
     <div class="page-header">
         <div>
-            <h1>Operasyon işleri</h1>
-            <p class="text-muted mb-0">Kabul edilen satış devirlerinden üretilen ve elle açılan işler. Atanacak sorumlu ya da ekip yoksa iş "Atama bekliyor" durumunda burada görünür.</p>
+            <h1>@Texts.Get("orders.jobs.title")</h1>
+            <p class="text-muted mb-0">@Texts.Get("orders.opjobs.intro")</p>
         </div>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="siparisler">Siparişler</a>
+            <a class="btn btn-outline-secondary" href="siparisler">@Texts.Get("orders.list.title")</a>
         </div>
     </div>
 
     @if (message is not null)
     {
-        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">@Texts.Get("orders.list.retry")</button></div>
     }
 
-    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="ChooseViewAsync" Label="İş görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="ChooseViewAsync" Label="@Texts.Get("orders.opjobs.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <label class="visually-hidden" for="job-search">İş ara</label>
-            <input id="job-search" class="form-control" type="search" placeholder="İş numarası, başlık ya da ekip ara" @bind="search" />
+            <label class="visually-hidden" for="job-search">@Texts.Get("orders.opjobs.search-label")</label>
+            <input id="job-search" class="form-control" type="search" placeholder="@Texts.Get("orders.opjobs.search-placeholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
@@ -35,14 +35,14 @@
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <label class="visually-hidden" for="job-status">İş durumu</label>
+            <label class="visually-hidden" for="job-status">@Texts.Get("orders.opjobs.status-filter")</label>
             <select id="job-status" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm durumlar</option>
+                <option value="">@Texts.Get("common.allStatuses")</option>
                 @foreach (var s in OrderLabels.JobStatuses) { <option value="@s.Key">@s.Label</option> }
             </select>
-            <label class="visually-hidden" for="job-kind">İş türü</label>
+            <label class="visually-hidden" for="job-kind">@Texts.Get("orders.opjobs.kind-filter")</label>
             <select id="job-kind" class="form-select form-select-sm filter-select" @bind="kind" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm türler</option>
+                <option value="">@Texts.Get("orders.opjobs.all-kinds")</option>
                 @foreach (var k in OrderLabels.JobKinds) { <option value="@k.Key">@k.Label</option> }
             </select>
         </div>
@@ -57,20 +57,20 @@
     }
     else if (page is not null && page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu süzgece uyan operasyon işi yok. İşler satış devri operasyonca kabul edilince oluşur.</p>
+        <p class="text-muted" role="status">@Texts.Get("orders.opjobs.empty")</p>
     }
     else if (page is not null)
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) iş listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("orders.opjobs.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Operasyon işi kuyruğu</caption>
+            <caption class="visually-hidden">@Texts.Get("orders.opjobs.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -82,9 +82,9 @@
                             @Cell(column, j)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{j.Number} eylemleri")">
-                                <a class="view-menu-item" role="menuitem" href="siparisler/isler/@j.Id"><AppIcon Name="eye" Size="16" /> <span>İşi aç</span></a>
-                                <a class="view-menu-item" role="menuitem" href="siparisler/@j.OrderId"><AppIcon Name="file-text" Size="16" /> <span>Siparişi aç</span></a>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", j.Number)">
+                                <a class="view-menu-item" role="menuitem" href="siparisler/isler/@j.Id"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("orders.opjobs.open-job")</span></a>
+                                <a class="view-menu-item" role="menuitem" href="siparisler/@j.OrderId"><AppIcon Name="file-text" Size="16" /> <span>@Texts.Get("orders.opjobs.open-order")</span></a>
                             </RowMenu>
                         </td>
                     </tr>
@@ -105,21 +105,22 @@
     private const string AllViews = "all";
 
     /// <summary>Hızlı görünümler; her biri sunucudaki süzgeçlerden birine karşılık gelir.</summary>
-    private static readonly (string Key, string Label, string Icon)[] Presets =
+    private static (string Key, string Label, string Icon)[] Presets =>
     [
-        ("mine", "Benim işlerim", "star"), ("unassigned", "Atanmamış", "user"), ("planned", "Planlanan", "calendar"), ("progress", "Devam eden", "activity"), ("overdue", "Geciken", "clock"),
+        ("mine", Texts.Get("orders.opjobs.view.mine"), "star"), ("unassigned", Texts.Get("orders.opjobs.view.unassigned"), "user"), ("planned", Texts.Get("orders.opjobs.view.planned"), "calendar"),
+        ("progress", Texts.Get("orders.opjobs.view.progress"), "activity"), ("overdue", Texts.Get("orders.opjobs.view.overdue"), "clock"),
     ];
 
     // Sıralama sunucudaki sort anahtarlarıdır (JobSort); varsayılan sıra en yeni önce.
-    private static readonly GridColumnDef[] Columns =
+    private static GridColumnDef[] Columns =>
     [
-        new("job", "İş", "clipboard-list", "number", "-number", Locked: true),
-        new("kind", "Tür", "tag"),
-        new("status", "Durum", "activity"),
-        new("responsible", "Sorumlu / ekip", "user"),
-        new("planned", "Planlanan", "calendar", "plannedEnd", "-plannedEnd"),
-        new("priority", "Öncelik", "alert-circle"),
-        new("location", "Konum", "map-pin", DefaultVisible: false),
+        new("job", Texts.Get("orders.jobs.col.job"), "clipboard-list", "number", "-number", Locked: true),
+        new("kind", Texts.Get("orders.jobs.col.kind"), "tag"),
+        new("status", Texts.Get("common.field.status"), "activity"),
+        new("responsible", Texts.Get("orders.jobs.col.responsible"), "user"),
+        new("planned", Texts.Get("orders.jobs.col.planned"), "calendar", "plannedEnd", "-plannedEnd"),
+        new("priority", Texts.Get("orders.opjobs.col.priority"), "alert-circle"),
+        new("location", Texts.Get("orders.list.col.location"), "map-pin", DefaultVisible: false),
     ];
 
     /// <summary>Özet panosundan gelen bağlantılar: <c>?gorunum=unassigned</c>, <c>?gorunum=overdue</c>.</summary>
@@ -153,7 +154,7 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm işler", Icon: "clipboard-list"),
+        new(AllViews, Texts.Get("orders.opjobs.view.all"), Icon: "clipboard-list"),
         .. Presets.Select(p => new ViewOption(p.Key, p.Label, Icon: p.Icon)),
         .. views.Options,
     ];
@@ -255,17 +256,17 @@
     {
         "job" => @<text>
             <a href="siparisler/isler/@j.Id">@j.Title</a>
-            <small class="text-muted">@j.Number · <a href="siparisler/@j.OrderId">siparişi aç</a></small>
+            <small class="text-muted">@j.Number · <a href="siparisler/@j.OrderId">@Texts.Get("orders.opjobs.open-order-lower")</a></small>
         </text>,
         "kind" => @<text>@OrderLabels.Label(OrderLabels.JobKinds, j.Kind)</text>,
         "status" => @<text>
             <span class="badge stage-@OrderLabels.JobBadge(j.Status)">@OrderLabels.Label(OrderLabels.JobStatuses, j.Status)</span>
-            @if (IsOverdue(j)) { <span class="badge stage-lost">Gecikti</span> }
+            @if (IsOverdue(j)) { <span class="badge stage-lost">@Texts.Get("orders.fulfillment-page.overdue")</span> }
         </text>,
         "responsible" => @<text>
             @(Lookups.MemberName(j.ResponsibleUserId) is { Length: > 0 } who ? who : null)
             @if (!string.IsNullOrEmpty(j.TeamName)) { <small class="text-muted d-block">@j.TeamName</small> }
-            @if (j.ResponsibleUserId is null && string.IsNullOrEmpty(j.TeamName)) { <span class="text-muted">Atanmadı</span> }
+            @if (j.ResponsibleUserId is null && string.IsNullOrEmpty(j.TeamName)) { <span class="text-muted">@Texts.Get("orders.jobs.unassigned")</span> }
         </text>,
         "planned" => @<text>@OrderLabels.Date(j.PlannedStartDate) – @OrderLabels.Date(j.PlannedEndDate)</text>,
         "priority" => @<text>@OrderLabels.Label(OrderLabels.Priorities, j.Priority)</text>,
