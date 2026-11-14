@@ -4,6 +4,7 @@ using Modulix.Api.Audit;
 using Modulix.Api.Imports;
 using Modulix.Api.Approvals;
 using Modulix.Api.Notifications;
+using Modulix.Api.Observability;
 using Modulix.Api.Automation;
 using Modulix.Api.Reports;
 using Modulix.Api.Auth;
@@ -64,6 +65,9 @@ if (args.Contains("migrate", StringComparer.OrdinalIgnoreCase))
     Console.WriteLine("Migration'lar uygulandı.");
     return;
 }
+
+// Log satırlarında TraceId, tenant ve kullanıcı; OTLP adresi verilirse OpenTelemetry izleri ve metrikleri (A2).
+builder.AddModulixObservability();
 
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
@@ -240,6 +244,7 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseMiddleware<TenantContextMiddleware>();
 app.UseMiddleware<CompanyContextMiddleware>();
+app.UseMiddleware<Modulix.Api.Observability.RequestLogScopeMiddleware>();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
