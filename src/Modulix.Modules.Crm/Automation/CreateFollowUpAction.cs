@@ -52,7 +52,7 @@ internal sealed class CreateFollowUpAction(CrmFollowUpActivities followUps, IRec
         }
 
         var result = await followUps.CreateAsync(
-            new Core.Contracts.Activities.FollowUpRequest(
+            new Modulix.Modules.Crm.Contracts.Activities.FollowUpRequest(
                 subject.Trim(), Text(request.Parameters["description"]), due, assignee, target.EntityKey, target.Id, request.IdempotencyKey),
             cancellationToken);
         if (result.ActivityId is not { } activityId)

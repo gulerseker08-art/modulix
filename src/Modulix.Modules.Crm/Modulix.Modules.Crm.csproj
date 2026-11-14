@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Modulix.Core.Contracts\Modulix.Core.Contracts.csproj" />
+    <ProjectReference Include="..\Modulix.Modules.Crm.Contracts\Modulix.Modules.Crm.Contracts.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
