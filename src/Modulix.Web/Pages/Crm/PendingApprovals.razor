@@ -25,11 +25,11 @@
 
     @if (loading)
     {
-        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (Visible.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("crm.pending.empty")</p>
+        <EmptyState Title="@Texts.Get("crm.pending.empty")" />
     }
     else
     {

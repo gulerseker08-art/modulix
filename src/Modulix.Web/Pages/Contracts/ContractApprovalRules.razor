@@ -166,11 +166,11 @@
         <h2 id="rules-title">@Texts.Get("contracts.approvalRules.rules")</h2>
         @if (rules is null)
         {
-            <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (rules.Count == 0)
         {
-            <p class="text-muted">@Texts.Get("contracts.approvalRules.none")</p>
+            <EmptyState Title="@Texts.Get("contracts.approvalRules.none")" />
         }
         else
         {
@@ -199,11 +199,11 @@
         <h2 id="delegations-title">@Texts.Get("contracts.approvalRules.delegations")</h2>
         @if (delegations is null)
         {
-            <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (delegations.Count == 0)
         {
-            <p class="text-muted">@Texts.Get("contracts.approvalRules.noDelegations")</p>
+            <EmptyState Title="@Texts.Get("contracts.approvalRules.noDelegations")" />
         }
         else
         {

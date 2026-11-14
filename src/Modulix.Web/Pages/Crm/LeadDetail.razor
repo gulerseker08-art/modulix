@@ -30,7 +30,7 @@
     {
         @if (message is null)
         {
-            <p class="text-muted">@Texts.Get("common.loading")</p>
+            <LoadingState />
         }
     }
     else if (editing)
@@ -279,7 +279,7 @@
             }
             @if (activities is null)
             {
-                <p class="text-muted">@Texts.Get("common.loading")</p>
+                <LoadingState />
             }
             else if (activities.Count == 0)
             {

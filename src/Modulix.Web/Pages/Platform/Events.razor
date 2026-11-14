@@ -88,12 +88,12 @@
     {
         @if (message is null)
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Teslim yok.</p>
+        <EmptyState Title="Teslim yok." />
     }
     else
     {

@@ -11,7 +11,7 @@
 
     @if (!loaded)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
     else
     {
@@ -58,7 +58,7 @@
 
             @if (links.Count == 0)
             {
-                <p class="text-muted">@Texts.Get("crm.quoteShare.noLinks")</p>
+                <EmptyState Title="@Texts.Get("crm.quoteShare.noLinks")" />
             }
             else
             {

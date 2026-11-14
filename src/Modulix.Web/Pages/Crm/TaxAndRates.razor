@@ -74,11 +74,11 @@
 
         @if (taxes is null)
         {
-            <p class="text-muted">@Texts.Get("common.loading")</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (taxes.Count == 0)
         {
-            <p class="text-muted">@Texts.Get("crm.taxAndRates.noTaxes")</p>
+            <EmptyState Title="@Texts.Get("crm.taxAndRates.noTaxes")" />
         }
         else
         {
@@ -168,11 +168,11 @@
 
         @if (rates is null)
         {
-            <p class="text-muted">@Texts.Get("common.loading")</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (rates.Count == 0)
         {
-            <p class="text-muted">@Texts.Get("crm.taxAndRates.noRates")</p>
+            <EmptyState Title="@Texts.Get("crm.taxAndRates.noRates")" />
         }
         else
         {

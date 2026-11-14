@@ -99,7 +99,7 @@
 
     @if (expenses is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (expenses.Count == 0)
     {

@@ -8,7 +8,7 @@
     <Notice Text="@message" Failed="@failed" />
     @if (jobs is null)
     {
-        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
     else
     {

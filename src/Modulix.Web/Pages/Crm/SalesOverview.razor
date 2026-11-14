@@ -63,7 +63,7 @@
 
     @if (loading)
     {
-        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
 
     @if (error is not null)
@@ -190,7 +190,7 @@
                     }
                     @if (d.Rows.Count == 0)
                     {
-                        <p class="text-muted">@Texts.Get("crm.salesOverview.cardEmpty")</p>
+                        <EmptyState Title="@Texts.Get("crm.salesOverview.cardEmpty")" />
                     }
                     else
                     {
@@ -324,7 +324,7 @@
             <div class="section-header"><h2 id="so-overdue">@Texts.Get("crm.salesOverview.overdue", r.OverdueOpenCount)</h2></div>
             @if (r.Overdue.Count == 0)
             {
-                <p class="text-muted">@Texts.Get("crm.salesOverview.noOverdue")</p>
+                <EmptyState Title="@Texts.Get("crm.salesOverview.noOverdue")" />
             }
             else
             {

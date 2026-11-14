@@ -1,0 +1,37 @@
+@* Boş durum (docs/design-system/component-catalog.md → EmptyState): ikon + başlık + isteğe bağlı açıklama ve eylem.
+   Liste boşken tablo yerine çizilir; kart içindeki küçük listelerde Compact kullanılır. *@
+<div class="empty-state @(Compact ? "empty-state-compact" : null)">
+    <span class="empty-state-icon" aria-hidden="true"><AppIcon Name="@Icon" Size="@(Compact ? 18 : 24)" /></span>
+    <div class="empty-state-body">
+        <p class="empty-state-title">@(Title ?? Texts.Get("common.noRecords"))</p>
+        @if (Text is not null)
+        {
+            <p class="empty-state-text">@Text</p>
+        }
+    </div>
+    @if (ChildContent is not null)
+    {
+        <div class="empty-state-actions">@ChildContent</div>
+    }
+</div>
+
+@code {
+    /// <summary>Başlık; verilmezse "Kayıt yok.".</summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>Kullanıcıya ne yapabileceğini söyleyen tek cümle.</summary>
+    [Parameter]
+    public string? Text { get; set; }
+
+    [Parameter]
+    public string Icon { get; set; } = "inbox";
+
+    /// <summary>Kart ya da panel içinde: tek satır, küçük ikon.</summary>
+    [Parameter]
+    public bool Compact { get; set; }
+
+    /// <summary>Eylem düğmesi (ör. "Yeni …"); yetkisi olmayan kullanıcıya verilmez.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

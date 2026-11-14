@@ -1,0 +1,57 @@
+@* Yükleme iskeleti (docs/design-system/component-catalog.md → LoadingState): veri gelene kadar içeriğin biçimini gösterir.
+   Ekran okuyucuya yalnızca "Yükleniyor…" okunur; çizgiler süs sayılır. Kısa süren yüklemede titreme olmasın diye
+   gecikmeyle belirir (CSS). *@
+<div class="loading-state loading-@Kind.ToString().ToLowerInvariant()" role="status">
+    <span class="visually-hidden">@Texts.Get("common.loading")</span>
+    @switch (Kind)
+    {
+        case LoadingKind.Table:
+            <div class="skeleton-table" aria-hidden="true">
+                <div class="skeleton-row skeleton-head">
+                    @for (var c = 0; c < 4; c++)
+                    {
+                        <span class="skeleton skeleton-bar"></span>
+                    }
+                </div>
+                @for (var r = 0; r < Rows; r++)
+                {
+                    <div class="skeleton-row">
+                        @for (var c = 0; c < 4; c++)
+                        {
+                            <span class="skeleton skeleton-bar"></span>
+                        }
+                    </div>
+                }
+            </div>
+            break;
+        case LoadingKind.Cards:
+            <div class="skeleton-cards" aria-hidden="true">
+                @for (var r = 0; r < Rows; r++)
+                {
+                    <div class="skeleton-card">
+                        <span class="skeleton skeleton-bar"></span>
+                        <span class="skeleton skeleton-bar skeleton-tall"></span>
+                    </div>
+                }
+            </div>
+            break;
+        default:
+            <div class="skeleton-lines" aria-hidden="true">
+                @for (var r = 0; r < Rows; r++)
+                {
+                    <span class="skeleton skeleton-bar"></span>
+                }
+            </div>
+            break;
+    }
+</div>
+
+@code {
+    /// <summary>İskeletin biçimi: liste için <see cref="LoadingKind.Table"/>, özet kutuları için <see cref="LoadingKind.Cards"/>.</summary>
+    [Parameter]
+    public LoadingKind Kind { get; set; } = LoadingKind.Lines;
+
+    /// <summary>Satır (ya da kart) sayısı.</summary>
+    [Parameter]
+    public int Rows { get; set; } = 4;
+}

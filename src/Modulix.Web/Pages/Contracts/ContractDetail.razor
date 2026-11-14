@@ -18,7 +18,7 @@
     }
     else if (Id is not null && contract is null)
     {
-        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
     else
     {
@@ -320,7 +320,7 @@
                     }
                     @if (parties.Count == 0)
                     {
-                        <p class="text-muted">@Texts.Get("contracts.detail.noParties")</p>
+                        <EmptyState Title="@Texts.Get("contracts.detail.noParties")" />
                     }
                     else
                     {
@@ -430,7 +430,7 @@
                     }
                     @if (lines.Count == 0)
                     {
-                        <p class="text-muted">@Texts.Get("contracts.detail.noLines")</p>
+                        <EmptyState Title="@Texts.Get("contracts.detail.noLines")" />
                     }
                     else
                     {
@@ -523,7 +523,7 @@
                     <p class="text-muted">@(contract.EffectiveVersionNo is { } ev2 ? Texts.Get("contracts.detail.versionsIntroEffective", contract.CurrentVersionNo, ev2) : Texts.Get("contracts.detail.versionsIntro", contract.CurrentVersionNo))</p>
                     @if (versions.Count == 0)
                     {
-                        <p class="text-muted">@Texts.Get("contracts.detail.noVersions")</p>
+                        <EmptyState Title="@Texts.Get("contracts.detail.noVersions")" />
                     }
                     else
                     {
@@ -641,7 +641,7 @@
                     <RenderedDocumentView Preview="documentPreview" />
                     @if (documents.Count == 0)
                     {
-                        <p class="text-muted">@Texts.Get("contracts.detail.noDocuments")</p>
+                        <EmptyState Title="@Texts.Get("contracts.detail.noDocuments")" />
                     }
                     else
                     {

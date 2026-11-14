@@ -47,7 +47,7 @@
 
         @if (prefs is null && message is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (prefs is not null && prefs.Items.Count == 0)
         {
@@ -153,7 +153,7 @@
 
         @if (blocks is null && message is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (blocks is not null && blocks.Items.Count == 0)
         {
@@ -248,7 +248,7 @@
 
         @if (topics is null && message is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (topics is not null && topics.Count == 0)
         {
@@ -313,7 +313,7 @@
         </div>
         @if (topicPrefs is null && message is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (topicPrefs is not null && topicPrefs.Items.Count == 0)
         {

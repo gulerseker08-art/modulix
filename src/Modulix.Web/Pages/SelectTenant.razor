@@ -14,7 +14,7 @@
 
     @if (!Session.IsLoaded)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
     else if (Session.User is null)
     {
