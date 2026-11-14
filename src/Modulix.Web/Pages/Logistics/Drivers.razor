@@ -4,10 +4,10 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Sürücüler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.logistics.drivers") · Modulix</PageTitle>
 
 <AuthGate Module="@LogisticsAccess.ModuleKey" Permission="@LogisticsAccess.DriversRead">
-    <PageHeader Title="Sürücüler" Icon="user" Subtitle="@(page is null ? "Kadrolu ve taşeron sürücüleri, çalıştıkları taşıyıcıyı ve araçlarını yönetin." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.logistics.drivers")" Icon="user" Subtitle="@(page is null ? Texts.Get("logistics.drivers.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -20,22 +20,22 @@
         @if (selected is not null)
         {
             <CredentialsPanel OwnerEntityKey="@LogisticsAccess.DriverEntityKey" OwnerId="selected.Id" Category="@CredentialAccess.Driver" Lookups="Lookups"
-                              CanWrite="@Session.Can(LogisticsAccess.DriversWrite)" Title="Sürücü belgeleri"
-                              EmptyText="Bu sürücüye henüz belge eklenmedi (ehliyet, SRC, psikoteknik…)." />
+                              CanWrite="@Session.Can(LogisticsAccess.DriversWrite)" Title="@Texts.Get("nav.app.logistics.credentials")"
+                              EmptyText="@Texts.Get("logistics.drivers.credentials-empty")" />
         }
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Sürücü görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("logistics.drivers.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Sürücü ara" placeholder="Ad, soyad, telefon veya e-posta ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("logistics.drivers.search-label")" placeholder="@Texts.Get("logistics.drivers.search-placeholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(LogisticsAccess.DriversWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni sürücü</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("logistics.drivers.new")</button>
         }
     </div>
 
@@ -48,20 +48,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan sürücü yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("logistics.drivers.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) sürücü listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("logistics.drivers.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Sürücü listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("logistics.drivers.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -75,8 +75,8 @@
                         <td class="row-menu-cell">
                             @if (Session.Can(LogisticsAccess.DriversWrite))
                             {
-                                <RowMenu Label="@($"{NameOf(driver)} eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(driver)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <RowMenu Label="@Texts.Get("common.rowActionsOf", NameOf(driver))">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(driver)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 </RowMenu>
                             }
                         </td>
@@ -98,13 +98,13 @@
     private const string SubcontractedView = "subcontracted";
 
     // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (DriverRecordStore.SortKeys).
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("name", "Ad soyad", "user", "name", "-name", Locked: true),
-        new("driverType", "Tip", "briefcase", "driverType", "-driverType"),
-        new("carrier", "Taşıyıcı", "building"),
-        new("vehicle", "Varsayılan araç", "truck"),
-        new("status", "Durum", "tag", "status", "-status"),
+        new("name", Texts.Get("logistics.drivers.col.name"), "user", "name", "-name", Locked: true),
+        new("driverType", Texts.Get("logistics.drivers.col.type"), "briefcase", "driverType", "-driverType"),
+        new("carrier", Texts.Get("logistics.drivers.col.carrier"), "building"),
+        new("vehicle", Texts.Get("logistics.drivers.col.vehicle"), "truck"),
+        new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
     ];
 
     private readonly GridViewState grid = new("logistics.drivers", "name");
@@ -138,11 +138,11 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm sürücüler", Icon: "users"),
-        new(ActiveView, "Etkin", Icon: "check-circle"),
-        new(OnLeaveView, "İzinde", Icon: "calendar"),
-        new(SubcontractedView, "Taşeron", Icon: "briefcase"),
-        new(PassiveView, "Pasif", Icon: "clock"),
+        new(AllViews, Texts.Get("logistics.drivers.view.all"), Icon: "users"),
+        new(ActiveView, Texts.Get("logistics.drivers.view.active"), Icon: "check-circle"),
+        new(OnLeaveView, Texts.Get("logistics.drivers.view.on-leave"), Icon: "calendar"),
+        new(SubcontractedView, Texts.Get("logistics.drivers.view.subcontracted"), Icon: "briefcase"),
+        new(PassiveView, Texts.Get("logistics.drivers.view.passive"), Icon: "clock"),
         .. views.Options,
     ];
 

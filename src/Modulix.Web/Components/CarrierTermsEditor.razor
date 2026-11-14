@@ -9,7 +9,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Terms is null ? "Yeni taşıyıcı anlaşması" : "Taşıyıcı anlaşması")</h2>
+            <h2>@(Terms is null ? Texts.Get("logistics.terms-form.new") : Texts.Get("logistics.terms-form.record"))</h2>
             @if (Terms is not null)
             {
                 <p>@form.Title</p>
@@ -17,13 +17,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -38,32 +38,32 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Anlaşma özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("logistics.terms-form.summary-label")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true"><AppIcon Name="file-text" Size="24" /></span>
-                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Title) ? "Anlaşma adı" : form.Title)</strong>
-                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.AgreementNo) ? "Numarasız" : form.AgreementNo.ToUpperInvariant())</span>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Title) ? Texts.Get("logistics.terms-form.title-placeholder") : form.Title)</strong>
+                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.AgreementNo) ? Texts.Get("logistics.terms-form.no-number") : form.AgreementNo.ToUpperInvariant())</span>
                 </div>
-                <h3 class="summary-heading">Anlaşma özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("logistics.terms-form.summary-label")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Geçerlilik</dt><dd>@ValidityText</dd></div>
-                    <div><dt>Para birimi</dt><dd>@(string.IsNullOrWhiteSpace(form.Currency) ? "—" : form.Currency.ToUpperInvariant())</dd></div>
-                    <div><dt>Ödeme vadesi</dt><dd>@(form.PaymentTermDays is { } days ? $"{days} gün" : "—")</dd></div>
+                    <div><dt>@Texts.Get("logistics.terms.col.validity")</dt><dd>@ValidityText</dd></div>
+                    <div><dt>@Texts.Get("logistics.terms.col.currency")</dt><dd>@(string.IsNullOrWhiteSpace(form.Currency) ? "—" : form.Currency.ToUpperInvariant())</dd></div>
+                    <div><dt>@Texts.Get("logistics.terms.col.payment")</dt><dd>@(form.PaymentTermDays is { } days ? Texts.Get("logistics.terms.days", days) : "—")</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Anlaşma formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("logistics.terms-form.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
                         case "carrierPartyId":
                             <label class="@f.LabelClass()" for="terms-carrier">@f.Label</label>
-                            <LookupPicker Id="terms-carrier" LookupKey="@LogisticsAccess.TermsCarrierLookup" @bind-Value="form.CarrierPartyId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="Taşıyıcı firma seçin…" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
+                            <LookupPicker Id="terms-carrier" LookupKey="@LogisticsAccess.TermsCarrierLookup" @bind-Value="form.CarrierPartyId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="@Texts.Get("logistics.terms-form.carrier-placeholder")" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
                             <FieldError Field="carrierPartyId" Errors="errors" />
-                            <small class="text-muted">@(form.Id is null ? "Yalnızca \"Taşıyıcı\" rolündeki firmalar listelenir." : "Anlaşmanın taşıyıcısı değiştirilemez; başka taşıyıcı için yeni anlaşma açın.")</small>
+                            <small class="text-muted">@(form.Id is null ? Texts.Get("logistics.terms-form.carrier-hint") : Texts.Get("logistics.terms-form.carrier-locked"))</small>
                             break;
                         case "title":
                             <label class="@f.LabelClass()" for="terms-title">@f.Label</label>
@@ -88,7 +88,7 @@
                             <label class="@f.LabelClass()" for="terms-to">@f.Label</label>
                             <input id="terms-to" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ValidTo" />
                             <FieldError Field="validTo" Errors="errors" />
-                            <small class="text-muted">Boşsa süresizdir.</small>
+                            <small class="text-muted">@Texts.Get("logistics.terms-form.valid-to-hint")</small>
                             break;
                         case "currency":
                             <label class="@f.LabelClass()" for="terms-currency">@f.Label</label>
@@ -102,9 +102,9 @@
                             break;
                         case "rateNote":
                             <label class="@f.LabelClass()" for="terms-rate">@f.Label</label>
-                            <textarea id="terms-rate" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" placeholder="ör. İstanbul–Ankara komple TIR 18.000 TRY + KDV; bekleme günü 2.500 TRY" @bind="form.RateNote"></textarea>
+                            <textarea id="terms-rate" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" placeholder="@Texts.Get("logistics.terms-form.rate-placeholder")" @bind="form.RateNote"></textarea>
                             <FieldError Field="rateNote" Errors="errors" />
-                            <small class="text-muted">Tarife altyapısı gelene kadar ücret burada açıklama olarak tutulur.</small>
+                            <small class="text-muted">@Texts.Get("logistics.terms-form.rate-hint")</small>
                             break;
                         case "performanceNote":
                             <label class="@f.LabelClass()" for="terms-performance">@f.Label</label>
@@ -118,10 +118,10 @@
             <div class="form-actions">
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
-                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
             </div>
         </div>
     </div>
@@ -156,15 +156,15 @@
 
     private string ValidityText => (form.ValidFrom, form.ValidTo) switch
     {
-        ({ } f, { } t) => $"{FleetLabels.Date(f)} – {FleetLabels.Date(t)}",
-        ({ } f, null) => $"{FleetLabels.Date(f)} tarihinden itibaren",
+        ({ } f, { } t) => Texts.Get("logistics.validity.range", FleetLabels.Date(f), FleetLabels.Date(t)),
+        ({ } f, null) => Texts.Get("logistics.validity.since", FleetLabels.Date(f)),
         _ => "—",
     };
 
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir anlaşma verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>

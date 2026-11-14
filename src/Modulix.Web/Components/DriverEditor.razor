@@ -9,7 +9,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Driver is null ? "Yeni sürücü" : "Sürücü kartı")</h2>
+            <h2>@(Driver is null ? Texts.Get("logistics.driver-form.new") : Texts.Get("logistics.driver-form.card"))</h2>
             @if (Driver is not null)
             {
                 <p>@personName · @LogisticsLabels.DriverType(form.DriverType)</p>
@@ -17,13 +17,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -38,23 +38,23 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Sürücü özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("logistics.driver-form.summary-label")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true"><AppIcon Name="user" Size="24" /></span>
-                    <strong class="summary-name">@(SummaryName ?? "Sürücü")</strong>
+                    <strong class="summary-name">@(SummaryName ?? Texts.Get("logistics.driver-form.summary-name"))</strong>
                     <span class="summary-sub">@LogisticsLabels.DriverType(form.DriverType)</span>
                 </div>
-                <h3 class="summary-heading">Sürücü özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("logistics.driver-form.summary-label")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Telefon</dt><dd>@(string.IsNullOrWhiteSpace(SummaryPhone) ? "—" : SummaryPhone)</dd></div>
-                    <div><dt>Durum</dt><dd>@LogisticsLabels.Status(form.Status)</dd></div>
+                    <div><dt>@Texts.Get("common.field.phone")</dt><dd>@(string.IsNullOrWhiteSpace(SummaryPhone) ? "—" : SummaryPhone)</dd></div>
+                    <div><dt>@Texts.Get("common.field.status")</dt><dd>@LogisticsLabels.Status(form.Status)</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Sürücü formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("logistics.driver-form.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
@@ -63,7 +63,7 @@
                             {
                                 <span class="@f.LabelClass()">@f.Label</span>
                                 <p class="mb-0"><strong>@personName</strong></p>
-                                <small class="text-muted">Ad ve iletişim bilgisi kişi kaydındadır; sürücünün kişisi değiştirilemez.</small>
+                                <small class="text-muted">@Texts.Get("logistics.driver-form.person-locked")</small>
                             }
                             else
                             {
@@ -72,22 +72,22 @@
                                 {
                                     <div class="form-grid mt-2">
                                         <div class="span-6">
-                                            <label class="form-label required" for="driver-first">Ad</label>
+                                            <label class="form-label required" for="driver-first">@Texts.Get("common.field.name")</label>
                                             <input id="driver-first" class="form-control" maxlength="100" aria-required="true" @bind="form.FirstName" />
                                             <FieldError Field="firstName" Errors="personErrors" />
                                         </div>
                                         <div class="span-6">
-                                            <label class="form-label required" for="driver-last">Soyad</label>
+                                            <label class="form-label required" for="driver-last">@Texts.Get("logistics.driver-form.last-name")</label>
                                             <input id="driver-last" class="form-control" maxlength="100" aria-required="true" @bind="form.LastName" />
                                             <FieldError Field="lastName" Errors="personErrors" />
                                         </div>
                                         <div class="span-6">
-                                            <label class="form-label" for="driver-phone">Telefon</label>
+                                            <label class="form-label" for="driver-phone">@Texts.Get("common.field.phone")</label>
                                             <input id="driver-phone" class="form-control" type="tel" maxlength="50" @bind="form.Phone" />
                                             <FieldError Field="phone" Errors="personErrors" />
                                         </div>
                                         <div class="span-6">
-                                            <label class="form-label" for="driver-email">E-posta</label>
+                                            <label class="form-label" for="driver-email">@Texts.Get("common.field.email")</label>
                                             <input id="driver-email" class="form-control" type="email" maxlength="200" @bind="form.Email" />
                                             <FieldError Field="email" Errors="personErrors" />
                                         </div>
@@ -95,7 +95,7 @@
                                 }
                                 else
                                 {
-                                    <LookupPicker Id="driver-person" LookupKey="@LogisticsAccess.DriverPersonLookup" @bind-Value="form.PersonId" Required="true" Placeholder="Kayıtlı kişiyi seçin…" Invalid="@(errors?.ContainsKey("personId") == true)" />
+                                    <LookupPicker Id="driver-person" LookupKey="@LogisticsAccess.DriverPersonLookup" @bind-Value="form.PersonId" Required="true" Placeholder="@Texts.Get("logistics.driver-form.person-placeholder")" Invalid="@(errors?.ContainsKey("personId") == true)" />
                                 }
                                 <FieldError Field="personId" Errors="errors" />
                             }
@@ -103,18 +103,18 @@
                         case "status":
                             <label class="@f.LabelClass()" for="driver-status">@f.Label</label>
                             <select id="driver-status" class="form-select" @bind="form.Status">
-                                @foreach (var (key, label) in LogisticsAccess.Statuses)
+                                @foreach (var (key, label) in LogisticsLabels.Statuses)
                                 {
                                     <option value="@key">@label</option>
                                 }
                             </select>
                             <FieldError Field="status" Errors="errors" />
-                            <small class="text-muted">Sürücü silinmez; çalışmayan sürücüyü "Pasif" yapın.</small>
+                            <small class="text-muted">@Texts.Get("logistics.driver-form.status-hint")</small>
                             break;
                         case "driverType":
                             <label class="@f.LabelClass()" for="driver-type">@f.Label</label>
                             <select id="driver-type" class="form-select" @bind="form.DriverType" @bind:after="TypeChanged">
-                                @foreach (var (key, label) in LogisticsAccess.DriverTypes)
+                                @foreach (var (key, label) in LogisticsLabels.DriverTypes)
                                 {
                                     <option value="@key">@label</option>
                                 }
@@ -123,15 +123,15 @@
                             break;
                         case "carrierPartyId":
                             <label class="@f.LabelClass()" for="driver-carrier">@f.Label@(IsSubcontracted ? " *" : "")</label>
-                            <LookupPicker Id="driver-carrier" LookupKey="@LogisticsAccess.DriverCarrierLookup" @bind-Value="form.CarrierPartyId" Required="IsSubcontracted" Disabled="@(!IsSubcontracted)" Placeholder="@(IsSubcontracted ? "Taşıyıcı firma seçin…" : "Yalnızca taşeron sürücüde")" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
+                            <LookupPicker Id="driver-carrier" LookupKey="@LogisticsAccess.DriverCarrierLookup" @bind-Value="form.CarrierPartyId" Required="IsSubcontracted" Disabled="@(!IsSubcontracted)" Placeholder="@(IsSubcontracted ? Texts.Get("logistics.driver-form.carrier-placeholder") : Texts.Get("logistics.driver-form.carrier-placeholder-disabled"))" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
                             <FieldError Field="carrierPartyId" Errors="errors" />
-                            <small class="text-muted">Yalnızca "Taşıyıcı" rolündeki firmalar listelenir.</small>
+                            <small class="text-muted">@Texts.Get("logistics.driver-form.carrier-hint")</small>
                             break;
                         case "defaultVehicleId":
                             <label class="@f.LabelClass()" for="driver-vehicle">@f.Label</label>
-                            <LookupPicker Id="driver-vehicle" LookupKey="@LogisticsAccess.DriverVehicleLookup" @bind-Value="form.DefaultVehicleId" Placeholder="Plaka ile araç seçin…" Invalid="@(errors?.ContainsKey("defaultVehicleId") == true)" />
+                            <LookupPicker Id="driver-vehicle" LookupKey="@LogisticsAccess.DriverVehicleLookup" @bind-Value="form.DefaultVehicleId" Placeholder="@Texts.Get("logistics.driver-form.vehicle-placeholder")" Invalid="@(errors?.ContainsKey("defaultVehicleId") == true)" />
                             <FieldError Field="defaultVehicleId" Errors="errors" />
-                            <small class="text-muted">Filo modülündeki çekici, kamyon ya da panelvan; dorse ve römork atanmaz.</small>
+                            <small class="text-muted">@Texts.Get("logistics.driver-form.vehicle-hint")</small>
                             break;
                         case "notes":
                             <label class="@f.LabelClass()" for="driver-notes">@f.Label</label>
@@ -143,8 +143,8 @@
             </LayoutForm>
 
             <div class="form-actions">
-                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
             </div>
         </div>
     </div>
@@ -154,7 +154,7 @@
     private bool dirty;
     private const string EntityKey = LogisticsAccess.DriverEntityKey;
     private static readonly string Url = "/api/records/" + EntityKey;
-    private static readonly IReadOnlyList<SegmentOption<bool>> PersonModes = [new(false, "Kayıtlı kişi"), new(true, "Yeni kişi")];
+    private static IReadOnlyList<SegmentOption<bool>> PersonModes => [new(false, Texts.Get("logistics.driver-form.mode-registered")), new(true, Texts.Get("logistics.driver-form.mode-new"))];
 
     private FormLayoutDto? layout;
     private string? layoutError;
@@ -191,7 +191,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir sürücü verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
@@ -255,7 +255,7 @@
             {
                 busy = false;
                 personErrors = person.FieldErrors;
-                message = person.FieldErrors is { Count: > 0 } ? "Kişi bilgilerini kontrol edin." : person.Error;
+                message = person.FieldErrors is { Count: > 0 } ? Texts.Get("logistics.driver-form.person-check") : person.Error;
                 return;
             }
 

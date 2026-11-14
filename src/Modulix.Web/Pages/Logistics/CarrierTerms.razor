@@ -4,10 +4,10 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Taşıyıcı anlaşmaları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.logistics.carrier-terms") · Modulix</PageTitle>
 
 <AuthGate Module="@LogisticsAccess.ModuleKey" Permission="@LogisticsAccess.CarriersRead">
-    <PageHeader Title="Taşıyıcı anlaşmaları" Icon="file-text" Subtitle="@(page is null ? "Taşeron taşıyıcılarla çalışma koşullarını, geçerlilik tarihlerini ve ödeme vadesini izleyin." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.logistics.carrier-terms")" Icon="file-text" Subtitle="@(page is null ? Texts.Get("logistics.terms.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -20,16 +20,16 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Anlaşma görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("logistics.terms.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Anlaşma ara" placeholder="Taşıyıcı, anlaşma adı veya numarası ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("logistics.terms.search-label")" placeholder="@Texts.Get("logistics.terms.search-placeholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(LogisticsAccess.CarriersWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni anlaşma</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("logistics.terms.new")</button>
         }
     </div>
 
@@ -42,20 +42,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan anlaşma yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("logistics.terms.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) anlaşma listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("logistics.terms.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Taşıyıcı anlaşmaları</caption>
+            <caption class="visually-hidden">@Texts.Get("nav.app.logistics.carrier-terms")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -69,8 +69,8 @@
                         <td class="row-menu-cell">
                             @if (Session.Can(LogisticsAccess.CarriersWrite))
                             {
-                                <RowMenu Label="@($"{WarehouseLabels.Text(terms, "title")} eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(terms)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <RowMenu Label="@Texts.Get("common.rowActionsOf", WarehouseLabels.Text(terms, "title"))">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(terms)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 </RowMenu>
                             }
                         </td>
@@ -91,15 +91,15 @@
     private const string PassiveView = "passive";
 
     // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (CarrierTermsRecordStore.SortKeys).
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("carrier", "Taşıyıcı", "building", "carrier", "-carrier", Locked: true),
-        new("title", "Anlaşma", "file-text", "title", "-title"),
-        new("agreementNo", "No", "hash", DefaultVisible: false),
-        new("validity", "Geçerlilik", "calendar", "validFrom", "-validFrom"),
-        new("currency", "Para birimi", "coins"),
-        new("paymentTermDays", "Ödeme vadesi", "clock", "paymentTermDays", "-paymentTermDays"),
-        new("state", "Durum", "tag", "isActive", "-isActive"),
+        new("carrier", Texts.Get("logistics.terms.col.carrier"), "building", "carrier", "-carrier", Locked: true),
+        new("title", Texts.Get("logistics.terms.col.title"), "file-text", "title", "-title"),
+        new("agreementNo", Texts.Get("logistics.terms.col.number"), "hash", DefaultVisible: false),
+        new("validity", Texts.Get("logistics.terms.col.validity"), "calendar", "validFrom", "-validFrom"),
+        new("currency", Texts.Get("logistics.terms.col.currency"), "coins"),
+        new("paymentTermDays", Texts.Get("logistics.terms.col.payment"), "clock", "paymentTermDays", "-paymentTermDays"),
+        new("state", Texts.Get("common.field.status"), "tag", "isActive", "-isActive"),
     ];
 
     private readonly GridViewState grid = new("logistics.carrier-terms", "carrier");
@@ -134,10 +134,10 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm anlaşmalar", Icon: "file-text"),
-        new(CurrentView, "Bugün geçerli", Icon: "check-circle"),
-        new(ExpiredView, "Süresi dolan", Icon: "alert-circle"),
-        new(PassiveView, "Pasif", Icon: "clock"),
+        new(AllViews, Texts.Get("logistics.terms.view.all"), Icon: "file-text"),
+        new(CurrentView, Texts.Get("logistics.terms.view.current"), Icon: "check-circle"),
+        new(ExpiredView, Texts.Get("logistics.terms.view.expired"), Icon: "alert-circle"),
+        new(PassiveView, Texts.Get("logistics.terms.view.passive"), Icon: "clock"),
         .. views.Options,
     ];
 
@@ -238,7 +238,7 @@
         "agreementNo" => @<text>@(WarehouseLabels.Text(terms, "agreementNo") is { Length: > 0 } no ? no : "—")</text>,
         "validity" => @<text>@LogisticsLabels.Validity(terms)</text>,
         "currency" => @<text>@WarehouseLabels.Text(terms, "currency")</text>,
-        "paymentTermDays" => @<text>@(terms.Values["paymentTermDays"]?.GetValue<int>() is { } days ? $"{days} gün" : "—")</text>,
+        "paymentTermDays" => @<text>@(terms.Values["paymentTermDays"]?.GetValue<int>() is { } days ? Texts.Get("logistics.terms.days", days) : "—")</text>,
         "state" => State(terms),
         _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(LogisticsAccess.CarrierTermsEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
             @<text>@CustomFieldText.Format(field, terms.Values["custom"] as JsonObject)</text>,
