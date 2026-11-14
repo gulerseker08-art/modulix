@@ -26,6 +26,7 @@ internal sealed class SubProfileService(
     IChoiceListService lists,
     IChoiceLists choiceLists,
     IActivityCodeCatalog activities,
+    SubProfileStarterCatalog starters,
     CustomizationLimits limits,
     IAuditWriter audit) : ISubProfileService
 {
@@ -287,6 +288,78 @@ internal sealed class SubProfileService(
         Audit(tenant, row.Id, AuditAction.Updated, before, Snapshot(row, options));
         await SaveAsync(cancellationToken);
         return await GetAsync(id, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SubProfileStarterView>> ListStartersAsync(CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var codes = (await db.SubProfiles.AsNoTracking().Select(p => p.Code).ToListAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
+        var enabled = await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken);
+        var names = await ActivityNamesAsync(starters.Starters.Select(s => s.ActivityCode), cancellationToken);
+        return [.. starters.Starters.Select(s => new SubProfileStarterView(
+            s.Key,
+            s.Name,
+            s.Description,
+            s.ActivityCode is { } code ? names.GetValueOrDefault(code) : null,
+            [.. s.Options.Select(o => o.Label)],
+            MissingModules(s, enabled),
+            codes.Contains(s.Key)))];
+    }
+
+    public async Task<SubProfileView?> CreateFromStarterAsync(string key, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        if (starters.Find(key) is not { } starter)
+        {
+            return null;
+        }
+
+        if (await db.SubProfiles.AnyAsync(p => p.Code == starter.Key, cancellationToken))
+        {
+            throw new SubProfileConflictException("Bu hazır alt profil zaten eklenmiş.");
+        }
+
+        var missing = MissingModules(starter, await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken));
+        if (missing.Count > 0)
+        {
+            throw new ArgumentException($"Bu alt profil için şu modüller açık olmalı: {string.Join(", ", missing)}.", "key");
+        }
+
+        // Katalogda bulunmayan ya da pasif faaliyet alt profilin eklenmesini engellemez; bağlanmadan eklenir.
+        var activityCode = starter.ActivityCode is { } code
+            && (await activities.FindAsync([code], cancellationToken)).SingleOrDefault() is { IsActive: true, Kind: ActivityCodeKinds.Activity }
+                ? code
+                : null;
+
+        var transaction = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
+        try
+        {
+            var created = await CreateAsync(new SubProfileInput(starter.Name, starter.Description, activityCode, starter.Key), cancellationToken);
+            foreach (var option in starter.Options)
+            {
+                _ = await AddOptionAsync(created.Id, option, cancellationToken);
+            }
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return await GetAsync(created.Id, cancellationToken);
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
+    }
+
+    private List<string> MissingModules(SubProfileStarter starter, IEnumerable<string> enabled)
+    {
+        var open = enabled.ToHashSet(StringComparer.Ordinal);
+        return [.. starters.ModulesOf(starter).Where(m => !catalog.IsEnabled(m, open)).Select(m => catalog.Find(m)?.DisplayName ?? m)];
     }
 
     private async Task ApplyWithTransactionAsync(TenantContext tenant, SubProfile row, CancellationToken cancellationToken)

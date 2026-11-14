@@ -244,6 +244,7 @@ public static class AppCatalog
         new("warehouse.regime-bindings", Warehouse, "Rejim profilleri", "shield", "depo/rejim-profilleri", 80, WarehouseAccess.ModuleKey, WarehouseAccess.RegimesRead, Tone: AppTone.Teal),
         new(Logistics, null, "Lojistik", "truck", null, 42, ModuleKey: LogisticsAccess.ModuleKey, Group: OperationsGroup),
         new("logistics.dashboard", Logistics, "Pano", "dashboard", "lojistik/pano", 2, LogisticsAccess.ModuleKey, AnyPermission: LogisticsAccess.DashboardAny, ExactMatch: true),
+        new("logistics.places", Logistics, "Yerler", "map-pin", "lojistik/yerler", 12, LogisticsAccess.ModuleKey, AnyPermission: LogisticsAccess.PlacesReadAny, Tone: AppTone.Teal),
         new("logistics.requests", Logistics, "Taşıma talepleri", "inbox", "lojistik/talepler", 4, LogisticsAccess.ModuleKey, LogisticsAccess.RequestsRead),
         new("logistics.shipments", Logistics, "Sevkiyatlar", "truck", "lojistik/sevkiyatlar", 6, LogisticsAccess.ModuleKey, LogisticsAccess.ShipmentsRead),
         new("logistics.trips", Logistics, "Seferler", "map-pin", "lojistik/seferler", 8, LogisticsAccess.ModuleKey, LogisticsAccess.TripsRead, Tone: AppTone.Teal),
@@ -306,7 +307,6 @@ public static class AppCatalog
         new("admin.custom-fields", Admin, "Özel alanlar", "square-pen", "yonetim/ozel-alanlar", 80, Permission: CoreAccess.ManageCustomization, Tone: AppTone.Teal),
         new("admin.lists", Admin, "Listeler", "list", "yonetim/listeler", 90, Permission: CoreAccess.ManageCustomization),
         new("admin.sector-profile", Admin, "Sektör profili", "layers", "yonetim/sektor-profili", 100, Permission: CoreAccess.ManageCustomization, Tone: AppTone.Teal),
-        new("admin.activities", Admin, "Faaliyetlerim", "layers", "yonetim/faaliyetler", 105, Permission: CoreAccess.ManageCustomization),
         new("admin.form-designer", Admin, "Form tasarımı", "clipboard-list", "yonetim/form-tasarimi", 85, Permission: CoreAccess.ManageCustomization),
         new("admin.import-design", Admin, "İçe aktarma tasarımı", "clipboard-list", "yonetim/ice-aktarma-tasarimi", 86, Permission: CoreAccess.ManageCustomization),
 

@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Customization;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -641,6 +642,40 @@ internal static class SharedField
             e => get(e).ToString(),
             (e, v) => set(e, v is PartyRelationshipStatus status ? status : PartyRelationshipStatus.Prospect));
 
+    /// <summary>Metin; kırpıldıktan sonra büyük harfe çevrilir (ör. ISO ülke kodu).</summary>
+    public static SharedField<T> UpperText<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set, bool required = false) =>
+        new(name, required,
+            node =>
+            {
+                var text = ParseText(node, maxLength);
+                return text.Error is null && text.Value is string value ? (value.ToUpperInvariant(), null) : text;
+            },
+            e => get(e), (e, v) => set(e, (string?)v));
+
+    /// <summary>Ondalık sayı (JSON sayı); boş değer temizler. Aralık dışı değer hata verir.</summary>
+    public static SharedField<T> Decimal<T>(string name, Func<T, decimal?> get, Action<T, decimal?> set, decimal min, decimal max) =>
+        new(name, required: false,
+            node =>
+            {
+                if (node.GetValueKind() != JsonValueKind.Number || !node.AsValue().TryGetValue<decimal>(out var number))
+                {
+                    return (null, "Sayı olmalıdır.");
+                }
+
+                return number < min || number > max
+                    ? (null, $"{min.ToString(CultureInfo.InvariantCulture)} ile {max.ToString(CultureInfo.InvariantCulture)} arasında olmalıdır.")
+                    : (number, null);
+            },
+            e => get(e) is { } value ? JsonValue.Create(value) : null,
+            (e, v) => set(e, (decimal?)v));
+
+    /// <summary>Evet/hayır alanı; boş değer <paramref name="whenEmpty"/> olur.</summary>
+    public static SharedField<T> Flag<T>(string name, Func<T, bool> get, Action<T, bool> set, bool whenEmpty = false) =>
+        new(name, required: false,
+            node => node.GetValueKind() is JsonValueKind.True or JsonValueKind.False ? (node.GetValue<bool>(), null) : (null, "Evet ya da hayır olmalıdır."),
+            e => get(e),
+            (e, v) => set(e, v is bool flag ? flag : whenEmpty));
+
     public static SharedField<T> Email<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set) =>
         new(name, required: false, node =>
             {
@@ -690,5 +725,107 @@ internal static class SharedField
     {
         var at = value.IndexOf('@');
         return at > 0 && at == value.LastIndexOf('@') && at < value.Length - 1 && !value.Any(char.IsWhiteSpace);
+    }
+}
+
+/// <summary>
+/// Yer defteri (ADR-0045 K1): depo, fabrika, liman, sınır kapısı... Ad ülke içinde tekildir (<c>NormalizedName</c> + ülke); ülke ISO 3166-1 alfa-2
+/// olmalıdır; koordinat ikisi birlikte verilir ya da hiçbiri (enlem -90..90, boylam -180..180); tür <c>core.place-kind</c> listesinden seçilir
+/// (pasif tür yalnızca kaydın mevcut değeriyse korunur). Kullanımdaki yer silinemez (referansı bildiren modüller <c>SharedRecordReferences</c> ile
+/// bildirir); pasife alınır (<c>isActive</c>).
+/// </summary>
+internal sealed class PlaceRecordStore(ModulixDbContext db, ModuleCatalog catalog, IServiceProvider services)
+    : SharedRecordStore<Place>(db, catalog, services)
+{
+    private const string CountryMessage = "Geçerli bir ülke kodu girin (ISO 3166-1 alfa-2, ör. TR, DE).";
+
+    public override string EntityKey => SharedEntities.Place;
+
+    protected override IReadOnlySet<string> IdentityFields { get; } = new HashSet<string> { "name", "countryCode", "city" };
+
+    protected override IReadOnlyList<SharedField<Place>> Fields { get; } =
+    [
+        SharedField.Text<Place>("name", Place.NameMaxLength, p => p.Name, (p, v) => p.Name = v!, required: true),
+        SharedField.Text<Place>("kindKey", Place.KindKeyMaxLength, p => p.KindKey, (p, v) => p.KindKey = v ?? string.Empty),
+        SharedField.UpperText<Place>("countryCode", Place.CountryLength, p => p.CountryCode, (p, v) => p.CountryCode = v!, required: true),
+        SharedField.Text<Place>("city", Place.CityMaxLength, p => p.City, (p, v) => p.City = v),
+        SharedField.Text<Place>("district", Place.CityMaxLength, p => p.District, (p, v) => p.District = v),
+        SharedField.Text<Place>("addressLine", Place.AddressMaxLength, p => p.AddressLine, (p, v) => p.AddressLine = v),
+        SharedField.Text<Place>("postalCode", Place.PostalCodeMaxLength, p => p.PostalCode, (p, v) => p.PostalCode = v),
+        SharedField.Decimal<Place>("latitude", p => p.Latitude, (p, v) => p.Latitude = v, -90m, 90m),
+        SharedField.Decimal<Place>("longitude", p => p.Longitude, (p, v) => p.Longitude = v, -180m, 180m),
+        SharedField.Flag<Place>("isActive", p => p.IsActive, (p, v) => p.IsActive = v, whenEmpty: true),
+    ];
+
+    protected override IReadOnlyDictionary<string, Func<IQueryable<Place>, string, IQueryable<Place>?>> Filters { get; } =
+        new Dictionary<string, Func<IQueryable<Place>, string, IQueryable<Place>?>>
+        {
+            ["countryCode"] = (q, v) => v.ToUpperInvariant() is { Length: Place.CountryLength } code && IsoCountryCodes.IsValid(code) ? q.Where(p => p.CountryCode == code) : null,
+            ["kindKey"] = (q, v) => v.Trim() is { Length: > 0 and <= Place.KindKeyMaxLength } key ? q.Where(p => p.KindKey == key) : null,
+            ["city"] = (q, v) => v.Trim() is { Length: > 0 and <= Place.CityMaxLength } city ? q.Where(p => p.City == city) : null,
+            ["isActive"] = (q, v) => v switch { "true" => q.Where(p => p.IsActive), "false" => q.Where(p => !p.IsActive), _ => null },
+        };
+
+    protected override IOrderedQueryable<Place> Order(IQueryable<Place> source) =>
+        source.OrderBy(p => p.Name).ThenBy(p => p.CountryCode);
+
+    protected override IQueryable<Place> Search(IQueryable<Place> source, string term)
+    {
+        var normalized = PlaceRules.NormalizeName(term);
+        return source.Where(p => p.Name.Contains(term)
+            || (normalized.Length > 0 && p.NormalizedName.Contains(normalized))
+            || (p.City != null && p.City.Contains(term))
+            || (p.AddressLine != null && p.AddressLine.Contains(term)));
+    }
+
+    protected override async Task CheckAsync(Place place, CancellationToken cancellationToken)
+    {
+        var errors = new List<RecordFieldError>();
+
+        place.NormalizedName = PlaceRules.NormalizeName(place.Name);
+        if (place.NormalizedName.Length == 0)
+        {
+            errors.Add(new RecordFieldError("name", "Bu alan zorunludur."));
+        }
+
+        if (!IsoCountryCodes.IsValid(place.CountryCode))
+        {
+            errors.Add(new RecordFieldError("countryCode", CountryMessage));
+        }
+
+        if (place.Latitude.HasValue != place.Longitude.HasValue)
+        {
+            errors.Add(new RecordFieldError(place.Latitude.HasValue ? "longitude" : "latitude", "Enlem ve boylam birlikte girilmelidir."));
+        }
+
+        if (string.IsNullOrWhiteSpace(place.KindKey))
+        {
+            place.KindKey = Place.DefaultKind;
+        }
+
+        var choice = (await services.GetRequiredService<IChoiceLists>().GetAsync(Place.KindList, cancellationToken)).Find(place.KindKey);
+        // Mevcut kayıtta pasife alınmış türün korunmasına izin verilir; yeni kayıtta (henüz izlenmiyor) izin yoktur.
+        var entry = Db.Entry(place);
+        var unchanged = entry.State is EntityState.Unchanged or EntityState.Modified && choice is not null
+            && string.Equals(entry.Property(p => p.KindKey).OriginalValue, choice.Key, StringComparison.OrdinalIgnoreCase);
+        if (choice is null || (!choice.Active && !unchanged))
+        {
+            errors.Add(new RecordFieldError("kindKey", choice is null ? "Listede olmayan değer." : "Bu değer artık kullanılmıyor."));
+        }
+        else
+        {
+            place.KindKey = choice.Key;
+        }
+
+        if (errors.Count == 0
+            && await Set.AnyAsync(p => p.Id != place.Id && p.NormalizedName == place.NormalizedName && p.CountryCode == place.CountryCode, cancellationToken))
+        {
+            errors.Add(new RecordFieldError("name", "Bu ülkede aynı adlı bir yer zaten var."));
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new RecordValidationException(errors);
+        }
     }
 }

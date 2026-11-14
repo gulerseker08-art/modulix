@@ -1,0 +1,230 @@
+@* Yer defteri ekleme/düzenleme formu (ADR-0045); Yerler ekranı kullanır. Yer Core ortak kaydıdır (core.place); kayıt genel kayıt uçlarından
+   (/api/records/core.place) yapılır. Ad ülke içinde tekildir, ülke ISO 3166-1 alfa-2 olmalıdır, enlem ve boylam birlikte verilir; bunlar
+   sunucuda denetlenir ve ileti alanın altında gösterilir. Kullanımdaki yer silinemez, pasife alınır. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Place is null ? "Yeni yer" : "Yer")</h2>
+            @if (Place is not null)
+            {
+                <p>@form.Name</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">Kaydet</button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <FormTabs Title="Yer bilgileri" Label="Yer formu bölümleri">
+        <div class="form-grid">
+            <div>
+                <label class="form-label" for="place-name">Ad *</label>
+                <input id="place-name" class="form-control" maxlength="200" required aria-required="true" @bind="form.Name" />
+                <FieldError Field="name" Errors="errors" />
+                <small class="text-muted">Ad ülke içinde tekildir.</small>
+            </div>
+            <div>
+                <label class="form-label" for="place-kind">Tür</label>
+                <select id="place-kind" class="form-select" @bind="form.KindKey">
+                    @foreach (var kind in Lookups.Choices(LogisticsAccess.PlaceKindList, form.KindKey))
+                    {
+                        <option value="@kind.Key">@kind.Label</option>
+                    }
+                </select>
+                <FieldError Field="kindKey" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="place-country">Ülke *</label>
+                <select id="place-country" class="form-select" required aria-required="true" @bind="form.CountryCode">
+                    @foreach (var country in CountryCatalog.All)
+                    {
+                        <option value="@country.Code">@country.NameTr (@country.Code)</option>
+                    }
+                </select>
+                <FieldError Field="countryCode" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="place-city">Şehir</label>
+                <input id="place-city" class="form-control" maxlength="100" @bind="form.City" />
+                <FieldError Field="city" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="place-district">İlçe</label>
+                <input id="place-district" class="form-control" maxlength="100" @bind="form.District" />
+                <FieldError Field="district" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="place-postal">Posta kodu</label>
+                <input id="place-postal" class="form-control" maxlength="20" @bind="form.PostalCode" />
+                <FieldError Field="postalCode" Errors="errors" />
+            </div>
+            <div class="span-all">
+                <label class="form-label" for="place-address">Adres</label>
+                <textarea id="place-address" class="form-control" rows="2" maxlength="250" @bind="form.AddressLine"></textarea>
+                <FieldError Field="addressLine" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="place-lat">Enlem</label>
+                <input id="place-lat" class="form-control" type="number" step="0.000001" min="-90" max="90" placeholder="41.0082" @bind="form.Latitude" />
+                <FieldError Field="latitude" Errors="errors" />
+            </div>
+            <div>
+                <label class="form-label" for="place-lon">Boylam</label>
+                <input id="place-lon" class="form-control" type="number" step="0.000001" min="-180" max="180" placeholder="28.9784" @bind="form.Longitude" />
+                <FieldError Field="longitude" Errors="errors" />
+                <small class="text-muted">Koordinat isteğe bağlıdır; ikisi birlikte girilir. Girilmezse haritada konum şehir ve ülkeden bulunur.</small>
+            </div>
+            <div>
+                <SegmentedChoice Id="place-active" Label="Durum" Options="SegmentOptions.Active" @bind-Value="form.IsActive" />
+                <FieldError Field="isActive" Errors="errors" />
+                <small class="text-muted">Pasif yer yeni kayıtta seçilemez; eski kayıtlar korunur.</small>
+            </div>
+        </div>
+    </FormTabs>
+
+    <div class="form-actions">
+        @if (form.Id is not null)
+        {
+            <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+        }
+        <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
+        <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">Kaydet</button>
+    </div>
+</form>
+
+@code {
+    private static readonly string Url = "/api/records/" + LogisticsAccess.PlaceEntityKey;
+
+    private bool dirty;
+    private PlaceForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private RecordResponse? source;
+    private bool initialized;
+
+    /// <summary>Düzenlenecek yer; null ise yeni yer.</summary>
+    [Parameter] public RecordResponse? Place { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Deleted { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    /// <summary>Form yalnızca başka bir yer verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
+    protected override void OnParametersSet()
+    {
+        if (initialized && ReferenceEquals(source, Place))
+        {
+            return;
+        }
+
+        initialized = true;
+        source = Place;
+        form = Place is { } r
+            ? new PlaceForm
+            {
+                Id = r.Id, Version = r.Version, Name = WarehouseLabels.Text(r, "name"),
+                KindKey = WarehouseLabels.Text(r, "kindKey") is { Length: > 0 } kind ? kind : "Other",
+                CountryCode = WarehouseLabels.Text(r, "countryCode") is { Length: > 0 } code ? code : CountryCatalog.DefaultCode,
+                City = WarehouseLabels.Text(r, "city"), District = WarehouseLabels.Text(r, "district"), AddressLine = WarehouseLabels.Text(r, "addressLine"),
+                PostalCode = WarehouseLabels.Text(r, "postalCode"), Latitude = r.Values["latitude"]?.GetValue<decimal>(),
+                Longitude = r.Values["longitude"]?.GetValue<decimal>(), IsActive = WarehouseLabels.Flag(r, "isActive", true),
+            }
+            : new PlaceForm { KindKey = Lookups.DefaultOf(LogisticsAccess.PlaceKindList) ?? "Other" };
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var values = new JsonObject
+        {
+            ["name"] = form.Name.Trim(),
+            ["kindKey"] = form.KindKey,
+            ["countryCode"] = form.CountryCode,
+            ["city"] = Blank(form.City),
+            ["district"] = Blank(form.District),
+            ["addressLine"] = Blank(form.AddressLine),
+            ["postalCode"] = Blank(form.PostalCode),
+            ["latitude"] = form.Latitude,
+            ["longitude"] = form.Longitude,
+            ["isActive"] = form.IsActive,
+        };
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var result = form.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private async Task DeleteAsync()
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{form.Id}?version={form.Version}");
+        busy = false;
+
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            await Deleted.InvokeAsync();
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class PlaceForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string KindKey { get; set; } = "Other";
+
+        public string CountryCode { get; set; } = CountryCatalog.DefaultCode;
+
+        public string? City { get; set; }
+
+        public string? District { get; set; }
+
+        public string? AddressLine { get; set; }
+
+        public string? PostalCode { get; set; }
+
+        public decimal? Latitude { get; set; }
+
+        public decimal? Longitude { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}
