@@ -2,20 +2,19 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Sektör profili · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.sector-profile") · Modulix</PageTitle>
 
 @* Sektör profili (Y9c): hazır alanlar ve liste değerleri. Bir kez uygulanır ve yalnızca ekler; önce önizleme gösterilir. Altında firmanın alt profilleri
    ve faaliyet seçimi vardır (ADR-0041 K8). *@
 <AuthGate Permission="@CoreAccess.ManageCustomization">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
     <div class="page-header">
-        <h1>Sektör profili</h1>
+        <h1>@Texts.Get("nav.app.admin.sector-profile")</h1>
     </div>
 
     <p class="text-muted">
-        Profil, sektörünüz için hazır alanlar ve liste değerleri ekler. Yalnızca eksikler eklenir: mevcut alanlarınız ve değerleriniz
-        değişmez, aynı adlı olanlar atlanır. Eklenenleri sonra Özel alanlar ve Listeler sayfalarından düzenleyebilirsiniz.
+        @Texts.Get("admin.sectorProfile.intro")
     </p>
 
     @if (message is not null)
@@ -26,8 +25,8 @@
     @if (profiles is not null)
     {
         <p>
-            Firmanın profili:
-            <strong>@(CurrentName ?? "Uygulanmadı")</strong>
+            @Texts.Get("admin.sectorProfile.current")
+            <strong>@(CurrentName ?? Texts.Get("admin.sectorProfile.notApplied"))</strong>
             @if (profiles.AppliedAt is { } appliedAt)
             {
                 <span class="text-muted"> · @CrmLabels.Time(appliedAt)</span>
@@ -43,7 +42,7 @@
                     <span>@profile.Description</span>
                     @if (profile.Key == profiles.Current)
                     {
-                        <span class="badge category">Uygulandı</span>
+                        <span class="badge category">@Texts.Get("admin.sectorProfile.applied")</span>
                     }
                 </button>
             }
@@ -58,9 +57,9 @@
                 {
                     <div class="form-actions">
                         <button type="button" class="btn btn-primary" disabled="@busy" @onclick="ApplyAsync">
-                            @(plan.IsEmpty ? "Profili firmaya kaydet" : "Profili uygula")
+                            @(plan.IsEmpty ? Texts.Get("admin.sectorProfile.saveProfile") : Texts.Get("admin.sectorProfile.apply"))
                         </button>
-                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">Vazgeç</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">@Texts.Get("common.dismiss")</button>
                     </div>
                 }
             </section>

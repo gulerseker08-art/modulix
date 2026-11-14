@@ -3,26 +3,23 @@
 @inject SessionState Session
 @inject LookupCatalog Catalog
 
-<PageTitle>Alan ve Lookup Ayarları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("admin.lookups.title") · Modulix</PageTitle>
 
 @* Lookup alanları (ADR-0016): kullanıcının seçtiği N→1 referans alanları. Teknik tanım kodda sabittir; yönetici yalnızca metin aramasını açıp kapatır. *@
 <AuthGate Permission="@CoreAccess.ManageCustomization">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
     <div class="page-header">
-        <h1>Alan ve Lookup Ayarları</h1>
+        <h1>@Texts.Get("admin.lookups.title")</h1>
     </div>
 
     <p class="text-muted">
-        Formlarda başka bir kaydı seçtiren alanlar (ör. kişideki Firma, fırsattaki Sorumlu) ortak bir seçim kutusu kullanır.
-        <strong>Aranabilir</strong> açıkken kutuda yazarak arama yapılır; kapalıyken yazma girişi kalkar ve kayıt sayfalı listeden seçilir.
-        Bu ayar yalnızca arama kutusunu etkiler: kullanıcının hangi kayıtları görebildiği rol ve kayıt kapsamıyla belirlenmeye devam eder,
-        listelerdeki filtreler ve genel arama bundan etkilenmez.
+        @((MarkupString)Texts.Get("admin.lookups.intro", "<strong>", "</strong>"))
     </p>
 
     @if (message is not null)
     {
-        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="LoadAsync">Yeniden yükle</button></div>
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="LoadAsync">@Texts.Get("admin.lookups.reload")</button></div>
     }
 
     @if (notice is not null)
@@ -37,8 +34,8 @@
     else if (items is { Count: > 0 })
     {
         <div class="filters">
-            <label class="visually-hidden" for="lookup-filter">Alan ara</label>
-            <input id="lookup-filter" class="form-control" type="search" placeholder="Alan, kayıt türü veya hedef ara" @bind="filter" @bind:event="oninput" />
+            <label class="visually-hidden" for="lookup-filter">@Texts.Get("admin.lookups.search")</label>
+            <input id="lookup-filter" class="form-control" type="search" placeholder="@Texts.Get("admin.lookups.searchPlaceholder")" @bind="filter" @bind:event="oninput" />
         </div>
 
         @foreach (var group in Visible.GroupBy(i => i.SourceEntityName))
@@ -48,7 +45,7 @@
                 <div class="table-responsive">
                     <table class="table lookup-settings">
                         <thead>
-                            <tr><th>Alan</th><th>Hedef</th><th>Aranabilir</th><th>Ne değişir?</th><th></th></tr>
+                            <tr><th>@Texts.Get("admin.subProfiles.field")</th><th>@Texts.Get("admin.subProfiles.target")</th><th>@Texts.Get("admin.lookups.searchable")</th><th>@Texts.Get("admin.lookups.effect")</th><th></th></tr>
                         </thead>
                         <tbody>
                             @foreach (var item in group)
@@ -56,36 +53,36 @@
                                 var value = Current(item);
                                 var changed = pending.ContainsKey(item.Key);
                                 <tr class="@(changed ? "is-changed" : null)">
-                                    <td data-label="Alan">
+                                    <td data-label="@Texts.Get("admin.subProfiles.field")">
                                         <strong>@item.Title</strong>
                                         @if (item.DependsOnField is not null)
                                         {
-                                            <small class="d-block text-muted">Bağımlı alan: seçilen üst kayda göre süzülür.</small>
+                                            <small class="d-block text-muted">@Texts.Get("admin.lookups.dependent")</small>
                                         }
                                     </td>
-                                    <td data-label="Hedef">@(item.IsMember ? "Kullanıcı (üye)" : item.TargetEntityName)</td>
-                                    <td data-label="Aranabilir">
+                                    <td data-label="@Texts.Get("admin.subProfiles.target")">@(item.IsMember ? Texts.Get("admin.lookups.member") : item.TargetEntityName)</td>
+                                    <td data-label="@Texts.Get("admin.lookups.searchable")">
                                         <div class="form-check form-switch">
                                             <input id="s-@item.Key" class="form-check-input" type="checkbox" role="switch" checked="@value"
                                                    disabled="@busy" @onchange="e => Set(item, (bool)e.Value!)" />
                                             <label class="form-check-label" for="s-@item.Key">
-                                                @(value ? "Açık" : "Kapalı")
-                                                @if (!changed && !item.Customized) { <small class="text-muted"> (varsayılan)</small> }
-                                                @if (changed) { <small class="text-warning-emphasis"> (kaydedilmedi)</small> }
+                                                @(value ? Texts.Get("two-factor.on") : Texts.Get("two-factor.off"))
+                                                @if (!changed && !item.Customized) { <small class="text-muted"> @Texts.Get("admin.lookups.default")</small> }
+                                                @if (changed) { <small class="text-warning-emphasis"> @Texts.Get("admin.lookups.unsaved")</small> }
                                             </label>
                                         </div>
                                     </td>
-                                    <td data-label="Ne değişir?">
+                                    <td data-label="@Texts.Get("admin.lookups.effect")">
                                         <small class="text-muted">
                                             @(value
-                                                ? $"Kutuda yazarak arama yapılır ({item.MinSearchLength}+ karakter). Aranan alanlar: {item.SearchDescription}."
-                                                : "Yazma girişi kalkar; kayıt sayfalı listeden seçilir. Seçili kayıt görünmeye devam eder.")
+                                                ? Texts.Get("admin.lookups.searchOn", item.MinSearchLength, item.SearchDescription)
+                                                : Texts.Get("admin.lookups.searchOff"))
                                         </small>
                                     </td>
                                     <td>
                                         @if (item.Customized || (changed && pending[item.Key] is not null))
                                         {
-                                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => Reset(item)">Varsayılana dön</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => Reset(item)">@Texts.Get("common.columns.reset")</button>
                                         }
                                         @if (rowErrors.TryGetValue(item.Key, out var rowError))
                                         {
@@ -102,18 +99,18 @@
 
         <div class="form-actions">
             <button type="button" class="btn btn-primary" disabled="@(busy || pending.Count == 0)" @onclick="SaveAsync">
-                @(busy ? "Kaydediliyor…" : pending.Count == 0 ? "Kaydet" : $"Kaydet ({pending.Count} değişiklik)")
+                @(busy ? Texts.Get("admin.lookups.saving") : pending.Count == 0 ? Texts.Get("common.save") : Texts.Get("admin.lookups.saveCount", pending.Count))
             </button>
-            <button type="button" class="btn btn-outline-secondary" disabled="@(busy || pending.Count == 0)" @onclick="Discard">Değişiklikleri at</button>
+            <button type="button" class="btn btn-outline-secondary" disabled="@(busy || pending.Count == 0)" @onclick="Discard">@Texts.Get("admin.lookups.discard")</button>
             @if (pending.Count == 0)
             {
-                <span class="text-muted">Değişiklik yok.</span>
+                <span class="text-muted">@Texts.Get("admin.lookups.noChanges")</span>
             }
         </div>
     }
     else if (!loading && message is null)
     {
-        <p class="text-muted">Lookup alanı olan bir modül açık değil.</p>
+        <p class="text-muted">@Texts.Get("admin.lookups.noModule")</p>
     }
 </AuthGate>
 
@@ -131,7 +128,7 @@
     private IEnumerable<LookupDto> Visible => (items ?? []).Where(i => filter.Length == 0
         || i.Title.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
         || i.SourceEntityName.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
-        || (i.TargetEntityName ?? "Kullanıcı").Contains(filter, StringComparison.CurrentCultureIgnoreCase));
+        || (i.TargetEntityName ?? Texts.Get("admin.lookups.user")).Contains(filter, StringComparison.CurrentCultureIgnoreCase));
 
     protected override async Task OnInitializedAsync()
     {
@@ -150,7 +147,7 @@
         loading = false;
         if (!result.IsSuccess)
         {
-            message = result.Error ?? "Ayarlar yüklenemedi.";
+            message = result.Error ?? Texts.Get("admin.lookups.loadFailed");
             return;
         }
 
@@ -215,8 +212,8 @@
             else
             {
                 rowErrors[key] = result.Status == System.Net.HttpStatusCode.Conflict
-                    ? "Ayar siz düzenlerken değişti. Sayfayı yenileyip tekrar deneyin."
-                    : result.Error ?? "Kaydedilemedi.";
+                    ? Texts.Get("admin.lookups.conflict")
+                    : result.Error ?? Texts.Get("common.saveFailed");
             }
         }
 
@@ -224,12 +221,12 @@
         Catalog.Invalidate();
         if (saved > 0)
         {
-            notice = $"{saved} ayar kaydedildi.";
+            notice = Texts.Get("admin.lookups.saved", saved);
         }
 
         if (rowErrors.Count > 0)
         {
-            message = "Bazı ayarlar kaydedilemedi; ilgili satırlara bakın.";
+            message = Texts.Get("admin.lookups.partial");
         }
     }
 }

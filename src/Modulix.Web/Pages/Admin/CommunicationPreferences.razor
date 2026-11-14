@@ -2,47 +2,44 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>İletişim tercihleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.communication") · Modulix</PageTitle>
 
 <AuthGate Permission="@CoreAccess.ReadCommunication">
     <div class="page-header">
         <div>
-            <h1>İletişim tercihleri</h1>
+            <h1>@Texts.Get("nav.app.admin.communication")</h1>
             <p class="text-muted mb-0">
-                Kişinin bir kanalda, bir amaçla bize ulaşılmasına izni (kanıtlı), reddi ve engeller. Kayıt yoksa durum "bilinmiyor"dur ve pazarlama gönderilmez; engel izni ezer.
-                Bir adresin izni segmentte ya da müşteri kartında yer almakla verilmiş olmaz.
+                @Texts.Get("admin.commPrefs.intro")
             </p>
         </div>
     </div>
 
     <Notice Text="@message" Failed="@failed" />
 
-    <div class="record-tabs" role="tablist" aria-label="Bölümler">
-        <button type="button" role="tab" class="record-tab @(tab == "prefs" ? "active" : null)" aria-selected="@(tab == "prefs")" @onclick='() => SwitchAsync("prefs")'>Tercihler</button>
-        <button type="button" role="tab" class="record-tab @(tab == "blocks" ? "active" : null)" aria-selected="@(tab == "blocks")" @onclick='() => SwitchAsync("blocks")'>Engeller</button>
-        <button type="button" role="tab" class="record-tab @(tab == "topics" ? "active" : null)" aria-selected="@(tab == "topics")" @onclick='() => SwitchAsync("topics")'>Konular</button>
+    <div class="record-tabs" role="tablist" aria-label="@Texts.Get("common.sections")">
+        <button type="button" role="tab" class="record-tab @(tab == "prefs" ? "active" : null)" aria-selected="@(tab == "prefs")" @onclick='() => SwitchAsync("prefs")'>@Texts.Get("admin.commPrefs.tab.prefs")</button>
+        <button type="button" role="tab" class="record-tab @(tab == "blocks" ? "active" : null)" aria-selected="@(tab == "blocks")" @onclick='() => SwitchAsync("blocks")'>@Texts.Get("admin.commPrefs.tab.blocks")</button>
+        <button type="button" role="tab" class="record-tab @(tab == "topics" ? "active" : null)" aria-selected="@(tab == "topics")" @onclick='() => SwitchAsync("topics")'>@Texts.Get("admin.commPrefs.tab.topics")</button>
     </div>
 
     @if (tab == "prefs")
     {
         <div class="filters">
-            <label class="visually-hidden" for="p-channel">Kanal</label>
+            <label class="visually-hidden" for="p-channel">@Texts.Get("admin.commPrefs.channel")</label>
             <select id="p-channel" class="form-select form-select-sm filter-select" @bind="channel" @bind:after="() => LoadPrefsAsync(1)">
-                <option value="">Tüm kanallar</option>
+                <option value="">@Texts.Get("marketing.allChannels")</option>
                 @foreach (var c in Channels) { <option value="@c.Key">@c.Label</option> }
             </select>
-            <label class="visually-hidden" for="p-status">Durum</label>
+            <label class="visually-hidden" for="p-status">@Texts.Get("common.field.status")</label>
             <select id="p-status" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadPrefsAsync(1)">
-                <option value="">Tüm durumlar</option>
-                <option value="Granted">İzinli</option>
-                <option value="Denied">Reddedildi</option>
-                <option value="Unknown">Bilinmiyor</option>
+                <option value="">@Texts.Get("common.allStatuses")</option>
+                @foreach (var st in SettingsLabels.ConsentStatuses) { <option value="@st.Key">@st.Label</option> }
             </select>
         </div>
         <form class="search" @onsubmit="() => LoadPrefsAsync(1)" @onsubmit:preventDefault>
-            <label class="visually-hidden" for="p-search">Adres ara</label>
-            <input id="p-search" class="form-control" type="search" placeholder="Adres (e-posta ya da telefon)" @bind="address" />
-            <button type="submit" class="btn btn-outline-secondary">Ara</button>
+            <label class="visually-hidden" for="p-search">@Texts.Get("admin.commPrefs.searchAddress")</label>
+            <input id="p-search" class="form-control" type="search" placeholder="@Texts.Get("admin.commPrefs.addressPlaceholder")" @bind="address" />
+            <button type="submit" class="btn btn-outline-secondary">@Texts.Get("common.search")</button>
         </form>
 
         @if (prefs is null && message is null)
@@ -51,15 +48,15 @@
         }
         else if (prefs is not null && prefs.Items.Count == 0)
         {
-            <EmptyState Compact="true" Title="Bu süzgece uyan tercih kaydı yok." />
+            <EmptyState Compact="true" Title="@Texts.Get("admin.commPrefs.emptyPrefs")" />
         }
         else if (prefs is not null)
         {
-            <p class="visually-hidden" role="status" aria-live="polite">@prefs.TotalCount kayıt listelendi.</p>
+            <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("admin.commPrefs.listed", prefs.TotalCount)</p>
             <div class="table-wrap">
                 <table class="table table-sm">
-                    <caption class="visually-hidden">İletişim tercihleri</caption>
-                    <thead><tr><th scope="col">Kanal</th><th scope="col">Adres</th><th scope="col">Amaç</th><th scope="col">Durum</th><th scope="col">Kaynak</th><th scope="col">Değişti</th><th scope="col"><span class="visually-hidden">İşlem</span></th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("nav.app.admin.communication")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("admin.commPrefs.channel")</th><th scope="col">@Texts.Get("admin.commPrefs.address")</th><th scope="col">@Texts.Get("marketing.purpose")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("admin.automation.source")</th><th scope="col">@Texts.Get("admin.commPrefs.changed")</th><th scope="col"><span class="visually-hidden">@Texts.Get("admin.automationRun.col.action")</span></th></tr></thead>
                     <tbody>
                     @foreach (var p in prefs.Items)
                     {
@@ -70,20 +67,20 @@
                             <td><span class="badge @StatusClass(p.Status)">@StatusText(p.Status)</span></td>
                             <td>@p.Source@(string.IsNullOrWhiteSpace(p.EvidenceRef) ? null : " · " + p.EvidenceRef)</td>
                             <td>@CrmLabels.Time(p.ChangedAt)</td>
-                            <td><button type="button" class="btn btn-sm btn-outline-secondary" aria-expanded="@(openEvents == p.Id)" @onclick="() => ToggleEventsAsync(p)">Geçmiş</button></td>
+                            <td><button type="button" class="btn btn-sm btn-outline-secondary" aria-expanded="@(openEvents == p.Id)" @onclick="() => ToggleEventsAsync(p)">@Texts.Get("common.history.tab")</button></td>
                         </tr>
                         @if (openEvents == p.Id)
                         {
                             <tr>
                                 <td colspan="7">
-                                    @if (events is null) { <span class="text-muted" role="status">Yükleniyor…</span> }
-                                    else if (events.Count == 0) { <span class="text-muted">Geçmiş kaydı yok.</span> }
+                                    @if (events is null) { <span class="text-muted" role="status">@Texts.Get("common.loading")</span> }
+                                    else if (events.Count == 0) { <span class="text-muted">@Texts.Get("admin.commPrefs.noEvents")</span> }
                                     else
                                     {
                                         <ul class="list-unstyled mb-0">
                                             @foreach (var e in events)
                                             {
-                                                <li>@CrmLabels.Time(e.ChangedAt) — @StatusText(e.FromStatus) → <strong>@StatusText(e.ToStatus)</strong> · @e.Source@(string.IsNullOrWhiteSpace(e.EvidenceRef) ? null : " · kanıt: " + e.EvidenceRef)@(string.IsNullOrWhiteSpace(e.Reason) ? null : " · " + e.Reason)</li>
+                                                <li>@CrmLabels.Time(e.ChangedAt) — @StatusText(e.FromStatus) → <strong>@StatusText(e.ToStatus)</strong> · @e.Source@(string.IsNullOrWhiteSpace(e.EvidenceRef) ? null : " · " + Texts.Get("admin.commPrefs.evidenceOf", e.EvidenceRef))@(string.IsNullOrWhiteSpace(e.Reason) ? null : " · " + e.Reason)</li>
                                             }
                                         </ul>
                                     }
@@ -101,53 +98,53 @@
         {
             <form class="record-form" novalidate @onsubmit="SaveConsentAsync" @onsubmit:preventDefault>
                 <fieldset disabled="@busy">
-                    <legend class="h6">İzin ya da ret kaydet</legend>
-                    <p class="text-muted small">Her kayıt kaynağı ve kanıtıyla tarihçeye yazılır. Reddedilmiş bir izin yalnızca kişinin kendisi (tercih merkezi) ya da yeni bir kanıtlı kayıtla değişir.</p>
+                    <legend class="h6">@Texts.Get("admin.commPrefs.consentTitle")</legend>
+                    <p class="text-muted small">@Texts.Get("admin.commPrefs.consentHint")</p>
                     <div class="form-grid">
                         <div class="span-3">
-                            <label class="form-label" for="c-ch">Kanal</label>
+                            <label class="form-label" for="c-ch">@Texts.Get("admin.commPrefs.channel")</label>
                             <select id="c-ch" class="form-select" @bind="formChannel">
                                 @foreach (var c in Channels) { <option value="@c.Key">@c.Label</option> }
                             </select>
                             <FieldError Field="channel" Errors="errors" />
                         </div>
                         <div class="span-5">
-                            <label class="form-label" for="c-addr">Adres</label>
+                            <label class="form-label" for="c-addr">@Texts.Get("admin.commPrefs.address")</label>
                             <input id="c-addr" class="form-control" maxlength="254" @bind="formAddress" />
                             <FieldError Field="address" Errors="errors" />
                         </div>
                         <div class="span-2">
-                            <label class="form-label" for="c-status2">Durum</label>
+                            <label class="form-label" for="c-status2">@Texts.Get("common.field.status")</label>
                             <select id="c-status2" class="form-select" @bind="formStatus">
-                                <option value="Granted">İzin verildi</option>
-                                <option value="Denied">Reddedildi</option>
+                                <option value="Granted">@Texts.Get("admin.commPrefs.granted")</option>
+                                <option value="Denied">@SettingsLabels.ConsentStatus("Denied")</option>
                             </select>
                             <FieldError Field="status" Errors="errors" />
                         </div>
                         <div class="span-6">
-                            <label class="form-label" for="c-evidence">Kanıt (form, sözleşme, e-posta no…)</label>
+                            <label class="form-label" for="c-evidence">@Texts.Get("admin.commPrefs.evidence")</label>
                             <input id="c-evidence" class="form-control" maxlength="200" @bind="formEvidence" />
                             <FieldError Field="evidenceRef" Errors="errors" />
                         </div>
                         <div class="span-6">
-                            <label class="form-label" for="c-reason">Gerekçe</label>
+                            <label class="form-label" for="c-reason">@Texts.Get("admin.supportAccess.col.reason")</label>
                             <input id="c-reason" class="form-control" maxlength="500" @bind="formReason" />
                             <FieldError Field="reason" Errors="errors" />
                         </div>
                     </div>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(formAddress))">Kaydet</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(formAddress))">@Texts.Get("common.save")</button></div>
             </form>
         }
     }
     else if (tab == "blocks")
     {
         <div class="filters">
-            <label class="visually-hidden" for="b-active">Durum</label>
+            <label class="visually-hidden" for="b-active">@Texts.Get("common.field.status")</label>
             <select id="b-active" class="form-select form-select-sm filter-select" @bind="blockActive" @bind:after="() => LoadBlocksAsync(1)">
-                <option value="">Tümü</option>
-                <option value="true">Etkin engeller</option>
-                <option value="false">Kaldırılmış ya da süresi dolmuş</option>
+                <option value="">@Texts.Get("admin.subProfiles.all")</option>
+                <option value="true">@Texts.Get("admin.commPrefs.activeBlocks")</option>
+                <option value="false">@Texts.Get("admin.commPrefs.pastBlocks")</option>
             </select>
         </div>
 
@@ -157,14 +154,14 @@
         }
         else if (blocks is not null && blocks.Items.Count == 0)
         {
-            <EmptyState Compact="true" Title="Bu süzgece uyan engel yok." />
+            <EmptyState Compact="true" Title="@Texts.Get("admin.commPrefs.emptyBlocks")" />
         }
         else if (blocks is not null)
         {
             <div class="table-wrap">
                 <table class="table table-sm">
-                    <caption class="visually-hidden">Engeller</caption>
-                    <thead><tr><th scope="col">Kanal</th><th scope="col">Adres</th><th scope="col">Neden</th><th scope="col">Başlangıç</th><th scope="col">Bitiş</th><th scope="col">Durum</th><th scope="col"><span class="visually-hidden">İşlem</span></th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("admin.commPrefs.tab.blocks")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("admin.commPrefs.channel")</th><th scope="col">@Texts.Get("admin.commPrefs.address")</th><th scope="col">@Texts.Get("marketing.col.reason")</th><th scope="col">@Texts.Get("admin.supportAccess.col.start")</th><th scope="col">@Texts.Get("admin.supportAccess.col.end")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col"><span class="visually-hidden">@Texts.Get("admin.automationRun.col.action")</span></th></tr></thead>
                     <tbody>
                     @foreach (var b in blocks.Items)
                     {
@@ -173,12 +170,12 @@
                             <td>@b.Address</td>
                             <td>@ReasonText(b.Reason)@(string.IsNullOrWhiteSpace(b.Note) ? null : " · " + b.Note)</td>
                             <td>@CrmLabels.Time(b.StartsAt)</td>
-                            <td>@(b.EndsAt is { } end ? CrmLabels.Time(end) : "süresiz")</td>
-                            <td>@(b.LiftedAt is not null ? "Kaldırıldı" + (string.IsNullOrWhiteSpace(b.LiftReason) ? null : " · " + b.LiftReason) : b.IsActive ? "Etkin" : "Süresi doldu")</td>
+                            <td>@(b.EndsAt is { } end ? CrmLabels.Time(end) : Texts.Get("admin.commPrefs.noEnd"))</td>
+                            <td>@(b.LiftedAt is not null ? Texts.Get("admin.commPrefs.lifted") + (string.IsNullOrWhiteSpace(b.LiftReason) ? null : " · " + b.LiftReason) : b.IsActive ? Texts.Get("admin.customFields.active") : Texts.Get("admin.supportAccess.state.expired"))</td>
                             <td>
                                 @if (b.IsActive && Session.Can(CoreAccess.SuppressCommunication))
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => AskLift(b)">Engeli kaldır</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => AskLift(b)">@Texts.Get("admin.commPrefs.lift")</button>
                                 }
                             </td>
                         </tr>
@@ -187,10 +184,10 @@
                             <tr>
                                 <td colspan="7">
                                     <div class="filters">
-                                        <label class="visually-hidden" for="lift-reason">Gerekçe</label>
-                                        <input id="lift-reason" class="form-control" maxlength="500" placeholder="Kaldırma gerekçesi (zorunlu)" @bind="liftReason" />
-                                        <button type="button" class="btn btn-sm btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(liftReason))" @onclick="LiftAsync">Onayla</button>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => liftId = null">Vazgeç</button>
+                                        <label class="visually-hidden" for="lift-reason">@Texts.Get("admin.supportAccess.col.reason")</label>
+                                        <input id="lift-reason" class="form-control" maxlength="500" placeholder="@Texts.Get("admin.commPrefs.liftReason")" @bind="liftReason" />
+                                        <button type="button" class="btn btn-sm btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(liftReason))" @onclick="LiftAsync">@Texts.Get("admin.commPrefs.confirm")</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => liftId = null">@Texts.Get("common.dismiss")</button>
                                     </div>
                                 </td>
                             </tr>
@@ -206,44 +203,43 @@
         {
             <form class="record-form" novalidate @onsubmit="AddBlockAsync" @onsubmit:preventDefault>
                 <fieldset disabled="@busy">
-                    <legend class="h6">Adresi engelle</legend>
-                    <p class="text-muted small">Engellenen adrese hiçbir pazarlama iletisi gitmez; izin verilmiş olsa bile. Kaldırmak gerekçe ister ve tarihçeye yazılır.</p>
+                    <legend class="h6">@Texts.Get("admin.commPrefs.blockTitle")</legend>
+                    <p class="text-muted small">@Texts.Get("admin.commPrefs.blockHint")</p>
                     <div class="form-grid">
                         <div class="span-3">
-                            <label class="form-label" for="s-ch">Kanal</label>
+                            <label class="form-label" for="s-ch">@Texts.Get("admin.commPrefs.channel")</label>
                             <select id="s-ch" class="form-select" @bind="blockChannel">
                                 @foreach (var c in Channels) { <option value="@c.Key">@c.Label</option> }
                             </select>
                             <FieldError Field="channel" Errors="errors" />
                         </div>
                         <div class="span-5">
-                            <label class="form-label" for="s-addr">Adres</label>
+                            <label class="form-label" for="s-addr">@Texts.Get("admin.commPrefs.address")</label>
                             <input id="s-addr" class="form-control" maxlength="254" @bind="blockAddress" />
                             <FieldError Field="address" Errors="errors" />
                         </div>
                         <div class="span-4">
-                            <label class="form-label" for="s-reason">Neden</label>
+                            <label class="form-label" for="s-reason">@Texts.Get("marketing.col.reason")</label>
                             <select id="s-reason" class="form-select" @bind="blockReason">
-                                @foreach (var r in Reasons) { <option value="@r.Key">@r.Label</option> }
+                                @foreach (var r in SettingsLabels.SuppressionReasons) { <option value="@r.Key">@r.Label</option> }
                             </select>
                             <FieldError Field="reason" Errors="errors" />
                         </div>
                         <div class="span-12">
-                            <label class="form-label" for="s-note">Not (isteğe bağlı)</label>
+                            <label class="form-label" for="s-note">@Texts.Get("admin.commPrefs.note")</label>
                             <input id="s-note" class="form-control" maxlength="500" @bind="blockNote" />
                             <FieldError Field="note" Errors="errors" />
                         </div>
                     </div>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(blockAddress))">Engelle</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(blockAddress))">@Texts.Get("admin.commPrefs.block")</button></div>
             </form>
         }
     }
     else
     {
         <p class="text-muted">
-            Konu, pazarlama iznini değil yalnızca kapsamını daraltır: kişi bir konudan çıkabilir, ama konuya dönmek izin vermez. Konusu seçilmiş bir kampanya, o konudan çıkmış alıcılara gönderilmez.
-            Kişiler konu tercihini abonelik bağlantısındaki tercih merkezinden de değiştirebilir.
+            @Texts.Get("admin.commPrefs.topicsIntro")
         </p>
 
         @if (topics is null && message is null)
@@ -252,25 +248,25 @@
         }
         else if (topics is not null && topics.Count == 0)
         {
-            <p class="text-muted" role="status">Henüz konu tanımlı değil.</p>
+            <p class="text-muted" role="status">@Texts.Get("admin.commPrefs.noTopics")</p>
         }
         else if (topics is not null)
         {
             <div class="table-wrap">
                 <table class="table table-sm">
-                    <caption class="visually-hidden">Konular</caption>
-                    <thead><tr><th scope="col">Anahtar</th><th scope="col">Ad</th><th scope="col">Durum</th><th scope="col"><span class="visually-hidden">İşlem</span></th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("admin.commPrefs.tab.topics")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("admin.commPrefs.key")</th><th scope="col">@Texts.Get("common.field.name")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col"><span class="visually-hidden">@Texts.Get("admin.automationRun.col.action")</span></th></tr></thead>
                     <tbody>
                     @foreach (var t in topics)
                     {
                         <tr>
                             <td><code>@t.Key</code></td>
                             <td>@t.Name</td>
-                            <td><span class="badge @(t.IsActive ? "text-bg-success" : "text-bg-secondary")">@(t.IsActive ? "Açık" : "Kapalı")</span></td>
+                            <td><span class="badge @(t.IsActive ? "text-bg-success" : "text-bg-secondary")">@(t.IsActive ? Texts.Get("two-factor.on") : Texts.Get("two-factor.off"))</span></td>
                             <td>
                                 @if (Session.Can(CoreAccess.ManageCommunication))
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => ToggleTopicAsync(t)">@(t.IsActive ? "Kapat" : "Aç")</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => ToggleTopicAsync(t)">@(t.IsActive ? Texts.Get("common.close") : Texts.Get("common.open"))</button>
                                 }
                             </td>
                         </tr>
@@ -284,30 +280,30 @@
         {
             <form class="record-form" novalidate @onsubmit="SaveTopicAsync" @onsubmit:preventDefault>
                 <fieldset disabled="@busy">
-                    <legend class="h6">Konu ekle</legend>
-                    <p class="text-muted small">Anahtar küçük harf, rakam ve tireden oluşur ve sonradan değişmez (ör. haber-bulteni). Kapalı konu yeni kampanyada seçilemez ve tercih merkezinde görünmez; mevcut tercihler korunur.</p>
+                    <legend class="h6">@Texts.Get("admin.commPrefs.addTopic")</legend>
+                    <p class="text-muted small">@Texts.Get("admin.commPrefs.topicHint")</p>
                     <div class="form-grid">
                         <div class="span-4">
-                            <label class="form-label" for="t-key">Anahtar</label>
+                            <label class="form-label" for="t-key">@Texts.Get("admin.commPrefs.key")</label>
                             <input id="t-key" class="form-control" maxlength="40" @bind="topicKey" />
                             <FieldError Field="key" Errors="errors" />
                         </div>
                         <div class="span-8">
-                            <label class="form-label" for="t-name">Ad</label>
+                            <label class="form-label" for="t-name">@Texts.Get("common.field.name")</label>
                             <input id="t-name" class="form-control" maxlength="100" @bind="topicName" />
                             <FieldError Field="name" Errors="errors" />
                         </div>
                     </div>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(topicKey) || string.IsNullOrWhiteSpace(topicName))">Kaydet</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(topicKey) || string.IsNullOrWhiteSpace(topicName))">@Texts.Get("common.save")</button></div>
             </form>
         }
 
-        <h2 class="h6 mt-4">Konudan çıkışlar</h2>
+        <h2 class="h6 mt-4">@Texts.Get("admin.commPrefs.optOuts")</h2>
         <div class="filters">
-            <label class="visually-hidden" for="tp-topic">Konu</label>
+            <label class="visually-hidden" for="tp-topic">@Texts.Get("admin.commPrefs.topic")</label>
             <select id="tp-topic" class="form-select form-select-sm filter-select" @bind="topicFilter" @bind:after="() => LoadTopicPrefsAsync(1)">
-                <option value="">Tüm konular</option>
+                <option value="">@Texts.Get("admin.commPrefs.allTopics")</option>
                 @foreach (var t in topics ?? []) { <option value="@t.Key">@t.Name</option> }
             </select>
         </div>
@@ -317,14 +313,14 @@
         }
         else if (topicPrefs is not null && topicPrefs.Items.Count == 0)
         {
-            <EmptyState Compact="true" Title="Konudan çıkış kaydı yok." />
+            <EmptyState Compact="true" Title="@Texts.Get("admin.commPrefs.noOptOuts")" />
         }
         else if (topicPrefs is not null)
         {
             <div class="table-wrap">
                 <table class="table table-sm">
-                    <caption class="visually-hidden">Konu tercihleri</caption>
-                    <thead><tr><th scope="col">Kanal</th><th scope="col">Adres</th><th scope="col">Konu</th><th scope="col">Durum</th><th scope="col">Kaynak</th><th scope="col">Değişti</th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("admin.commPrefs.topicPrefs")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("admin.commPrefs.channel")</th><th scope="col">@Texts.Get("admin.commPrefs.address")</th><th scope="col">@Texts.Get("admin.commPrefs.topic")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("admin.automation.source")</th><th scope="col">@Texts.Get("admin.commPrefs.changed")</th></tr></thead>
                     <tbody>
                     @foreach (var p in topicPrefs.Items)
                     {
@@ -332,7 +328,7 @@
                             <td>@ChannelText(p.Channel)</td>
                             <td>@p.Address</td>
                             <td>@TopicName(p.TopicKey)</td>
-                            <td><span class="badge @(p.OptedOut ? "text-bg-danger" : "text-bg-success")">@(p.OptedOut ? "Konudan çıktı" : "Konuda")</span></td>
+                            <td><span class="badge @(p.OptedOut ? "text-bg-danger" : "text-bg-success")">@(p.OptedOut ? Texts.Get("admin.commPrefs.optedOut") : Texts.Get("admin.commPrefs.inTopic"))</span></td>
                             <td>@p.Source</td>
                             <td>@CrmLabels.Time(p.ChangedAt)</td>
                         </tr>
@@ -347,48 +343,46 @@
         {
             <form class="record-form" novalidate @onsubmit="SaveTopicPrefAsync" @onsubmit:preventDefault>
                 <fieldset disabled="@busy">
-                    <legend class="h6">Konu çıkışı kaydet</legend>
-                    <p class="text-muted small">Konudan çıkış her kaynakla kaydedilir. Çıkışı geri açmak yalnızca kişinin kendisi (tercih merkezi) ya da yetkili kullanıcıyla olur ve pazarlama izni vermez.</p>
+                    <legend class="h6">@Texts.Get("admin.commPrefs.optOutTitle")</legend>
+                    <p class="text-muted small">@Texts.Get("admin.commPrefs.optOutHint")</p>
                     <div class="form-grid">
                         <div class="span-3">
-                            <label class="form-label" for="tp-ch">Kanal</label>
+                            <label class="form-label" for="tp-ch">@Texts.Get("admin.commPrefs.channel")</label>
                             <select id="tp-ch" class="form-select" @bind="tpChannel">
                                 @foreach (var c in Channels) { <option value="@c.Key">@c.Label</option> }
                             </select>
                             <FieldError Field="channel" Errors="errors" />
                         </div>
                         <div class="span-4">
-                            <label class="form-label" for="tp-addr">Adres</label>
+                            <label class="form-label" for="tp-addr">@Texts.Get("admin.commPrefs.address")</label>
                             <input id="tp-addr" class="form-control" maxlength="254" @bind="tpAddress" />
                             <FieldError Field="address" Errors="errors" />
                         </div>
                         <div class="span-3">
-                            <label class="form-label" for="tp-key">Konu</label>
+                            <label class="form-label" for="tp-key">@Texts.Get("admin.commPrefs.topic")</label>
                             <select id="tp-key" class="form-select" @bind="tpTopic">
-                                <option value="">Seçin</option>
+                                <option value="">@Texts.Get("support.choose")</option>
                                 @foreach (var t in topics) { <option value="@t.Key">@t.Name</option> }
                             </select>
                             <FieldError Field="topicKey" Errors="errors" />
                         </div>
                         <div class="span-2">
-                            <label class="form-label" for="tp-out">Durum</label>
+                            <label class="form-label" for="tp-out">@Texts.Get("common.field.status")</label>
                             <select id="tp-out" class="form-select" @bind="tpOptedOut">
-                                <option value="true">Konudan çıktı</option>
-                                <option value="false">Konuya döndü</option>
+                                <option value="true">@Texts.Get("admin.commPrefs.optedOut")</option>
+                                <option value="false">@Texts.Get("admin.commPrefs.optedIn")</option>
                             </select>
                         </div>
                     </div>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(tpAddress) || tpTopic.Length == 0)">Kaydet</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(tpAddress) || tpTopic.Length == 0)">@Texts.Get("common.save")</button></div>
             </form>
         }
     }
 </AuthGate>
 
 @code {
-    private static readonly (string Key, string Label)[] Channels = [("Email", "E-posta"), ("Phone", "Telefon"), ("Sms", "SMS"), ("WhatsApp", "WhatsApp")];
-    private static readonly (string Key, string Label)[] Reasons =
-        [("OptOut", "Çıkış (kişi istedi)"), ("Complaint", "Şikâyet"), ("HardBounce", "Kalıcı geri dönme"), ("InvalidAddress", "Geçersiz adres"), ("Manual", "Elle")];
+    private static IReadOnlyList<(string Key, string Label)> Channels => MarketingLabels.Channels;
 
     private string tab = "prefs";
     private PreferencePageDto? prefs;
@@ -463,7 +457,7 @@
         {
             topicKey = string.Empty; topicName = string.Empty;
             await LoadTopicsAsync();
-            Report("Konu kaydedildi.", false);
+            Report(Texts.Get("admin.commPrefs.topicSaved"), false);
         }
         else
         {
@@ -480,7 +474,7 @@
         if (result.IsSuccess)
         {
             await LoadTopicsAsync();
-            Report(topic.IsActive ? "Konu kapatıldı." : "Konu açıldı.", false);
+            Report(topic.IsActive ? Texts.Get("admin.commPrefs.topicClosed") : Texts.Get("admin.commPrefs.topicOpened"), false);
         }
         else
         {
@@ -499,7 +493,7 @@
         {
             tpAddress = string.Empty;
             await LoadTopicPrefsAsync(1);
-            Report("Konu tercihi kaydedildi.", false);
+            Report(Texts.Get("admin.commPrefs.topicPrefSaved"), false);
         }
         else
         {
@@ -547,7 +541,7 @@
         if (result.IsSuccess)
         {
             formAddress = string.Empty; formEvidence = string.Empty; formReason = string.Empty;
-            Report("Tercih kaydedildi.", false);
+            Report(Texts.Get("admin.commPrefs.prefSaved"), false);
             await LoadPrefsAsync(1);
         }
         else
@@ -567,7 +561,7 @@
         if (result.IsSuccess)
         {
             blockAddress = string.Empty; blockNote = string.Empty;
-            Report("Adres engellendi.", false);
+            Report(Texts.Get("admin.commPrefs.blocked"), false);
             await LoadBlocksAsync(1);
         }
         else
@@ -590,7 +584,7 @@
         var result = await Api.PostAsync<SuppressionDto>($"/api/communication/suppressions/{id}/lift", new LiftSuppressionRequest(liftReason.Trim()));
         busy = false;
         liftId = null;
-        Report(result.IsSuccess ? "Engel kaldırıldı." : result.Error, !result.IsSuccess);
+        Report(result.IsSuccess ? Texts.Get("admin.commPrefs.liftedNotice") : result.Error, !result.IsSuccess);
         await LoadBlocksAsync(1);
     }
 
@@ -600,13 +594,13 @@
         failed = isFailure;
     }
 
-    private static string ChannelText(string key) => Channels.FirstOrDefault(c => c.Key == key).Label ?? key;
+    private static string ChannelText(string key) => MarketingLabels.Lookup(MarketingLabels.ChannelGroup, MarketingLabels.ChannelSource, key);
 
-    private static string PurposeText(string key) => key switch { "Marketing" => "Pazarlama", "Transactional" => "İşlemsel", "Service" => "Hizmet", _ => key };
+    private static string PurposeText(string key) => SettingsLabels.ConsentPurpose(key);
 
-    private static string ReasonText(string key) => Reasons.FirstOrDefault(r => r.Key == key).Label ?? key;
+    private static string ReasonText(string key) => SettingsLabels.SuppressionReason(key);
 
-    private static string StatusText(string key) => key switch { "Granted" => "İzinli", "Denied" => "Reddedildi", "Unknown" => "Bilinmiyor", _ => key };
+    private static string StatusText(string key) => SettingsLabels.ConsentStatus(key);
 
     private static string StatusClass(string key) => key switch { "Granted" => "text-bg-success", "Denied" => "text-bg-danger", _ => "text-bg-secondary" };
 }

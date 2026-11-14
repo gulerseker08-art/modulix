@@ -2,37 +2,35 @@
 
 @if (Plan.IsEmpty)
 {
-    <p class="text-muted">Eklenecek bir şey yok: profilin alanları ve değerleri firmada zaten var.</p>
+    <p class="text-muted">@Texts.Get("admin.sectorProfile.nothingToAdd")</p>
 }
 else
 {
-    <p>@(Applied ? "Şunlar eklendi:" : "Şunlar eklenecek:")</p>
+    <p>@(Applied ? Texts.Get("admin.sectorProfile.added") : Texts.Get("admin.sectorProfile.toAdd"))</p>
     <ul class="profile-plan">
         @if (Plan.ModulesToEnable.Count > 0)
         {
-            <li><strong>Açılacak modüller:</strong> @string.Join(", ", Plan.ModulesToEnable)</li>
+            <li><strong>@Texts.Get("admin.sectorProfile.modulesToEnable")</strong> @string.Join(", ", Plan.ModulesToEnable)</li>
         }
         @foreach (var field in Plan.Fields)
         {
-            <li>
-                <strong>@field.EntityName</strong> kaydına <em>@field.Label</em> alanı (@CustomFieldTypeLabels.Of(field.Type)@(field.Options.Count > 0 ? $": {string.Join(", ", field.Options)}" : null))
-            </li>
+            <li>@FieldLine(field)</li>
         }
         @foreach (var value in Plan.ListValues)
         {
-            <li><strong>@value.ListName</strong> listesine <em>@value.Label</em> değeri</li>
+            <li>@((MarkupString)Texts.Get("admin.sectorProfile.planValue", Bold(value.ListName), Italic(value.Label)))</li>
         }
     </ul>
 }
 @if (Plan.UnavailableModules.Count > 0)
 {
     <p class="form-text">
-        @string.Join(", ", Plan.UnavailableModules) modülü firmada kapalı; bu modülün alanları ve değerleri eklenmez. Modülü platform yöneticisi açabilir.
+        @Texts.Get("admin.sectorProfile.unavailable", string.Join(", ", Plan.UnavailableModules))
     </p>
 }
 @if (!Applied)
 {
-    <p class="form-text">Mevcut alanlar ve liste değerleri değişmez; aynı adlı olanlar atlanır.</p>
+    <p class="form-text">@Texts.Get("admin.sectorProfile.keepsExisting")</p>
 }
 
 @code {
@@ -40,4 +38,15 @@ else
 
     /// <summary>Uygulandıktan sonra gösteriliyorsa true ("Şunlar eklendi").</summary>
     [Parameter] public bool Applied { get; set; }
+
+    // Kayıt türü kalın, alan adı eğik yazılır; sunucudan gelen adlar HTML'e kodlanır.
+    private static string Bold(string text) => $"<strong>{System.Net.WebUtility.HtmlEncode(text)}</strong>";
+
+    private static string Italic(string text) => $"<em>{System.Net.WebUtility.HtmlEncode(text)}</em>";
+
+    private static MarkupString FieldLine(ProfileFieldDto field)
+    {
+        var type = SettingsLabels.FieldType(field.Type) + (field.Options.Count > 0 ? $": {string.Join(", ", field.Options)}" : null);
+        return (MarkupString)Texts.Get("admin.sectorProfile.planField", Bold(field.EntityName), Italic(field.Label), System.Net.WebUtility.HtmlEncode(type));
+    }
 }

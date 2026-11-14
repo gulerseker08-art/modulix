@@ -15,9 +15,9 @@ else
 {
     var run = detail.Run;
     <p class="text-muted">
-        @ImportText.Mode(run.Mode) · @ImportText.Policy(run.Policy)
-        @if (run.StartedAt is { } started) { <text> · Başladı: @CrmLabels.Time(started)</text> }
-        @if (run.CompletedAt is { } done) { <text> · Bitti: @CrmLabels.Time(done)</text> }
+        @SettingsLabels.ImportMode(run.Mode) · @SettingsLabels.ImportPolicy(run.Policy)
+        @if (run.StartedAt is { } started) { <text> · @Texts.Get("admin.importRun.startedAt", CrmLabels.Time(started))</text> }
+        @if (run.CompletedAt is { } done) { <text> · @Texts.Get("admin.importRun.finishedAt", CrmLabels.Time(done))</text> }
     </p>
     @if (run.Note is not null)
     {
@@ -31,19 +31,19 @@ else
         @if (!confirming)
         {
             <div class="list-toolbar">
-                <button type="button" class="btn btn-outline-danger" @onclick="() => confirming = true">İçe aktarılan kayıtları geri al</button>
+                <button type="button" class="btn btn-outline-danger" @onclick="() => confirming = true">@Texts.Get("admin.importRun.rollback")</button>
             </div>
         }
         else
         {
             <div class="alert alert-warning" role="alertdialog" aria-labelledby="rollback-title">
-                <h3 id="rollback-title" class="h6">@run.CreatedCount kaydı geri al</h3>
-                <p>Bu içe aktarmanın oluşturduğu kayıtlar silinir. Sonradan değiştirilmiş ya da başka kayda bağlanmış kayıtlar korunur.</p>
-                <label class="form-label required" for="rollback-reason">Gerekçe</label>
+                <h3 id="rollback-title" class="h6">@Texts.Get("admin.importRun.rollbackTitle", run.CreatedCount)</h3>
+                <p>@Texts.Get("admin.importRun.rollbackHint")</p>
+                <label class="form-label required" for="rollback-reason">@Texts.Get("admin.supportAccess.col.reason")</label>
                 <input id="rollback-reason" class="form-control mb-2" maxlength="300" @bind="reason" @bind:event="oninput" />
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = false">Vazgeç</button>
-                    <button type="button" class="btn btn-danger" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" aria-busy="@(busy ? "true" : "false")" @onclick="RollBackAsync">Geri al</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = false">@Texts.Get("common.dismiss")</button>
+                    <button type="button" class="btn btn-danger" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" aria-busy="@(busy ? "true" : "false")" @onclick="RollBackAsync">@Texts.Get("admin.importRun.rollbackConfirm")</button>
                 </div>
             </div>
         }
@@ -51,39 +51,39 @@ else
     @if (outcome is not null)
     {
         <div class="alert @(outcome.Kept.Count == 0 ? "alert-success" : "alert-warning")" role="status">
-            @outcome.Removed kayıt silindi@(outcome.AlreadyRemoved > 0 ? $", {outcome.AlreadyRemoved} kayıt zaten silinmişti" : string.Empty)@(outcome.Kept.Count > 0 ? $"; {outcome.Kept.Count} kayıt korundu: {string.Join(" ", outcome.Kept.Select(k => k.Reason).Distinct())}" : ".")
+            @Outcome(outcome)
         </div>
     }
 
     @if (detail.IssueCodes.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu içe aktarmada satır hatası yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("admin.importRun.noIssues")" />
     }
     else
     {
-        <div class="filters" role="group" aria-label="Hata koduna göre süz">
-            <button type="button" class="chip @(code is null ? "active" : null)" aria-pressed="@(code is null ? "true" : "false")" @onclick="() => FilterCodeAsync(null)">Tümü</button>
+        <div class="filters" role="group" aria-label="@Texts.Get("admin.importRun.filterByCode")">
+            <button type="button" class="chip @(code is null ? "active" : null)" aria-pressed="@(code is null ? "true" : "false")" @onclick="() => FilterCodeAsync(null)">@Texts.Get("admin.subProfiles.all")</button>
             @foreach (var item in detail.IssueCodes)
             {
                 <button type="button" class="chip @(code == item.Code ? "active" : null)" aria-pressed="@(code == item.Code ? "true" : "false")"
-                        @onclick="() => FilterCodeAsync(item.Code)">@ImportText.Code(item.Code) (@item.Count)</button>
+                        @onclick="() => FilterCodeAsync(item.Code)">@SettingsLabels.ImportCode(item.Code) (@item.Count)</button>
             }
         </div>
 
         <table class="table record-table">
-            <caption class="visually-hidden">Satır hataları</caption>
+            <caption class="visually-hidden">@Texts.Get("admin.importRun.issues")</caption>
             <thead>
-                <tr><th scope="col">Satır</th><th scope="col">Sütun</th><th scope="col">Hata</th><th scope="col">Önem</th><th scope="col">Açıklama</th></tr>
+                <tr><th scope="col">@Texts.Get("admin.importRun.row")</th><th scope="col">@Texts.Get("admin.importDesign.column")</th><th scope="col">@Texts.Get("admin.importRun.error")</th><th scope="col">@Texts.Get("admin.importRun.severity")</th><th scope="col">@Texts.Get("common.field.description")</th></tr>
             </thead>
             <tbody>
                 @foreach (var issue in detail.Issues.Items)
                 {
                     <tr>
-                        <td data-label="Satır">@(issue.RowNo == 0 ? "Dosya" : issue.RowNo.ToString())</td>
-                        <td data-label="Sütun">@(issue.ColumnKey ?? "—")</td>
-                        <td data-label="Hata">@ImportText.Code(issue.Code)</td>
-                        <td data-label="Önem"><span class="badge stage-@ImportText.SeverityBadge(issue.Severity)">@ImportText.Severity(issue.Severity)</span></td>
-                        <td data-label="Açıklama">@issue.Message</td>
+                        <td data-label="@Texts.Get("admin.importRun.row")">@(issue.RowNo == 0 ? Texts.Get("admin.importRun.file") : issue.RowNo.ToString())</td>
+                        <td data-label="@Texts.Get("admin.importDesign.column")">@(issue.ColumnKey ?? "—")</td>
+                        <td data-label="@Texts.Get("admin.importRun.error")">@SettingsLabels.ImportCode(issue.Code)</td>
+                        <td data-label="@Texts.Get("admin.importRun.severity")"><span class="badge stage-@ImportText.SeverityBadge(issue.Severity)">@SettingsLabels.ImportSeverity(issue.Severity)</span></td>
+                        <td data-label="@Texts.Get("common.field.description")">@issue.Message</td>
                     </tr>
                 }
             </tbody>
@@ -91,7 +91,7 @@ else
         <Pager Page="detail.Issues.Page" PageSize="detail.Issues.PageSize" TotalCount="detail.Issues.TotalCount" PageChanged="LoadAsync" />
         @if (run.FailedCount > detail.IssueCodes.Sum(c => c.Count))
         {
-            <p class="text-muted">Hata sayısı saklama sınırını aştı; yalnızca saklanan satır hataları gösteriliyor, kalanı sayıya yansır.</p>
+            <p class="text-muted">@Texts.Get("admin.importRun.truncated")</p>
         }
     }
 }
@@ -106,6 +106,12 @@ else
     private bool busy;
     private string? reason;
     private ImportRollbackDto? outcome;
+
+    // Geri alma sonucu: silinen, zaten silinmiş ve korunan kayıt sayıları; korunma nedenleri sunucudan gelir.
+    private static string Outcome(ImportRollbackDto result) =>
+        Texts.Get("admin.importRun.removed", result.Removed)
+        + (result.AlreadyRemoved > 0 ? Texts.Get("admin.importRun.alreadyRemoved", result.AlreadyRemoved) : string.Empty)
+        + (result.Kept.Count > 0 ? Texts.Get("admin.importRun.kept", result.Kept.Count, string.Join(" ", result.Kept.Select(k => k.Reason).Distinct())) : ".");
 
     private bool CanRollBack(ImportRunDto run) =>
         Session.Can(CoreAccess.RollbackImports) && run.Mode == "Apply" && run.Status is "Succeeded" or "PartiallySucceeded" && run.CreatedCount > 0;

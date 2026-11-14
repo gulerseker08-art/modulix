@@ -2,27 +2,27 @@
 @inject ApiClient Api
 @inject FormLayouts Layouts
 
-<PageTitle>Form tasarımı · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.form-designer") · Modulix</PageTitle>
 
 @* Form tasarımı (ADR-0021): firma yöneticisi her formun sekmelerini, bölümlerini ve alanlarını düzenler — alan taşır, yeni sekme ve
    bölüm açar, genişlik, zorunluluk ve görünürlük belirler. Alanların kendisi (girdi tipi, doğrulama) koddadır; buradan yalnızca
    yerleşim ve zorunluluk değişir. Kodun zorunlu tuttuğu ve sabit alanlar değiştirilemez; zorunluluk sunucuda da denetlenir. *@
 <AuthGate Permission="@CoreAccess.ManageCustomization">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
-    <PageHeader Title="Form tasarımı" Icon="clipboard-list" Subtitle="Formların sekmelerini, bölümlerini ve alanlarını firmanıza göre düzenleyin.">
+    <PageHeader Title="@Texts.Get("nav.app.admin.form-designer")" Icon="clipboard-list" Subtitle="@Texts.Get("admin.formDesigner.subtitle")">
         @if (current is not null)
         {
             @if (current.Customized)
             {
-                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ResetAsync">Varsayılana dön</button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ResetAsync">@Texts.Get("common.columns.reset")</button>
             }
             <button type="button" class="btn btn-primary" disabled="@(busy || !dirty)" @onclick="SaveAsync">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         }
     </PageHeader>
@@ -56,44 +56,42 @@
     {
         <div class="designer-toolbar">
             <div>
-                <label class="form-label" for="designer-form">Form</label>
+                <label class="form-label" for="designer-form">@Texts.Get("admin.formDesigner.form")</label>
                 <select id="designer-form" class="form-select" value="@current?.EntityKey" @onchange="OnFormChanged">
                     @foreach (var item in layouts)
                     {
-                        <option value="@item.EntityKey">@item.EntityName@(item.Customized ? " · firma düzeni" : null)</option>
+                        <option value="@item.EntityKey">@item.EntityName@(item.Customized ? " · " + Texts.Get("admin.formDesigner.customized") : null)</option>
                     }
                 </select>
             </div>
             <div class="designer-toolbar-actions">
-                <button type="button" class="btn btn-outline-primary" disabled="@(tabs.Count >= 8)" @onclick="AddTab"><span aria-hidden="true">+</span> Yeni sekme</button>
+                <button type="button" class="btn btn-outline-primary" disabled="@(tabs.Count >= 8)" @onclick="AddTab"><span aria-hidden="true">+</span> @Texts.Get("admin.formDesigner.newTab")</button>
             </div>
         </div>
 
         @if (current is not null)
         {
             <p class="text-muted small">
-                Sürükleme yerine ok düğmeleri ve "taşı" listeleri kullanılır; böylece klavyeyle de çalışır. Sabit alanlar (<AppIcon Name="shield" Size="14" />) gizlenemez ve
-                zorunluluğu değişmez; kodun zorunlu tuttuğu alan isteğe bağlı yapılamaz. Özel alanlar "Özel alanlar" ekranında tanımlanır, burada yalnızca yerleşir.
-                Zorunlu kıldığınız alanlar kaydederken sunucuda da denetlenir.
+                @IntroParts[0]<AppIcon Name="shield" Size="14" />@IntroParts[1]
             </p>
 
             @for (var ti = 0; ti < tabs.Count; ti++)
             {
                 var tab = tabs[ti];
                 var tabIndex = ti;
-                <section class="section-card designer-tab" aria-label="@tab.Label sekmesi">
+                <section class="section-card designer-tab" aria-label="@Texts.Get("admin.formDesigner.tabOf", tab.Label)">
                     <div class="designer-tab-head">
                         <span class="section-card-icon" aria-hidden="true"><AppIcon Name="layers" Size="18" /></span>
                         <div class="designer-name">
-                            <label class="visually-hidden" for="tab-label-@tab.Key">Sekme adı</label>
+                            <label class="visually-hidden" for="tab-label-@tab.Key">@Texts.Get("admin.formDesigner.tabName")</label>
                             <input id="tab-label-@tab.Key" class="form-control" maxlength="60" value="@tab.Label" @onchange="e => Rename(tab, e.Value as string)" />
-                            <small class="text-muted">Sekme</small>
+                            <small class="text-muted">@Texts.Get("admin.formDesigner.tab")</small>
                         </div>
                         <div class="designer-actions">
-                            <button type="button" class="icon-button" title="Yukarı taşı" aria-label="@tab.Label sekmesini yukarı taşı" disabled="@(tabIndex == 0)" @onclick="() => MoveTab(tabIndex, -1)">↑</button>
-                            <button type="button" class="icon-button" title="Aşağı taşı" aria-label="@tab.Label sekmesini aşağı taşı" disabled="@(tabIndex == tabs.Count - 1)" @onclick="() => MoveTab(tabIndex, 1)">↓</button>
-                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => AddSection(tab)"><span aria-hidden="true">+</span> Bölüm ekle</button>
-                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(tabs.Count == 1)" @onclick="() => RemoveTab(tab)">Sekmeyi sil</button>
+                            <button type="button" class="icon-button" title="@Texts.Get("admin.formDesigner.moveUp")" aria-label="@Texts.Get("admin.formDesigner.tabUp", tab.Label)" disabled="@(tabIndex == 0)" @onclick="() => MoveTab(tabIndex, -1)">↑</button>
+                            <button type="button" class="icon-button" title="@Texts.Get("admin.formDesigner.moveDown")" aria-label="@Texts.Get("admin.formDesigner.tabDown", tab.Label)" disabled="@(tabIndex == tabs.Count - 1)" @onclick="() => MoveTab(tabIndex, 1)">↓</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => AddSection(tab)"><span aria-hidden="true">+</span> @Texts.Get("admin.formDesigner.addSection")</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(tabs.Count == 1)" @onclick="() => RemoveTab(tab)">@Texts.Get("admin.formDesigner.removeTab")</button>
                         </div>
                     </div>
 
@@ -106,12 +104,12 @@
                             <div class="designer-section-head">
                                 <span class="section-card-icon" aria-hidden="true"><AppIcon Name="@(section.Icon ?? "square-pen")" Size="16" /></span>
                                 <div class="designer-name">
-                                    <label class="visually-hidden" for="section-label-@section.Key">Bölüm adı</label>
+                                    <label class="visually-hidden" for="section-label-@section.Key">@Texts.Get("admin.formDesigner.sectionName")</label>
                                     <input id="section-label-@section.Key" class="form-control form-control-sm" maxlength="60" value="@section.Label" @onchange="e => Rename(section, e.Value as string)" />
                                 </div>
-                                <label class="visually-hidden" for="section-icon-@section.Key">Bölüm ikonu</label>
+                                <label class="visually-hidden" for="section-icon-@section.Key">@Texts.Get("admin.formDesigner.sectionIcon")</label>
                                 <select id="section-icon-@section.Key" class="form-select form-select-sm designer-icon" value="@(section.Icon ?? "")" @onchange="e => SetIcon(section, e.Value as string)">
-                                    <option value="">İkon yok</option>
+                                    <option value="">@Texts.Get("admin.formDesigner.noIcon")</option>
                                     @foreach (var icon in Icons)
                                     {
                                         <option value="@icon">@icon</option>
@@ -119,7 +117,7 @@
                                 </select>
                                 @if (tabs.Count > 1)
                                 {
-                                    <label class="visually-hidden" for="section-tab-@section.Key">Bölümün sekmesi</label>
+                                    <label class="visually-hidden" for="section-tab-@section.Key">@Texts.Get("admin.formDesigner.sectionTab")</label>
                                     <select id="section-tab-@section.Key" class="form-select form-select-sm designer-move" value="@section.Tab" @onchange="e => MoveSectionToTab(section, e.Value as string)">
                                         @foreach (var t in tabs)
                                         {
@@ -128,27 +126,27 @@
                                     </select>
                                 }
                                 <div class="designer-actions">
-                                    <button type="button" class="icon-button" title="Yukarı taşı" aria-label="@section.Label bölümünü yukarı taşı" disabled="@(inTab.IndexOf(section) == 0)" @onclick="() => MoveSection(section, -1)">↑</button>
-                                    <button type="button" class="icon-button" title="Aşağı taşı" aria-label="@section.Label bölümünü aşağı taşı" disabled="@(inTab.IndexOf(section) == inTab.Count - 1)" @onclick="() => MoveSection(section, 1)">↓</button>
-                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(sections.Count == 1)" @onclick="() => RemoveSection(section)">Bölümü sil</button>
+                                    <button type="button" class="icon-button" title="@Texts.Get("admin.formDesigner.moveUp")" aria-label="@Texts.Get("admin.formDesigner.sectionUp", section.Label)" disabled="@(inTab.IndexOf(section) == 0)" @onclick="() => MoveSection(section, -1)">↑</button>
+                                    <button type="button" class="icon-button" title="@Texts.Get("admin.formDesigner.moveDown")" aria-label="@Texts.Get("admin.formDesigner.sectionDown", section.Label)" disabled="@(inTab.IndexOf(section) == inTab.Count - 1)" @onclick="() => MoveSection(section, 1)">↓</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(sections.Count == 1)" @onclick="() => RemoveSection(section)">@Texts.Get("admin.formDesigner.removeSection")</button>
                                 </div>
                             </div>
 
                             @if (fieldsHere.Count == 0)
                             {
-                                <p class="text-muted small designer-empty">Bu bölümde alan yok; başka bölümdeki bir alanı "Bölüm" listesinden buraya taşıyın.</p>
+                                <p class="text-muted small designer-empty">@Texts.Get("admin.formDesigner.emptySection")</p>
                             }
                             else
                             {
                                 <table class="table record-table designer-fields">
                                     <thead>
                                         <tr>
-                                            <th scope="col">Alan</th>
-                                            <th scope="col">Genişlik</th>
-                                            <th scope="col">Zorunlu</th>
-                                            <th scope="col">Görünür</th>
-                                            <th scope="col">Bölüm</th>
-                                            <th scope="col" class="actions">Sıra</th>
+                                            <th scope="col">@Texts.Get("admin.subProfiles.field")</th>
+                                            <th scope="col">@Texts.Get("admin.formDesigner.width")</th>
+                                            <th scope="col">@Texts.Get("admin.customFields.required")</th>
+                                            <th scope="col">@Texts.Get("admin.formDesigner.visible")</th>
+                                            <th scope="col">@Texts.Get("admin.formDesigner.section")</th>
+                                            <th scope="col" class="actions">@Texts.Get("admin.automationRun.col.order")</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -156,40 +154,40 @@
                                         {
                                             var position = fieldsHere.IndexOf(field);
                                             <tr class="@(field.Visible ? null : "designer-hidden")">
-                                                <td data-label="Alan">
+                                                <td data-label="@Texts.Get("admin.subProfiles.field")">
                                                     <strong>@field.Label</strong>
                                                     @if (field.Fixed)
                                                     {
-                                                        <span class="badge category ms-2" title="Sabit alan: gizlenemez, zorunluluğu değişmez"><AppIcon Name="shield" Size="12" /> Sabit</span>
+                                                        <span class="badge category ms-2" title="@Texts.Get("admin.formDesigner.fixedHint")"><AppIcon Name="shield" Size="12" /> @Texts.Get("admin.formDesigner.fixed")</span>
                                                     }
                                                     @if (field.IsCustom)
                                                     {
-                                                        <span class="badge ms-2">Özel alan</span>
+                                                        <span class="badge ms-2">@Texts.Get("admin.formDesigner.custom")</span>
                                                     }
                                                     @if (field.DefaultRequired && !field.Fixed)
                                                     {
-                                                        <span class="badge ms-2" title="Kodun zorunlu tuttuğu alan">Zorunlu (tanım)</span>
+                                                        <span class="badge ms-2" title="@Texts.Get("admin.formDesigner.defaultRequiredHint")">@Texts.Get("admin.formDesigner.defaultRequired")</span>
                                                     }
                                                 </td>
-                                                <td data-label="Genişlik">
-                                                    <label class="visually-hidden" for="span-@field.Key">@field.Label genişliği</label>
+                                                <td data-label="@Texts.Get("admin.formDesigner.width")">
+                                                    <label class="visually-hidden" for="span-@field.Key">@Texts.Get("admin.formDesigner.widthOf", field.Label)</label>
                                                     <select id="span-@field.Key" class="form-select form-select-sm" value="@field.Span" @onchange="e => SetSpan(field, e.Value as string)">
                                                         @foreach (var span in FormSpanLabels.All)
                                                         {
-                                                            <option value="@span">@FormSpanLabels.Of(span)</option>
+                                                            <option value="@span">@SettingsLabels.Span(span)</option>
                                                         }
                                                     </select>
                                                 </td>
-                                                <td data-label="Zorunlu">
-                                                    <input type="checkbox" class="form-check-input" aria-label="@field.Label zorunlu" checked="@field.Required"
+                                                <td data-label="@Texts.Get("admin.customFields.required")">
+                                                    <input type="checkbox" class="form-check-input" aria-label="@Texts.Get("admin.formDesigner.requiredOf", field.Label)" checked="@field.Required"
                                                            disabled="@(field.Fixed || field.DefaultRequired)" @onchange="e => SetRequired(field, (bool)e.Value!)" />
                                                 </td>
-                                                <td data-label="Görünür">
-                                                    <input type="checkbox" class="form-check-input" aria-label="@field.Label görünür" checked="@field.Visible"
+                                                <td data-label="@Texts.Get("admin.formDesigner.visible")">
+                                                    <input type="checkbox" class="form-check-input" aria-label="@Texts.Get("admin.formDesigner.visibleOf", field.Label)" checked="@field.Visible"
                                                            disabled="@field.Fixed" @onchange="e => SetVisible(field, (bool)e.Value!)" />
                                                 </td>
-                                                <td data-label="Bölüm">
-                                                    <label class="visually-hidden" for="section-of-@field.Key">@field.Label bölümü</label>
+                                                <td data-label="@Texts.Get("admin.formDesigner.section")">
+                                                    <label class="visually-hidden" for="section-of-@field.Key">@Texts.Get("admin.formDesigner.sectionOf", field.Label)</label>
                                                     <select id="section-of-@field.Key" class="form-select form-select-sm designer-move" value="@field.Section" @onchange="e => MoveFieldToSection(field, e.Value as string)">
                                                         @foreach (var s in sections)
                                                         {
@@ -197,9 +195,9 @@
                                                         }
                                                     </select>
                                                 </td>
-                                                <td class="actions" data-label="Sıra">
-                                                    <button type="button" class="icon-button" title="Yukarı taşı" aria-label="@field.Label alanını yukarı taşı" disabled="@(position == 0)" @onclick="() => MoveField(field, -1)">↑</button>
-                                                    <button type="button" class="icon-button" title="Aşağı taşı" aria-label="@field.Label alanını aşağı taşı" disabled="@(position == fieldsHere.Count - 1)" @onclick="() => MoveField(field, 1)">↓</button>
+                                                <td class="actions" data-label="@Texts.Get("admin.automationRun.col.order")">
+                                                    <button type="button" class="icon-button" title="@Texts.Get("admin.formDesigner.moveUp")" aria-label="@Texts.Get("admin.formDesigner.fieldUp", field.Label)" disabled="@(position == 0)" @onclick="() => MoveField(field, -1)">↑</button>
+                                                    <button type="button" class="icon-button" title="@Texts.Get("admin.formDesigner.moveDown")" aria-label="@Texts.Get("admin.formDesigner.fieldDown", field.Label)" disabled="@(position == fieldsHere.Count - 1)" @onclick="() => MoveField(field, 1)">↓</button>
                                                 </td>
                                             </tr>
                                         }
@@ -215,6 +213,9 @@
 </AuthGate>
 
 @code {
+    // Açıklamadaki {0} sabit alan ikonunun yeridir.
+    private static string[] IntroParts => Texts.Get("admin.formDesigner.intro").Split("{0}", 2) is { Length: 2 } parts ? parts : [Texts.Get("admin.formDesigner.intro"), string.Empty];
+
     private static readonly string[] Icons =
     [
         "building", "user", "users", "user-check", "phone", "mail", "map-pin", "globe", "target", "coins", "wallet", "clipboard-list",
@@ -335,7 +336,7 @@
 
     private void AddTab()
     {
-        var label = $"Yeni sekme {tabs.Count + 1}";
+        var label = Texts.Get("admin.formDesigner.newTabLabel", tabs.Count + 1);
         tabs.Add(new DraftTab { Key = UniqueKey(label, tabs.Select(t => t.Key), "sekme"), Label = label });
         Touch();
     }
@@ -377,7 +378,7 @@
 
     private void AddSection(DraftTab tab)
     {
-        var label = "Yeni bölüm";
+        var label = Texts.Get("admin.formDesigner.newSection");
         sections.Add(new DraftSection { Key = UniqueKey(label, sections.Select(s => s.Key), "bolum"), Label = label, Tab = tab.Key });
         Touch();
     }
@@ -514,7 +515,7 @@
 
         Layouts.Invalidate();
         await LoadAsync(current.EntityKey);
-        notice = "Form düzeni kaydedildi; formlar yeni düzenle açılır.";
+        notice = Texts.Get("admin.formDesigner.saved");
     }
 
     private async Task ResetAsync()
@@ -538,6 +539,6 @@
 
         Layouts.Invalidate();
         await LoadAsync(current.EntityKey);
-        notice = "Varsayılan düzene dönüldü.";
+        notice = Texts.Get("admin.formDesigner.reset");
     }
 }

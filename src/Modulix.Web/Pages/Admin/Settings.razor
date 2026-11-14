@@ -11,7 +11,7 @@
 <AuthGate Module="@ModuleKey" AnyPermission="CoreAccess.AdministrationPermissions">
     @if (ModuleKey is null)
     {
-        <a class="back-link" href="yonetim">← Yönetim</a>
+        <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
     }
     <h1>@Title</h1>
 
@@ -22,7 +22,7 @@
 
     @if (!canEdit)
     {
-        <p class="text-muted">Ayarları değiştirmek için "Kuruluş ve modül ayarlarını değiştirir" izni gerekir.</p>
+        <p class="text-muted">@Texts.Get("admin.settings.readOnly")</p>
     }
 
     @if (settings is null)
@@ -36,36 +36,36 @@
     {
         @if (ModuleKey is not null && !settings.Any(InScope))
         {
-            <EmptyState Compact="true" Title="Bu modülün ayarı yok." />
+            <EmptyState Compact="true" Title="@Texts.Get("admin.settings.empty")" />
         }
 
         <section class="record-form settings-group" hidden="@(ModuleKey is not null)">
-            <h2>Logo</h2>
+            <h2>@Texts.Get("admin.settings.logo")</h2>
             @if (logoMessage is not null)
             {
                 <div class="alert @(logoFailed ? "alert-danger" : "alert-success")" role="@(logoFailed ? "alert" : "status")">@logoMessage</div>
             }
             @if (Session.Logo is { } logo)
             {
-                <p><img class="logo-preview" src="@logo.Url" alt="Firmanın logosu" /></p>
+                <p><img class="logo-preview" src="@logo.Url" alt="@Texts.Get("admin.settings.logoAlt")" /></p>
             }
             else
             {
-                <p class="text-muted">Logo yüklenmemiş.</p>
+                <p class="text-muted">@Texts.Get("admin.settings.noLogo")</p>
             }
             @if (canEdit)
             {
                 <div class="form-actions">
                     <label class="btn btn-outline-primary mb-0">
-                        @(Session.Logo is null ? "Logo yükle" : "Logoyu değiştir")
+                        @(Session.Logo is null ? Texts.Get("admin.settings.uploadLogo") : Texts.Get("admin.settings.changeLogo"))
                         <InputFile class="visually-hidden" accept="image/png,image/jpeg" OnChange="UploadLogoAsync" disabled="@busy" />
                     </label>
                     @if (Session.Logo is not null)
                     {
-                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="RemoveLogoAsync">Logoyu kaldır</button>
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="RemoveLogoAsync">@Texts.Get("admin.settings.removeLogo")</button>
                     }
                 </div>
-                <div class="form-text">PNG veya JPEG, en fazla 256 KB. Üst çubukta firmanın adının yanında görünür.</div>
+                <div class="form-text">@Texts.Get("admin.settings.logoHint")</div>
             }
         </section>
 
@@ -82,7 +82,7 @@
                     <div class="alert alert-danger" role="alert">@groupError</div>
                 }
 
-                <FormTabs Title="@group.Key" Label="Ayar grubu formu bölümleri">
+                <FormTabs Title="@group.Key" Label="@Texts.Get("admin.settings.groupSections")">
                 <div class="form-grid">
                     @foreach (var setting in group)
                     {
@@ -122,10 +122,10 @@
                 @if (canEdit)
                 {
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@(busy || !IsChanged(group))">Kaydet</button>
+                        <button type="submit" class="btn btn-primary" disabled="@(busy || !IsChanged(group))">@Texts.Get("common.save")</button>
                         @if (IsChanged(group))
                         {
-                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Reset(group)">Vazgeç</button>
+                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Reset(group)">@Texts.Get("common.dismiss")</button>
                         }
                     </div>
                 }
@@ -141,7 +141,7 @@
     // Başlık menüdeki adla aynıdır (etkin dildeki karşılığı, ADR-0034).
     private string Title => AppNavigation.Resolve(ModuleKey is null ? "yonetim/ayarlar" : AppCatalog.ModuleSettingsRoute(ModuleKey)) is { } screen
         ? AppNames.Of(screen)
-        : "Modül ayarları";
+        : Texts.Get("admin.home.moduleSettings");
 
     private bool InScope(SettingDto setting) => setting.ModuleKey == (ModuleKey ?? CoreAccess.ModuleKey);
 
@@ -222,7 +222,7 @@
                 values[key] = value;
             }
 
-            notices[group] = "Kaydedildi.";
+            notices[group] = Texts.Get("common.saved");
 
             // Üst çubuktaki görünen ad ve ekranların biçimleri yeni ayarlarla yenilenir.
             await Session.RefreshAsync();
@@ -238,7 +238,7 @@
         logoMessage = null;
         if (e.File.Size > TenantLogoDto.MaxBytes)
         {
-            (logoMessage, logoFailed) = ("Logo en fazla 256 KB olabilir.", true);
+            (logoMessage, logoFailed) = (Texts.Get("admin.settings.logoTooLarge"), true);
             return;
         }
 
@@ -247,7 +247,7 @@
         await e.File.OpenReadStream(TenantLogoDto.MaxBytes).CopyToAsync(stream);
         var result = await Api.PutBytesAsync<TenantLogoDto>("/api/settings/logo", stream.ToArray(), e.File.ContentType);
         busy = false;
-        (logoMessage, logoFailed) = result.IsSuccess ? ("Logo kaydedildi.", false) : (result.Error, true);
+        (logoMessage, logoFailed) = result.IsSuccess ? (Texts.Get("admin.settings.logoSaved"), false) : (result.Error, true);
         await Session.RefreshAsync();
     }
 
@@ -256,7 +256,7 @@
         busy = true;
         var result = await Api.DeleteAsync("/api/settings/logo");
         busy = false;
-        (logoMessage, logoFailed) = result.IsSuccess ? ("Logo kaldırıldı.", false) : (result.Error, true);
+        (logoMessage, logoFailed) = result.IsSuccess ? (Texts.Get("admin.settings.logoRemoved"), false) : (result.Error, true);
         await Session.RefreshAsync();
     }
 

@@ -3,10 +3,9 @@
 @* Firmanın sektör/faaliyet seçimi (ADR-0029, Dilim B; ADR-0041 K8 ile Sektör profili sayfasına taşındı). Birden fazla faaliyet seçilebilir; üst başlığı
    seçmek alt faaliyetleri seçmiş saymaz. *@
 <section class="settings-group" id="faaliyetler" aria-labelledby="activitiesTitle">
-    <h2 id="activitiesTitle">Faaliyetlerim</h2>
+    <h2 id="activitiesTitle">@Texts.Get("admin.activities.title")</h2>
     <p class="text-muted">
-        Firmanızın yaptığı işleri seçin. Birden fazla faaliyet seçebilirsiniz; bağlı olduğu sektör ve grup otomatik gösterilir ama
-        alt faaliyetleri seçmiş sayılmaz. Seçim tek başına modül açmaz ve mevcut ayarlarınızı değiştirmez.
+        @Texts.Get("admin.activities.intro")
     </p>
 
     @if (message is not null)
@@ -34,13 +33,13 @@
     }
     else if (catalog.Nodes.Count == 0)
     {
-        <p class="text-muted">Platform kataloğunda henüz sektör tanımlı değil.</p>
+        <p class="text-muted">@Texts.Get("admin.activities.emptyCatalog")</p>
     }
     else
     {
         <div class="record-form">
             <fieldset>
-                <legend class="visually-hidden">Faaliyetler</legend>
+                <legend class="visually-hidden">@Texts.Get("admin.activities.legend")</legend>
                 @foreach (var row in Rows())
                 {
                     <label class="form-check">
@@ -50,11 +49,11 @@
                             @(new string('—', row.Depth) + (row.Depth > 0 ? " " : string.Empty))@row.Node.Name
                             @if (!row.Node.IsActive)
                             {
-                                <span class="badge category">Pasif</span>
+                                <span class="badge category">@Texts.Get("common.inactive")</span>
                             }
                             else if (row.Node.Readiness != "Available" && selected.Contains(row.Node.Id))
                             {
-                                <span class="badge tag">Yalnızca katalog</span>
+                                <span class="badge tag">@Texts.Get("admin.activities.catalogOnly")</span>
                             }
                         </span>
                     </label>
@@ -65,21 +64,20 @@
         @if (preview is not null)
         {
             <section class="detail-section" aria-live="polite">
-                <h3>Seçiminizin özeti</h3>
+                <h3>@Texts.Get("admin.activities.summary")</h3>
                 @if (preview.ContextNodeIds.Count > 0)
                 {
-                    <p>Bağlı olduğu sektör ve gruplar: <strong>@string.Join(", ", preview.ContextNodeIds.Select(NameOf))</strong></p>
+                    <p>@Texts.Strong("admin.activities.context", string.Join(", ", preview.ContextNodeIds.Select(NameOf)))</p>
                 }
                 @if (preview.CatalogOnlyNodeIds.Count > 0)
                 {
                     <p class="text-muted">
-                        Şu faaliyetlerin operasyon modülü henüz hazır değil, yalnızca katalog kaydı olarak tutulur:
-                        @string.Join(", ", preview.CatalogOnlyNodeIds.Select(NameOf)).
+                        @Texts.Get("admin.activities.catalogOnlyNote", string.Join(", ", preview.CatalogOnlyNodeIds.Select(NameOf)))
                     </p>
                 }
                 @foreach (var gap in preview.Gaps)
                 {
-                    <p class="text-muted">Eksik yetenek: <code>@gap.Capability</code> (@string.Join(", ", gap.RequiredByNodes.Select(NameOf)))</p>
+                    <p class="text-muted">@((MarkupString)Texts.Get("admin.activities.gap", $"<code>{System.Net.WebUtility.HtmlEncode(gap.Capability)}</code>", System.Net.WebUtility.HtmlEncode(string.Join(", ", gap.RequiredByNodes.Select(NameOf)))))</p>
                 }
                 @foreach (var error in preview.Errors)
                 {
@@ -89,12 +87,12 @@
         }
 
         <div class="form-actions">
-            <button type="button" class="btn btn-outline-secondary" disabled="@(busy || !Changed)" @onclick="ResetAsync">Vazgeç</button>
-            <button type="button" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")" disabled="@(busy || !Changed)" @onclick="SaveAsync">Kaydet</button>
+            <button type="button" class="btn btn-outline-secondary" disabled="@(busy || !Changed)" @onclick="ResetAsync">@Texts.Get("common.dismiss")</button>
+            <button type="button" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")" disabled="@(busy || !Changed)" @onclick="SaveAsync">@Texts.Get("common.save")</button>
         </div>
         @if (saved)
         {
-            <p class="text-muted" role="status">Seçiminiz kaydedildi.</p>
+            <p class="text-muted" role="status">@Texts.Get("admin.activities.saved")</p>
         }
     }
 </section>

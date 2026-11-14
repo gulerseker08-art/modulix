@@ -1,18 +1,18 @@
 @page "/yonetim/denetim"
 @inject ApiClient Api
 
-<PageTitle>Denetim kaydı · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.audit") · Modulix</PageTitle>
 
 @* Denetim kaydı (Y5): kim, neyi, ne zaman, nereden değiştirdi. Yalnızca okunur; kayıtlar değiştirilemez. Okurun
    görüntüleme izni olmayan kayıt türlerinde değişen alanların adları görünür, değerleri gizlidir. *@
 <AuthGate Permission="@CoreAccess.ReadAudit">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
     <div class="page-header">
-        <h1>Denetim kaydı</h1>
-        <a class="btn btn-outline-primary" href="@ExportUrl" download>CSV indir</a>
+        <h1>@Texts.Get("nav.app.admin.audit")</h1>
+        <a class="btn btn-outline-primary" href="@ExportUrl" download>@Texts.Get("admin.audit.export")</a>
     </div>
-    <p class="text-muted">Kayıtlar değiştirilemez ve silinemez. CSV en fazla 50.000 kayıt içerir; fazlası için tarih aralığını daraltın.</p>
+    <p class="text-muted">@Texts.Get("admin.audit.intro")</p>
 
     @if (message is not null)
     {
@@ -21,9 +21,9 @@
 
     <form class="audit-filters" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
         <div>
-            <label class="form-label" for="auditUser">Kullanıcı</label>
+            <label class="form-label" for="auditUser">@Texts.Get("admin.lookups.user")</label>
             <select id="auditUser" class="form-select" @bind="userId">
-                <option value="">Herkes</option>
+                <option value="">@Texts.Get("admin.audit.everyone")</option>
                 @foreach (var user in filters?.Users ?? [])
                 {
                     <option value="@user.UserId">@user.Name</option>
@@ -31,9 +31,9 @@
             </select>
         </div>
         <div>
-            <label class="form-label" for="auditType">Kayıt türü</label>
+            <label class="form-label" for="auditType">@Texts.Get("admin.automation.entity")</label>
             <select id="auditType" class="form-select" @bind="entityKey">
-                <option value="">Tümü</option>
+                <option value="">@Texts.Get("admin.subProfiles.all")</option>
                 @foreach (var type in filters?.EntityTypes ?? [])
                 {
                     <option value="@type.Key">@type.Name</option>
@@ -41,36 +41,36 @@
             </select>
         </div>
         <div>
-            <label class="form-label" for="auditAction">İşlem</label>
+            <label class="form-label" for="auditAction">@Texts.Get("admin.automationRun.col.action")</label>
             <select id="auditAction" class="form-select" @bind="action">
-                <option value="">Tümü</option>
+                <option value="">@Texts.Get("admin.subProfiles.all")</option>
                 @foreach (var value in Enum.GetValues<AuditOperation>())
                 {
-                    <option value="@value">@AuditText.Of(value)</option>
+                    <option value="@value">@SettingsLabels.Audit(value)</option>
                 }
             </select>
         </div>
         <div>
-            <label class="form-label" for="auditSource">Kaynak</label>
+            <label class="form-label" for="auditSource">@Texts.Get("admin.automation.source")</label>
             <select id="auditSource" class="form-select" @bind="source">
-                <option value="">Tümü</option>
+                <option value="">@Texts.Get("admin.subProfiles.all")</option>
                 @foreach (var value in Enum.GetValues<AuditSource>())
                 {
-                    <option value="@value">@AuditText.Of(value)</option>
+                    <option value="@value">@SettingsLabels.Audit(value)</option>
                 }
             </select>
         </div>
         <div>
-            <label class="form-label" for="auditFrom">Başlangıç</label>
+            <label class="form-label" for="auditFrom">@Texts.Get("admin.supportAccess.col.start")</label>
             <input id="auditFrom" class="form-control" type="date" @bind="from" />
         </div>
         <div>
-            <label class="form-label" for="auditTo">Bitiş</label>
+            <label class="form-label" for="auditTo">@Texts.Get("admin.supportAccess.col.end")</label>
             <input id="auditTo" class="form-control" type="date" @bind="to" />
         </div>
         <div class="audit-filter-actions">
-            <button type="submit" class="btn btn-primary">Filtrele</button>
-            <button type="button" class="btn btn-outline-secondary" @onclick="ClearAsync">Temizle</button>
+            <button type="submit" class="btn btn-primary">@Texts.Get("common.filter")</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="ClearAsync">@Texts.Get("admin.audit.clear")</button>
         </div>
     </form>
 
@@ -83,19 +83,19 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Title="Bu filtreye uyan kayıt yok." />
+        <EmptyState Title="@Texts.Get("admin.audit.empty")" />
     }
     else
     {
         <table class="table record-table audit-table">
             <thead>
                 <tr>
-                    <th scope="col"><SortHeader Label="Tarih" ColumnIcon="calendar" Asc="occurredAt" Desc="-occurredAt" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><SortHeader Label="Kullanıcı" ColumnIcon="user" Asc="user" Desc="-user" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><SortHeader Label="Kayıt türü" ColumnIcon="layers" Asc="entityKey" Desc="-entityKey" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
-                    <th scope="col">Kayıt</th>
-                    <th scope="col"><SortHeader Label="İşlem" ColumnIcon="activity" Asc="action" Desc="-action" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><SortHeader Label="Kaynak" ColumnIcon="globe" Asc="source" Desc="-source" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("admin.audit.date")" ColumnIcon="calendar" Asc="occurredAt" Desc="-occurredAt" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("admin.lookups.user")" ColumnIcon="user" Asc="user" Desc="-user" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("admin.automation.entity")" ColumnIcon="layers" Asc="entityKey" Desc="-entityKey" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col">@Texts.Get("admin.automationRule.record")</th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("admin.automationRun.col.action")" ColumnIcon="activity" Asc="action" Desc="-action" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("admin.automation.source")" ColumnIcon="globe" Asc="source" Desc="-source" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
                 </tr>
             </thead>
             <tbody>
@@ -103,14 +103,14 @@
                 {
                     var open = expanded.Contains(entry.Id);
                     <tr class="audit-row @(open ? "is-open" : null)" @onclick="() => Toggle(entry.Id)">
-                        <td data-label="Tarih">
+                        <td data-label="@Texts.Get("admin.audit.date")">
                             <button type="button" class="link-button" aria-expanded="@(open ? "true" : "false")">@CrmLabels.Time(entry.OccurredAt)</button>
                         </td>
-                        <td data-label="Kullanıcı">@entry.UserName</td>
-                        <td data-label="Kayıt türü">@entry.EntityName</td>
-                        <td data-label="Kayıt" class="primary">@RecordTitle(entry)</td>
-                        <td data-label="İşlem">@AuditText.Of(entry.Action)</td>
-                        <td data-label="Kaynak">@AuditText.Of(entry.Source, entry.Subscription)</td>
+                        <td data-label="@Texts.Get("admin.lookups.user")">@entry.UserName</td>
+                        <td data-label="@Texts.Get("admin.automation.entity")">@entry.EntityName</td>
+                        <td data-label="@Texts.Get("admin.automationRule.record")" class="primary">@RecordTitle(entry)</td>
+                        <td data-label="@Texts.Get("admin.automationRun.col.action")">@SettingsLabels.Audit(entry.Action)</td>
+                        <td data-label="@Texts.Get("admin.automation.source")">@SettingsLabels.Audit(entry.Source, entry.Subscription)</td>
                     </tr>
                     @if (open)
                     {
@@ -118,16 +118,16 @@
                             <td colspan="6">
                                 @if (entry.ValuesHidden)
                                 {
-                                    <p class="text-muted">Bu kayıt türünü görüntüleme izniniz yok; yalnızca değişen alanlar gösteriliyor.</p>
+                                    <p class="text-muted">@Texts.Get("admin.audit.valuesHidden")</p>
                                 }
                                 @if (entry.Changes.Count == 0)
                                 {
-                                    <EmptyState Compact="true" Title="Alan değişikliği yok." />
+                                    <EmptyState Compact="true" Title="@Texts.Get("admin.audit.noChanges")" />
                                 }
                                 else
                                 {
                                     <table class="table table-sm audit-changes">
-                                        <thead><tr><th>Alan</th><th>Eski değer</th><th>Yeni değer</th></tr></thead>
+                                        <thead><tr><th>@Texts.Get("admin.subProfiles.field")</th><th>@Texts.Get("admin.audit.oldValue")</th><th>@Texts.Get("admin.audit.newValue")</th></tr></thead>
                                         <tbody>
                                             @foreach (var change in entry.Changes)
                                             {
@@ -225,8 +225,8 @@
     }
 
     private static string RecordTitle(AuditEntryDto entry) =>
-        entry.ValuesHidden ? "Gizli" : entry.RecordTitle ?? "—";
+        entry.ValuesHidden ? Texts.Get("admin.audit.hidden") : entry.RecordTitle ?? "—";
 
     private static string Value(AuditEntryDto entry, AuditFieldChangeDto change, string? value) =>
-        entry.ValuesHidden || change.Hidden ? "Gizli" : string.IsNullOrEmpty(value) ? "—" : value;
+        entry.ValuesHidden || change.Hidden ? Texts.Get("admin.audit.hidden") : string.IsNullOrEmpty(value) ? "—" : value;
 }
