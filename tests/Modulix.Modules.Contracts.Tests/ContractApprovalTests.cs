@@ -223,6 +223,8 @@ public class ContractApprovalTests
     {
         Assert.Empty(ContractApprovalPlans.Deserialize(null).Matches);
         Assert.Empty(ContractApprovalPlans.Deserialize("{bozuk").Matches);
+        Assert.Empty(ContractApprovalPlans.Deserialize("{}").Matches);
+        Assert.Empty(ContractApprovalPlans.Deserialize("""{"matches":null,"note":"eski"}""").Specs());
 
         var plan = new ContractApprovalPlan([new ContractApprovalMatch(Guid.CreateVersion7(), 5, "A", 2, Ayse, "neden")], "not");
         var back = ContractApprovalPlans.Deserialize(ContractApprovalPlans.Serialize(plan));
