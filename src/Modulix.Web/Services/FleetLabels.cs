@@ -5,9 +5,14 @@ namespace Modulix.Web.Services;
 /// <summary>Filo ekranlarının etiket ve rozet kuralları. Rozet tonları yalnızca mevcut tasarım sınıflarından seçilir.</summary>
 public static class FleetLabels
 {
-    public static string Ownership(string? key) => FleetAccess.Ownerships.FirstOrDefault(o => o.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Mülkiyet ve durum tabloları her okunuşta etkin dile göre kurulur (Türkçe kaynak metin sözlükte yoksa yedek kalır).</summary>
+    public static IReadOnlyList<(string Key, string Label)> Ownerships => WarehouseLabels.Translate("fleet.ownership", FleetAccess.Ownerships);
 
-    public static string Status(string? key) => FleetAccess.Statuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    public static IReadOnlyList<(string Key, string Label)> Statuses => WarehouseLabels.Translate("fleet.status", FleetAccess.Statuses);
+
+    public static string Ownership(string? key) => Ownerships.FirstOrDefault(o => o.Key == key).Label ?? key ?? string.Empty;
+
+    public static string Status(string? key) => Statuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Etkin başarı tonu, bakımda dikkat tonu, pasif nötr ton.</summary>
     public static string StatusBadge(string? key) => key switch
@@ -29,8 +34,8 @@ public static class FleetLabels
     /// </summary>
     public static (string Badge, string Text) Due(DateOnly? due, DateOnly today) => due switch
     {
-        null => ("status-inactive", "Planlanmadı"),
-        { } d when d < today => ("stage-lost", $"Gecikti · {Date(d)}"),
+        null => ("status-inactive", Texts.Get("fleet.due.none")),
+        { } d when d < today => ("stage-lost", Texts.Get("fleet.due.overdue", Date(d))),
         { } d when d <= today.AddDays(14) => ("stage-negotiation", Date(d)),
         { } d => ("status-customer", Date(d)),
     };

@@ -4,10 +4,10 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Bakım kayıtları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.fleet.maintenance") · Modulix</PageTitle>
 
 <AuthGate Module="@FleetAccess.ModuleKey" Permission="@FleetAccess.MaintenanceRead">
-    <PageHeader Title="Bakım kayıtları" Icon="wrench" Subtitle="@(page is null ? "Araçların bakım ve onarımlarını izleyin; sonraki bakım araç kartına yansır." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.fleet.maintenance")" Icon="wrench" Subtitle="@(page is null ? Texts.Get("fleet.maintenance.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -20,25 +20,25 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Bakım görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("fleet.maintenance.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Bakım ara" placeholder="Plaka veya açıklama ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("fleet.maintenance.search-label")" placeholder="@Texts.Get("fleet.maintenance.search-placeholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(FleetAccess.MaintenanceWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni bakım</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("fleet.maintenance.new")</button>
         }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <select class="form-select" aria-label="Bakım türü" @bind="kindKey" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm türler</option>
+            <select class="form-select" aria-label="@Texts.Get("fleet.maintenance.kind-filter")" @bind="kindKey" @bind:after="() => LoadAsync(1)">
+                <option value="">@Texts.Get("fleet.all-kinds")</option>
                 @foreach (var kind in Lookups.ValuesOf(FleetAccess.MaintenanceKindList))
                 {
                     <option value="@kind.Key">@kind.Label</option>
@@ -56,20 +56,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan bakım kaydı yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("fleet.maintenance.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) bakım kaydı listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("fleet.maintenance.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Bakım kayıtları</caption>
+            <caption class="visually-hidden">@Texts.Get("fleet.maintenance.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -83,8 +83,8 @@
                         <td class="row-menu-cell">
                             @if (Session.Can(FleetAccess.MaintenanceWrite))
                             {
-                                <RowMenu Label="@($"{PlateOf(record)} bakımı eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(record)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <RowMenu Label="@Texts.Get("fleet.maintenance.row-actions", PlateOf(record))">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(record)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 </RowMenu>
                             }
                         </td>
@@ -104,15 +104,15 @@
     private const string ThisYearView = "year";
 
     // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (MaintenanceRecordStore.SortKeys).
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("performedOn", "Tarih", "calendar", "performedOn", "-performedOn", Locked: true),
-        new("vehicle", "Araç", "truck"),
-        new("kindKey", "Tür", "wrench", "kindKey", "-kindKey"),
-        new("odometerKm", "Kilometre", "hash", "odometerKm", "-odometerKm"),
-        new("supplier", "Servis", "building"),
-        new("cost", "Tutar", "wallet", "cost", "-cost"),
-        new("nextDueDate", "Sonraki bakım", "clock", "nextDueDate", "-nextDueDate"),
+        new("performedOn", Texts.Get("fleet.maintenance.col.date"), "calendar", "performedOn", "-performedOn", Locked: true),
+        new("vehicle", Texts.Get("fleet.maintenance.col.vehicle"), "truck"),
+        new("kindKey", Texts.Get("common.field.kind"), "wrench", "kindKey", "-kindKey"),
+        new("odometerKm", Texts.Get("fleet.maintenance.col.odometer"), "hash", "odometerKm", "-odometerKm"),
+        new("supplier", Texts.Get("fleet.maintenance.col.supplier"), "building"),
+        new("cost", Texts.Get("fleet.maintenance.col.cost"), "wallet", "cost", "-cost"),
+        new("nextDueDate", Texts.Get("fleet.maintenance.col.next"), "clock", "nextDueDate", "-nextDueDate"),
     ];
 
     private readonly GridViewState grid = new("fleet.maintenance", "-performedOn");
@@ -150,9 +150,9 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm bakımlar", Icon: "wrench"),
-        new(Last30View, "Son 30 gün", Icon: "clock"),
-        new(ThisYearView, "Bu yıl", Icon: "calendar"),
+        new(AllViews, Texts.Get("fleet.maintenance.view.all"), Icon: "wrench"),
+        new(Last30View, Texts.Get("fleet.maintenance.view.last30"), Icon: "clock"),
+        new(ThisYearView, Texts.Get("fleet.maintenance.view.year"), Icon: "calendar"),
         .. views.Options,
     ];
 
