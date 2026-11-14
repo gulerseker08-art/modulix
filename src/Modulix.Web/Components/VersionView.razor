@@ -1,22 +1,22 @@
 @* Otomasyon kural sürümünün salt okunur görünümü (ADR-0027, Dilim 5a): ad, açıklama, okunabilir özet, öncelik, geçerlilik ve
    şu anki katalogla doğrulama sorunları. Özeti sunucu üretir (kullanıcının görebildiği alanlarla); burada yeniden hesaplanmaz. *@
 <dl class="detail-grid">
-    <dt>Ad</dt>
+    <dt>@Texts.Get("common.field.name")</dt>
     <dd>@Version.Name</dd>
     @if (!string.IsNullOrWhiteSpace(Version.Description))
     {
-        <dt>Açıklama</dt>
+        <dt>@Texts.Get("common.field.description")</dt>
         <dd>@Version.Description</dd>
     }
-    <dt>Ne yapar</dt>
-    <dd class="span-all">@(string.IsNullOrWhiteSpace(Version.Summary) ? "Özet gösterilemiyor (bu kayıt türünü görme izniniz yok ya da modül kapalı)." : Version.Summary)</dd>
-    <dt>Öncelik</dt>
-    <dd>@Version.Priority @(Version.StopProcessing ? "· Bu kuraldan sonra aynı kayıt için başka kural çalışmaz" : null)</dd>
-    <dt>Geçerlilik</dt>
+    <dt>@Texts.Get("admin.automationRule.summary")</dt>
+    <dd class="span-all">@(string.IsNullOrWhiteSpace(Version.Summary) ? Texts.Get("admin.automationRule.noSummary") : Version.Summary)</dd>
+    <dt>@Texts.Get("admin.automation.priority")</dt>
+    <dd>@Version.Priority @(Version.StopProcessing ? "· " + Texts.Get("admin.automationRule.stopsOthers") : null)</dd>
+    <dt>@Texts.Get("admin.automationRule.validity")</dt>
     <dd>@Validity</dd>
     @if (Version.PublishedAt is { } at)
     {
-        <dt>Yayın tarihi</dt>
+        <dt>@Texts.Get("admin.automationRule.publishedAt")</dt>
         <dd>@CrmLabels.Time(at)</dd>
     }
 </dl>
@@ -24,7 +24,7 @@
 @if (Issues.Count > 0)
 {
     <div class="alert alert-warning" role="alert">
-        <strong>Sorunlar</strong>
+        <strong>@Texts.Get("admin.automationRule.issues")</strong>
         <ul class="mb-0">
             @foreach (var issue in Issues)
             {
@@ -41,9 +41,9 @@
 
     private string Validity => (Version.ActiveFrom, Version.ActiveUntil) switch
     {
-        (null, null) => "Süresiz",
-        ({ } from, null) => $"{CrmLabels.Time(from)} tarihinden itibaren",
-        (null, { } until) => $"{CrmLabels.Time(until)} tarihine kadar",
+        (null, null) => Texts.Get("admin.automationRule.validAlways"),
+        ({ } from, null) => Texts.Get("admin.automationRule.validFrom", CrmLabels.Time(from)),
+        (null, { } until) => Texts.Get("admin.automationRule.validUntil", CrmLabels.Time(until)),
         ({ } from, { } until) => $"{CrmLabels.Time(from)} – {CrmLabels.Time(until)}",
     };
 }

@@ -25,6 +25,20 @@ public static class AdminLabels
     public static IReadOnlyList<(string Key, string Label)> Translate(string group, IReadOnlyList<(string Key, string Label)> source) =>
         [.. source.Select(x => (x.Key, Of(group, x.Key, x.Label)))];
 
+    /// <summary>Tablodaki karşılığı çevirir; tabloda olmayan anahtar <paramref name="otherwise"/> (verilmezse anahtarın kendisi) olarak döner.</summary>
+    public static string Lookup(string group, IReadOnlyList<(string Key, string Label)> source, string key, string? otherwise = null)
+    {
+        foreach (var (k, label) in source)
+        {
+            if (k == key)
+            {
+                return Of(group, k, label);
+            }
+        }
+
+        return otherwise ?? key;
+    }
+
     internal static IReadOnlyList<(string Key, string Label)> UserStatusSource =>
         [.. Enum.GetValues<UserStatus>().Select(s => (s.ToString(), UserLabels.Of(s)))];
 

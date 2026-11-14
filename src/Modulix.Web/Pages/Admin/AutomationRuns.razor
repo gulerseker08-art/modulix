@@ -2,26 +2,26 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Otomasyon çalışmaları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("admin.automationRuns.title") · Modulix</PageTitle>
 
 @* Otomasyon çalışma geçmişi (ADR-0027, Dilim 5b): liste. Okuma core.automation-logs.read ister. Çalışma kaydı kayıt değeri ya da
    parametre taşımaz; yalnızca durum, özet ve kimlikler görünür. Düğmeleri gizlemek yetki değildir, sunucu uygular. *@
 <AuthGate Permission="@CoreAccess.ReadAutomationLogs">
-    <a class="back-link" href="yonetim/otomasyon">← Otomasyon kuralları</a>
+    <a class="back-link" href="yonetim/otomasyon">← @Texts.Get("admin.automationRules.title")</a>
 
-    <PageHeader Title="Otomasyon çalışmaları" Icon="zap"
-                Subtitle="Kuralların kayıtlar üzerinde ne zaman, hangi sonuçla çalıştığı. Başarısız çalışmayı ayrıntıdan yeniden deneyebilir, bitmemiş olanı iptal edebilirsiniz." />
+    <PageHeader Title="@Texts.Get("admin.automationRuns.title")" Icon="zap"
+                Subtitle="@Texts.Get("admin.automationRuns.subtitle")" />
 
     @if (message is not null)
     {
-        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">@Texts.Get("admin.automation.retry")</button></div>
     }
 
     <div class="list-toolbar">
-        <ViewSelector Label="Durum" Items="StatusOptions" Value="@(status ?? AutomationLabels.AllViews)" ValueChanged="ChooseStatusAsync" />
+        <ViewSelector Label="@Texts.Get("common.field.status")" Items="StatusOptions" Value="@(status ?? AutomationLabels.AllViews)" ValueChanged="ChooseStatusAsync" />
         @if (RuleId is not null)
         {
-            <span class="chip active">Tek kural <a href="yonetim/otomasyon/calismalar" aria-label="Kural süzgecini kaldır">×</a></span>
+            <span class="chip active">@Texts.Get("admin.automationRuns.singleRule") <a href="yonetim/otomasyon/calismalar" aria-label="@Texts.Get("admin.automationRuns.clearRule")">×</a></span>
         }
     </div>
 
@@ -35,30 +35,30 @@
     else if (runPage.Items.Count == 0)
     {
         <p class="text-muted" role="status">
-            @(status is not null || RuleId is not null ? "Bu süzgece uyan çalışma yok." : "Henüz çalışma yok. Açık bir kural tetiklendiğinde burada görünür.")
+            @(status is not null || RuleId is not null ? Texts.Get("admin.automationRuns.emptyFiltered") : Texts.Get("admin.automationRuns.empty"))
         </p>
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@runPage.TotalCount çalışma listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("admin.automationRuns.listed", runPage.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Otomasyon çalışmaları</caption>
+            <caption class="visually-hidden">@Texts.Get("admin.automationRuns.title")</caption>
             <thead>
-                <tr><th scope="col">Kural</th><th scope="col">Kayıt türü</th><th scope="col">Kaynak</th><th scope="col">Durum</th><th scope="col">Başladı</th><th scope="col">Bitti</th></tr>
+                <tr><th scope="col">@Texts.Get("admin.automation.rule")</th><th scope="col">@Texts.Get("admin.automation.entity")</th><th scope="col">@Texts.Get("admin.automation.source")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("admin.automation.started")</th><th scope="col">@Texts.Get("admin.automation.finished")</th></tr>
             </thead>
             <tbody>
                 @foreach (var run in runPage.Items)
                 {
                     <tr>
-                        <td data-label="Kural" class="primary">
+                        <td data-label="@Texts.Get("admin.automation.rule")" class="primary">
                             <a href="yonetim/otomasyon/calismalar/@run.Id">@run.RuleName</a>
                             <small class="text-muted d-block">v@(run.VersionNo)@(string.IsNullOrWhiteSpace(run.Note) ? "" : " · " + run.Note)</small>
                         </td>
-                        <td data-label="Kayıt türü">@AutomationLabels.EntityName(entities, run.EntityKey)</td>
-                        <td data-label="Kaynak">@AutomationLabels.Origin(run.Origin)</td>
-                        <td data-label="Durum"><span class="badge stage-@AutomationLabels.RunStatusBadge(run.Status)">@AutomationLabels.RunStatus(run.Status)</span></td>
-                        <td data-label="Başladı">@CrmLabels.Time(run.CreatedAt)</td>
-                        <td data-label="Bitti">@(run.CompletedAt is { } done ? CrmLabels.Time(done) : "—")</td>
+                        <td data-label="@Texts.Get("admin.automation.entity")">@AutomationLabels.EntityName(entities, run.EntityKey)</td>
+                        <td data-label="@Texts.Get("admin.automation.source")">@AutomationLabels.Origin(run.Origin)</td>
+                        <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@AutomationLabels.RunStatusBadge(run.Status)">@AutomationLabels.RunStatus(run.Status)</span></td>
+                        <td data-label="@Texts.Get("admin.automation.started")">@CrmLabels.Time(run.CreatedAt)</td>
+                        <td data-label="@Texts.Get("admin.automation.finished")">@(run.CompletedAt is { } done ? CrmLabels.Time(done) : "—")</td>
                     </tr>
                 }
             </tbody>
@@ -92,7 +92,7 @@
     }
 
     private static IReadOnlyList<ViewOption> StatusOptions =>
-        [new(AutomationLabels.AllViews, "Tüm çalışmalar"), .. AutomationLabels.RunStatuses.Select(s => new ViewOption(s, AutomationLabels.RunStatus(s)))];
+        [new(AutomationLabels.AllViews, Texts.Get("admin.automationRuns.view.all")), .. AutomationLabels.RunStatuses.Select(s => new ViewOption(s, AutomationLabels.RunStatus(s)))];
 
     private Task ChooseStatusAsync(string key)
     {

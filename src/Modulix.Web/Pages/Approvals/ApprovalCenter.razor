@@ -4,24 +4,24 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>Onay merkezi · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.approvals") · Modulix</PageTitle>
 
 @* Onay merkezi (ADR-0027 Dilim 4a): firmanın tanımladığı süreçlerdeki talepler. Pano sayıları ve liste sunucuda kişinin görebildiği taleplerle
    sınırlıdır; düğmeleri gizlemek yetki değildir, karar sunucuda yeniden denetlenir. Teklif ve sözleşme onayları kendi ekranlarındadır. *@
 <AuthGate AnyPermission="@(new[] { CoreAccess.RequestApprovals, CoreAccess.DecideApprovals, CoreAccess.ManageApprovals })">
     <section class="hero-band" aria-labelledby="approvals-title">
         <div class="hero-band-text">
-            <span class="hero-band-eyebrow"><AppIcon Name="check-circle" Size="16" /> Onay merkezi</span>
+            <span class="hero-band-eyebrow"><AppIcon Name="check-circle" Size="16" /> @Texts.Get("nav.app.approvals")</span>
             <h1 id="approvals-title">@HeroTitle</h1>
             <p>@HeroText</p>
         </div>
         @if (overview is not null)
         {
             <div class="hero-band-stats">
-                <button type="button" class="hero-stat" @onclick="@(() => SelectViewAsync("waiting"))"><strong>@Count(overview.WaitingForMe)</strong><span>Kararınızı bekliyor</span></button>
-                <button type="button" class="hero-stat" @onclick="@(() => SelectViewAsync("mine"))"><strong>@Count(overview.MyOpen)</strong><span>Açık talebiniz</span></button>
-                <div class="hero-stat"><strong>@Count(overview.Overdue)</strong><span>Süresi geçen</span></div>
-                <div class="hero-stat"><strong>@AverageText</strong><span>Ortalama karar süresi</span></div>
+                <button type="button" class="hero-stat" @onclick="@(() => SelectViewAsync("waiting"))"><strong>@Count(overview.WaitingForMe)</strong><span>@Texts.Get("approvals.center.stat.waiting")</span></button>
+                <button type="button" class="hero-stat" @onclick="@(() => SelectViewAsync("mine"))"><strong>@Count(overview.MyOpen)</strong><span>@Texts.Get("approvals.center.stat.mine")</span></button>
+                <div class="hero-stat"><strong>@Count(overview.Overdue)</strong><span>@Texts.Get("approvals.center.stat.overdue")</span></div>
+                <div class="hero-stat"><strong>@AverageText</strong><span>@Texts.Get("approvals.center.stat.average")</span></div>
             </div>
         }
     </section>
@@ -33,50 +33,50 @@
         @if (overview.Orphaned > 0)
         {
             <div class="alert alert-warning" role="alert">
-                <AppIcon Name="alert-circle" Size="16" /> @Count(overview.Orphaned) talebin bekleyen adımında etkin onaycı yok. Talebi açıp onaycıyı değiştirin; yoksa süreç ilerlemez.
+                <AppIcon Name="alert-circle" Size="16" /> @Texts.Get("approvals.center.orphaned", Count(overview.Orphaned))
             </div>
         }
 
         <div class="chart-grid">
             <section class="chart-card" aria-labelledby="trend-title">
-                <h2 id="trend-title">Son 14 günün kararları</h2>
+                <h2 id="trend-title">@Texts.Get("approvals.center.trend")</h2>
                 @if (overview.ApprovedLast30Days + overview.RejectedLast30Days == 0)
                 {
-                    <p class="text-muted">Henüz sonuçlanan talep yok.</p>
+                    <p class="text-muted">@Texts.Get("approvals.center.trendEmpty")</p>
                 }
                 else
                 {
-                    <LineChart Categories="TrendDays" Series="TrendSeries" Title="Son 14 günde onaylanan ve reddedilen talepler" />
+                    <LineChart Categories="TrendDays" Series="TrendSeries" Title="@Texts.Get("approvals.center.trendChart")" />
                 }
             </section>
             <section class="chart-card" aria-labelledby="process-title">
-                <h2 id="process-title">Açık talepler · sürece göre</h2>
+                <h2 id="process-title">@Texts.Get("approvals.center.byProcess")</h2>
                 @if (overview.OpenByProcess.Count == 0)
                 {
-                    <p class="text-muted">Açık talep yok.</p>
+                    <p class="text-muted">@Texts.Get("approvals.center.byProcessEmpty")</p>
                 }
                 else
                 {
-                    <DonutChart Slices="ProcessSlices" Title="Açık taleplerin sürece göre dağılımı" Caption="açık talep" />
+                    <DonutChart Slices="ProcessSlices" Title="@Texts.Get("approvals.center.byProcessChart")" Caption="@Texts.Get("approvals.center.byProcessCaption")" />
                 }
             </section>
         </div>
     }
 
-    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="SelectViewAsync" Label="Onay görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="SelectViewAsync" Label="@Texts.Get("approvals.center.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Talep ara" placeholder="Başlık ya da süreç ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("approvals.center.searchLabel")" placeholder="@Texts.Get("approvals.center.searchPlaceholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(CoreAccess.DecideApprovals) || Session.Can(CoreAccess.ManageApprovals))
         {
-            <button type="button" class="btn btn-tonal" @onclick="OpenDelegationsAsync"><AppIcon Name="repeat" Size="16" /> Vekâlet</button>
+            <button type="button" class="btn btn-tonal" @onclick="OpenDelegationsAsync"><AppIcon Name="repeat" Size="16" /> @Texts.Get("approvals.center.delegation")</button>
         }
         @if (Session.Can(CoreAccess.RequestApprovals))
         {
-            <button type="button" class="btn btn-primary" @onclick="OpenNewAsync"><AppIcon Name="plus" Size="16" /> Yeni talep</button>
+            <button type="button" class="btn btn-primary" @onclick="OpenNewAsync"><AppIcon Name="plus" Size="16" /> @Texts.Get("approvals.center.newRequest")</button>
         }
     </div>
 
@@ -94,14 +94,14 @@
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Onay talepleri</caption>
+            <caption class="visually-hidden">@Texts.Get("approvals.center.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -113,8 +113,8 @@
                             <td data-label="@column.Label" class="@(column.Key == "title" ? "primary" : null)">@CellContent(column.Key, item)</td>
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{item.Title} eylemleri")">
-                                <button type="button" class="dropdown-item" role="menuitem" @onclick="() => OpenDetailAsync(item.Id)">Aç</button>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", item.Title)">
+                                <button type="button" class="dropdown-item" role="menuitem" @onclick="() => OpenDetailAsync(item.Id)">@Texts.Get("common.open")</button>
                             </RowMenu>
                         </td>
                     </tr>
@@ -124,7 +124,7 @@
         <Pager Page="result.Page" PageSize="result.PageSize" TotalCount="result.TotalCount" PageChanged="LoadAsync" />
     }
 
-    <Drawer Open="detail is not null" Label="Onay talebi" OnClose="CloseDetail">
+    <Drawer Open="detail is not null" Label="@Texts.Get("approvals.center.request")" OnClose="CloseDetail">
         @if (detail is not null)
         {
             <div class="section-header">
@@ -136,13 +136,13 @@
                         <p><AppIcon Name="file-text" Size="14" /> @(detail.TargetLink is { } recordLink ? (MarkupString)$"<a href=\"{System.Net.WebUtility.HtmlEncode(recordLink)}\">{System.Net.WebUtility.HtmlEncode(recordLabel)}</a>" : (MarkupString)System.Net.WebUtility.HtmlEncode(recordLabel))</p>
                     }
                 </div>
-                <button type="button" class="btn btn-icon btn-ghost" aria-label="Kapat" @onclick="CloseDetail"><AppIcon Name="x" Size="18" /></button>
+                <button type="button" class="btn btn-icon btn-ghost" aria-label="@Texts.Get("common.close")" @onclick="CloseDetail"><AppIcon Name="x" Size="18" /></button>
             </div>
             <div>
-                <p><span class="badge @StatusClass(detail.Status)">@StatusText(detail.Status)</span> <strong>@AmountText(detail)</strong></p>
+                <p><span class="badge @ApprovalLabels.StatusClass(detail.Status)">@ApprovalLabels.StatusText(detail.Status)</span> <strong>@AmountText(detail)</strong></p>
                 @if (!string.IsNullOrWhiteSpace(detail.Description)) { <p>@detail.Description</p> }
 
-                <h3 class="h6">Adımlar</h3>
+                <h3 class="h6">@Texts.Get("admin.automationRun.steps")</h3>
                 <ol class="step-track">
                     @foreach (var step in detail.Steps)
                     {
@@ -151,18 +151,18 @@
                             <div>
                                 <strong>@step.Name</strong>
                                 <small>@step.ApproverName @StepNote(step)</small>
-                                @if (step.IsOrphaned) { <span class="badge stage-lost">Etkin onaycı yok</span> }
-                                @if (step.IsEscalated && step.Status == "Active") { <span class="badge stage-onhold">Süresi geçti@(step.EscalationName is { } target ? $" · {target}" : null)</span> }
-                                @if (step.OnBehalfOfName is { } principal) { <small>@principal adına vekâleten</small> }
+                                @if (step.IsOrphaned) { <span class="badge stage-lost">@Texts.Get("approvals.center.noApprover")</span> }
+                                @if (step.IsEscalated && step.Status == "Active") { <span class="badge stage-onhold">@Texts.Get("approvals.center.escalated")@(step.EscalationName is { } target ? $" · {target}" : null)</span> }
+                                @if (step.OnBehalfOfName is { } principal) { <small>@Texts.Get("approvals.center.onBehalfOf", principal)</small> }
                                 @if (!string.IsNullOrWhiteSpace(step.Comment)) { <p>@step.Comment</p> }
                                 @if (step.Status == "Active" && Session.Can(CoreAccess.ManageApprovals) && options is not null)
                                 {
                                     <div class="inline-form">
-                                        <select class="form-select" aria-label="Yeni onaycı" @bind="reassignTo">
-                                            <option value="">Onaycıyı değiştir…</option>
+                                        <select class="form-select" aria-label="@Texts.Get("approvals.center.newApprover")" @bind="reassignTo">
+                                            <option value="">@Texts.Get("approvals.center.changeApprover")</option>
                                             @foreach (var person in options.People.Where(p => p.Id != detail.RequesterId)) { <option value="@person.Id">@person.Name</option> }
                                         </select>
-                                        <button type="button" class="btn btn-tonal" disabled="@(busy || reassignTo is null)" @onclick="() => ReassignAsync(step)">Değiştir</button>
+                                        <button type="button" class="btn btn-tonal" disabled="@(busy || reassignTo is null)" @onclick="() => ReassignAsync(step)">@Texts.Get("approvals.center.reassign")</button>
                                     </div>
                                 }
                             </div>
@@ -174,64 +174,64 @@
 
                 @if (detail.CanDecide)
                 {
-                    <label class="form-label" for="decision-note">Not (ret için zorunlu)</label>
+                    <label class="form-label" for="decision-note">@Texts.Get("approvals.center.decisionNote")</label>
                     <textarea id="decision-note" class="form-control" rows="3" maxlength="1000" @bind="comment"></textarea>
                 }
             </div>
             <div class="form-actions">
                 @if (detail.CanWithdraw)
                 {
-                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="WithdrawAsync">Geri çek</button>
+                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="WithdrawAsync">@Texts.Get("approvals.center.withdraw")</button>
                 }
                 @if (detail.CanDecide)
                 {
-                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => DecideAsync(false)">Reddet</button>
-                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => DecideAsync(true)">Onayla</button>
+                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => DecideAsync(false)">@Texts.Get("approvals.center.reject")</button>
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => DecideAsync(true)">@Texts.Get("approvals.center.approve")</button>
                 }
             </div>
         }
     </Drawer>
 
-    <Drawer Open="delegating" Label="Onay vekâleti" OnClose="() => delegating = false">
+    <Drawer Open="delegating" Label="@Texts.Get("approvals.center.delegationTitle")" OnClose="() => delegating = false">
         <div class="section-header">
-            <h2>Onay vekâleti</h2>
-            <button type="button" class="btn btn-icon btn-ghost" aria-label="Kapat" @onclick="() => delegating = false"><AppIcon Name="x" Size="18" /></button>
+            <h2>@Texts.Get("approvals.center.delegationTitle")</h2>
+            <button type="button" class="btn btn-icon btn-ghost" aria-label="@Texts.Get("common.close")" @onclick="() => delegating = false"><AppIcon Name="x" Size="18" /></button>
         </div>
         <div>
-            <p class="text-muted">İzinliyken size atanan adımlara vekiliniz karar versin. Role atanmış adımlar vekâlete girmez; vekil, talep sahibi olduğu talebe karar veremez.</p>
+            <p class="text-muted">@Texts.Get("approvals.center.delegationHelp")</p>
             @foreach (var delegation in delegations)
             {
                 <div class="step-editor">
                     <strong>@delegation.PrincipalName → @delegation.DelegateName</strong>
                     <small class="d-block text-muted">@DateText(delegation.StartsAt) – @DateText(delegation.EndsAt)</small>
-                    <span class="badge @(delegation.IsActive ? "stage-won" : "stage-cancelled")">@(delegation.RevokedAt is not null ? "Geri alındı" : delegation.IsActive ? "Etkin" : "Etkin değil")</span>
+                    <span class="badge @(delegation.IsActive ? "stage-won" : "stage-cancelled")">@(delegation.RevokedAt is not null ? Texts.Get("approvals.center.revoked") : delegation.IsActive ? Texts.Get("approvals.center.delegationActive") : Texts.Get("approvals.center.delegationInactive"))</span>
                     @if (delegation.RevokedAt is null && delegation.EndsAt > DateTimeOffset.UtcNow && (delegation.PrincipalUserId == Session.User?.UserId || Session.Can(CoreAccess.ManageApprovals)))
                     {
-                        <button type="button" class="btn btn-ghost btn-sm" disabled="@busy" @onclick="() => RevokeDelegationAsync(delegation)">Geri al</button>
+                        <button type="button" class="btn btn-ghost btn-sm" disabled="@busy" @onclick="() => RevokeDelegationAsync(delegation)">@Texts.Get("approvals.center.revoke")</button>
                     }
                 </div>
             }
-            <FormTabs Title="Yeni vekâlet">
-                <FormSection Title="Vekil" Icon="user">
+            <FormTabs Title="@Texts.Get("approvals.center.newDelegation")">
+                <FormSection Title="@Texts.Get("approvals.center.delegate")" Icon="user">
                     <div class="mb-3">
-                        <label class="form-label" for="delegate-user">Vekil</label>
+                        <label class="form-label" for="delegate-user">@Texts.Get("approvals.center.delegate")</label>
                         <select id="delegate-user" class="form-select" @bind="delegateId">
-                            <option value="">Seçin…</option>
+                            <option value="">@Texts.Get("common.choose")</option>
                             @foreach (var member in members.Where(m => m.UserId != Session.User?.UserId)) { <option value="@member.UserId">@member.DisplayName</option> }
                         </select>
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label class="form-label" for="delegate-from">Başlangıç</label>
+                            <label class="form-label" for="delegate-from">@Texts.Get("approvals.center.from")</label>
                             <input id="delegate-from" class="form-control" type="date" @bind="delegateFrom" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label" for="delegate-to">Bitiş</label>
+                            <label class="form-label" for="delegate-to">@Texts.Get("approvals.center.to")</label>
                             <input id="delegate-to" class="form-control" type="date" @bind="delegateTo" />
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label" for="delegate-reason">Gerekçe</label>
+                        <label class="form-label" for="delegate-reason">@Texts.Get("approvals.center.reason")</label>
                         <input id="delegate-reason" class="form-control" maxlength="300" @bind="delegateReason" />
                     </div>
                 </FormSection>
@@ -239,48 +239,48 @@
             <Notice Text="@actionError" Failed="true" />
         </div>
         <div class="form-actions">
-            <button type="button" class="btn btn-outline-secondary" @onclick="() => delegating = false">Kapat</button>
-            <button type="button" class="btn btn-primary" disabled="@(busy || delegateId is null)" @onclick="SaveDelegationAsync">Vekâleti aç</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="() => delegating = false">@Texts.Get("common.close")</button>
+            <button type="button" class="btn btn-primary" disabled="@(busy || delegateId is null)" @onclick="SaveDelegationAsync">@Texts.Get("approvals.center.openDelegation")</button>
         </div>
     </Drawer>
 
-    <Drawer Open="creating" Label="Yeni onay talebi" OnClose="() => creating = false">
+    <Drawer Open="creating" Label="@Texts.Get("approvals.center.newTitle")" OnClose="() => creating = false">
         <div class="section-header">
-            <h2>Yeni onay talebi</h2>
-            <button type="button" class="btn btn-icon btn-ghost" aria-label="Kapat" @onclick="() => creating = false"><AppIcon Name="x" Size="18" /></button>
+            <h2>@Texts.Get("approvals.center.newTitle")</h2>
+            <button type="button" class="btn btn-icon btn-ghost" aria-label="@Texts.Get("common.close")" @onclick="() => creating = false"><AppIcon Name="x" Size="18" /></button>
         </div>
         <div>
             @if (definitions.Count == 0)
             {
-                <p class="text-muted">Açık onay süreci yok. Yöneticiniz Yönetim → Onay süreçleri ekranından süreç tanımlayabilir.</p>
+                <p class="text-muted">@Texts.Get("approvals.center.noProcesses")</p>
             }
             else
             {
-                <FormTabs Title="Talep bilgileri">
-                    <FormSection Title="Talep" Icon="file-text">
+                <FormTabs Title="@Texts.Get("approvals.center.requestInfo")">
+                    <FormSection Title="@Texts.Get("approvals.center.col.request")" Icon="file-text">
                         <div class="mb-3">
-                            <label class="form-label" for="new-process">Süreç</label>
+                            <label class="form-label" for="new-process">@Texts.Get("admin.approvalProcesses.process")</label>
                             <select id="new-process" class="form-select" @bind="newDefinitionId">
                                 @foreach (var definition in definitions) { <option value="@definition.Id">@definition.Name</option> }
                             </select>
                             @if (SelectedDefinition?.Description is { } about) { <small class="text-muted">@about</small> }
                         </div>
                         <div class="mb-3">
-                            <label class="form-label" for="new-title">Başlık</label>
+                            <label class="form-label" for="new-title">@Texts.Get("approvals.center.title")</label>
                             <input id="new-title" class="form-control" maxlength="200" @bind="newTitle" />
                         </div>
                         <div class="row g-2 mb-3">
                             <div class="col-8">
-                                <label class="form-label" for="new-amount">Tutar</label>
+                                <label class="form-label" for="new-amount">@Texts.Get("approvals.center.col.amount")</label>
                                 <input id="new-amount" class="form-control" type="number" min="0" step="0.01" @bind="newAmount" />
                             </div>
                             <div class="col-4">
-                                <label class="form-label" for="new-currency">Para birimi</label>
+                                <label class="form-label" for="new-currency">@Texts.Get("admin.automationEditor.currency")</label>
                                 <input id="new-currency" class="form-control" maxlength="3" disabled="@(SelectedDefinition?.Currency is not null)" @bind="newCurrency" />
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label" for="new-description">Açıklama</label>
+                            <label class="form-label" for="new-description">@Texts.Get("common.field.description")</label>
                             <textarea id="new-description" class="form-control" rows="4" maxlength="2000" @bind="newDescription"></textarea>
                         </div>
                     </FormSection>
@@ -289,8 +289,8 @@
             <Notice Text="@actionError" Failed="true" />
         </div>
         <div class="form-actions">
-            <button type="button" class="btn btn-outline-secondary" @onclick="() => creating = false">İptal</button>
-            <button type="button" class="btn btn-primary" disabled="@(busy || definitions.Count == 0)" @onclick="SubmitNewAsync">Onaya gönder</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="() => creating = false">@Texts.Get("common.cancel")</button>
+            <button type="button" class="btn btn-primary" disabled="@(busy || definitions.Count == 0)" @onclick="SubmitNewAsync">@Texts.Get("approvals.center.submit")</button>
         </div>
     </Drawer>
 </AuthGate>
@@ -301,23 +301,23 @@
     private const string DefaultView = "waiting";
 
     // Sistem görünümleri sunucunun view süzgecidir (Waiting, Mine, All); kişisel görünümler ardına eklenir ve süzgeci view=… ile saklar (ADR-0036).
-    private static readonly IReadOnlyList<ViewOption> SystemViews =
+    private static IReadOnlyList<ViewOption> SystemViews =>
     [
-        new(DefaultView, "Kararımı bekleyenler", Icon: "hourglass"),
-        new("mine", "Taleplerim", Icon: "user"),
-        new("all", "Tümü", Icon: "clipboard-list"),
+        new(DefaultView, Texts.Get("approvals.center.view.waiting"), Icon: "hourglass"),
+        new("mine", Texts.Get("approvals.center.view.mine"), Icon: "user"),
+        new("all", Texts.Get("approvals.center.view.all"), Icon: "clipboard-list"),
     ];
 
     // Sıralanabilir sütunlar sunucudaki sort anahtarlarıdır (title, process, amount, submitted).
-    private static readonly GridColumnDef[] Columns =
+    private static GridColumnDef[] Columns =>
     [
-        new("title", "Talep", "type", "title", "-title", Locked: true),
-        new("process", "Süreç", "layers", "process", "-process"),
-        new("amount", "Tutar", "coins", "amount", "-amount"),
-        new("requester", "Talep eden", "user"),
-        new("progress", "İlerleme", "activity"),
-        new("submitted", "Tarih", "calendar", "submitted", "-submitted"),
-        new("status", "Durum", "tag"),
+        new("title", Texts.Get("approvals.center.col.request"), "type", "title", "-title", Locked: true),
+        new("process", Texts.Get("admin.approvalProcesses.process"), "layers", "process", "-process"),
+        new("amount", Texts.Get("approvals.center.col.amount"), "coins", "amount", "-amount"),
+        new("requester", Texts.Get("approvals.center.col.requester"), "user"),
+        new("progress", Texts.Get("approvals.center.col.progress"), "activity"),
+        new("submitted", Texts.Get("approvals.center.col.submitted"), "calendar", "submitted", "-submitted"),
+        new("status", Texts.Get("common.field.status"), "tag"),
     ];
 
     [SupplyParameterFromQuery(Name = "talep")] public Guid? RequestId { get; set; }
@@ -356,32 +356,32 @@
 
     private string HeroTitle => overview switch
     {
-        null => "Onay merkezi",
-        { WaitingForMe: 0 } => "Masanız temiz",
-        var o => $"{Count(o.WaitingForMe)} talep kararınızı bekliyor",
+        null => Texts.Get("nav.app.approvals"),
+        { WaitingForMe: 0 } => Texts.Get("approvals.center.hero.clear"),
+        var o => Texts.Get("approvals.center.hero.waiting", Count(o.WaitingForMe)),
     };
 
     private string HeroText => overview is { Overdue: > 0 } o
-        ? $"{Count(o.Overdue)} talebin süresi geçti; önce onlara bakın."
-        : "Talepler adım adım ilerler, her karar kim verdi ve neden diye kayıt altına alınır.";
+        ? Texts.Get("approvals.center.hero.overdue", Count(o.Overdue))
+        : Texts.Get("approvals.center.hero.text");
 
     private string AverageText => overview?.AverageDecisionHours is { } hours
-        ? hours < 24 ? $"{hours.ToString("N1", Regional.Numbers)} sa" : $"{(hours / 24).ToString("N1", Regional.Numbers)} gün"
+        ? hours < 24 ? Texts.Get("approvals.center.hours", hours.ToString("N1", Regional.Numbers)) : Texts.Get("approvals.center.days", (hours / 24).ToString("N1", Regional.Numbers))
         : "—";
 
     private string EmptyText => view switch
     {
-        "waiting" => "Kararınızı bekleyen talep yok.",
-        "mine" => "Henüz talep açmadınız.",
-        _ => "Görebildiğiniz talep yok.",
+        "waiting" => Texts.Get("approvals.center.empty.waiting"),
+        "mine" => Texts.Get("approvals.center.empty.mine"),
+        _ => Texts.Get("approvals.center.empty.all"),
     };
 
     private IReadOnlyList<string> TrendDays => [.. overview!.Trend.Select(d => d.Day.ToString("dd.MM"))];
 
     private IReadOnlyList<LineSeries> TrendSeries =>
     [
-        new("Onaylanan", [.. overview!.Trend.Select(d => (decimal?)d.Approved)]),
-        new("Reddedilen", [.. overview!.Trend.Select(d => (decimal?)d.Rejected)]),
+        new(Texts.Get("approvals.center.series.approved"), [.. overview!.Trend.Select(d => (decimal?)d.Approved)]),
+        new(Texts.Get("approvals.center.series.rejected"), [.. overview!.Trend.Select(d => (decimal?)d.Rejected)]),
     ];
 
     private IReadOnlyList<ChartSlice> ProcessSlices => [.. overview!.OpenByProcess.Select(p => new ChartSlice(p.Name, p.Open))];
@@ -494,7 +494,7 @@
         "amount" => @<text>@AmountText(item)</text>,
         "requester" => @<text>@item.RequesterName</text>,
         "progress" => @<span class="step-dots" aria-label="@ProgressText(item)">@foreach (var step in item.Steps) { <span class="step-dot @StepClass(step)"></span> }</span>,
-        "status" => @<text><span class="badge @StatusClass(item.Status)">@StatusText(item.Status)</span>@if (item.Steps.Any(s => s.IsOverdue)) { <span class="badge stage-lost">Gecikti</span> }</text>,
+        "status" => @<text><span class="badge @ApprovalLabels.StatusClass(item.Status)">@ApprovalLabels.StatusText(item.Status)</span>@if (item.Steps.Any(s => s.IsOverdue)) { <span class="badge stage-lost">@Texts.Get("approvals.center.late")</span> }</text>,
         "submitted" => @<text>@DateText(item.SubmittedAt)</text>,
         _ => @<text></text>,
     };
@@ -615,25 +615,6 @@
     private static string AmountText(ApprovalRequestDto item) =>
         item.Amount is { } amount ? $"{amount.ToString("N2", Regional.Numbers)} {item.Currency}" : "—";
 
-    private static string StatusText(string status) => status switch
-    {
-        "Pending" => "Bekliyor",
-        "Approved" => "Onaylandı",
-        "Rejected" => "Reddedildi",
-        "Withdrawn" => "Geri çekildi",
-        "Invalidated" => "Geçersizleşti",
-        _ => status,
-    };
-
-    private static string StatusClass(string status) => status switch
-    {
-        "Pending" => "stage-open",
-        "Approved" => "stage-won",
-        "Rejected" => "stage-lost",
-        "Invalidated" => "stage-onhold",
-        _ => "stage-cancelled",
-    };
-
     private static string StepClass(ApprovalStepDto step) => step.Status switch
     {
         "Approved" => "is-approved",
@@ -654,10 +635,10 @@
     private static string StepNote(ApprovalStepDto step) => step switch
     {
         { DecidedAt: { } at } => $"· {step.DecidedByName} · {DateText(at)}",
-        { Status: "Active", DueAt: { } due } => $"· son tarih {DateText(due)}",
+        { Status: "Active", DueAt: { } due } => "· " + Texts.Get("approvals.center.dueAt", DateText(due)),
         _ => string.Empty,
     };
 
     private static string ProgressText(ApprovalRequestDto item) =>
-        $"{item.Steps.Count} adımdan {item.Steps.Count(s => s.Status == "Approved")} tanesi onaylandı";
+        Texts.Get("approvals.center.progress", item.Steps.Count, item.Steps.Count(s => s.Status == "Approved"));
 }

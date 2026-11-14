@@ -3,15 +3,15 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>Otomasyon şablonları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("admin.automationTemplates.title") · Modulix</PageTitle>
 
 @* Başlangıç şablonları (ADR-0027, Dilim 3b/5a): "Kullan" yalnızca taslak kural açar; taslak yayınlanıp açılana kadar hiçbir şey çalıştırmaz.
    Şablonu kullanmak core.automation.manage ister; listeyi görmek core.automation.read. *@
 <AuthGate Permission="@CoreAccess.ReadAutomation">
-    <a class="back-link" href="yonetim/otomasyon">← Otomasyon kuralları</a>
+    <a class="back-link" href="yonetim/otomasyon">← @Texts.Get("admin.automationRules.title")</a>
 
-    <PageHeader Title="Otomasyon şablonları" Icon="zap"
-                Subtitle="Hazır bir şablonu kullanınca kural taslak olarak açılır. Hiçbir şey çalışmaz; gözden geçirip yayınlamak size kalır." />
+    <PageHeader Title="@Texts.Get("admin.automationTemplates.title")" Icon="zap"
+                Subtitle="@Texts.Get("admin.automationTemplates.subtitle")" />
 
     @if (message is not null)
     {
@@ -27,34 +27,34 @@
     }
     else if (templates.Count == 0)
     {
-        <p class="text-muted" role="status">Bu firmada kullanılabilir şablon yok. Şablonlar, açık modüllere göre listelenir.</p>
+        <p class="text-muted" role="status">@Texts.Get("admin.automationTemplates.empty")</p>
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Otomasyon şablonları</caption>
+            <caption class="visually-hidden">@Texts.Get("admin.automationTemplates.title")</caption>
             <thead>
-                <tr><th scope="col">Şablon</th><th scope="col">Kayıt türü</th><th scope="col"><span class="visually-hidden">Eylem</span></th></tr>
+                <tr><th scope="col">@Texts.Get("admin.automationTemplates.col.template")</th><th scope="col">@Texts.Get("admin.automation.entity")</th><th scope="col"><span class="visually-hidden">@Texts.Get("admin.automationTemplates.col.action")</span></th></tr>
             </thead>
             <tbody>
                 @foreach (var template in templates)
                 {
                     <tr>
-                        <td data-label="Şablon" class="primary">
+                        <td data-label="@Texts.Get("admin.automationTemplates.col.template")" class="primary">
                             @template.DisplayName
                             <small class="text-muted d-block">@template.Description</small>
                             @if (!template.Available)
                             {
-                                <small class="text-danger d-block">Kullanılamıyor: @(template.Issues.FirstOrDefault()?.Message ?? "Gerekli izin ya da modül yok.")</small>
+                                <small class="text-danger d-block">@Texts.Get("admin.automationTemplates.unavailable", template.Issues.FirstOrDefault()?.Message ?? Texts.Get("admin.automationTemplates.missingAccess"))</small>
                             }
                         </td>
-                        <td data-label="Kayıt türü">@AutomationLabels.EntityName(entities, template.EntityKey)</td>
-                        <td data-label="Eylem" class="actions">
+                        <td data-label="@Texts.Get("admin.automation.entity")">@AutomationLabels.EntityName(entities, template.EntityKey)</td>
+                        <td data-label="@Texts.Get("admin.automationTemplates.col.action")" class="actions">
                             @if (Session.Can(CoreAccess.ManageAutomation))
                             {
                                 <button type="button" class="btn btn-sm btn-outline-primary" disabled="@(!template.Available || busy is not null)"
                                         @onclick="() => UseAsync(template)">
-                                    @(busy == template.Key ? "Açılıyor…" : "Kullan")
+                                    @(busy == template.Key ? Texts.Get("admin.automationTemplates.opening") : Texts.Get("admin.automationTemplates.use"))
                                 </button>
                             }
                         </td>
