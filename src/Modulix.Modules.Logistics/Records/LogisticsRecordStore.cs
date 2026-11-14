@@ -12,7 +12,7 @@ namespace Modulix.Modules.Logistics.Records;
 /// alan listesini, filtreleri, sıralamayı ve aramayı verir. Kaydetmez: boru hattı kaydı, audit'i ve olayı tek seferde yazar.
 /// Tenant filtresi ve RLS <see cref="IModuleData"/> üzerinden uygulanır.
 /// </summary>
-internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext context) : IRecordStore
+internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext context) : IRecordStore, IRecordWriteGuard
     where TEntity : LogisticsEntity, new()
 {
     private static readonly IReadOnlyDictionary<string, RecordFilter<TEntity>> NoFilters = new Dictionary<string, RecordFilter<TEntity>>();
@@ -23,6 +23,15 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
 
     /// <summary>Lisans kontrolü modül düzeyindedir: modül tenant için açıksa tüm kayıtları kullanılabilir.</summary>
     public string FeatureKey => EntityKey;
+
+    /// <summary>
+    /// Kayıt düzeyinde yan yazma kuralı (ADR-0040 K2, ADR-0038 bölüm 24): kayda dosya eklemek ve silmek, tür izninden sonra kaydın kendi kuralına da
+    /// uymalıdır. Kural <see cref="FileWriteDeniedAsync"/>'tedir; kayıt bulunamazsa karar okuma denetimine kalır.
+    /// </summary>
+    public async Task<string?> WriteDeniedAsync(Guid id, CancellationToken cancellationToken) =>
+        await Data.Set<TEntity>().AsNoTracking().SingleOrDefaultAsync(e => e.Id == id, cancellationToken) is { } entity
+            ? await FileWriteDeniedAsync(entity, cancellationToken)
+            : null;
 
     protected abstract string ReadPermission { get; }
 
@@ -171,6 +180,12 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
         Data.Set<TEntity>().Remove(entity);
         return true;
     }
+
+    /// <summary>
+    /// Bu kayda dosya eklenemez/silinemezse nedeni (403). Varsayılan: kural yok (tür güncelleme izni yeter). Kaydı yalnızca belirli durumda
+    /// değiştirilebilen ya da değişmeyen depolar (ör. onaylanmış masraf, teslim kanıtı) aynı kuralı burada da verir; yoksa dosya kaydın kuralını atlatır.
+    /// </summary>
+    protected virtual Task<string?> FileWriteDeniedAsync(TEntity entity, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
 
     /// <summary>Kayıt silinmeden önce (bağlı kayıtları denetlemek ya da kaldırmak için).</summary>
     protected virtual Task BeforeDeleteAsync(TEntity entity, CancellationToken cancellationToken) => Task.CompletedTask;

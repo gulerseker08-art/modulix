@@ -10,7 +10,8 @@ namespace Modulix.Modules.Logistics.Records;
 /// Teslim kanıtı deposu (ADR-0038 K8, dilim 6). Kayıt <b>değişmez</b>: güncellenmez ve silinmez, genel uçtan oluşturulamaz; yalnızca teslim komutu
 /// (<see cref="Lifecycle.IShipmentDelivery"/>) iş akışı kapısını açıp yazar. Zaman sunucuda verilir. Kuralları depo da uygular, komut atlanamaz:
 /// yalnızca yoldaki sevkiyata kanıt yazılır; teslim ve kısmi teslimde teslim alan, kısmi teslimde açıklama, başarısız teslimde neden zorunludur.
-/// Fotoğraf ve imza dosyaları kayda Core dosya deposuyla eklenir (okuma = sevkiyat okuma izni, ekleme = sevkiyat yazma izni).
+/// Fotoğraf ve imza dosyaları kayda Core dosya deposuyla eklenir (okuma = sevkiyat okuma izni, ekleme ve silme = sevkiyat yazma izni ve kaydın kuralı,
+/// ADR-0038 bölüm 24: dosyalar teslimden sonra eklenir, sevkiyatın seferi kapanınca kanıtla birlikte donar).
 /// </summary>
 internal sealed class DeliveryProofRecordStore(LogisticsStoreContext context) : LogisticsRecordStore<DeliveryProof>(context)
 {
@@ -95,6 +96,22 @@ internal sealed class DeliveryProofRecordStore(LogisticsStoreContext context) : 
         {
             throw new RecordValidationException(errors);
         }
+    }
+
+    /// <summary>
+    /// Kanıt kaydı değişmez ama fotoğraf ve imza teslimden sonra eklenir (kayıt dosyadan önce doğar). Bu yüzden dosya kuralı kaydınkinden bir adım
+    /// geniştir (ADR-0038 bölüm 24): sevkiyatın seferi açıkken (tamamlanmamış, iptal edilmemiş) dosya eklenir ve silinir; sefer kapanınca kanıt dosyalarıyla
+    /// birlikte donar. Seferi olmayan sevkiyatın kanıtı da donmuş sayılır (yoldaki sevkiyat seferden ayrılamaz; bu durum beklenmez).
+    /// </summary>
+    protected override async Task<string?> FileWriteDeniedAsync(DeliveryProof entity, CancellationToken cancellationToken)
+    {
+        var tripId = await Context.Data.Set<Shipment>().AsNoTracking().Where(s => s.Id == entity.ShipmentId).Select(s => s.TripId).SingleOrDefaultAsync(cancellationToken);
+        var tripStatus = tripId is { } id
+            ? await Context.Data.Set<Trip>().AsNoTracking().Where(t => t.Id == id).Select(t => t.Status).SingleOrDefaultAsync(cancellationToken)
+            : null;
+        return tripStatus is null or Trip.Statuses.Completed or Trip.Statuses.Cancelled
+            ? "Sefer kapandığı için teslim kanıtı donmuştur; fotoğraf ve imza eklenemez ya da silinemez."
+            : null;
     }
 
     private static string? Trim(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();

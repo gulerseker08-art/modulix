@@ -41,6 +41,7 @@ Sürüm geçmişi (aynı dosyanın yeni sürümü), saklama süresi ve legal hol
 
 - **Listele ve indir:** `IRecordPipeline.GetAsync(kayıt)` başarılıysa. Kayıt kullanıcının kapsamında yoksa ya da izni yoksa dosya **404** döner (varlığı sızmaz); modül lisansı bitmişse boru hattı zaten reddeder.
 - **Yükle ve sil:** kayıt okunabilir **ve** kayıt türünde `Update` izni var **ve** modül yazılabilir (lisans salt okunur evresinde değil, ADR-0028). Kayıt okunabilir ama yazma izni yoksa 403.
+- **Kayıt düzeyinde kural:** kaydı yalnızca belirli durumda değiştirilebilen ya da hiç değişmeyen türlerde depo aynı kuralı `IRecordWriteGuard` ile verir; yükleme ve silme tür izninden sonra buna da sorulur, kural tutmazsa 403. Kuralı vermeyen tür izinle sınırlı kalır; bu yüzden kaydın güncellemesini durumla sınırlayan her depo dosya kuralını da vermelidir. Lojistik: onaylanmış masraf ve iptal edilmiş seferdeki masraf, kapanmış seferdeki teslim kanıtı (ADR-0038 bölüm 24).
 - Dosya kimliğinden gidilirken önce metadata okunur, sonra bağlı kaydın erişimi her istekte yeniden sorulur. Dosya kimliğini bilmek yetki vermez. Tenant yalnızca oturumdan gelir; başka tenant'ın dosyası RLS ve sorgu süzgeciyle bulunamaz.
 - Bağlı kayıt silinmiş ya da erişilemezse dosya da erişilemez (404). Silinen kaydın eklerinin temizliği dilim 3'tür; tenant silme ise hepsini kapsar (K6).
 

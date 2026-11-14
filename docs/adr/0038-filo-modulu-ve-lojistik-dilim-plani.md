@@ -584,3 +584,31 @@ Lojistik, kural altyapısına (ADR-0027) kayıt türlerini ve alanlarını dilim
 | `dotnet test tests/Modulix.Modules.Logistics.Tests` | 36 (6 yeni): gerçek katalog ve gerçek tanım doğrulayıcısıyla on şablonun her biri; tek sorun boş alıcı, alıcı seçilince sorun yok; sevkiyat okuma izni olmayana sevkiyat şablonları kapalı; modül kapalıyken liste boş; tarama şablonları kayıt kaynağının desteklediği tarih alanlarını kullanır |
 | `dotnet test tests/Modulix.Core.Tests --filter "AutomationTemplate"` | 6 yeni: boşluk beyanının katalog denetimi; beyan edilen boşluk şablonu açık tutar, beyan edilmeyen eksik / izin / modül sorunu tutmaz |
 | `... --filter "LogisticsAutomationTemplateTests"` (SQL Server; CI koşar) | 4 test yazıldı. **Mutlu yol:** şablon taslak açar, alıcı seçilince yayınlanır, tarama yalnızca yarın yüklenecek talebi bulur ve alıcıya bildirim yazar. **Doğrulama:** alıcı seçilmeden yayın reddedilir; on şablonun hepsi alıcıyla yayın doğrulamasından geçer. **Tenant izolasyonu:** bir firmada kullanılan şablon diğerinde kural açmaz. **Yetki:** yönetme izni olmayan 403, kayıt türünü okuyamayan 400, modül kapalıyken 404 |
+
+## 24. Kayıt düzeyinde dosya izni: masraf belgesi ve teslim kanıtı (14 Kasım 2026)
+
+**Bulunan açık:** ADR-0040 K2'de dosya ekleme ve silme kaydı okuyabilmeye ve kayıt **türünün** güncelleme iznine bağlıdır; kayıt düzeyinde kural ancak depo `IRecordWriteGuard` uygularsa sorulur (İK masraf satırı için aynı açık ADR-0042 bölüm 25'te kapatıldı). Lojistik depoları bunu uygulamıyordu:
+- **Sefer masrafı:** onaylanmış masraf değişmez, iptal edilen sefere masraf açılmaz; ama makbuz ve fiş, onaydan sonra da masraf yazma izni olan herkesçe eklenip silinebiliyordu (onaylanan belge sessizce değişebiliyordu).
+- **Teslim kanıtı:** kayıt değişmez (güncellenmez, silinmez); ama fotoğraf ve imza herhangi bir zamanda, sevkiyat yazma izni olan herkesçe eklenip silinebiliyordu (kanıt sonradan değiştirilebiliyordu).
+
+**Çözüm:**
+- `LogisticsRecordStore` her lojistik deposu için `IRecordWriteGuard` uygular (`FileWriteDeniedAsync`; varsayılan kural yok, diğer türlerde davranış değişmez). Core'da yeni kod yok: dosya deposu tür izninden sonra bu kancayı zaten soruyordu.
+- **Masraf:** kural kaydın güncelleme kuralıyla aynıdır. Beklemedeki ve reddedilmiş masrafın belgesi eklenir ve silinir; onaylanmış masrafın belgesi değişmez (403, "Onaylanmış masrafın makbuzu ve fişi değiştirilemez…"). İptal edilmiş seferin masrafına belge eklenmez, silinmez (403).
+  - **Reddedilmiş masraf bilerek açık:** reddedilen masraf düzeltilip yeniden gönderilir ve en sık ret nedeni belgedir ("Fiş okunmuyor"); belgeyi kilitlemek düzeltme akışını bozardı.
+- **Teslim kanıtı:** kayıt dosyadan önce doğar (fotoğraf ve imza teslimden sonra eklenir), bu yüzden kaydın "hiç değişmez" kuralı dosyaya birebir uygulanamaz. Kural: sevkiyatın seferi açıkken (tamamlanmamış, iptal edilmemiş) dosya eklenir ve silinir; sefer kapanınca kanıt dosyalarıyla birlikte donar (403). Seferi olmayan sevkiyatın kanıtı da donmuş sayılır (yoldaki sevkiyat seferden ayrılamadığı için beklenmez).
+- Okuma ve indirme değişmedi: kaydı okuyan dosyaları listeler ve indirir.
+- **Arayüz:** `AttachmentPanel CanWrite` aynı koşulla (`LogisticsAccess.ExpenseFilesWritable`, `ProofFilesWritable`): sefer kartındaki masraf panelinde seferin durumu kayıttan; Masraflar ekranında ve teslim panelinde seferin durumu sefer okuma izni varsa okunur, yoksa düğme yalnızca masrafın durumuna bakar ve kararı sunucu verir (403 iletisi panelde görünür). Yeni CSS sınıfı ya da token yok.
+
+**Kapsam dışı (bilerek):**
+- İptal edilmiş seferin **beklemedeki masrafının kendisi** hâlâ düzenlenebilir (kayıt kuralı yalnızca oluştururken seferin iptaline bakıyor); dosya kuralı daha sıkıdır. Kaydın kuralını da sıkılaştırmak ayrı karardır.
+- Teslim kanıtı için süre penceresi (ör. teslimden sonra 24 saat) ya da "yalnızca ekle, silme yok" kuralı: ikincisi Core sözleşmesinde işlem türü (ekle/sil) ayrımı gerektirir; ilk ihtiyaçta.
+- Sefer tamamlama yolu entegrasyon testinde iptal ile sınandı (kural iki durumu aynı koşulla denetler); tamamlama araç, sürücü ve durak varışı kurulumu gerektirir.
+
+### Test sonuçları (bölüm 24)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet build` | Hatasız (SDK 10.0.404). Not: 10.0.100 ve Ubuntu'nun 10.0.115 paketiyle `Modulix.Web` bu değişiklikten bağımsız Razor hataları veriyor (`DashKpi`, `AppLauncher`, `LayoutForm`, `FormDesigner`, `ImportLog`); CI `rollForward: latestFeature` ile runner'daki daha yeni SDK'yı kullanır |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Web.Tests` | 94/94 / 36/36 / 258/258 |
+| `... --filter "LogisticsExpenseTests\|LogisticsDeliveryTests"` (yerel SQL Server) | 16/16 (5 yeni test + 2 genişletilen). **Masraf, mutlu yol:** beklemedeki masrafa makbuz eklenir ve silinir; reddedilen masrafta doğru fiş eklenir, yanlışı silinir, yeniden gönderilir. **Kural (403):** onaylanmış masrafa giren de müdür de ekleyemez ve silemez, okuma ve indirme sürer; iptal edilen seferin beklemedeki masrafına eklenemez, silinemez. **Tenant izolasyonu:** başka tenant ekleyemez, listeleyemez, indiremez, silemez (404). **Yetki:** yalnızca okuyan listeler ama ekleyemez ve silemez (403); masrafı okuyamayan ulaşamaz. **Teslim kanıtı:** sefer açıkken fotoğraf eklenir ve silinir, sefer kapanınca (iptal) ekleme ve silme 403, okuma sürer; başka tenant kanıt dosyasını indiremez ve silemez (404); okuyan silemez (403). Kural kodu geri alınınca tam olarak iki kural testi kırılıyor |
+| `... --filter "Logistics\|File"` (yerel SQL Server) | 99 geçti, 2 atlandı (önceden atlanan), 0 kırık |

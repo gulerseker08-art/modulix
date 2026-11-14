@@ -1,11 +1,14 @@
 using System.Globalization;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 using Modulix.Infrastructure.Identity;
 using Modulix.Shared.Audit;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Files;
 using Modulix.Shared.Logistics;
 using Modulix.Shared.Lookups;
 using Modulix.Shared.Records;
@@ -19,7 +22,8 @@ namespace Modulix.IntegrationTests;
 /// gerekçeyle reddeder, karar verilmiş masraf kilitlenir ve silinmez, denetim kaydı), doğrulama (tutar, para birimi, KDV, tarih, kategoriye bağlı
 /// litre/kilometre/rücu kuralları, bilinmeyen tür ve sefer, iptal edilmiş sefer, gerekçesiz ret, çifte karar), tenant izolasyonu (başka tenant'ın
 /// masrafı görünmez, onaylanamaz, başka tenant'ın seferine masraf açılamaz) ve yetki (yazma izni olmayan giremez, onay izni olmayan onaylayamaz ve
-/// eylem listesinde görmez, okuma izni olmayan göremez).
+/// eylem listesinde görmez, okuma izni olmayan göremez). Makbuz ve fiş (bölüm 24): beklemede ve reddedilmişte eklenir ve silinir, onaylanmışta ve
+/// iptal edilmiş seferde 403; başka tenant 404; yalnızca okuyan 403.
 /// </summary>
 public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
@@ -269,7 +273,140 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
         Assert.DoesNotContain(number, await ResolveAsync(managerB));
     }
 
+    // --- makbuz ve fiş: kaydın kuralı (ADR-0038 bölüm 24, ADR-0040 K2) ---
+
+    /// <summary>Mutlu yol: beklemedeki masrafa makbuz eklenir ve silinir; reddedilen masrafın belgesi düzeltilir (yeni fiş eklenir, eskisi silinir).</summary>
+    [Fact]
+    public async Task Receipts_are_added_and_removed_while_the_expense_is_pending_or_rejected()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var manager = await LoginAsync(s.Manager);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(operations, Expenses, Toll(trip.Id));
+
+        var wrong = await UploadAsync(operations, expense.Id, "yanlis-fis.png");
+        var extra = await UploadAsync(operations, expense.Id, "ek.png");
+        Assert.Equal(HttpStatusCode.NoContent, (await operations.DeleteAsync($"{Files}/{extra.Id}?version={extra.Version}")).StatusCode);
+        Assert.Equal(["yanlis-fis.png"], (await ReceiptsAsync(operations, expense.Id)).Select(f => f.FileName));
+
+        // Ret "fiş okunmuyor": giren doğru fişi ekler, yanlışını siler ve yeniden gönderir.
+        var rejected = await ActAsync(manager, expense, "reject", "Fiş okunmuyor");
+        await UploadAsync(operations, rejected.Id, "dogru-fis.png");
+        Assert.Equal(HttpStatusCode.NoContent, (await operations.DeleteAsync($"{Files}/{wrong.Id}?version={wrong.Version}")).StatusCode);
+        Assert.Equal(["dogru-fis.png"], (await ReceiptsAsync(manager, rejected.Id)).Select(f => f.FileName));
+        Assert.Equal("pending", (await ActAsync(operations, rejected, "resubmit")).Values["status"]!.GetValue<string>());
+    }
+
+    /// <summary>
+    /// Kural: onaylanmış masrafın ve iptal edilmiş seferdeki masrafın belgesi tür yazma izni olan kimse tarafından eklenemez ve silinemez (403);
+    /// okuma ve indirme sürer.
+    /// </summary>
+    [Fact]
+    public async Task Receipts_of_an_approved_expense_or_of_a_cancelled_trip_cannot_be_added_or_removed()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var manager = await LoginAsync(s.Manager);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(operations, Expenses, Toll(trip.Id));
+        var receipt = await UploadAsync(operations, expense.Id, "fis.png");
+
+        await ActAsync(manager, expense, "approve");
+        foreach (var client in new[] { operations, manager })
+        {
+            var denied = await PostFileAsync(client, expense.Id, "sonradan.png");
+            Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+            Assert.Contains("Onaylanmış masraf", (await denied.Content.ReadFromJsonAsync<ProblemDetails>())!.Title);
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.DeleteAsync($"{Files}/{receipt.Id}?version={receipt.Version}")).StatusCode);
+        }
+
+        Assert.Equal(["fis.png"], (await ReceiptsAsync(manager, expense.Id)).Select(f => f.FileName));
+        Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync($"{Files}/{receipt.Id}/content")).StatusCode);
+
+        // İptal edilen seferin beklemedeki masrafı: belge eklenmez, silinmez.
+        var cancelledTrip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var pending = await PostAsync(operations, Expenses, Toll(cancelledTrip.Id));
+        var pendingReceipt = await UploadAsync(operations, pending.Id, "bekleyen.png");
+        Assert.Equal("cancelled", (await ActAsync(operations, cancelledTrip, "cancel", "Müşteri vazgeçti", kind: "trips")).Values["status"]!.GetValue<string>());
+        var afterCancel = await PostFileAsync(operations, pending.Id, "iptal-sonrasi.png");
+        Assert.Equal(HttpStatusCode.Forbidden, afterCancel.StatusCode);
+        Assert.Contains("İptal edilen sefer", (await afterCancel.Content.ReadFromJsonAsync<ProblemDetails>())!.Title);
+        Assert.Equal(HttpStatusCode.Forbidden, (await operations.DeleteAsync($"{Files}/{pendingReceipt.Id}?version={pendingReceipt.Version}")).StatusCode);
+        Assert.Single(await ReceiptsAsync(operations, pending.Id));
+    }
+
+    /// <summary>Tenant izolasyonu: başka tenant'ın masrafına belge eklenemez; belgesi listelenmez, indirilmez, silinmez (404).</summary>
+    [Fact]
+    public async Task Another_tenant_cannot_list_download_add_or_remove_expense_receipts()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var opsA = await LoginAsync(a.Operations);
+        using var opsB = await LoginAsync(b.Operations);
+        var tripA = await PostAsync(opsA, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expenseA = await PostAsync(opsA, Expenses, Toll(tripA.Id));
+        var receiptA = await UploadAsync(opsA, expenseA.Id, "fis.png");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await PostFileAsync(opsB, expenseA.Id, "yabanci.png")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await opsB.GetAsync($"{Files}?entityKey={LogisticsAccess.TripExpenseEntityKey}&recordId={expenseA.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await opsB.GetAsync($"{Files}/{receiptA.Id}/content")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await opsB.DeleteAsync($"{Files}/{receiptA.Id}?version={receiptA.Version}")).StatusCode);
+
+        Assert.Equal(["fis.png"], (await ReceiptsAsync(opsA, expenseA.Id)).Select(f => f.FileName));
+    }
+
+    /// <summary>Yetki: yalnızca okuyan beklemedeki masrafın belgesini görür ama ekleyemez, silemez (403); masrafı okuyamayan ulaşamaz.</summary>
+    [Fact]
+    public async Task Without_expense_write_permission_receipts_cannot_be_added_or_removed_even_while_pending()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var reader = await LoginAsync(s.Reader);
+        using var outsider = await LoginAsync(s.Outsider);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(operations, Expenses, Toll(trip.Id));
+        var receipt = await UploadAsync(operations, expense.Id, "fis.png");
+
+        Assert.Single(await ReceiptsAsync(reader, expense.Id));
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostFileAsync(reader, expense.Id, "okuyan.png")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await reader.DeleteAsync($"{Files}/{receipt.Id}?version={receipt.Version}")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await PostFileAsync(outsider, expense.Id, "disaridan.png")).StatusCode);
+        Assert.NotEqual(HttpStatusCode.OK, (await outsider.GetAsync($"{Files}/{receipt.Id}/content")).StatusCode);
+        Assert.NotEqual(HttpStatusCode.NoContent, (await outsider.DeleteAsync($"{Files}/{receipt.Id}?version={receipt.Version}")).StatusCode);
+
+        Assert.Single(await ReceiptsAsync(operations, expense.Id));
+    }
+
     // --- yardımcılar ---
+
+    private const string Files = "/api/files";
+
+    private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D];
+
+    private static Task<HttpResponseMessage> PostFileAsync(HttpClient client, Guid expenseId, string fileName)
+    {
+        var file = new ByteArrayContent([.. Png, .. Encoding.ASCII.GetBytes(Guid.NewGuid().ToString())]);
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        var form = new MultipartFormDataContent
+        {
+            { new StringContent(LogisticsAccess.TripExpenseEntityKey), "entityKey" },
+            { new StringContent(expenseId.ToString()), "recordId" },
+            { file, "file", fileName },
+        };
+        return client.PostAsync(Files, form);
+    }
+
+    private static async Task<StoredFileDto> UploadAsync(HttpClient client, Guid expenseId, string fileName)
+    {
+        var response = await PostFileAsync(client, expenseId, fileName);
+        Assert.True(response.StatusCode == HttpStatusCode.Created, $"{(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        return (await response.Content.ReadFromJsonAsync<StoredFileDto>())!;
+    }
+
+    private static async Task<List<StoredFileDto>> ReceiptsAsync(HttpClient client, Guid expenseId) =>
+        (await client.GetFromJsonAsync<List<StoredFileDto>>($"{Files}?entityKey={LogisticsAccess.TripExpenseEntityKey}&recordId={expenseId}"))!;
 
     private static JsonObject Fuel(Guid tripId) => new()
     {

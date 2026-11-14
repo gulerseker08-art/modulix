@@ -12,7 +12,8 @@ namespace Modulix.Modules.Logistics.Records;
 /// girilmez; sürücüye rücu bayrağı yalnızca ceza kategorisinde işaretlenir. Tutar sıfırdan büyük, para birimi üç harflidir; KDV payı tutarı aşamaz;
 /// masraf tarihi ileri bir gün olamaz. Beklemedeki ve reddedilmiş masraf düzenlenir (reddedilen düzeltilip yeniden gönderilir); onaylanmış masraf
 /// değişmez: onay tutara bağlıdır. Durum yalnızca iş akışı komutuyla (onay, ret, yeniden gönderme) değişir. Masraf silinmez (K12): yanlış masraf reddedilir. Makbuz ve fiş kayda Core dosya deposuyla
-/// eklenir (okuma = masraf okuma izni, ekleme = masraf yazma izni).
+/// eklenir (okuma = masraf okuma izni, ekleme ve silme = masraf yazma izni ve kaydın kuralı, ADR-0038 bölüm 24: onaylanmış masrafta ve iptal edilmiş
+/// seferde belge eklenmez, silinmez).
 /// </summary>
 internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : LogisticsRecordStore<TripExpense>(context)
 {
@@ -168,4 +169,20 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
 
     protected override Task BeforeDeleteAsync(TripExpense entity, CancellationToken cancellationToken) =>
         throw new RecordConflictException("Masraf silinmez; hatalı masrafı reddedin.");
+
+    /// <summary>
+    /// Makbuz ve fiş kuralı kaydın güncelleme kuralıyla aynıdır (ADR-0038 bölüm 24): beklemedeki ve reddedilmiş masrafın belgesi değişir (reddedilen
+    /// masraf belgesi düzeltilip yeniden gönderilir); onaylanmış masrafın belgesi değişmez (onay belgeye de bağlıdır). İptal edilmiş seferin masrafına
+    /// belge eklenmez ve silinmez (iptal edilen sefere masraf da açılmaz).
+    /// </summary>
+    protected override async Task<string?> FileWriteDeniedAsync(TripExpense entity, CancellationToken cancellationToken)
+    {
+        if (entity.Status is not (TripExpense.Statuses.Pending or TripExpense.Statuses.Rejected))
+        {
+            return "Onaylanmış masrafın makbuzu ve fişi değiştirilemez; hatalıysa yeni masraf girin.";
+        }
+
+        var tripStatus = await Context.Data.Set<Trip>().AsNoTracking().Where(t => t.Id == entity.TripId).Select(t => t.Status).SingleOrDefaultAsync(cancellationToken);
+        return tripStatus == Trip.Statuses.Cancelled ? "İptal edilen seferin masrafına makbuz ya da fiş eklenmez, silinmez." : null;
+    }
 }

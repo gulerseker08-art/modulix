@@ -25,7 +25,8 @@ namespace Modulix.IntegrationTests;
 /// ADR-0038 dilim 6: teslim komutu ve değişmez teslim kanıtı. Mutlu yol (teslim: kanıt, sunucu zamanı, durum, iş olayı ve outbox yükü, kanıta fotoğraf;
 /// kısmi teslim; başarısız teslim ayrı olay), doğrulama (yoldaki olmayan sevkiyat, zorunlu alanlar, bilinmeyen sonuç, kanıt değişmez ve silinmez, genel
 /// uçtan kanıt açılmaz, eski sürüm, genel eylem ucu teslim durumuna geçmez), tenant izolasyonu (başka tenant'ın sevkiyatı ve kanıtı görünmez, teslim
-/// edilemez, dosyası eklenemez) ve yetki (okuyan teslim kaydedemez ve dosya ekleyemez, izinsiz göremez, modül kapalıyken 403).
+/// edilemez, dosyası eklenemez, indirilemez, silinemez) ve yetki (okuyan teslim kaydedemez, dosya ekleyemez ve silemez, izinsiz göremez, modül kapalıyken 403).
+/// Kanıt dosyası (bölüm 24): sefer açıkken eklenir ve silinir, sefer kapanınca donar (403).
 /// </summary>
 public class LogisticsDeliveryTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
@@ -168,6 +169,38 @@ public class LogisticsDeliveryTests(ModulixApiFactory factory) : IClassFixture<M
         Assert.Equal("Ali", (await GetAsync(manager, $"{Proofs}/{delivery.Proof.Id}")).Values["receivedBy"]!.GetValue<string>());
     }
 
+    /// <summary>
+    /// Kanıt dosyası kaydın kuralını izler (ADR-0038 bölüm 24): kayıt değişmez ama fotoğraf ve imza teslimden sonra eklenir; sevkiyatın seferi açıkken
+    /// eklenir ve silinir, sefer kapanınca (burada iptal) kanıt dosyalarıyla birlikte donar: sevkiyat yazma izni olan da ekleyemez, silemez (403). Okuma sürer.
+    /// </summary>
+    [Fact]
+    public async Task Proof_files_change_while_the_trip_is_open_and_freeze_once_the_trip_is_closed()
+    {
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        var shipment = await InTransitAsync(manager, s.CustomerId);
+        var tripId = shipment.Values["tripId"]!.GetValue<string>();
+        var proof = (await DeliverAsync(manager, shipment, new RecordDeliveryRequest(shipment.Version, "delivered", "Ali", false, false, null, null))).Proof;
+
+        // Sefer açık: fotoğraf ve imza eklenir, yanlış yüklenen silinir.
+        var photo = await UploadAsync(manager, proof.Id, "teslim-foto.png");
+        var mistake = await UploadAsync(manager, proof.Id, "yanlis.png");
+        Assert.Equal(HttpStatusCode.NoContent, (await manager.DeleteAsync($"/api/files/{mistake.Id}?version={mistake.Version}")).StatusCode);
+
+        // Sefer kapanır: kanıt donar.
+        var trip = await GetAsync(manager, $"/api/records/logistics.trip/{tripId}");
+        Assert.Equal("cancelled", Status(await ActAsync(manager, "trips", trip, "cancel", "Sefer kapatıldı")));
+        using var late = Form(proof.Id, "sonradan.png");
+        var denied = await manager.PostAsync("/api/files", late);
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        Assert.Contains("donmuştur", (await denied.Content.ReadFromJsonAsync<ProblemDetails>())!.Title);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.DeleteAsync($"/api/files/{photo.Id}?version={photo.Version}")).StatusCode);
+
+        var files = (await manager.GetFromJsonAsync<List<StoredFileDto>>($"/api/files?entityKey={LogisticsAccess.DeliveryProofEntityKey}&recordId={proof.Id}"))!;
+        Assert.Equal(["teslim-foto.png"], files.Select(f => f.FileName));
+        Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync($"/api/files/{photo.Id}/content")).StatusCode);
+    }
+
     [Fact]
     public async Task Another_tenants_shipments_and_proofs_cannot_be_seen_delivered_or_given_files()
     {
@@ -192,6 +225,11 @@ public class LogisticsDeliveryTests(ModulixApiFactory factory) : IClassFixture<M
         {
             Assert.Equal(HttpStatusCode.NotFound, (await managerB.PostAsync("/api/files", form)).StatusCode);
         }
+
+        // Sefer açıkken bile başka tenant kanıtın dosyasını indiremez ve silemez.
+        var photoA = await UploadAsync(managerA, proofA.Id, "teslim.png");
+        Assert.Equal(HttpStatusCode.NotFound, (await managerB.GetAsync($"/api/files/{photoA.Id}/content")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await managerB.DeleteAsync($"/api/files/{photoA.Id}?version={photoA.Version}")).StatusCode);
 
         // Kanıtın çıktığı tenant kendi kaydını görmeye devam eder.
         Assert.Equal(proofA.Id, Assert.Single(await ListAsync(managerA, Proofs, null)).Id);
@@ -222,6 +260,11 @@ public class LogisticsDeliveryTests(ModulixApiFactory factory) : IClassFixture<M
         {
             Assert.Equal(HttpStatusCode.Forbidden, (await reader.PostAsync("/api/files", form)).StatusCode);
         }
+
+        // Sefer açıkken bile okuyan, yazanın eklediği dosyayı silemez.
+        var photo = await UploadAsync(manager, delivery.Proof.Id, "teslim.png");
+        Assert.Equal(HttpStatusCode.Forbidden, (await reader.DeleteAsync($"/api/files/{photo.Id}?version={photo.Version}")).StatusCode);
+        Assert.NotEqual(HttpStatusCode.NoContent, (await outsider.DeleteAsync($"/api/files/{photo.Id}?version={photo.Version}")).StatusCode);
 
         Assert.Equal(HttpStatusCode.OK, (await reader.GetAsync($"/api/files?entityKey={LogisticsAccess.DeliveryProofEntityKey}&recordId={delivery.Proof.Id}")).StatusCode);
         Assert.NotEqual(HttpStatusCode.OK, (await outsider.GetAsync($"/api/files?entityKey={LogisticsAccess.DeliveryProofEntityKey}&recordId={delivery.Proof.Id}")).StatusCode);
@@ -304,6 +347,14 @@ public class LogisticsDeliveryTests(ModulixApiFactory factory) : IClassFixture<M
             { new StringContent(proofId.ToString()), "recordId" },
             { file, "file", fileName },
         };
+    }
+
+    private static async Task<StoredFileDto> UploadAsync(HttpClient client, Guid proofId, string fileName)
+    {
+        using var form = Form(proofId, fileName);
+        var response = await client.PostAsync("/api/files", form);
+        Assert.True(response.StatusCode == HttpStatusCode.Created, $"{(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        return (await response.Content.ReadFromJsonAsync<StoredFileDto>())!;
     }
 
     private async Task<List<Modulix.Infrastructure.Records.OutboxMessage>> OutboxAsync(Guid tenantId, Guid recordId, string eventType)
