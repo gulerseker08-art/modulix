@@ -1,8 +1,8 @@
 @* Kullanıcının durumu; hesap kilitliyse ayrıca "Kilitli". *@
-<span class="badge user-@User.Status.ToString().ToLowerInvariant()">@UserLabels.Of(User.Status)</span>
+<span class="badge user-@User.Status.ToString().ToLowerInvariant()">@AdminLabels.Status(User.Status)</span>
 @if (User.IsLockedOut)
 {
-    <span class="badge user-locked">Kilitli</span>
+    <span class="badge user-locked">@Texts.Get("admin.users.locked")</span>
 }
 
 @code {

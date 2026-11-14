@@ -3,20 +3,17 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>Ekipler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.teams") · Modulix</PageTitle>
 
 @* Ekipler (Y8). "Ekibinin kayıtları" kapsamlı rolü olan kişi, ekip arkadaşlarının sorumlu olduğu kayıtları da görür. *@
 <AuthGate Permission="@CoreAccess.ManageUsers">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
     <div class="page-header">
-        <h1>Ekipler</h1>
+        <h1>@Texts.Get("nav.app.admin.teams")</h1>
     </div>
 
-    <p class="text-muted">
-        Ekip, bölge ya da proje gibi bir çalışma grubudur. Bir kişi birden fazla ekipte olabilir. Rolünün kayıt kapsamı
-        "Ekibinin kayıtları" olan kişi, ekip arkadaşlarının sorumlu olduğu kayıtları da görür ve düzenler.
-    </p>
+    <p class="text-muted">@Texts.Get("admin.teams.intro")</p>
 
     @if (message is not null)
     {
@@ -24,23 +21,23 @@
     }
 
     <form class="record-form settings-group" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
-        <h2>Yeni ekip</h2>
-        <FormTabs Title="Ekip bilgileri" Label="Ekip formu bölümleri">
+        <h2>@Texts.Get("admin.teams.new")</h2>
+        <FormTabs Title="@Texts.Get("admin.teams.section")" Label="@Texts.Get("admin.teams.sections")">
         <div class="form-grid">
             <div>
-                <label class="form-label" for="teamName">Ekip adı *</label>
-                <input id="teamName" class="form-control" maxlength="100" placeholder="ör. İstanbul Satış" @bind="name" @bind:event="oninput" />
+                <label class="form-label" for="teamName">@Texts.Get("admin.teams.name")</label>
+                <input id="teamName" class="form-control" maxlength="100" placeholder="@Texts.Get("admin.teams.namePlaceholder")" @bind="name" @bind:event="oninput" />
                 <FieldError Field="name" Errors="errors" />
             </div>
             <div>
-                <label class="form-label" for="teamDescription">Açıklama</label>
+                <label class="form-label" for="teamDescription">@Texts.Get("common.field.description")</label>
                 <input id="teamDescription" class="form-control" maxlength="500" @bind="description" />
                 <FieldError Field="description" Errors="errors" />
             </div>
         </div>
         </FormTabs>
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name))">Ekip ekle</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name))">@Texts.Get("admin.teams.add")</button>
         </div>
     </form>
 
@@ -53,21 +50,21 @@
     }
     else if (teams.Count == 0)
     {
-        <EmptyState Title="Henüz ekip yok." />
+        <EmptyState Title="@Texts.Get("admin.teams.empty")" />
     }
     else
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Ekip</th><th>Açıklama</th><th>Üyeler</th></tr>
+                <tr><th>@Texts.Get("admin.teams.col.team")</th><th>@Texts.Get("common.field.description")</th><th>@Texts.Get("admin.roles.col.members")</th></tr>
             </thead>
             <tbody>
                 @foreach (var team in teams)
                 {
                     <tr>
-                        <td data-label="Ekip" class="primary"><a href="yonetim/ekipler/@team.Id">@team.Name</a></td>
-                        <td data-label="Açıklama">@(team.Description ?? "—")</td>
-                        <td data-label="Üyeler">@team.MemberCount</td>
+                        <td data-label="@Texts.Get("admin.teams.col.team")" class="primary"><a href="yonetim/ekipler/@team.Id">@team.Name</a></td>
+                        <td data-label="@Texts.Get("common.field.description")">@(team.Description ?? "—")</td>
+                        <td data-label="@Texts.Get("admin.roles.col.members")">@team.MemberCount</td>
                     </tr>
                 }
             </tbody>

@@ -3,7 +3,7 @@
 @inject ApiClient Api
 
 <section class="detail-section">
-    <div class="section-header"><h2>Erişim</h2></div>
+    <div class="section-header"><h2>@Texts.Get("admin.access.title")</h2></div>
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
@@ -17,32 +17,32 @@
         <p class="text-muted">
             @if (access.IsAdministrator)
             {
-                @:Yönetici rolü tüm izinleri verir.
+                @Texts.Get("admin.access.administrator")
             }
             else if (access.Permissions.Count == 0)
             {
-                @:Kişinin bu kuruluşta hiçbir izni yok; yalnızca giriş yapabilir.
+                @Texts.Get("admin.access.none")
             }
             else
             {
-                @($"{access.Permissions.Count} izin. ")
+                @(Texts.Get("admin.access.permissionCount", access.Permissions.Count) + " ")
                 @(string.Join(" · ", RoleSummaries()))
             }
-            @(Disabled ? " Kişi devre dışı olduğu için şu an hiçbirini kullanamaz." : null)
+            @(Disabled ? " " + Texts.Get("admin.access.disabled") : null)
         </p>
         @if (access.Roles is { Count: > 0 } sources)
         {
             @* Rolün kaynağı (ADR-0026): doğrudan atanmış ya da departmandan gelen. *@
             <p class="scope-line">
-                <strong>Roller:</strong>
+                <strong>@Texts.Get("admin.access.roles")</strong>
                 @foreach (var source in sources)
                 {
-                    <span class="badge tag">@source.Name · @(source.ViaBusinessUnit is { } via ? $"Departman: {via}" : "Doğrudan")</span>
+                    <span class="badge tag">@source.Name · @(source.ViaBusinessUnit is { } via ? Texts.Get("admin.access.viaUnit", via) : Texts.Get("admin.access.direct"))</span>
                 }
             </p>
         }
         <p class="scope-line">
-            <strong>Kayıt kapsamı:</strong>
+            <strong>@Texts.Get("admin.access.scope")</strong>
             @ScopeText()
             @if (Scopes.Contains(RecordScope.Unit) || Scopes.Contains(RecordScope.UnitAndBelow))
             {
@@ -50,7 +50,7 @@
             }
             @if (Scopes.Contains(RecordScope.Team))
             {
-                @(access.Teams is { Count: > 0 } teams ? $" ({string.Join(", ", teams)})" : " (henüz bir ekipte değil; yalnızca kendi kayıtlarını görür)")
+                @(access.Teams is { Count: > 0 } teams ? $" ({string.Join(", ", teams)})" : " " + Texts.Get("admin.access.noTeam"))
             }
         </p>
         <PermissionMatrix Permissions="access.Assignable" Selected="granted" ReadOnly="true" Describe="Describe" />
@@ -85,15 +85,15 @@
     // Birden fazla kapsam varsa kişi hepsinin gördüğü kayıtları görür (birleşim).
     private string ScopeText() =>
         Scopes.Count > 1
-            ? string.Join(" + ", Scopes.Select(RecordScopeLabels.Of)) + " (birleşimi)"
-            : RecordScopeLabels.Of(access!.Scope);
+            ? Texts.Get("admin.access.union", string.Join(" + ", Scopes.Select(AdminLabels.Scope)))
+            : AdminLabels.Scope(access!.Scope);
 
-    private string DepartmentText() => " · Departman: " + (access!.BusinessUnit ?? "yok");
+    private string DepartmentText() => " · " + Texts.Get("admin.access.viaUnit", access!.BusinessUnit ?? Texts.Get("common.noneLower"));
 
     private string? Describe(string key) =>
         access?.Permissions.FirstOrDefault(p => p.Key == key) is { } grant
-            ? $"Veren rol: {string.Join(", ", grant.GrantedBy.Select(r => r.ViaBusinessUnit is { } via ? $"{r.Name} (departman: {via})" : r.Name))}"
-            : "Kişide bu izin yok";
+            ? Texts.Get("admin.access.grantedBy", string.Join(", ", grant.GrantedBy.Select(r => r.ViaBusinessUnit is { } via ? Texts.Get("admin.access.grantedByUnit", r.Name, via) : r.Name)))
+            : Texts.Get("admin.access.notGranted");
 
     // "Satış temsilcisi: 8 izin" gibi; kişi birden fazla rolden aynı izni alabilir.
     private IEnumerable<string> RoleSummaries() =>
@@ -101,5 +101,5 @@
             .SelectMany(p => p.GrantedBy.Select(r => (r.Name, p.Key)))
             .GroupBy(x => x.Name)
             .OrderBy(g => g.Key)
-            .Select(g => $"{g.Key}: {g.Count()} izin");
+            .Select(g => Texts.Get("admin.access.roleSummary", g.Key, g.Count()));
 }

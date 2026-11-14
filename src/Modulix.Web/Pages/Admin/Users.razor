@@ -2,13 +2,13 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Kullanıcılar · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.users") · Modulix</PageTitle>
 
 <AuthGate Permission="@CoreAccess.ManageUsers">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
     <div class="page-header">
-        <h1>Kullanıcılar</h1>
+        <h1>@Texts.Get("nav.app.admin.users")</h1>
     </div>
 
     @if (notice is not null)
@@ -26,36 +26,36 @@
         <InviteUserForm Roles="roles" Units="units" CanGrantAdministrator="Session.IsAdministrator" Invited="InvitedAsync" Cancelled="() => inviting = false" />
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Kullanıcı görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("admin.users.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (!inviting)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => inviting = true"><AppIcon Name="plus" Size="16" /> Kullanıcı davet et</button>
+            <button type="button" class="btn btn-primary" @onclick="() => inviting = true"><AppIcon Name="plus" Size="16" /> @Texts.Get("admin.users.invite")</button>
         }
     </div>
 
     <form class="search has-select" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" aria-label="Kullanıcı ara" placeholder="Ad veya e-posta ara" @bind="search" />
-        <select class="form-select" aria-label="Rol" @bind="roleId" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm roller</option>
+        <input class="form-control" type="search" aria-label="@Texts.Get("admin.users.search")" placeholder="@Texts.Get("admin.users.searchPlaceholder")" @bind="search" />
+        <select class="form-select" aria-label="@Texts.Get("admin.users.role")" @bind="roleId" @bind:after="() => LoadAsync(1)">
+            <option value="">@Texts.Get("admin.users.allRoles")</option>
             @foreach (var role in roles)
             {
                 <option value="@role.Id">@role.Name</option>
             }
         </select>
-        <select class="form-select" aria-label="Departman" @bind="businessUnitId" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm departmanlar</option>
+        <select class="form-select" aria-label="@Texts.Get("admin.unit")" @bind="businessUnitId" @bind:after="() => LoadAsync(1)">
+            <option value="">@Texts.Get("admin.users.allUnits")</option>
             @foreach (var unit in units)
             {
                 <option value="@unit.Id">@unit.PathNames</option>
             }
         </select>
-        <select class="form-select" aria-label="İki adımlı doğrulama" @bind="twoFactor" @bind:after="() => LoadAsync(1)">
-            <option value="">İki adımlı: tümü</option>
-            <option value="true">İki adımlı açık</option>
-            <option value="false">İki adımlı kapalı</option>
+        <select class="form-select" aria-label="@Texts.Get("admin.users.twoFactor")" @bind="twoFactor" @bind:after="() => LoadAsync(1)">
+            <option value="">@Texts.Get("admin.users.twoFactorAll")</option>
+            <option value="true">@Texts.Get("admin.users.twoFactorOn")</option>
+            <option value="false">@Texts.Get("admin.users.twoFactorOff")</option>
         </select>
     </form>
 
@@ -71,7 +71,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Title="Kullanıcı yok." />
+        <EmptyState Title="@Texts.Get("admin.users.empty")" />
     }
     else
     {
@@ -82,7 +82,7 @@
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -94,8 +94,8 @@
                             @Cell(column, user)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{user.DisplayName} eylemleri")">
-                                <a class="view-menu-item" role="menuitem" href="yonetim/kullanicilar/@user.MembershipId"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", user.DisplayName)">
+                                <a class="view-menu-item" role="menuitem" href="yonetim/kullanicilar/@user.MembershipId"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></a>
                             </RowMenu>
                         </td>
                     </tr>
@@ -111,15 +111,16 @@
     private const string StatusPrefix = "status:";
 
     // Başlık tıklamasıyla sıralanan sütunlar sunucudaki sort anahtarlarıdır (UserSortKeys). Departman ve roller sayfa dışında çözüldüğü için sıralanamaz.
-    private static readonly GridColumnDef[] Columns =
+    // Özellik olarak tanımlıdır: başlıklar sayfa açılırken etkin dilden çözülür (ADR-0034).
+    private static GridColumnDef[] Columns =>
     [
-        new("name", "Ad", "type", "name", "-name", Locked: true),
-        new("email", "E-posta", "mail", "email", "-email"),
-        new("unit", "Departman", "building"),
-        new("roles", "Roller", "shield"),
-        new("status", "Durum", "tag", "status", "-status"),
-        new("twoFactor", "İki adımlı", "key", "twoFactor", "-twoFactor"),
-        new("lastSignIn", "Son giriş", "clock", "lastSignInAt", "-lastSignInAt"),
+        new("name", Texts.Get("common.field.name"), "type", "name", "-name", Locked: true),
+        new("email", Texts.Get("common.field.email"), "mail", "email", "-email"),
+        new("unit", Texts.Get("admin.unit"), "building"),
+        new("roles", Texts.Get("nav.app.admin.roles"), "shield"),
+        new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
+        new("twoFactor", Texts.Get("admin.users.col.twoFactor"), "key", "twoFactor", "-twoFactor"),
+        new("lastSignIn", Texts.Get("admin.users.col.lastSignIn"), "clock", "lastSignInAt", "-lastSignInAt"),
     ];
 
     private readonly GridViewState grid = new("admin.users", "name");
@@ -156,8 +157,8 @@
     // Görünümler yalnızca süzgeçtir (Tümü, durum, kişisel); kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm kullanıcılar", Icon: "users"),
-        .. Enum.GetValues<UserStatus>().Select(v => new ViewOption(StatusPrefix + v, UserLabels.Of(v), Icon: "user")),
+        new(AllViews, Texts.Get("admin.users.all"), Icon: "users"),
+        .. Enum.GetValues<UserStatus>().Select(v => new ViewOption(StatusPrefix + v, AdminLabels.Status(v), Icon: "user")),
         .. views.Options,
     ];
 
@@ -272,8 +273,8 @@
     {
         inviting = false;
         notice = response.ExistingAccount
-            ? $"{response.User.DisplayName} zaten Modulix kullanıyordu; kuruluşunuza eklendi ve bilgilendirildi."
-            : $"{response.User.Email} adresine davet gönderildi.";
+            ? Texts.Get("admin.users.existingAdded", response.User.DisplayName)
+            : Texts.Get("admin.users.invited", response.User.Email);
         await LoadAsync(1);
     }
 
@@ -281,12 +282,12 @@
 
     private RenderFragment CellContent(string key, UserDto user) => key switch
     {
-        "name" => @<text><a href="yonetim/kullanicilar/@user.MembershipId">@user.DisplayName</a>@if (user.IsCurrentUser) { <small class="text-muted"> (siz)</small> }</text>,
+        "name" => @<text><a href="yonetim/kullanicilar/@user.MembershipId">@user.DisplayName</a>@if (user.IsCurrentUser) { <small class="text-muted"> @Texts.Get("admin.users.you")</small> }</text>,
         "email" => @<text>@user.Email</text>,
         "unit" => @<text>@(user.BusinessUnitName ?? "—")</text>,
         "roles" => @<text>@RoleNames(user)</text>,
         "status" => @<UserStatusBadge User="user" />,
-        "twoFactor" => @<text>@(user.TwoFactorEnabled ? "Açık" : "Kapalı")</text>,
+        "twoFactor" => @<text>@(user.TwoFactorEnabled ? Texts.Get("two-factor.on") : Texts.Get("two-factor.off"))</text>,
         "lastSignIn" => @<text>@(user.LastSignInAt is { } at ? CrmLabels.Time(at) : "—")</text>,
         _ => @<text></text>,
     };
