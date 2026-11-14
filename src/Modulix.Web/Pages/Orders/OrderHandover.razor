@@ -28,7 +28,7 @@
     }
     else if (detail is null)
     {
-        <p class="text-muted">@Texts.Get("orders.handover-page.none")</p>
+        <EmptyState Compact="true" Title="@Texts.Get("orders.handover-page.none")" />
         @if (Session.Can(OrderHandoverAccess.HandoversWrite))
         {
             <button type="button" class="btn btn-primary" disabled="@busy" @onclick="CreateAsync">@Texts.Get("orders.handover-page.create")</button>
@@ -188,7 +188,7 @@
                         @if (item.IsDone && item.DoneAt is { } doneAt) { <small class="text-muted"> · @Lookups.MemberName(item.DoneBy), @CrmLabels.Time(doneAt)</small> }
                         @if (Editable && !item.IsDefault)
                         {
-                            <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteItemAsync(item)">@Texts.Get("common.delete")</button>
+                            <ConfirmAction Class="btn btn-link btn-sm" Disabled="@busy" OnConfirm="() => DeleteItemAsync(item)">@Texts.Get("common.delete")</ConfirmAction>
                         }
                     </li>
                 }

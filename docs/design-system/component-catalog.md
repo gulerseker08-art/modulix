@@ -124,3 +124,32 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 - Ana sayfa (`Pages/Home.razor`): `PageHeader` ("Hoş geldiniz, {ad}"), ilgili listeye bağlanan özet kutuları (`stat-grid`), solda satış hunisi (`BarChart`), sağda kullanıcının bugünkü işleri (`TodayActivities`). Aynı veri iki grafikle yinelenmez; özet kutuları zaten bağlantı olduğu için ayrıca kısayol kartı (`tiles`) çizilmez.
 - `ViewTabs` çubuğu içerik panelini genişletmez (`contain: inline-size`): sekmeler sığmayınca çubuk kendi içinde yatay kayar. Telefonda sayfa yatay taşmamalıdır; yeni ekranın görsel denetiminde 390 px genişlikte `scrollWidth` kontrol edilir.
 
+## Sıralama: sunucuda mı istemcide mi (14.11.2026)
+
+- **Sayfalanan liste** sunucuda sıralanır: kayıt deposu `SortKeys` + `Order(source, sort)` tanımlar, başlık `SortHeader`/`GridHeader` ile bu anahtarları gönderir; bilinmeyen anahtar reddedilir. Her yeni `sort` anahtarı dört testle gelir (yön, geçersiz anahtar, tenant izolasyonu, yetki). Örnek: `MeasureUnitSortTests`, `SalesTargetSortTests`.
+- **Tamamı yüklü küçük liste** (sayfalanmayan: platform planları, sektörler, onay bekleyenler) istemcide `ClientSort.Apply(liste, sort, sütunlar)` ile sıralanır; Türkçe sıra, boş değerler sonda, eşit satırlar yerinde kalır. Sayfalanan listede `ClientSort` kullanılmaz (yalnızca görünen sayfayı sıralar, yanıltır).
+- **Günlükler** (denetim kaydı, otomasyon çalışma geçmişi, olay teslimleri) varsayılan olarak en yeni önce gelir ve sunucuda sıralanır: sorgu kaydı `SortKeys` taşır (`AuditQuery`, `AutomationRunQuery`, `EventDeliveryQuery`), uç nokta bilinmeyen anahtarı 422 ile reddeder. `SortHeader`'ın `Default` değeri varsayılan azalan anahtardır (ör. `-occurredAt`); başka tablodan çözülen ad sütunları da sıralanır (`user`, `rule`, `tenant`): kullanıcı ve kural adında satır başına ad sorgusu yapılmaz: süzülen satırlar kullanıcıya (kurala) göre sayılır, adlar bellekte sıralanır ve sayfaya düşen kullanıcıların satırları dizinden okunur (`PageByUserAsync`, `PageByRuleAsync`). Denetim kaydında sıralama ekranda gösterilen ada göredir ("Sistem", "Platform yöneticisi" dahil); gizlenen gerçek ad sıralamaya sızmaz. 300 bin satırlık yerel ölçümde ilk sayfa 0,28 sn (alt sorguyla 1 sn, varsayılan sıra 0,25 sn).
+- **Platform sağlığı ve GTİP (14.11.2026):** sağlık raporundaki "giriş yapılmayan firmalar" ve "güvenlik olayları" tabloları ile GTİP sürüm listesi tamamı yüklü olduğundan `ClientSort` ile; GTİP satırları sayfalandığından sunucuda sıralanır (`GtipEntrySort.Keys`: `code`, `description`, `unit`; varsayılan koda göre artan). Sağlık raporundaki "Kuyruklar" tablosu iki sabit satırdır, sıralanmaz.
+
+## Silme onayı (14.11.2026)
+
+- `ConfirmBox`: yıkıcı eylem ayrı adımda onaylanır. `Text` (soru), isteğe bağlı `ConfirmLabel` (varsayılan "Sil"), `Busy`, `Confirm`, `Cancel`. Kutu `alert alert-warning confirm` + `role="alertdialog"`; onay düğmesi `btn-danger`, yanında "Vazgeç". Açılınca odak "Vazgeç"tedir, Escape kapatır.
+- Liste satırında (`ul.item-list`) menüdeki "Sil" satırın yerinde `ConfirmBox` açar; silme başarılıysa toast ("Silindi.") gösterilir. Onaysız tek tıkla silme yazılmaz. Örnek: `AddressesSection`, `ContactPointsSection`.
+
+## Özet kutusunda dönem karşılaştırması (14.11.2026)
+
+- Ana sayfa özet kutuları toplamın altında son 30 günde eklenen kayıt sayısını gösterir: `small.stat-trend` içinde `dash-delta` rozeti (işaretli sayı + ok ikonu; önceki 30 güne göre azaldıysa `is-down`, aynıysa `is-flat`) ve "son 30 günde yeni" etiketi. Yön yalnızca renkle anlatılmaz; ekran okuyucuya iki dönemin sayıları tam cümleyle okunur (`visually-hidden`).
+- Sayılar liste uçlarının `createdSince` (dahil) ve `createdBefore` (hariç) süzgeçleriyle alınır (ISO 8601 an; firma, kişi, fırsat, aktivite). Kapsam ve yetki sunucudadır; yüklenemeyen kutuda karşılaştırma çizilmez. Hesap `PeriodChange` ile yapılır.
+
+## Onaylı yıkıcı eylemler: hangi bileşen nerede (14.11.2026)
+
+Kalıcı olarak silen ya da ilişkiyi kaldıran hiçbir düğme tek tıkla çalışmaz. Üç bileşen vardır:
+
+| Bileşen | Nerede | Davranış |
+|---|---|---|
+| `ConfirmAction` | Tablo hücresi, liste satırı ya da satır içi düğme ("Sil", "Kaldır", "Çıkar") | Düğme yerinde `confirm-inline` satırına dönüşür: "Emin misiniz?" + `btn-danger` (düğmenin kendi metni) + "Vazgeç". `Class` ilk düğmenin sınıfıdır (varsayılan `btn btn-outline-danger btn-sm`), `Question` soru metnini değiştirir. |
+| `RowMenuDelete` | `RowMenu` ("⋯") içindeki silme öğesi | Menü kapanır, aynı yerde `row-menu-confirm` içinde `ConfirmBox` açılır. `Label` (varsayılan "Sil"), `Question` (varsayılan "Bu kayıt silinsin mi?"). Menüye elle `view-menu-item` silme düğmesi yazılmaz. |
+| `ConfirmBox` | Soru metni uzun ya da ek seçim gerektiren onaylar; liste satırının yerinde | Tam genişlikte uyarı kutusu. |
+
+Üçünde de odak "Vazgeç"e gelir, Escape kapatır, onay düğmesi çalışırken `aria-busy` taşır. Kaydedilmeden önce yalnızca ekrandaki girdiyi değiştiren kaldırmalar (ör. `TagInput` etiketi) onay istemez.
+

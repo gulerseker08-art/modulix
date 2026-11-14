@@ -153,6 +153,12 @@ public sealed class Opportunity : CrmEntity, IOwnedEntity
     /// </summary>
     public Guid? SourceLeadId { get; internal set; }
 
+    /// <summary>
+    /// Fırsatı getiren kampanya (Pazarlama modülünün kaydı; ADR-0025). Müşteri adayından dönüşen fırsata adayın kampanyası geçer.
+    /// Modüller arası bağ olduğundan veritabanında yabancı anahtar yoktur; kampanya kayıt boru hattından okunur.
+    /// </summary>
+    public Guid? CampaignId { get; internal set; }
+
     public Guid? OwnerId { get; internal set; }
 
     public string? Notes { get; internal set; }
@@ -806,6 +812,12 @@ public sealed class Lead : CrmEntity, IOwnedEntity
     public string? UtmMedium { get; internal set; }
 
     public string? UtmCampaign { get; internal set; }
+
+    /// <summary>
+    /// Talebi getiren kampanya (Pazarlama modülünün kaydı; ADR-0025). <see cref="UtmCampaign"/> serbest metindir, bu alan kayda bağdır.
+    /// Modüller arası bağ olduğundan veritabanında yabancı anahtar yoktur; kampanya kayıt boru hattından okunur.
+    /// </summary>
+    public Guid? CampaignId { get; internal set; }
 
     /// <summary>Talebin ilk geldiği an (içe aktarmada orijinal zaman olabilir).</summary>
     public DateTimeOffset FirstReceivedAt { get; internal set; } = DateTimeOffset.UtcNow;

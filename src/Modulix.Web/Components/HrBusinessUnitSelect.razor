@@ -1,0 +1,42 @@
+@* Core departmanı seçici (ADR-0042 bölüm 22): departmanlar Yönetim › Departmanlar ağacından gelir, seçenek ağaç yoluyla yazılır ("Merkez › Satış").
+   Kapalı departman seçilemez; kayıtta zaten seçili kapalı departman "(kapalı)" ekiyle görünür. Liste sunucudan bir kez okunur. *@
+@inject ApiClient Api
+
+<select id="@Id" class="form-select@(Invalid ? " is-invalid" : "")" aria-label="@AriaLabel" disabled="@Disabled" @onchange="ChangedAsync">
+    <option value="" selected="@(Value is null)">@EmptyLabel</option>
+    @foreach (var unit in units.Where(u => u.IsActive || u.Id == Value))
+    {
+        <option value="@unit.Id" selected="@(unit.Id == Value)">@unit.PathName@(unit.IsActive ? "" : " (kapalı)")</option>
+    }
+</select>
+
+@code {
+    private IReadOnlyList<HrBusinessUnitDto> units = [];
+
+    [Parameter] public string? Id { get; set; }
+
+    [Parameter] public string? AriaLabel { get; set; }
+
+    [Parameter] public string EmptyLabel { get; set; } = "Seçilmedi";
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public bool Invalid { get; set; }
+
+    [Parameter] public Guid? Value { get; set; }
+
+    [Parameter] public EventCallback<Guid?> ValueChanged { get; set; }
+
+    /// <summary>Liste yüklenince bildirilir (sayfa departman adını ya da alt departmanları göstermek için kullanabilir).</summary>
+    [Parameter] public EventCallback<IReadOnlyList<HrBusinessUnitDto>> Loaded { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<List<HrBusinessUnitDto>>("/api/hr/business-units");
+        units = result.IsSuccess ? [.. result.Value!.OrderBy(u => u.PathName, StringComparer.CurrentCulture)] : [];
+        await Loaded.InvokeAsync(units);
+    }
+
+    private Task ChangedAsync(ChangeEventArgs e) =>
+        ValueChanged.InvokeAsync(Guid.TryParse(e.Value?.ToString(), out var id) ? id : null);
+}

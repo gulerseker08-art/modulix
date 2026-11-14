@@ -10,7 +10,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Declaration is null ? "Yeni beyanname" : "Beyanname")</h2>
+            <h2>@(Declaration is null ? Texts.Get("warehouse.declarations.new") : Texts.Get("warehouse.declaration"))</h2>
             @if (Declaration is not null)
             {
                 <p>@form.RegistrationNo</p>
@@ -18,13 +18,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@(Declaration is null ? "İptal" : "Kapat")</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@(Declaration is null ? Texts.Get("common.cancel") : Texts.Get("common.close"))</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -39,23 +39,23 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Beyanname özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("warehouse.declarationEditor.summary")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true"><AppIcon Name="clipboard-list" Size="24" /></span>
-                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.RegistrationNo) ? "Tescil no" : form.RegistrationNo)</strong>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.RegistrationNo) ? Texts.Get("warehouse.registrationNo") : form.RegistrationNo)</strong>
                     <span class="summary-sub">@Show(form.RegistrationDate)</span>
                 </div>
-                <h3 class="summary-heading">Beyanname özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("warehouse.declarationEditor.summary")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Durum</dt><dd>@(string.IsNullOrEmpty(form.StatusKey) ? "—" : Lookups.Label(WarehouseAccess.DeclarationStatusList, form.StatusKey))</dd></div>
-                    <div><dt>Rejim</dt><dd>@(string.IsNullOrEmpty(form.RegimeKey) ? "—" : Lookups.Label(WarehouseAccess.CustomsRegimeList, form.RegimeKey))</dd></div>
+                    <div><dt>@Texts.Get("common.field.status")</dt><dd>@(string.IsNullOrEmpty(form.StatusKey) ? "—" : Lookups.Label(WarehouseAccess.DeclarationStatusList, form.StatusKey))</dd></div>
+                    <div><dt>@Texts.Get("warehouse.regime")</dt><dd>@(string.IsNullOrEmpty(form.RegimeKey) ? "—" : Lookups.Label(WarehouseAccess.CustomsRegimeList, form.RegimeKey))</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Beyanname formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("warehouse.declarationEditor.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
@@ -63,7 +63,7 @@
                             <label class="@f.LabelClass()" for="decl-no">@f.Label</label>
                             <input id="decl-no" class="form-control" maxlength="30" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.RegistrationNo" @bind:event="onchange" />
                             <FieldError Field="registrationNo" Errors="errors" />
-                            <small class="text-muted">Harf, rakam ve - _ . / karakterleri; büyük harfe çevrilir, firma içinde benzersizdir.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.identifierHelp")</small>
                             @* Rejim bir rejim profiline bağlıysa tescil no profilin kuralına göre denetlenir (uyarı kaydı engellemez). *@
                             <RegistrationNoHint RegimeKey="@form.RegimeKey" RegistrationNo="@form.RegistrationNo" />
                             break;
@@ -81,7 +81,7 @@
                                 }
                             </select>
                             <FieldError Field="statusKey" Errors="errors" />
-                            <small class="text-muted">İptal durumundaki beyannamenin satırları değiştirilemez.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.declarationEditor.statusHelp")</small>
                             break;
                         case "regimeKey":
                             <label class="@f.LabelClass()" for="decl-regime">@f.Label</label>
@@ -100,21 +100,21 @@
                             break;
                         case "importerPartyId":
                             <label class="@f.LabelClass()" for="decl-importer">@f.Label</label>
-                            <LookupPicker Id="decl-importer" LookupKey="@WarehouseAccess.DeclarationImporterLookup" @bind-Value="form.ImporterPartyId" Required="f.Required" Placeholder="İthalatçı seçin…" Invalid="@(errors?.ContainsKey("importerPartyId") == true)" />
+                            <LookupPicker Id="decl-importer" LookupKey="@WarehouseAccess.DeclarationImporterLookup" @bind-Value="form.ImporterPartyId" Required="f.Required" Placeholder="@Texts.Get("warehouse.declarationEditor.chooseImporter")" Invalid="@(errors?.ContainsKey("importerPartyId") == true)" />
                             <FieldError Field="importerPartyId" Errors="errors" />
-                            <small class="text-muted">Yalnızca "İthalatçı / malik" rolündeki firmalar listelenir; rol firma kaydından verilir.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.declarationEditor.importerHelp")</small>
                             break;
                         case "brokerPartyId":
                             <label class="@f.LabelClass()" for="decl-broker">@f.Label</label>
-                            <LookupPicker Id="decl-broker" LookupKey="@WarehouseAccess.DeclarationBrokerLookup" @bind-Value="form.BrokerPartyId" Required="f.Required" Placeholder="Gümrük müşaviri seçin…" Invalid="@(errors?.ContainsKey("brokerPartyId") == true)" />
+                            <LookupPicker Id="decl-broker" LookupKey="@WarehouseAccess.DeclarationBrokerLookup" @bind-Value="form.BrokerPartyId" Required="f.Required" Placeholder="@Texts.Get("warehouse.declarationEditor.chooseBroker")" Invalid="@(errors?.ContainsKey("brokerPartyId") == true)" />
                             <FieldError Field="brokerPartyId" Errors="errors" />
-                            <small class="text-muted">İsteğe bağlı. Yalnızca "Gümrük müşaviri" rolündeki firmalar listelenir.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.declarationEditor.brokerHelp")</small>
                             break;
                         case "externalReference":
                             <label class="@f.LabelClass()" for="decl-external">@f.Label</label>
                             <input id="decl-external" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ExternalReference" />
                             <FieldError Field="externalReference" Errors="errors" />
-                            <small class="text-muted">Müşavirlik yazılımındaki kayıt numarası; doluysa firma içinde benzersizdir.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.declarationEditor.externalHelp")</small>
                             break;
                         case "description":
                             <label class="@f.LabelClass()" for="decl-description">@f.Label</label>
@@ -126,11 +126,11 @@
             </LayoutForm>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@(Declaration is null ? "İptal" : "Kapat")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@(Declaration is null ? Texts.Get("common.cancel") : Texts.Get("common.close"))</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </div>
@@ -167,7 +167,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir beyanname verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>

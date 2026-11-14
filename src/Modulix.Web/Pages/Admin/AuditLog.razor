@@ -89,7 +89,14 @@
     {
         <table class="table record-table audit-table">
             <thead>
-                <tr><th>Tarih</th><th>Kullanıcı</th><th>Kayıt türü</th><th>Kayıt</th><th>İşlem</th><th>Kaynak</th></tr>
+                <tr>
+                    <th scope="col"><SortHeader Label="Tarih" ColumnIcon="calendar" Asc="occurredAt" Desc="-occurredAt" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="Kullanıcı" ColumnIcon="user" Asc="user" Desc="-user" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="Kayıt türü" ColumnIcon="layers" Asc="entityKey" Desc="-entityKey" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col">Kayıt</th>
+                    <th scope="col"><SortHeader Label="İşlem" ColumnIcon="activity" Asc="action" Desc="-action" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="Kaynak" ColumnIcon="globe" Asc="source" Desc="-source" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var entry in page.Items)
@@ -115,7 +122,7 @@
                                 }
                                 @if (entry.Changes.Count == 0)
                                 {
-                                    <p class="text-muted">Alan değişikliği yok.</p>
+                                    <EmptyState Compact="true" Title="Alan değişikliği yok." />
                                 }
                                 else
                                 {
@@ -168,10 +175,21 @@
         }
     }
 
+    // Günlük varsayılan olarak en yeni önce gelir; sıralama sunucudadır (AuditQuery.SortKeys).
+    private const string DefaultSort = "-occurredAt";
+
+    private string sort = DefaultSort;
+
+    private async Task SortAsync(string value)
+    {
+        sort = value;
+        await LoadAsync(1);
+    }
+
     private async Task LoadAsync(int pageNumber)
     {
         expanded.Clear();
-        var result = await Api.GetAsync<AuditPageResponse>($"/api/audit?page={pageNumber}&{Filters()}");
+        var result = await Api.GetAsync<AuditPageResponse>($"/api/audit?page={pageNumber}&sort={Uri.EscapeDataString(sort)}&{Filters()}");
         page = result.Value;
         message = result.Error;
     }

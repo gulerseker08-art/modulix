@@ -36,7 +36,7 @@
             </div>
             @if (items is null || items.Count == 0)
             {
-                <p class="text-muted" role="status">Henüz adım yok. Süreç başlatmak için en az bir adım ekleyin.</p>
+                <EmptyState Compact="true" Title="Henüz adım yok." Text="Süreç başlatmak için en az bir adım ekleyin." />
             }
             else
             {
@@ -64,7 +64,7 @@
                                 <td class="row-menu-cell">
                                     <RowMenu Label="@($"{WarehouseLabels.Text(item, "title")} eylemleri")">
                                         <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenItem(item)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
-                                        <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteItemAsync(item)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                        <RowMenuDelete OnConfirm="() => DeleteItemAsync(item)" />
                                     </RowMenu>
                                 </td>
                             </tr>
@@ -97,7 +97,7 @@
     }
     else if (templates.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu görünüme uyan şablon yok.</p>
+        <EmptyState Compact="true" Title="Bu görünüme uyan şablon yok." />
     }
     else
     {
@@ -124,7 +124,7 @@
                         <td class="row-menu-cell">
                             <RowMenu Label="@($"{WarehouseLabels.Text(template, "name")} eylemleri")">
                                 <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(template)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle ve adımlar</span></button>
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteAsync(template)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                <RowMenuDelete OnConfirm="() => DeleteAsync(template)" />
                             </RowMenu>
                         </td>
                     </tr>

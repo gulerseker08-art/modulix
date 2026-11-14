@@ -1589,6 +1589,43 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("SubProfiles", "meta");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Customization.SubProfileFeature", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Group")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("SubProfileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "SubProfileId", "Group", "Value")
+                        .IsUnique();
+
+                    b.ToTable("SubProfileFeatures", "meta");
+                });
+
             modelBuilder.Entity("Modulix.Core.Customization.SubProfileOption", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1649,6 +1686,49 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("SubProfileOptions", "meta");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Customization.SubProfileRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RuleJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("SubProfileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "Key")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "SubProfileId");
+
+                    b.ToTable("SubProfileRules", "meta");
                 });
 
             modelBuilder.Entity("Modulix.Core.Customization.TenantChoiceList", b =>
@@ -6902,6 +6982,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("AssignedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("CampaignId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("City")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -7108,6 +7191,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("IndustryCode");
+
+                    b.HasIndex("TenantId", "CampaignId")
+                        .HasFilter("[CampaignId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "CompanyId");
 
@@ -7383,6 +7469,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<Guid?>("CampaignId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("CloseDateChangeCount")
                         .HasColumnType("int");
 
@@ -7569,6 +7658,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsFixedLength();
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CampaignId")
+                        .HasFilter("[CampaignId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "CompanyId");
 
@@ -9300,6 +9392,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("AudienceBusinessUnitId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("AudienceDepartmentKey")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -9572,6 +9667,52 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("AssetAssignments", "hr");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Hr.Domain.AudienceTarget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BusinessUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ContentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ContentId")
+                        .HasDatabaseName("IX_AudienceTargets_Content");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .HasDatabaseName("IX_AudienceTargets_User");
+
+                    b.ToTable("AudienceTargets", "hr", t =>
+                        {
+                            t.HasCheckConstraint("CK_AudienceTargets_OneKind", "([BusinessUnitId] IS NULL AND [UserId] IS NOT NULL) OR ([BusinessUnitId] IS NOT NULL AND [UserId] IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Modules.Hr.Domain.BlogPost", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9827,6 +9968,92 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("ChecklistTemplateItems", "hr");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Hr.Domain.ContentComment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AuthorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("ContentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("HiddenByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ContentId", "CreatedAt")
+                        .HasDatabaseName("IX_ContentComments_Content");
+
+                    b.ToTable("ContentComments", "hr");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Hr.Domain.ContentLike", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ContentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ContentId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContentLikes_User");
+
+                    b.ToTable("ContentLikes", "hr");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Hr.Domain.Employee", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9834,6 +10061,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.Property<DateOnly?>("BirthDate")
                         .HasColumnType("date");
+
+                    b.Property<Guid?>("BusinessUnitId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -9922,6 +10152,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(150)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "BusinessUnitId")
+                        .HasDatabaseName("IX_Employees_BusinessUnit");
 
                     b.HasIndex("TenantId", "EmployeeNumber")
                         .IsUnique()
@@ -10031,6 +10264,69 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_EmployeeChecklists_Employee");
 
                     b.ToTable("EmployeeChecklists", "hr");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Hr.Domain.EmployeePosition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BusinessUnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ChangedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DepartmentKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EmploymentType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("JobTitle")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<Guid?>("ManagerEmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "EmployeeId", "StartDate")
+                        .HasDatabaseName("IX_EmployeePositions_Employee");
+
+                    b.ToTable("EmployeePositions", "hr");
                 });
 
             modelBuilder.Entity("Modulix.Modules.Hr.Domain.ExpenseClaim", b =>
@@ -10443,6 +10739,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Modulix.Modules.Hr.Domain.Survey", b =>
                 {
                     b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AudienceBusinessUnitId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("AudienceDepartmentKey")
@@ -15931,7 +16230,27 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Modulix.Core.Customization.SubProfileFeature", b =>
+                {
+                    b.HasOne("Modulix.Core.Customization.SubProfile", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SubProfileId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Modulix.Core.Customization.SubProfileOption", b =>
+                {
+                    b.HasOne("Modulix.Core.Customization.SubProfile", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SubProfileId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Customization.SubProfileRule", b =>
                 {
                     b.HasOne("Modulix.Core.Customization.SubProfile", null)
                         .WithMany()
@@ -17039,6 +17358,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasOne("Modulix.Modules.Hr.Domain.ChecklistTemplate", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "TemplateId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Hr.Domain.EmployeePosition", b =>
+                {
+                    b.HasOne("Modulix.Modules.Hr.Domain.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EmployeeId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();

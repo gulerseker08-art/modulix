@@ -44,7 +44,14 @@
         <table class="table record-table">
             <caption class="visually-hidden">Otomasyon çalışmaları</caption>
             <thead>
-                <tr><th scope="col">Kural</th><th scope="col">Kayıt türü</th><th scope="col">Kaynak</th><th scope="col">Durum</th><th scope="col">Başladı</th><th scope="col">Bitti</th></tr>
+                <tr>
+                    <th scope="col"><SortHeader Label="Kural" ColumnIcon="zap" Asc="rule" Desc="-rule" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="Kayıt türü" ColumnIcon="layers" Asc="entityKey" Desc="-entityKey" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col">Kaynak</th>
+                    <th scope="col"><SortHeader Label="Durum" ColumnIcon="tag" Asc="status" Desc="-status" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="Başladı" ColumnIcon="calendar" Asc="createdAt" Desc="-createdAt" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col">Bitti</th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var run in runPage.Items)
@@ -100,9 +107,20 @@
         return LoadAsync(1);
     }
 
+    // Günlük varsayılan olarak en yeni önce gelir; sıralama sunucudadır (AutomationRunQuery.SortKeys).
+    private const string DefaultSort = "-createdAt";
+
+    private string sort = DefaultSort;
+
+    private async Task SortAsync(string value)
+    {
+        sort = value;
+        await LoadAsync(1);
+    }
+
     private async Task LoadAsync(int pageNumber)
     {
-        var url = $"/api/automation/runs?page={pageNumber}&pageSize={ListPaging.Size}";
+        var url = $"/api/automation/runs?page={pageNumber}&pageSize={ListPaging.Size}&sort={Uri.EscapeDataString(sort)}";
         if (status is not null)
         {
             url += $"&status={status}";

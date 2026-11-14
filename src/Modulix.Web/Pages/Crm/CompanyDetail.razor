@@ -232,7 +232,7 @@
                                 }
                                 else if (links is not null)
                                 {
-                                    <p class="text-muted">@Texts.Get("crm.company.people.none")</p>
+                                    <EmptyState Compact="true" Title="@Texts.Get("crm.company.people.none")" />
                                 }
                                 <Pager Page="contactPage" PageSize="ListSize" TotalCount="contactTotal" PageChanged="ContactPageChanged" />
                             </section>
@@ -285,7 +285,7 @@
                                 }
                                 else if (opportunities is not null)
                                 {
-                                    <p class="text-muted">@Texts.Get("crm.company.opps.none")</p>
+                                    <EmptyState Compact="true" Title="@Texts.Get("crm.company.opps.none")" />
                                 }
                                 <Pager Page="opportunityPage" PageSize="ListSize" TotalCount="opportunityTotal" PageChanged="OpportunityPageChanged" />
                             </section>
@@ -342,7 +342,7 @@
                                 }
                                 else if (activities is not null)
                                 {
-                                    <p class="text-muted">@Texts.Get("crm.company.acts.none")</p>
+                                    <EmptyState Compact="true" Title="@Texts.Get("crm.company.acts.none")" />
                                 }
                                 <Pager Page="activityPage" PageSize="ListSize" TotalCount="activityTotal" PageChanged="ActivityPageChanged" />
                             </section>

@@ -5,10 +5,10 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Beyannameler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.warehouse.customs-declarations") · Modulix</PageTitle>
 
 <AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.DeclarationsRead">
-    <PageHeader Title="Beyannameler" Icon="clipboard-list" Subtitle="@(page is null ? "Gümrük beyannamelerini ve satırlarını yönetin." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.warehouse.customs-declarations")" Icon="clipboard-list" Subtitle="@(page is null ? Texts.Get("warehouse.declarations.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -28,27 +28,27 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Beyanname görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("warehouse.declarations.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Beyanname ara" placeholder="Tescil no, dış referans veya idare ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("warehouse.declarations.search")" placeholder="@Texts.Get("warehouse.declarations.searchPlaceholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(WarehouseAccess.DeclarationsWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni beyanname</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("warehouse.declarations.new")</button>
         }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <LookupPicker Id="decl-importer-filter" LookupKey="@WarehouseAccess.DeclarationImporterLookup" Value="importerId" ValueChanged="ChooseImporterAsync" Placeholder="Tüm ithalatçılar" />
-            <LookupPicker Id="decl-broker-filter" LookupKey="@WarehouseAccess.DeclarationBrokerLookup" Value="brokerId" ValueChanged="ChooseBrokerAsync" Placeholder="Tüm müşavirler" />
-            <input class="form-control" type="date" aria-label="Tescil tarihi başlangıç" title="Tescil tarihi (başlangıç)" @bind="from" @bind:after="() => LoadAsync(1)" />
-            <input class="form-control" type="date" aria-label="Tescil tarihi bitiş" title="Tescil tarihi (bitiş)" @bind="to" @bind:after="() => LoadAsync(1)" />
+            <LookupPicker Id="decl-importer-filter" LookupKey="@WarehouseAccess.DeclarationImporterLookup" Value="importerId" ValueChanged="ChooseImporterAsync" Placeholder="@Texts.Get("warehouse.declarations.allImporters")" />
+            <LookupPicker Id="decl-broker-filter" LookupKey="@WarehouseAccess.DeclarationBrokerLookup" Value="brokerId" ValueChanged="ChooseBrokerAsync" Placeholder="@Texts.Get("warehouse.declarations.allBrokers")" />
+            <input class="form-control" type="date" aria-label="@Texts.Get("warehouse.declarations.fromLabel")" title="@Texts.Get("warehouse.declarations.fromTitle")" @bind="from" @bind:after="() => LoadAsync(1)" />
+            <input class="form-control" type="date" aria-label="@Texts.Get("warehouse.declarations.toLabel")" title="@Texts.Get("warehouse.declarations.toTitle")" @bind="to" @bind:after="() => LoadAsync(1)" />
         </div>
     }
 
@@ -61,20 +61,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu görünüme uyan beyanname yok.</p>
+        <EmptyState Compact="true" Title="@Texts.Get("warehouse.declarations.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) beyanname listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("warehouse.declarations.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Beyanname listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("warehouse.declarations.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -86,9 +86,9 @@
                             @Cell(column, declaration)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{WarehouseLabels.Text(declaration, "registrationNo")} eylemleri")">
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", WarehouseLabels.Text(declaration, "registrationNo"))">
                                 <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(declaration)">
-                                    <AppIcon Name="@(Session.Can(WarehouseAccess.DeclarationsWrite) ? "pencil" : "eye")" Size="16" /> <span>@(Session.Can(WarehouseAccess.DeclarationsWrite) ? "Düzenle" : "Aç")</span>
+                                    <AppIcon Name="@(Session.Can(WarehouseAccess.DeclarationsWrite) ? "pencil" : "eye")" Size="16" /> <span>@(Session.Can(WarehouseAccess.DeclarationsWrite) ? Texts.Get("common.edit") : Texts.Get("common.open"))</span>
                                 </button>
                             </RowMenu>
                         </td>
@@ -107,14 +107,14 @@
 
     // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (WarehouseRecordStore.SortKeys).
     // Taraflar (firma adı) sunucuda sıralanamaz: firma görünürlüğü sıralamayla dolanılmasın. Varsayılan sıra tescil tarihine göre en yenidir.
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("registrationNo", "Tescil no", "hash", "registrationNo", "-registrationNo", Locked: true),
-        new("registrationDate", "Tescil tarihi", "calendar", "registrationDate", "-registrationDate"),
-        new("importer", "İthalatçı", "building", DefaultVisible: true),
-        new("broker", "Gümrük müşaviri", "user"),
-        new("regimeKey", "Rejim", "landmark", "regimeKey", "-regimeKey"),
-        new("statusKey", "Durum", "tag", "statusKey", "-statusKey"),
+        new("registrationNo", Texts.Get("warehouse.registrationNo"), "hash", "registrationNo", "-registrationNo", Locked: true),
+        new("registrationDate", Texts.Get("warehouse.registrationDate"), "calendar", "registrationDate", "-registrationDate"),
+        new("importer", Texts.Get("warehouse.importer"), "building", DefaultVisible: true),
+        new("broker", Texts.Get("warehouse.broker"), "user"),
+        new("regimeKey", Texts.Get("warehouse.regime"), "landmark", "regimeKey", "-regimeKey"),
+        new("statusKey", Texts.Get("common.field.status"), "tag", "statusKey", "-statusKey"),
     ];
 
     private readonly GridViewState grid = new("warehouse.customs-declarations", "-registrationDate");
@@ -152,7 +152,7 @@
     // Görünümler yalnızca süzgeçtir (Tümü, firmanın beyanname durumları, kişisel); taraf ve tarih süzgeçleri "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm beyannameler", Icon: "clipboard-list"),
+        new(AllViews, Texts.Get("warehouse.declarations.view.all"), Icon: "clipboard-list"),
         .. Lookups.ValuesOf(WarehouseAccess.DeclarationStatusList).Where(v => v.Active).Select(v => new ViewOption(StatusPrefix + v.Key, v.Label, Icon: "tag")),
         .. views.Options,
     ];
@@ -319,7 +319,7 @@
     private async Task SavedAsync(RecordResponse saved)
     {
         selected = saved;
-        notice = "Beyanname kaydedildi; satırlarını aşağıdan ekleyip düzenleyebilirsiniz.";
+        notice = Texts.Get("warehouse.declarations.saved");
         await LoadAsync(page?.Page ?? 1);
     }
 

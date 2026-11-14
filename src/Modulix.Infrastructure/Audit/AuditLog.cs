@@ -41,10 +41,11 @@ internal sealed class AuditLog(
 
         var filtered = Filter(query);
         var total = await filtered.CountAsync(cancellationToken);
-        var entries = await filtered
-            .OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id)
-            .Skip((page - 1) * pageSize).Take(pageSize)
-            .ToListAsync(cancellationToken);
+        var entries = query.Sort is "user" or "-user"
+            ? await PageByUserAsync(filtered, query.Sort == "-user", page, pageSize, cancellationToken)
+            : await Order(filtered, query.Sort)
+                .Skip((page - 1) * pageSize).Take(pageSize)
+                .ToListAsync(cancellationToken);
 
         return new AuditLogPage(await DescribeAsync(entries, cancellationToken), page, pageSize, total);
     }
@@ -104,6 +105,62 @@ internal sealed class AuditLog(
     }
 
     // Kayıtlar tenant verisidir: sorgu filtresi ve RLS yalnızca aktif tenant'ınkileri döndürür.
+    // Anahtarlar AuditQuery.SortKeys'tedir; bilinmeyen anahtar uç noktada reddedilir, burada varsayılan sıraya düşer.
+    private static IQueryable<AuditLogEntry> Order(IQueryable<AuditLogEntry> entries, string? sort) => sort switch
+    {
+        "occurredAt" => entries.OrderBy(a => a.OccurredAt).ThenBy(a => a.Id),
+        "entityKey" => entries.OrderBy(a => a.EntityKey).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+        "-entityKey" => entries.OrderByDescending(a => a.EntityKey).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+        "action" => entries.OrderBy(a => a.Action).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+        "-action" => entries.OrderByDescending(a => a.Action).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+        "source" => entries.OrderBy(a => a.Source).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+        "-source" => entries.OrderByDescending(a => a.Source).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+        _ => entries.OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+    };
+
+    /// <summary>
+    /// Kullanıcı adına göre sayfa: adlar ekranda gösterildiği gibi çözülür (sistem, bilinmeyen kişi ve firma üyesi olmayan
+    /// platform yöneticisi dahil; gerçek ad sıralamaya da sızmaz). Satır başına ad sorgusu yapılmaz: süzülen kayıtlar
+    /// kullanıcıya göre sayılır, kullanıcılar ada göre sıralanır ve sayfaya düşen kullanıcıların kayıtları
+    /// (TenantId, UserId, OccurredAt) dizininden en yeni önce okunur.
+    /// </summary>
+    private async Task<List<AuditLogEntry>> PageByUserAsync(
+        IQueryable<AuditLogEntry> filtered, bool descending, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var counts = await filtered.GroupBy(a => a.UserId)
+            .Select(g => new { UserId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+        var users = await LoadUsersAsync(RequireTenant(), [.. counts.Select(c => c.UserId)], cancellationToken);
+        string NameOf(Guid id) => users.GetValueOrDefault(id)?.Name ?? (id == Guid.Empty ? SystemName : "Bilinmeyen kişi");
+
+        var ordered = descending
+            ? counts.OrderByDescending(c => NameOf(c.UserId), StringComparer.CurrentCulture).ThenBy(c => c.UserId)
+            : counts.OrderBy(c => NameOf(c.UserId), StringComparer.CurrentCulture).ThenBy(c => c.UserId);
+
+        var skip = (page - 1) * pageSize;
+        List<AuditLogEntry> entries = [];
+        foreach (var user in ordered)
+        {
+            if (skip >= user.Count)
+            {
+                skip -= user.Count;
+                continue;
+            }
+
+            entries.AddRange(await filtered.Where(a => a.UserId == user.UserId)
+                .OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id)
+                .Skip(skip).Take(pageSize - entries.Count)
+                .ToListAsync(cancellationToken));
+            skip = 0;
+            if (entries.Count >= pageSize)
+            {
+                break;
+            }
+        }
+
+        return entries;
+    }
+
     private IQueryable<AuditLogEntry> Filter(AuditQuery query)
     {
         var entries = db.AuditLog.AsNoTracking();

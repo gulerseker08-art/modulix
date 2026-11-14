@@ -10,7 +10,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Line is null ? "Yeni satır" : $"Satır {form.LineNo}")</h2>
+            <h2>@(Line is null ? Texts.Get("warehouse.lineEditor.new") : Texts.Get("warehouse.lineEditor.title", form.LineNo))</h2>
             @if (Line is not null)
             {
                 <p>@form.Gtip</p>
@@ -18,13 +18,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -38,7 +38,7 @@
         <div class="alert alert-danger" role="alert">@layoutError</div>
     }
 
-    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Beyanname satırı formu bölümleri">
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("warehouse.lineEditor.tabs")">
         <Field Context="f">
             @switch (f.Key)
             {
@@ -51,7 +51,7 @@
                     <label class="@f.LabelClass()" for="line-gtip">@f.Label</label>
                     <input id="line-gtip" class="form-control" inputmode="numeric" maxlength="40" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Gtip" @bind:event="onchange" />
                     <FieldError Field="gtip" Errors="errors" />
-                    <small class="text-muted">Yalnızca rakamlar (nokta ve boşluk atılır, 6-14 hane).</small>
+                    <small class="text-muted">@Texts.Get("warehouse.lineEditor.gtipHelp")</small>
                     <GtipCheckHint Code="@form.Gtip" />
                     break;
                 case "description":
@@ -62,7 +62,7 @@
                 case "containerTypeKey":
                     <label class="@f.LabelClass()" for="line-container">@f.Label</label>
                     <select id="line-container" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ContainerTypeKey">
-                        <option value="">Seçin…</option>
+                        <option value="">@Texts.Get("common.choose")</option>
                         @foreach (var kind in Lookups.Choices(WarehouseAccess.ContainerTypeList, form.ContainerTypeKey))
                         {
                             <option value="@kind.Key">@kind.Label</option>
@@ -84,12 +84,12 @@
                     <label class="@f.LabelClass()" for="line-net">@f.Label</label>
                     <input id="line-net" class="form-control" type="number" step="0.001" min="0" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.NetKg" @bind:culture="Invariant" />
                     <FieldError Field="netKg" Errors="errors" />
-                    <small class="text-muted">Brüt kilodan büyük olamaz.</small>
+                    <small class="text-muted">@Texts.Get("warehouse.lineEditor.netHelp")</small>
                     break;
                 case "originCountryKey":
                     <label class="@f.LabelClass()" for="line-origin">@f.Label</label>
                     <select id="line-origin" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.OriginCountryKey">
-                        <option value="">Seçin…</option>
+                        <option value="">@Texts.Get("common.choose")</option>
                         @foreach (var country in Lookups.Choices(WarehouseAccess.OriginCountryList, form.OriginCountryKey))
                         {
                             <option value="@country.Key">@country.Label</option>
@@ -105,7 +105,7 @@
                 case "unitKey":
                     <label class="@f.LabelClass()" for="line-unit">@f.Label</label>
                     <select id="line-unit" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.UnitKey">
-                        <option value="">Seçin…</option>
+                        <option value="">@Texts.Get("common.choose")</option>
                         @foreach (var unit in Lookups.Choices(WarehouseAccess.DeclarationLineUnitList, form.UnitKey))
                         {
                             <option value="@unit.Key">@unit.Label</option>
@@ -118,11 +118,11 @@
     </LayoutForm>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
         @if (form.Id is not null)
         {
-            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
         }
     </div>
 </form>
@@ -164,7 +164,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir satır verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>

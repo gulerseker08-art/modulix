@@ -7,14 +7,18 @@ namespace Modulix.Modules.Hr.Records;
 
 /// <summary>
 /// Duyurular (ADR-0042 dilim 6). "Duyuru yönetimi" izni olan bütün duyuruları (taslak, ileri tarihli, süresi geçmiş) görür ve yazar. Diğer okur
-/// yalnızca yayında, başlangıç günü gelmiş, süresi dolmamış ve kendisine hedeflenmiş (hedef departman boş ya da çalışan kartındaki departmanı)
-/// duyuruları görür; görmediği duyuru "bulunamadı"dır. Bitiş günü başlangıçtan önce olamaz; başlangıç verilmezse bugündür. Silinen duyurunun okundu
-/// kayıtları da silinir.
+/// yalnızca yayında, başlangıç günü gelmiş, süresi dolmamış ve kendisine hedeflenmiş (hedefi yok ya da hedeflerden biri okurun Core departmanı,
+/// onun bir üst departmanı ya da okurun kendisi; bkz. <see cref="HrAudience"/>) duyuruları görür; görmediği duyuru "bulunamadı"dır. Bitiş günü başlangıçtan önce olamaz; başlangıç verilmezse bugündür. Silinen duyurunun okundu
+/// kayıtları ve hedefleri de silinir.
 /// </summary>
 internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecordStore<Announcement>(context)
 {
     private readonly Dictionary<Guid, int> readCounts = [];
     private readonly HashSet<Guid> readByMe = [];
+    private readonly AudienceFields<Announcement> audience =
+        new(context, a => a.AudienceBusinessUnitId = null, a => a.AudienceDepartmentKey = null);
+
+    private readonly ContentStats stats = new(context);
 
     public override string EntityKey => HrModule.Entities.Announcement;
 
@@ -26,7 +30,8 @@ internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecord
     [
         Field.Text<Announcement>("title", Announcement.TitleMaxLength, a => a.Title, (a, v) => a.Title = v!, required: true),
         Field.Text<Announcement>("body", Announcement.BodyMaxLength, a => a.Body, (a, v) => a.Body = v!, required: true),
-        Field.ListChoice<Announcement>("audienceDepartmentKey", HrModule.Lists.Department, a => a.AudienceDepartmentKey, (a, v) => a.AudienceDepartmentKey = v, required: false),
+        .. audience.Fields(),
+        .. stats.Fields<Announcement>(),
         Field.Flag<Announcement>("isPinned", a => a.IsPinned, (a, v) => a.IsPinned = v),
         Field.Flag<Announcement>("isPublished", a => a.IsPublished, (a, v) => a.IsPublished = v),
         Field.Date<Announcement>("publishOn", a => a.PublishOn == default ? null : a.PublishOn, (a, v) => a.PublishOn = v ?? default),
@@ -51,8 +56,22 @@ internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecord
         },
         ["isPublished"] = (q, v) => bool.TryParse(v, out var published) ? q.Where(a => a.IsPublished == published) : null,
         ["expired"] = (q, v) => v == "true" ? q.Where(a => a.ExpiresOn != null && a.ExpiresOn < Today) : null,
+
+        // Kullanıcının henüz okumadığı duyurular (ana sayfa kutucuğundaki okunmamış sayısı).
+        ["unread"] = (q, v) => v == "true" ? Unread(q, context) : null,
+        ["audienceBusinessUnitId"] = (q, v) => FilterValue.Id(v) is { } id
+            ? q.Where(a => a.AudienceBusinessUnitId == id
+                || context.Data.Set<AudienceTarget>().Any(t => t.ContentId == a.Id && t.BusinessUnitId == id))
+            : null,
         ["audienceDepartmentKey"] = (q, v) => v.Length is > 0 and <= 100 ? q.Where(a => a.AudienceDepartmentKey == v) : null,
     };
+
+    private static IQueryable<Announcement> Unread(IQueryable<Announcement> source, HrStoreContext context)
+    {
+        var me = context.CurrentUserId ?? Guid.Empty;
+        var reads = context.Data.Set<AnnouncementRead>().AsNoTracking();
+        return source.Where(a => !reads.Any(r => r.AnnouncementId == a.Id && r.UserId == me));
+    }
 
     protected override IOrderedQueryable<Announcement> Order(IQueryable<Announcement> source) =>
         source.OrderByDescending(a => a.IsPinned).ThenByDescending(a => a.PublishOn).ThenByDescending(a => a.CreatedAt);
@@ -70,19 +89,21 @@ internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecord
     protected override IQueryable<Announcement> Search(IQueryable<Announcement> source, string term) =>
         source.Where(a => a.Title.Contains(term) || a.Body.Contains(term));
 
-    protected override async Task<IQueryable<Announcement>> RestrictAsync(IQueryable<Announcement> source, CancellationToken cancellationToken)
+    protected override Task<IQueryable<Announcement>> RestrictAsync(IQueryable<Announcement> source, CancellationToken cancellationToken) =>
+        ForReaderAsync(Context, source, cancellationToken);
+
+    /// <summary>Kullanıcının görebildiği duyurular (yorum ve beğeni de bu kuralı kullanır; bölüm 23d).</summary>
+    internal static async Task<IQueryable<Announcement>> ForReaderAsync(HrStoreContext context, IQueryable<Announcement> source, CancellationToken cancellationToken)
     {
-        if (await Context.Access.HasPermissionAsync(HrModule.Permissions.AnnouncementsManage, cancellationToken))
+        if (await context.Access.HasPermissionAsync(HrModule.Permissions.AnnouncementsManage, cancellationToken))
         {
             return source;
         }
 
-        var me = Context.CurrentUserId ?? Guid.Empty;
-        var department = await Context.Data.Set<Employee>().AsNoTracking()
-            .Where(e => e.UserId == me && e.Status != Employee.Statuses.Terminated).Select(e => e.DepartmentKey).FirstOrDefaultAsync(cancellationToken);
+        var reader = await HrAudience.ReaderAsync(context, cancellationToken);
         var today = Today;
-        return source.Where(a => a.IsPublished && a.PublishOn <= today && (a.ExpiresOn == null || a.ExpiresOn >= today)
-            && (a.AudienceDepartmentKey == null || a.AudienceDepartmentKey == department));
+        return HrAudience.Visible(source.Where(a => a.IsPublished && a.PublishOn <= today && (a.ExpiresOn == null || a.ExpiresOn >= today)),
+            reader, context.Data.Set<AudienceTarget>().AsNoTracking());
     }
 
     protected override async Task PrepareAsync(IReadOnlyCollection<Announcement> entities, CancellationToken cancellationToken)
@@ -96,10 +117,15 @@ internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecord
 
         var me = Context.CurrentUserId ?? Guid.Empty;
         readByMe.UnionWith(await reads.Where(r => r.UserId == me).Select(r => r.AnnouncementId).ToListAsync(cancellationToken));
+        await audience.PrepareAsync(entities, cancellationToken);
+        await stats.LoadAsync(ids, cancellationToken);
     }
 
-    protected override Task AppliedAsync(Announcement entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
+    protected override async Task AppliedAsync(Announcement entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
+        // Hedefler (departmanlar ve/veya kişiler; boş: herkes) eski İK departman hedefinin yerini alır.
+        await audience.AppliedAsync(entity, values, isNew, cancellationToken);
+
         if (entity.PublishOn == default)
         {
             entity.PublishOn = Today;
@@ -110,14 +136,19 @@ internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecord
             entity.AuthorUserId = Context.CurrentUserId;
         }
 
-        return entity.ExpiresOn is { } expires && expires < entity.PublishOn
-            ? throw new RecordValidationException([new RecordFieldError("expiresOn", "Bitiş günü başlangıç gününden önce olamaz.")])
-            : Task.CompletedTask;
+        if (entity.ExpiresOn is { } expires && expires < entity.PublishOn)
+        {
+            throw new RecordValidationException([new RecordFieldError("expiresOn", "Bitiş günü başlangıç gününden önce olamaz.")]);
+        }
     }
 
-    protected override async Task BeforeDeleteAsync(Announcement entity, CancellationToken cancellationToken) =>
+    protected override async Task BeforeDeleteAsync(Announcement entity, CancellationToken cancellationToken)
+    {
         Context.Data.Set<AnnouncementRead>().RemoveRange(
             await Context.Data.Set<AnnouncementRead>().Where(r => r.AnnouncementId == entity.Id).ToListAsync(cancellationToken));
+        await HrAudience.RemoveAsync(Context, entity.Id, cancellationToken);
+        await ContentStats.RemoveAsync(Context, entity.Id, cancellationToken);
+    }
 }
 
 /// <summary>

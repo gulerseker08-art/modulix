@@ -147,7 +147,8 @@ internal sealed class GtipCatalogService(ModulixDbContext db, TimeProvider time)
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task<GtipCatalogEntryPage> SearchEntriesAsync(Guid versionId, string? search, int page, int pageSize, CancellationToken cancellationToken)
+    public async Task<GtipCatalogEntryPage> SearchEntriesAsync(
+        Guid versionId, string? search, int page, int pageSize, CancellationToken cancellationToken, string? sort = null)
     {
         if (!await db.GtipCatalogVersions.AsNoTracking().AnyAsync(v => v.Id == versionId, cancellationToken))
         {
@@ -163,7 +164,17 @@ internal sealed class GtipCatalogService(ModulixDbContext db, TimeProvider time)
         }
 
         var total = await query.CountAsync(cancellationToken);
-        var items = await query.OrderBy(e => e.Code)
+        // Anahtarlar GtipEntrySort.Keys'tedir; eşit satırlar koda göre sıralanır, birimi olmayanlar sonda kalır.
+        var ordered = sort switch
+        {
+            "-code" => query.OrderByDescending(e => e.Code),
+            "description" => query.OrderBy(e => e.Description).ThenBy(e => e.Code),
+            "-description" => query.OrderByDescending(e => e.Description).ThenBy(e => e.Code),
+            "unit" => query.OrderBy(e => e.Unit == null).ThenBy(e => e.Unit).ThenBy(e => e.Code),
+            "-unit" => query.OrderBy(e => e.Unit == null).ThenByDescending(e => e.Unit).ThenBy(e => e.Code),
+            _ => query.OrderBy(e => e.Code),
+        };
+        var items = await ordered
             .Skip((number - 1) * size).Take(size)
             .Select(e => new GtipCatalogEntryView(e.Code, e.Description, e.Unit))
             .ToListAsync(cancellationToken);

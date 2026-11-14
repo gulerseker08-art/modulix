@@ -7,16 +7,14 @@
 
 <section class="detail-section" aria-labelledby="rsp-title" id="zamanlamalar">
     <div class="section-header">
-        <h2 id="rsp-title">Zamanlamalar</h2>
+        <h2 id="rsp-title">@Texts.Get("reports.schedules.title")</h2>
         @if (ReportId is not null && !formOpen)
         {
-            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(items.Count >= ReportCenterLabels.MaxSchedules || loading)" @onclick="NewSchedule">Yeni zamanlama</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(items.Count >= ReportCenterLabels.MaxSchedules || loading)" @onclick="NewSchedule">@Texts.Get("reports.schedules.new")</button>
         }
     </div>
     <p class="text-muted small">
-        Rapor sizin yetkinizle çalışır; yetkiniz kalkarsa teslim durur. E-postada veri yok, yalnızca indirme bağlantısı vardır
-        (dosya <a href="raporlar/disa-aktarimlar">Dışa aktarımlar</a> sayfasında da görünür). En fazla @ReportCenterLabels.MaxSchedules zamanlama.
-        Saatler firmanın saat dilimindedir (@Regional.Zone.Id).
+        @((MarkupString)Texts.Get("reports.schedules.intro", "<a href=\"raporlar/disa-aktarimlar\">", "</a>", ReportCenterLabels.MaxSchedules, System.Net.WebUtility.HtmlEncode(Regional.Zone.Id)))
     </p>
 
     @if (message is not null)
@@ -25,18 +23,18 @@
             @message
             @if (conflict)
             {
-                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@busy" @onclick="ReloadAfterConflictAsync">Listeyi yenile</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@busy" @onclick="ReloadAfterConflictAsync">@Texts.Get("reports.schedules.reload")</button>
             }
         </div>
     }
 
     @if (formOpen)
     {
-        <form class="report-builder-section" @onsubmit="SaveAsync" @onsubmit:preventDefault aria-label="@(editingId is null ? "Yeni zamanlama" : "Zamanlamayı düzenle")">
-            <h3 class="h6">@(editingId is null ? "Yeni zamanlama" : "Zamanlamayı düzenle")</h3>
+        <form class="report-builder-section" @onsubmit="SaveAsync" @onsubmit:preventDefault aria-label="@(editingId is null ? Texts.Get("reports.schedules.new") : Texts.Get("reports.schedules.edit"))">
+            <h3 class="h6">@(editingId is null ? Texts.Get("reports.schedules.new") : Texts.Get("reports.schedules.edit"))</h3>
             <div class="form-grid">
                 <div class="span-3">
-                    <label class="form-label" for="rsp-frequency">Sıklık</label>
+                    <label class="form-label" for="rsp-frequency">@Texts.Get("reports.schedules.frequency")</label>
                     <select id="rsp-frequency" class="form-select" @bind="frequency">
                         @foreach (var (key, label) in ReportCenterLabels.Frequencies)
                         {
@@ -47,7 +45,7 @@
                 @if (frequency == "weekly")
                 {
                     <div class="span-3">
-                        <label class="form-label" for="rsp-weekday">Haftanın günü</label>
+                        <label class="form-label" for="rsp-weekday">@Texts.Get("reports.schedules.weekday")</label>
                         <select id="rsp-weekday" class="form-select" @bind="weekday">
                             @foreach (var (key, label) in ReportCenterLabels.Weekdays)
                             {
@@ -59,18 +57,18 @@
                 @if (frequency == "monthly")
                 {
                     <div class="span-3">
-                        <label class="form-label" for="rsp-monthday">Ayın günü</label>
+                        <label class="form-label" for="rsp-monthday">@Texts.Get("reports.schedules.monthDay")</label>
                         <select id="rsp-monthday" class="form-select" aria-describedby="rsp-monthday-help" @bind="monthDay">
                             @for (var d = 1; d <= 28; d++)
                             {
                                 <option value="@d">@d</option>
                             }
                         </select>
-                        <div id="rsp-monthday-help" class="form-text">Her ayda bulunması için 1-28 arası seçilebilir.</div>
+                        <div id="rsp-monthday-help" class="form-text">@Texts.Get("reports.schedules.monthDayHelp")</div>
                     </div>
                 }
                 <div class="span-3">
-                    <label class="form-label" for="rsp-hour">Saat</label>
+                    <label class="form-label" for="rsp-hour">@Texts.Get("reports.schedules.hour")</label>
                     <select id="rsp-hour" class="form-select" @bind="hour">
                         @for (var h = 0; h < 24; h++)
                         {
@@ -79,7 +77,7 @@
                     </select>
                 </div>
                 <div class="span-3">
-                    <label class="form-label" for="rsp-format">Dosya biçimi</label>
+                    <label class="form-label" for="rsp-format">@Texts.Get("reports.schedules.format")</label>
                     <select id="rsp-format" class="form-select" @bind="format">
                         <option value="csv">CSV</option>
                         <option value="xlsx">Excel (xlsx)</option>
@@ -87,28 +85,27 @@
                 </div>
             </div>
             <fieldset class="mt-3">
-                <legend class="form-label">Alıcılar (isteğe bağlı)</legend>
+                <legend class="form-label">@Texts.Get("reports.schedules.recipientsOptional")</legend>
                 <p id="rsp-recipients-help" class="form-text">
-                    Siz her zaman alırsınız. Seçtiğiniz kişiler raporu <strong>kendi yetkileriyle</strong> alır (kendi veri kapsamlarında, kendi dosyaları olarak):
-                    raporu göremeyen (özel rapor paylaşılmamışsa) ya da dışa aktarma yetkisi olmayan kişi o çalışmada atlanır ve nedeni son durum notunda yazılır.
-                    En fazla @ReportCenterLabels.MaxRecipients alıcı.
+                    @Texts.Strong("reports.schedules.recipientsHelp", Texts.Get("reports.schedules.ownPermissions"))
+                    @Texts.Get("reports.schedules.maxRecipients", ReportCenterLabels.MaxRecipients)
                 </p>
                 @if (membersError is not null)
                 {
                     <div class="alert alert-danger" role="alert">
                         @membersError
-                        <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadMembersAsync">Tekrar dene</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadMembersAsync">@Texts.Get("crm.sales.retry")</button>
                     </div>
                 }
                 else if (members is null)
                 {
-                    <p class="text-muted" role="status">Kullanıcılar yükleniyor…</p>
+                    <p class="text-muted" role="status">@Texts.Get("reports.usersLoading")</p>
                 }
                 else
                 {
-                    <label class="visually-hidden" for="rsp-member-filter">Kullanıcı ara</label>
-                    <input id="rsp-member-filter" class="form-control mb-2" type="search" placeholder="Kullanıcı ara" aria-describedby="rsp-recipients-help" @bind="memberFilter" @bind:event="oninput" />
-                    <div class="report-member-list" role="group" aria-label="Alıcılar">
+                    <label class="visually-hidden" for="rsp-member-filter">@Texts.Get("reports.searchUser")</label>
+                    <input id="rsp-member-filter" class="form-control mb-2" type="search" placeholder="@Texts.Get("reports.searchUser")" aria-describedby="rsp-recipients-help" @bind="memberFilter" @bind:event="oninput" />
+                    <div class="report-member-list" role="group" aria-label="@Texts.Get("reports.schedules.recipients")">
                         @foreach (var member in FilteredMembers())
                         {
                             var memberId = member.UserId;
@@ -119,18 +116,18 @@
                         }
                         @if (!FilteredMembers().Any())
                         {
-                            <p class="text-muted mb-0">Kullanıcı bulunamadı.</p>
+                            <EmptyState Compact="true" Title="@Texts.Get("reports.noUserFound")" />
                         }
                     </div>
-                    <p class="small text-muted mt-1" role="status">@recipientIds.Count alıcı seçili.</p>
+                    <p class="small text-muted mt-1" role="status">@Texts.Get("reports.schedules.recipientsSelected", recipientIds.Count)</p>
                 }
             </fieldset>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@busy">
                     @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
-                    Kaydet
+                    @Texts.Get("common.save")
                 </button>
-                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CloseForm">Vazgeç</button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CloseForm">@Texts.Get("common.dismiss")</button>
             </div>
         </form>
     }
@@ -141,7 +138,7 @@
     {
         @if (items.Count == 0)
         {
-            <p class="text-muted" role="status">@(ReportId is null ? "Henüz zamanlamanız yok. Bir raporun sayfasından zamanlama ekleyebilirsiniz." : "Bu rapor için zamanlamanız yok.")</p>
+            <p class="text-muted" role="status">@(ReportId is null ? Texts.Get("reports.schedules.emptyAll") : Texts.Get("reports.schedules.emptyReport"))</p>
         }
 
         @foreach (var item in items)
@@ -152,23 +149,23 @@
                     <h3>@ReportCenterLabels.ScheduleSummary(item)</h3>
                     @if (ReportId is null)
                     {
-                        <p class="mb-0"><a href="raporlar/@item.ReportId">@(item.ReportName ?? "Rapor")</a></p>
+                        <p class="mb-0"><a href="raporlar/@item.ReportId">@(item.ReportName ?? Texts.Get("reports.run.pageTitle"))</a></p>
                     }
 
                     <div class="report-row-meta">
-                        <span class="badge @(item.Enabled ? "status-customer" : "status-inactive")">@(item.Enabled ? "Açık" : "Kapalı")</span>
+                        <span class="badge @(item.Enabled ? "status-customer" : "status-inactive")">@(item.Enabled ? Texts.Get("warehouse.on") : Texts.Get("warehouse.off"))</span>
                         <span class="badge tag">@(item.Format == "xlsx" ? "Excel" : "CSV")</span>
                         @if (item.Enabled)
                         {
-                            <span class="badge tag">Sonraki çalışma: @CrmLabels.Time(item.NextRunAt)</span>
+                            <span class="badge tag">@Texts.Get("reports.schedules.nextRun", CrmLabels.Time(item.NextRunAt))</span>
                         }
                         <span class="badge tag">
-                            Son durum: @ReportCenterLabels.ScheduleStatus(item.LastStatus)@(item.LastRunAt is { } last ? $" ({CrmLabels.Time(last)})" : null)
+                            @(item.LastRunAt is { } last ? Texts.Get("reports.schedules.lastStatusAt", ReportCenterLabels.ScheduleStatus(item.LastStatus), CrmLabels.Time(last)) : Texts.Get("reports.schedules.lastStatus", ReportCenterLabels.ScheduleStatus(item.LastStatus)))
                         </span>
                     </div>
                     @if (item.Recipients is { Count: > 0 } recipients)
                     {
-                        <p class="small mt-2 mb-0"><strong>Alıcılar:</strong> @string.Join(", ", recipients.Select(r => r.DisplayName ?? "Eski üye"))</p>
+                        <p class="small mt-2 mb-0"><strong>@Texts.Get("reports.schedules.recipientsLabel")</strong> @string.Join(", ", recipients.Select(r => r.DisplayName ?? Texts.Get("reports.schedules.formerMember")))</p>
                     }
                     @if (!string.IsNullOrWhiteSpace(item.LastMessage))
                     {
@@ -177,35 +174,35 @@
                     @if (stopped)
                     {
                         <div class="alert alert-warning mt-2 mb-0" role="alert">
-                            <strong>Teslim durduruldu.</strong> @item.StoppedReason
-                            Bu zamanlamadan dosya gelmiyor; nedeni giderildikten sonra zamanlamayı yeniden açabilirsiniz.
+                            <strong>@Texts.Get("reports.schedules.stoppedTitle")</strong> @item.StoppedReason
+                            @Texts.Get("reports.schedules.stopped")
                         </div>
                     }
                 </div>
                 <div class="report-row-actions">
                     <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-pressed="@(item.Enabled ? "true" : "false")"
-                            aria-label="@(item.Enabled ? "Kapat" : "Aç"): @ReportCenterLabels.ScheduleSummary(item)" @onclick="() => ToggleAsync(item)">
-                        @(item.Enabled ? "Kapat" : "Aç")
+                            aria-label="@(item.Enabled ? Texts.Get("reports.schedules.closeAria", ReportCenterLabels.ScheduleSummary(item)) : Texts.Get("reports.schedules.openAria", ReportCenterLabels.ScheduleSummary(item)))" @onclick="() => ToggleAsync(item)">
+                        @(item.Enabled ? Texts.Get("common.close") : Texts.Get("common.open"))
                     </button>
                     @if (ReportId is not null)
                     {
-                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="Düzenle: @ReportCenterLabels.ScheduleSummary(item)" @onclick="() => Edit(item)">Düzenle</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="@Texts.Get("reports.schedules.editAria", ReportCenterLabels.ScheduleSummary(item))" @onclick="() => Edit(item)">@Texts.Get("common.edit")</button>
                     }
                     else
                     {
-                        <a class="btn btn-outline-secondary btn-sm" href="raporlar/@item.ReportId#zamanlamalar" aria-label="Rapor sayfasında düzenle: @ReportCenterLabels.ScheduleSummary(item)">Düzenle</a>
+                        <a class="btn btn-outline-secondary btn-sm" href="raporlar/@item.ReportId#zamanlamalar" aria-label="@Texts.Get("reports.schedules.editOnReportAria", ReportCenterLabels.ScheduleSummary(item))">@Texts.Get("common.edit")</a>
                     }
                     @if (confirmDeleteId == item.Id)
                     {
                         <span class="confirm" role="alert">
-                            <span>Zamanlama silinsin mi?</span>
-                            <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">Evet, sil</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirmDeleteId = null">Vazgeç</button>
+                            <span>@Texts.Get("reports.schedules.deleteConfirm")</span>
+                            <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">@Texts.Get("common.view.deleteYes")</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirmDeleteId = null">@Texts.Get("common.dismiss")</button>
                         </span>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="Sil: @ReportCenterLabels.ScheduleSummary(item)" @onclick="() => confirmDeleteId = item.Id">Sil</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="@Texts.Get("reports.schedules.deleteAria", ReportCenterLabels.ScheduleSummary(item))" @onclick="() => confirmDeleteId = item.Id">@Texts.Get("common.delete")</button>
                     }
                 </div>
             </div>
@@ -370,7 +367,7 @@
         {
             formOpen = false;
             messageFailed = false;
-            message = editingId is null ? "Zamanlama eklendi." : "Zamanlama güncellendi.";
+            message = editingId is null ? Texts.Get("reports.schedules.added") : Texts.Get("reports.schedules.updated");
             await LoadAsync();
             return;
         }
@@ -378,7 +375,7 @@
         messageFailed = true;
         conflict = result.Status == HttpStatusCode.Conflict;
         message = conflict
-            ? "Bu zamanlama başka bir yerde değiştirilmiş; kaydedilmedi. Listeyi yenileyip değişikliği yeniden yapın."
+            ? Texts.Get("reports.schedules.conflict")
             : result.Issues.Count > 0 ? $"{result.Error} {string.Join(" ", result.Issues.Select(i => i.Message))}" : result.Error;
     }
 
@@ -397,7 +394,7 @@
         var result = await Api.PutAsync<ReportScheduleDto>($"/api/reports/schedules/{item.Id}/enabled", new SetReportScheduleEnabledRequest(!item.Enabled));
         busy = false;
         messageFailed = !result.IsSuccess;
-        message = result.IsSuccess ? (result.Value!.Enabled ? "Zamanlama açıldı." : "Zamanlama kapatıldı.") : result.Error;
+        message = result.IsSuccess ? (result.Value!.Enabled ? Texts.Get("reports.schedules.enabled") : Texts.Get("reports.schedules.disabled")) : result.Error;
         if (result.IsSuccess || result.Status == HttpStatusCode.NotFound)
         {
             await LoadAsync();
@@ -412,7 +409,7 @@
         busy = false;
         confirmDeleteId = null;
         messageFailed = !result.IsSuccess;
-        message = result.IsSuccess ? "Zamanlama silindi." : result.Error;
+        message = result.IsSuccess ? Texts.Get("reports.schedules.deleted") : result.Error;
         if (result.IsSuccess || result.Status == HttpStatusCode.NotFound)
         {
             await LoadAsync();

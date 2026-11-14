@@ -95,9 +95,14 @@
             else
             {
                 <table class="table record-table">
-                    <thead><tr><th>Firma</th><th>Son giriş</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th scope="col"><SortHeader Label="Firma" ColumnIcon="building" Asc="name" Desc="-name" Value="@inactiveSort" Default="" ValueChanged="@(v => inactiveSort = v)" /></th>
+                            <th scope="col"><SortHeader Label="Son giriş" ColumnIcon="clock" Asc="lastSignIn" Desc="-lastSignIn" Value="@inactiveSort" Default="" ValueChanged="@(v => inactiveSort = v)" /></th>
+                        </tr>
+                    </thead>
                     <tbody>
-                        @foreach (var tenant in report.InactiveTenants)
+                        @foreach (var tenant in ClientSort.Apply(report.InactiveTenants, inactiveSort, InactiveColumns))
                         {
                             <tr>
                                 <td data-label="Firma" class="primary"><a href="platform/firmalar/@tenant.TenantId">@tenant.Name</a></td>
@@ -113,9 +118,14 @@
         <section class="detail-section">
             <div class="section-header"><h2>Güvenlik olayları (son 7 gün)</h2></div>
             <table class="table record-table">
-                <thead><tr><th>Olay</th><th>Adet</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th scope="col"><SortHeader Label="Olay" ColumnIcon="shield" Asc="action" Desc="-action" Value="@securitySort" Default="" ValueChanged="@(v => securitySort = v)" /></th>
+                        <th scope="col"><SortHeader Label="Adet" ColumnIcon="hash" Asc="count" Desc="-count" Value="@securitySort" Default="" ValueChanged="@(v => securitySort = v)" /></th>
+                    </tr>
+                </thead>
                 <tbody>
-                    @foreach (var item in report.SecurityEvents7Days)
+                    @foreach (var item in ClientSort.Apply(report.SecurityEvents7Days, securitySort, SecurityColumns))
                     {
                         <tr>
                             <td data-label="Olay" class="primary">@PlatformAuditText.Of(item.Action)</td>
@@ -131,6 +141,22 @@
 
 @code {
     private PlatformHealthResponse? report;
+
+    // Rapor tabloları tamamı yüklü gelir: istemcide sıralanır (ClientSort); boş değer raporun kendi sırasıdır.
+    private string inactiveSort = "";
+    private string securitySort = "";
+
+    private static readonly Dictionary<string, Func<InactiveTenantDto, object?>> InactiveColumns = new()
+    {
+        ["name"] = t => t.Name,
+        ["lastSignIn"] = t => t.LastSignInAt,
+    };
+
+    private static readonly Dictionary<string, Func<SecurityEventCountDto, object?>> SecurityColumns = new()
+    {
+        ["action"] = e => PlatformAuditText.Of(e.Action),
+        ["count"] = e => e.Count,
+    };
     private string? message;
     private bool loading;
 

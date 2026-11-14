@@ -35,7 +35,7 @@ firma alt profili, sektör bilgisi tablosu, AI erişimi menüsü) bu sıraya al�
 | 2 | Eskimiş ADR metinleri (A-9) | Yapıldı (13 Kasım, PR #305): 0010, 0014–0017, 0019 sonuna tarihli güncel durum notu |
 | 3 | İçe aktarma dilim 4 kalanları (A-6) | 4b aynı dosya uyarısı (#306), 4c kayıtlı sütun eşlemesi (#307), 4d geri alma (#312) yapıldı ve 4e "hepsi ya da hiç" yapıldı; dilim 4 tamam |
 | 4 | Arayüz dili aşama 4 kalan dilimleri (A-10): 8b teklif ayrıntısı → 18 | Mekanik; `az` doğrulaması hâlâ açık (taslak sayılır) |
-| 5 | Raporlama kalanları (A-11) ve CRM bağları (A-12) | Ürün önceliği sorulmalı (B listesi); önerilen varsayılan: önce xlsx dışa aktarma, sonra `CampaignId` bağı |
+| 5 | Raporlama kalanları (A-11) ve CRM bağları (A-12) | xlsx dışa aktarma, dağıtım listesi ve kart dışa aktarma yapıldı (ADR-0035; 7–9 Kasım). `CampaignId` bağı yapıldı (14 Kasım; müşteri adayı + fırsat, ADR-0025 "CRM kampanya bağı"; kampanya ayrıntısında "Bağlı kayıtlar" sekmesi eklendi). Kalan A-11: ekip/departman kırılımı (ekip sözleşmesi + çift sayım kararı), lead sütun daraltma (önce ölçüm). Kalan A-12: `OwningBusinessUnitId`, ürün kataloğu bağı (`productInterest`), indirim onayının genel onay servisine bağlanması, birime göre kullanıcı lookup'ı; her biri ürün önceliği ister |
 | — | Ç4 dosya dilim 1b (A-4) | `AttachmentPanel` ADR-0038 dilim 2a ile geldi; kalan 2 tarama, 3 yaşam döngüsü, 4 portal bağlantısı dış sağlayıcı/ürün kararı bekliyor |
 | — | Ç0.4 kalanları (A-3) | Sevkiyat teslimi olayı ADR-0038 dilim 6 ile geldi; teklif kabul olayı `crm.quote.accepted` yapıldı (#311); kalan: webhook (dış sağlayıcı kararı) |
 
@@ -43,6 +43,7 @@ firma alt profili, sektör bilgisi tablosu, AI erişimi menüsü) bu sıraya al�
 
 - **Antrepo 6b:** partide beyanname satırı seçimi, bakiyede stok kartı/birim sütunu, toplu (barkod) hareket ekranı; ekranlar tarayıcıda açık/koyu temada gözle doğrulanmadı (C listesine eklendi).
 - **Depo seçim kutuları:** hareketin lokasyon seçimi tesise bağlı değil (hareketin tesisi yok); çok tesisli müşteride uzun liste olursa tesis süzgeci eklenmeli.
+- **CRM kampanya bağı:** müşteri adayı/fırsat listesinde kampanya sütunu ve süzgeç seçicisi, kampanya raporuna elle bağlanan kayıtların girmesi (atıf modeli kararı), içe aktarma ve rapor veri kümesinde kampanya sütunu; formdaki alan tarayıcıda gözle doğrulanmadı.
 
 ## B. Karar bekleyen (kod yazılmaz)
 

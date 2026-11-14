@@ -1,0 +1,151 @@
+@* Kampanyaya kayıt bağıyla (campaignId) bağlı müşteri adayları ve fırsatlar (ADR-0025 "CRM kampanya bağı"). Veri CRM'in kendi liste uçlarından gelir:
+   sunucu çağıranın iznini ve kayıt kapsamını uygular, bu yüzden yalnızca kullanıcının görebildiği kayıtlar listelenir. İzni olmayan bölüm hiç çizilmez.
+   Kampanya raporundaki sayılar yanıt zincirinden hesaplanır; bu liste rapor değildir. *@
+@inject ApiClient Api
+@inject SessionState Session
+
+<div class="alert alert-info" role="note">@Texts.Get("marketing.linked.info")</div>
+
+@if (CanLeads)
+{
+    <section aria-labelledby="linked-leads-title">
+        <h2 id="linked-leads-title" class="h5">@Texts.Get("crm.leads.title")</h2>
+        @if (leads is null)
+        {
+            <LoadingState Kind="LoadingKind.Table" />
+        }
+        else if (leads.TotalCount == 0)
+        {
+            <EmptyState Compact="true" Title="@Texts.Get("marketing.linked.noLeads")" />
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">@Texts.Get("marketing.linked.leadsCaption")</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">@Texts.Get("crm.leads.col.number")</th>
+                        <th scope="col">@Texts.Get("crm.leads.col.subject")</th>
+                        <th scope="col">@Texts.Get("crm.leads.col.requester")</th>
+                        <th scope="col">@Texts.Get("common.field.status")</th>
+                        <th scope="col">@Texts.Get("crm.leads.col.received")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var lead in leads.Items)
+                    {
+                        <tr>
+                            <td data-label="@Texts.Get("crm.leads.col.number")" class="primary"><a href="crm/leadler/@lead.Id">@lead.LeadNumber</a></td>
+                            <td data-label="@Texts.Get("crm.leads.col.subject")">@lead.Subject</td>
+                            <td data-label="@Texts.Get("crm.leads.col.requester")">@Requester(lead)</td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@lead.Status.ToLowerInvariant()">@CrmText.LeadStatusName(lead.Status)</span></td>
+                            <td data-label="@Texts.Get("crm.leads.col.received")">@CrmLabels.Time(lead.FirstReceivedAt)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <Pager Page="leads.Page" PageSize="leads.PageSize" TotalCount="leads.TotalCount" PageChanged="LoadLeadsAsync" />
+        }
+    </section>
+}
+
+@if (CanOpportunities)
+{
+    <section aria-labelledby="linked-opportunities-title">
+        <h2 id="linked-opportunities-title" class="h5">@Texts.Get("crm.opportunities.title")</h2>
+        @if (opportunities is null)
+        {
+            <LoadingState Kind="LoadingKind.Table" />
+        }
+        else if (opportunities.TotalCount == 0)
+        {
+            <EmptyState Compact="true" Title="@Texts.Get("marketing.linked.noOpportunities")" />
+        }
+        else
+        {
+            <table class="table record-table">
+                <caption class="visually-hidden">@Texts.Get("marketing.linked.opportunitiesCaption")</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">@Texts.Get("crm.opportunities.col.title")</th>
+                        <th scope="col">@Texts.Get("common.field.status")</th>
+                        @if (ShowAmounts) { <th scope="col">@Texts.Get("crm.sales.col.amount")</th> }
+                        <th scope="col">@Texts.Get("crm.opportunities.col.closeDate")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var opportunity in opportunities.Items)
+                    {
+                        <tr>
+                            <td data-label="@Texts.Get("crm.opportunities.col.title")" class="primary"><a href="crm/firsatlar/@opportunity.Id">@opportunity.Title</a></td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@opportunity.Status.ToLowerInvariant()">@CrmText.OpportunityStatusName(opportunity.Status)</span></td>
+                            @if (ShowAmounts)
+                            {
+                                <td data-label="@Texts.Get("crm.sales.col.amount")">@(opportunity.Amount is { } amount ? CrmLabels.Amount(amount, opportunity.Currency) : "—")</td>
+                            }
+                            <td data-label="@Texts.Get("crm.opportunities.col.closeDate")">@(opportunity.ExpectedCloseDate is { } day ? CrmLabels.Date(day) : "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <Pager Page="opportunities.Page" PageSize="opportunities.PageSize" TotalCount="opportunities.TotalCount" PageChanged="LoadOpportunitiesAsync" />
+        }
+    </section>
+}
+
+@code {
+    private const int PageSize = 10;
+
+    private CrmPage<LeadDto>? leads;
+    private CrmPage<OpportunityDto>? opportunities;
+    private Guid loaded;
+
+    [Parameter, EditorRequired] public Guid CampaignId { get; set; }
+
+    /// <summary>Sekmenin gösterilip gösterilmeyeceği: CRM açık ve iki listeden en az biri okunabiliyor olmalı.</summary>
+    public static bool Visible(SessionState session) =>
+        session.IsModuleEnabled(CrmAccess.ModuleKey) && (session.Can(CrmAccess.LeadsRead) || session.Can(CrmAccess.OpportunitiesRead));
+
+    private bool CanLeads => Session.IsModuleEnabled(CrmAccess.ModuleKey) && Session.Can(CrmAccess.LeadsRead);
+
+    private bool CanOpportunities => Session.IsModuleEnabled(CrmAccess.ModuleKey) && Session.Can(CrmAccess.OpportunitiesRead);
+
+    private bool ShowAmounts => Session.Can(CrmAccess.OpportunityAmountsRead);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loaded == CampaignId)
+        {
+            return;
+        }
+
+        loaded = CampaignId;
+        await Task.WhenAll(LoadLeadsAsync(1), LoadOpportunitiesAsync(1));
+    }
+
+    private async Task LoadLeadsAsync(int pageNumber)
+    {
+        if (!CanLeads) { return; }
+        leads = (await Api.GetAsync<CrmPage<LeadDto>>($"/api/crm/leads?campaignId={CampaignId}&page={pageNumber}&pageSize={PageSize}")).Value
+            ?? new CrmPage<LeadDto>([], 1, PageSize, 0);
+    }
+
+    private async Task LoadOpportunitiesAsync(int pageNumber)
+    {
+        if (!CanOpportunities) { return; }
+        opportunities = (await Api.GetAsync<CrmPage<OpportunityDto>>($"/api/crm/opportunities?campaignId={CampaignId}&page={pageNumber}&pageSize={PageSize}")).Value
+            ?? new CrmPage<OpportunityDto>([], 1, PageSize, 0);
+    }
+
+    private static string Requester(LeadDto lead)
+    {
+        string person = string.Join(' ', new[] { lead.FirstName, lead.LastName }.Where(part => !string.IsNullOrWhiteSpace(part)));
+        return (person, lead.CompanyName) switch
+        {
+            ({ Length: > 0 }, { Length: > 0 } company) => $"{person} · {company}",
+            ({ Length: > 0 }, _) => person,
+            (_, { Length: > 0 } company) => company,
+            _ => "—",
+        };
+    }
+}

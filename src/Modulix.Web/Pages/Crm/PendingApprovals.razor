@@ -37,15 +37,15 @@
             <caption class="visually-hidden">@Texts.Get("crm.pending.caption")</caption>
             <thead>
                 <tr>
-                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> @Texts.Get("crm.pending.col.kind")</span></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="type" Size="14" /> @Texts.Get("crm.pending.col.record")</span></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="building" Size="14" /> @Texts.Get("crm.pending.col.related")</span></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="clock" Size="14" /> @Texts.Get("crm.approval.waiting")</span></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("crm.pending.col.kind")" ColumnIcon="tag" Asc="kind" Desc="-kind" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("crm.pending.col.record")" ColumnIcon="type" Asc="title" Desc="-title" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("crm.pending.col.related")" ColumnIcon="building" Asc="related" Desc="-related" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("crm.approval.waiting")" ColumnIcon="clock" Asc="since" Desc="-since" Value="@sort" Default="" ValueChanged="SortBy" /></th>
                     <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var item in Visible)
+                @foreach (var item in ClientSort.Apply(Visible, sort, SortColumns))
                 {
                     <tr>
                         <td data-label="@Texts.Get("crm.pending.col.kind")"><span class="badge stage-@(item.Kind == "quote" ? "qualified" : "open")">@Texts.Get(item.Kind == "quote" ? "crm.pending.kind.quote" : "crm.pending.kind.contract")</span></td>
@@ -92,6 +92,20 @@
     private bool CanSeeQuotes => Session.IsModuleEnabled(CrmAccess.ModuleKey) && Session.Can(CrmAccess.QuotesApprove);
 
     private bool CanSeeContracts => Session.IsModuleEnabled(ContractsAccess.ModuleKey) && Session.Can(ContractsAccess.ContractsApprove);
+
+    // Liste tamamı yüklü geldiği için sıralama istemcidedir (ClientSort); boş değer sunucunun sırasıdır.
+    private string sort = "";
+
+    private void SortBy(string value) => sort = value;
+
+    // "Bekliyor" sütunu bekleme süresine göre sıralanır: artan = en yeni istek önce.
+    private static readonly Dictionary<string, Func<Item, object?>> SortColumns = new()
+    {
+        ["kind"] = i => i.Kind,
+        ["title"] = i => i.Title,
+        ["related"] = i => i.Related,
+        ["since"] = i => i.Since is { } since ? -since.UtcTicks : null,
+    };
 
     private IReadOnlyList<Item> Visible => view == "all" ? items : [.. items.Where(i => i.Kind == view)];
 

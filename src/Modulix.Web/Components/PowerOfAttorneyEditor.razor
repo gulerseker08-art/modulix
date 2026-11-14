@@ -9,21 +9,21 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Attorney is null ? "Yeni vekâlet" : "Vekâlet kartı")</h2>
+            <h2>@(Attorney is null ? Texts.Get("warehouse.powerOfAttorneys.new") : Texts.Get("warehouse.attorneyEditor.card"))</h2>
             @if (Attorney is not null)
             {
-                <p>@(string.IsNullOrWhiteSpace(form.DocumentReference) ? "Belge referansı yok" : form.DocumentReference)</p>
+                <p>@(string.IsNullOrWhiteSpace(form.DocumentReference) ? Texts.Get("warehouse.attorneyEditor.noDocument") : form.DocumentReference)</p>
             }
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -38,36 +38,36 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Vekâlet özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("warehouse.attorneyEditor.summary")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true"><AppIcon Name="file-text" Size="24" /></span>
-                    <strong class="summary-name">Vekâlet</strong>
-                    <span class="summary-sub">@(form.ValidTo is not null ? $"{Show(form.ValidFrom)} – {Show(form.ValidTo)}" : $"{Show(form.ValidFrom)} – süresiz")</span>
+                    <strong class="summary-name">@Texts.Get("warehouse.attorney")</strong>
+                    <span class="summary-sub">@(form.ValidTo is not null ? $"{Show(form.ValidFrom)} – {Show(form.ValidTo)}" : $"{Show(form.ValidFrom)} – {Texts.Get("warehouse.openEndedLower")}")</span>
                 </div>
-                <h3 class="summary-heading">Vekâlet özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("warehouse.attorneyEditor.summary")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Durum</dt><dd>@(form.IsActive ? "Etkin" : "İptal edildi")</dd></div>
+                    <div><dt>@Texts.Get("common.field.status")</dt><dd>@(form.IsActive ? Texts.Get("warehouse.active") : Texts.Get("warehouse.attorneyStatus.revoked"))</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Vekâlet formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("warehouse.attorneyEditor.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
                         case "importerPartyId":
                             <label class="@f.LabelClass()" for="attorney-importer">@f.Label</label>
-                            <LookupPicker Id="attorney-importer" LookupKey="@WarehouseAccess.AttorneyImporterLookup" @bind-Value="form.ImporterPartyId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="İthalatçı seçin…" Invalid="@(errors?.ContainsKey("importerPartyId") == true)" />
+                            <LookupPicker Id="attorney-importer" LookupKey="@WarehouseAccess.AttorneyImporterLookup" @bind-Value="form.ImporterPartyId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="@Texts.Get("warehouse.declarationEditor.chooseImporter")" Invalid="@(errors?.ContainsKey("importerPartyId") == true)" />
                             <FieldError Field="importerPartyId" Errors="errors" />
-                            <small class="text-muted">@(form.Id is null ? "Yalnızca \"İthalatçı / malik\" rolündeki firmalar listelenir; rol firma kaydından verilir." : "Taraflar oluşturulduktan sonra değiştirilemez; başka taraf için yeni vekâlet açın.")</small>
+                            <small class="text-muted">@(form.Id is null ? Texts.Get("warehouse.declarationEditor.importerHelp") : Texts.Get("warehouse.attorneyEditor.partiesLocked"))</small>
                             break;
                         case "brokerPartyId":
                             <label class="@f.LabelClass()" for="attorney-broker">@f.Label</label>
-                            <LookupPicker Id="attorney-broker" LookupKey="@WarehouseAccess.AttorneyBrokerLookup" @bind-Value="form.BrokerPartyId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="Gümrük müşaviri seçin…" Invalid="@(errors?.ContainsKey("brokerPartyId") == true)" />
+                            <LookupPicker Id="attorney-broker" LookupKey="@WarehouseAccess.AttorneyBrokerLookup" @bind-Value="form.BrokerPartyId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="@Texts.Get("warehouse.declarationEditor.chooseBroker")" Invalid="@(errors?.ContainsKey("brokerPartyId") == true)" />
                             <FieldError Field="brokerPartyId" Errors="errors" />
-                            <small class="text-muted">Yalnızca "Gümrük müşaviri" rolündeki firmalar listelenir.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.attorneyEditor.brokerHelp")</small>
                             break;
                         case "validFrom":
                             <label class="@f.LabelClass()" for="attorney-from">@f.Label</label>
@@ -78,12 +78,12 @@
                             <label class="@f.LabelClass()" for="attorney-to">@f.Label</label>
                             <input id="attorney-to" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ValidTo" />
                             <FieldError Field="validTo" Errors="errors" />
-                            <small class="text-muted">Boş bırakılırsa süresiz.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.attorneyEditor.validToHelp")</small>
                             break;
                         case "isActive":
                             <SegmentedChoice Id="attorney-active" Label="@f.Label" LabelClass="@f.LabelClass()" Options="ActiveOptions" @bind-Value="form.IsActive" />
                             <FieldError Field="isActive" Errors="errors" />
-                            <small class="text-muted">İptal edilen vekâlet silinmez; tarihi geçerli olsa da geçerli sayılmaz.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.attorneyEditor.activeHelp")</small>
                             break;
                         case "scope":
                             <label class="@f.LabelClass()" for="attorney-scope">@f.Label</label>
@@ -94,18 +94,18 @@
                             <label class="@f.LabelClass()" for="attorney-document">@f.Label</label>
                             <input id="attorney-document" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.DocumentReference" />
                             <FieldError Field="documentReference" Errors="errors" />
-                            <small class="text-muted">Noter yevmiye numarası, dosya adı gibi bir referans; belge dosyası yükleme sonraki adımdır.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.attorneyEditor.documentHelp")</small>
                             break;
                     }
                 </Field>
             </LayoutForm>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </div>
@@ -113,7 +113,7 @@
 </form>
 
 @code {
-    private static readonly IReadOnlyList<SegmentOption<bool>> ActiveOptions = [new(true, "Etkin"), new(false, "İptal edildi")];
+    private static IReadOnlyList<SegmentOption<bool>> ActiveOptions => [new(true, Texts.Get("warehouse.active")), new(false, Texts.Get("warehouse.attorneyStatus.revoked"))];
 
     private bool dirty;
     private const string EntityKey = WarehouseAccess.PowerOfAttorneyEntityKey;
@@ -144,7 +144,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir vekâlet verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>

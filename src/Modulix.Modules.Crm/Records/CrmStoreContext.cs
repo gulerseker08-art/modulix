@@ -13,13 +13,35 @@ internal sealed class CrmStoreContext(
     IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access,
     ICurrentAccess permissions, IEnumerable<IActivityLinkTarget> linkTargets, LeadWorkflowGate? leadGate = null,
     ActivityWorkflowGate? activityGate = null, IRecordCommandContext? command = null, OpportunityWorkflowGate? opportunityGate = null,
-    IOpportunityPolicyProvider? policy = null, IActivityCodeCatalog? activityCodes = null, IIndustryCatalog? industries = null)
+    IOpportunityPolicyProvider? policy = null, IActivityCodeCatalog? activityCodes = null, IIndustryCatalog? industries = null,
+    IServiceProvider? services = null, CampaignLinkTrust? campaignTrust = null, TimeProvider? time = null)
 {
+    /// <summary>
+    /// Kampanya bağının (müşteri adayı/fırsat <c>campaignId</c>) sunucu doğrulaması: kampanya Pazarlama modülünün kaydıdır, CRM onun tablosunu görmez;
+    /// kayıt boru hattından <b>çağıranın yetkisi ve veri kapsamıyla</b> okunur. Kayıt yoksa, okunamıyorsa, modül kapalıysa ya da yetki yoksa aynı sonuç
+    /// (false) döner. Boru hattı yazma sırasında geç çözülür (depolar boru hattına bağlı olduğundan döngüsel bağımlılık oluşmaz). Pazarlama modülünün
+    /// kendi açtığı müşteri adayında (<see cref="CampaignLinkTrust"/>) kampanya yeniden okunmaz. Servis sağlayıcı yoksa (birim testi) denetim atlanır.
+    /// </summary>
+    public async Task<bool> CanSeeCampaignAsync(Guid campaignId, CancellationToken cancellationToken)
+    {
+        if (services is null || campaignTrust?.CampaignId == campaignId)
+        {
+            return true;
+        }
+
+        var pipeline = (IRecordPipeline?)services.GetService(typeof(IRecordPipeline));
+        return pipeline is not null
+            && (await pipeline.GetAsync(new RecordRef(CrmModule.ExternalEntities.Campaign, campaignId), cancellationToken)).IsSuccess;
+    }
+
     /// <summary>Sektör kataloğunu okuma sınırı (ADR-0043); yoksa (ör. birim testi) sektör kodu denetimi atlanır.</summary>
     public IIndustryCatalog? Industries { get; } = industries;
 
     /// <summary>Faaliyet kataloğunu okuma sınırı (hizmet kapsamı doğrulaması); yoksa (ör. birim testi) katalog denetimi atlanır.</summary>
     public IActivityCodeCatalog? ActivityCodes { get; } = activityCodes;
+
+    /// <summary>Şimdiki an (UTC). İş akışıyla aynı saatten okunur ki tarihçe anı ile kapanış günü birbirini tutsun; sağlayıcı yoksa sistem saati.</summary>
+    public DateTimeOffset Now => (time ?? TimeProvider.System).GetUtcNow();
 
     /// <summary>Fırsat iş akışı kapısı (<see cref="OpportunityWorkflowGate"/>).</summary>
     public OpportunityWorkflowGate OpportunityGate { get; } = opportunityGate ?? new OpportunityWorkflowGate();
@@ -54,6 +76,27 @@ internal sealed class CrmStoreContext(
 
     /// <summary>İsteği yapan kullanıcı; aktif tenant yoksa null.</summary>
     public Guid? CurrentUserId => tenant.Current?.UserId;
+}
+
+/// <summary>
+/// Güvenilen kampanya bağı (istek ömürlü): Pazarlama modülü kampanya yanıtından müşteri adayı açarken kendi kampanyasının kimliğini verir. Yanıtı işleyen
+/// kullanıcının kampanyayı okuma izni olmayabilir; bağ yine de yazılır, çünkü kimliği istemci değil kampanyanın sahibi modül sağlamıştır. İstemci bu
+/// nesneye erişemez: yalnızca <see cref="CrmCampaignLeads"/> açar.
+/// </summary>
+internal sealed class CampaignLinkTrust
+{
+    public Guid? CampaignId { get; private set; }
+
+    public IDisposable Allow(Guid campaignId)
+    {
+        CampaignId = campaignId;
+        return new Closer(this);
+    }
+
+    private sealed class Closer(CampaignLinkTrust trust) : IDisposable
+    {
+        public void Dispose() => trust.CampaignId = null;
+    }
 }
 
 /// <summary>

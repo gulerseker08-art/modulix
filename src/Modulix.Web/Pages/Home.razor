@@ -25,6 +25,14 @@
                         <span class="stat-icon"><AppIcon Name="@IconFor(href)" Size="18" /></span>
                         <span>@label</span>
                         <strong>@total.ToString("N0", Regional.Numbers)</strong>
+                        @if (changes.TryGetValue(href, out PeriodChange? change))
+                        {
+                            <small class="stat-trend">
+                                <span class="dash-delta @change.CssClass" aria-hidden="true">@if (change.Icon is { } icon) { <AppIcon Name="@icon" Size="12" /> }@change.Text(Regional.Numbers)</span>
+                                <span aria-hidden="true">@Texts.Get("home.trend.label")</span>
+                                <span class="visually-hidden">@Texts.Get("home.trend.detail", change.Current, change.Previous)</span>
+                            </small>
+                        }
                     </a>
                 }
             </div>
@@ -48,7 +56,16 @@
             </div>
         }
     }
-    else
+
+    @* İK duyuruları (ADR-0042 bölüm 23a): duyuru okuma izni olan herkese, CRM açık olmasa da. *@
+    @if (ShowAnnouncements)
+    {
+        <div class="chart-grid">
+            <AnnouncementsTile />
+        </div>
+    }
+
+    @if (!Session.IsModuleEnabled(CrmAccess.ModuleKey) && !ShowAnnouncements)
     {
         <p>@Texts.Get("home.noModule")</p>
     }
@@ -57,6 +74,12 @@
 @code {
     private readonly List<(string Label, string Href, int Total)> counts = [];
     private IReadOnlyList<ChartSlice> stages = [];
+
+    /// <summary>Dönem karşılaştırmasının uzunluğu: son 30 gün ve ondan önceki 30 gün.</summary>
+    private const int TrendDays = 30;
+
+    // Özet kutusunun route'una göre son dönemde eklenen kayıtlar; yüklenemeyen kutuda karşılaştırma çizilmez.
+    private readonly Dictionary<string, PeriodChange> changes = [];
     private IReadOnlyList<ActivityDto>? todayItems;
     private string? todayError;
     private bool showToday;
@@ -66,6 +89,8 @@
         ? Texts.Get("home.greeting", name)
         : Texts.Get("home.title");
 
+
+    private bool ShowAnnouncements => Session.IsModuleEnabled(HrAccess.ModuleKey) && Session.Can(HrAccess.AnnouncementsRead);
 
     private void OpenActivities(ActivityDto activity) => Navigation.NavigateTo("crm/aktiviteler");
 
@@ -101,6 +126,7 @@
         var totals = await Task.WhenAll(entries.Where(e => e.Allowed).Select(async e =>
             (e.Label, e.Href, Result: await Api.GetAsync<CrmPage<object>>($"{e.Url}?pageSize=1"))));
         counts.AddRange(totals.Where(t => t.Result.Value is not null).Select(t => (t.Label, t.Href, t.Result.Value!.TotalCount)));
+        Task trendTask = LoadChangesAsync([.. entries.Where(e => e.Allowed).Select(e => (e.Href, e.Url))]);
 
         if (Session.Can(CrmAccess.OpportunitiesRead))
         {
@@ -120,7 +146,33 @@
         }
 
         loaded = true;
-        await todayTask;
+        await Task.WhenAll(todayTask, trendTask);
+    }
+
+    // Son 30 günde ve ondan önceki 30 günde oluşturulan kayıt sayıları (createdSince / createdBefore; kapsam ve yetki sunucuda).
+    private async Task LoadChangesAsync(IReadOnlyList<(string Href, string Url)> lists)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        string recent = Uri.EscapeDataString(now.AddDays(-TrendDays).ToString("O"));
+        string earlier = Uri.EscapeDataString(now.AddDays(-2 * TrendDays).ToString("O"));
+
+        var results = await Task.WhenAll(lists.Select(async list =>
+        {
+            var current = Api.GetAsync<CrmPage<object>>($"{list.Url}?pageSize=1&createdSince={recent}");
+            var previous = Api.GetAsync<CrmPage<object>>($"{list.Url}?pageSize=1&createdSince={earlier}&createdBefore={recent}");
+            await Task.WhenAll(current, previous);
+            return (list.Href, Current: current.Result.Value, Previous: previous.Result.Value);
+        }));
+
+        foreach (var (href, current, previous) in results)
+        {
+            if (current is not null && previous is not null)
+            {
+                changes[href] = new PeriodChange(current.TotalCount, previous.TotalCount);
+            }
+        }
+
+        StateHasChanged();
     }
 
     private async Task LoadTodayAsync()

@@ -31,6 +31,19 @@ internal static class LookupGuard
     }
 
     /// <summary>
+    /// Kampanya bağı değiştiyse çağıranın görebildiği bir kampanya olmalıdır (Pazarlama modülü kapalıysa ya da kampanya okuma izni yoksa da "bulunamadı").
+    /// Bağı boşaltmak her zaman serbesttir.
+    /// </summary>
+    public static async Task AddCampaignErrorAsync(
+        List<RecordFieldError> errors, CrmStoreContext context, string field, Guid? value, Guid? stored, CancellationToken cancellationToken)
+    {
+        if (value is { } id && id != stored && !await context.CanSeeCampaignAsync(id, cancellationToken))
+        {
+            errors.Add(new RecordFieldError(field, "Kampanya bulunamadı."));
+        }
+    }
+
+    /// <summary>
     /// Bağımlı lookup: kişi, seçili firmayla ilişkili olmalıdır (birincil firma ya da aktif kişi-firma ilişkisi). Kişi ya da firma
     /// değiştiyse denetlenir; ikisinden biri boşsa kural yoktur. Başka bir hata varsa tekrar edilmez.
     /// </summary>

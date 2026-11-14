@@ -66,12 +66,17 @@ public sealed class HrModule : IModule
         public const string ChecklistTask = "hr.checklist-task";
         public const string Announcement = "hr.announcement";
         public const string AnnouncementRead = "hr.announcement-read";
+        public const string AnnouncementComment = "hr.announcement-comment";
+        public const string AnnouncementLike = "hr.announcement-like";
+        public const string BlogComment = "hr.blog-comment";
+        public const string BlogLike = "hr.blog-like";
         public const string Survey = "hr.survey";
         public const string SurveyQuestion = "hr.survey-question";
         public const string SurveyResponse = "hr.survey-response";
         public const string SurveyAnswer = "hr.survey-answer";
         public const string BlogPost = "hr.blog-post";
         public const string PhotoAlbum = "hr.photo-album";
+        public const string EmployeePosition = "hr.employee-position";
     }
 
     public static class Lists
@@ -155,7 +160,7 @@ public sealed class HrModule : IModule
         new(Entities.Employee, "Çalışan", Permissions.EmployeesRead, new Dictionary<string, string>
         {
             ["personId"] = "Kişi", ["employeeNumber"] = "Sicil numarası", ["userId"] = "Kullanıcı hesabı", ["jobTitle"] = "Unvan",
-            ["departmentKey"] = "Departman", ["managerEmployeeId"] = "Yönetici", ["employmentType"] = "Çalışma şekli",
+            ["businessUnitName"] = "Departman", ["departmentKey"] = "Eski İK departmanı", ["managerEmployeeId"] = "Yönetici", ["employmentType"] = "Çalışma şekli",
             ["workLocation"] = "Çalışma yeri", ["hireDate"] = "İşe giriş tarihi", ["terminationDate"] = "Ayrılış tarihi", ["status"] = "Durum",
             ["nationalId"] = "T.C. kimlik numarası", ["birthDate"] = "Doğum tarihi", ["homeAddress"] = "Ev adresi",
             ["emergencyContactName"] = "Acil durum kişisi", ["emergencyContactPhone"] = "Acil durum telefonu", ["iban"] = "IBAN", ["notes"] = "Notlar",
@@ -266,7 +271,7 @@ public sealed class HrModule : IModule
         },
         new(Entities.Announcement, "Duyuru", Permissions.AnnouncementsRead, new Dictionary<string, string>
         {
-            ["title"] = "Başlık", ["body"] = "Metin", ["audienceDepartmentKey"] = "Hedef departman", ["isPinned"] = "Sabitlenmiş",
+            ["title"] = "Başlık", ["body"] = "Metin", ["audienceName"] = "Hedef kitle", ["audienceDepartmentKey"] = "Eski hedef departman", ["isPinned"] = "Sabitlenmiş",
             ["isPublished"] = "Yayında", ["publishOn"] = "Başlangıç", ["expiresOn"] = "Bitiş",
         }, "title")
         {
@@ -274,7 +279,7 @@ public sealed class HrModule : IModule
         },
         new(Entities.Survey, "Anket", Permissions.SurveysManage, new Dictionary<string, string>
         {
-            ["title"] = "Başlık", ["description"] = "Açıklama", ["isAnonymous"] = "Kimliği gizli", ["audienceDepartmentKey"] = "Hedef departman",
+            ["title"] = "Başlık", ["description"] = "Açıklama", ["isAnonymous"] = "Kimliği gizli", ["audienceName"] = "Hedef kitle", ["audienceDepartmentKey"] = "Eski hedef departman",
             ["closesOn"] = "Kapanış", ["status"] = "Durum",
         }, "title")
         {
@@ -299,6 +304,22 @@ public sealed class HrModule : IModule
         }, "title")
         {
             UserFields = ["authorUserId"],
+        },
+        new(Entities.AnnouncementComment, "Duyuru yorumu", Permissions.AnnouncementsManage, new Dictionary<string, string>
+        {
+            ["contentId"] = "Duyuru", ["body"] = "Yorum", ["isHidden"] = "Gizli",
+        }, "body")
+        {
+            References = new Dictionary<string, string> { ["contentId"] = Entities.Announcement },
+            UserFields = ["authorUserId", "hiddenByUserId"],
+        },
+        new(Entities.BlogComment, "Blog yorumu", Permissions.BlogManage, new Dictionary<string, string>
+        {
+            ["contentId"] = "Blog yazısı", ["body"] = "Yorum", ["isHidden"] = "Gizli",
+        }, "body")
+        {
+            References = new Dictionary<string, string> { ["contentId"] = Entities.BlogPost },
+            UserFields = ["authorUserId", "hiddenByUserId"],
         },
         new(Entities.PhotoAlbum, "Fotoğraf albümü", Permissions.GalleryRead, new Dictionary<string, string>
         {
@@ -336,7 +357,10 @@ public sealed class HrModule : IModule
         new(Entities.PhotoAlbum, "Fotoğraf albümü"),
     ];
 
-    /// <summary>Departman (Y9b): hazır değerler örnektir; firma kendi departmanlarını ekler. Kod departmanın adına bakmaz.</summary>
+    /// <summary>
+    /// Eski İK departman listesi (Y9b). Departmanlar artık Core'un departman ağacındadır (ADR-0042 bölüm 22); bu liste yalnızca eski değerlerin
+    /// Core departmanına adla eşlenmesi için durur (Çalışanlar › Departman eşleme). Kod departmanın adına bakmaz.
+    /// </summary>
     IReadOnlyList<ChoiceListDefinition> IModule.ChoiceLists { get; } =
     [
         new(
@@ -548,6 +572,13 @@ public sealed class HrModule : IModule
         services.AddScoped<ISurveyService, SurveyService>();
         services.AddScoped<IRecordStore, BlogPostRecordStore>();
         services.AddScoped<IRecordStore, PhotoAlbumRecordStore>();
+        services.AddScoped<IRecordStore, EmployeePositionRecordStore>();
+        services.AddScoped<IDepartmentMapping, DepartmentMapping>();
+        services.AddScoped<IRecordStore, AnnouncementCommentRecordStore>();
+        services.AddScoped<IRecordStore, BlogCommentRecordStore>();
+        services.AddScoped<IRecordStore, AnnouncementLikeRecordStore>();
+        services.AddScoped<IRecordStore, BlogLikeRecordStore>();
+        services.AddScoped<IContentInteractions, ContentInteractions>();
         services.AddScoped<HrAutomationRecordSource>();
         services.AddScoped<Automation.StartChecklistAction>();
     }

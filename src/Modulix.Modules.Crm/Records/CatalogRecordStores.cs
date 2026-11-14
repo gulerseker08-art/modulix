@@ -92,6 +92,23 @@ internal sealed class MeasureUnitRecordStore(CrmStoreContext context) : CrmRecor
 
     protected override IOrderedQueryable<MeasureUnit> Order(IQueryable<MeasureUnit> source) => source.OrderBy(u => u.GroupKey).ThenBy(u => u.Code);
 
+    // Liste başlıklarına göre sıralama (sort=code, sort=-name ...); eşitlikte koda göre.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        ["code", "-code", "name", "-name", "groupKey", "-groupKey", "factorToBase", "-factorToBase"];
+
+    protected override IOrderedQueryable<MeasureUnit> Order(IQueryable<MeasureUnit> source, string? sort) => sort switch
+    {
+        "code" => source.OrderBy(u => u.Code),
+        "-code" => source.OrderByDescending(u => u.Code),
+        "name" => source.OrderBy(u => u.Name).ThenBy(u => u.Code),
+        "-name" => source.OrderByDescending(u => u.Name).ThenBy(u => u.Code),
+        "groupKey" => source.OrderBy(u => u.GroupKey).ThenBy(u => u.Code),
+        "-groupKey" => source.OrderByDescending(u => u.GroupKey).ThenBy(u => u.Code),
+        "factorToBase" => source.OrderBy(u => u.FactorToBase).ThenBy(u => u.Code),
+        "-factorToBase" => source.OrderByDescending(u => u.FactorToBase).ThenBy(u => u.Code),
+        _ => Order(source),
+    };
+
     protected override IQueryable<MeasureUnit> Search(IQueryable<MeasureUnit> source, string term) =>
         source.Where(u => u.Code.Contains(term) || u.Name.Contains(term));
 

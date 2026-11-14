@@ -35,6 +35,7 @@ public static class HrAccess
     public const string GalleryManage = "hr.gallery.manage";
 
     public const string EmployeeEntityKey = "hr.employee";
+    public const string EmployeePositionEntityKey = "hr.employee-position";
     public const string LeaveRequestEntityKey = "hr.leave-request";
     public const string LeaveBalanceEntityKey = "hr.leave-balance";
     public const string HolidayEntityKey = "hr.holiday";
@@ -63,6 +64,12 @@ public static class HrAccess
     public const string BlogPostEntityKey = "hr.blog-post";
     public const string PhotoAlbumEntityKey = "hr.photo-album";
     public const string AnnouncementReadEntityKey = "hr.announcement-read";
+
+    /// <summary>Yorum ve beğeni kayıt türleri (ADR-0042 bölüm 23d).</summary>
+    public const string AnnouncementCommentEntityKey = "hr.announcement-comment";
+    public const string BlogCommentEntityKey = "hr.blog-comment";
+    public const string AnnouncementLikeEntityKey = "hr.announcement-like";
+    public const string BlogLikeEntityKey = "hr.blog-like";
 
     /// <summary>Yalnızca bu kategorideki izin türü yıllık haktan düşer.</summary>
     public const string AnnualCategory = "annual";
@@ -181,6 +188,7 @@ public static class HrAccess
     [
         ("rating", "1–5 puan"),
         ("choice", "Tek seçim"),
+        ("multiChoice", "Çoklu seçim"),
         ("text", "Serbest metin"),
     ];
 
@@ -207,7 +215,8 @@ public sealed record StartChecklistRequest(Guid EmployeeId, Guid TemplateId, Dat
 /// <summary>Anket yanıtı: soru başına bir cevap (puan, seçenek ya da metin; sorunun türüne göre biri dolu).</summary>
 public sealed record SubmitSurveyRequest(IReadOnlyList<SurveyAnswerItem>? Answers);
 
-public sealed record SurveyAnswerItem(Guid QuestionId, int? Rating, string? Choice, string? Text);
+/// <summary>Bir sorunun cevabı; çoklu seçim sorusunda seçilenler <see cref="Choices"/>'tadır.</summary>
+public sealed record SurveyAnswerItem(Guid QuestionId, int? Rating, string? Choice, string? Text, IReadOnlyList<string>? Choices = null);
 
 /// <summary>Anket sonucu; <see cref="HiddenReason"/> doluysa (kimliği gizli ankette yanıt az) sorular boştur.</summary>
 public sealed record SurveyResultsDto(Guid SurveyId, int ResponseCount, string? HiddenReason, IReadOnlyList<SurveyQuestionResultDto> Questions);
@@ -217,3 +226,19 @@ public sealed record SurveyQuestionResultDto(
     Guid QuestionId, string Text, string QuestionType, int AnswerCount, decimal? Average, IReadOnlyList<SurveyOptionCountDto> Counts, IReadOnlyList<string> Texts);
 
 public sealed record SurveyOptionCountDto(string Option, int Count);
+
+/// <summary>Core departmanı (ADR-0026) İK seçicileri için: üst departman, ağaç yolu adı ("Merkez › Satış"), derinlik, etkin mi.</summary>
+public sealed record HrBusinessUnitDto(Guid Id, Guid? ParentId, string Name, string PathName, int Depth, bool IsActive);
+
+/// <summary>
+/// Eski İK departman değerinin Core departmanına eşlemesi (ADR-0042 bölüm 22): bulunan departman (yoksa boş: Core'da aynı adla departman yok ya da birden
+/// çok departman uyuyor) ve henüz Core departmanı olmayan çalışan, duyuru, anket sayıları.
+/// </summary>
+public sealed record DepartmentMappingRowDto(
+    string DepartmentKey, string Label, Guid? BusinessUnitId, string? BusinessUnitName, int EmployeeCount, int AnnouncementCount, int SurveyCount);
+
+/// <summary>Eşleme uygulamasının sonucu: güncellenen kayıt sayısı.</summary>
+public sealed record DepartmentMappingResultDto(int Updated);
+
+/// <summary>Yorum yazma isteği (duyuru ya da blog yazısı; ADR-0042 bölüm 23d).</summary>
+public sealed record WriteCommentRequest(string? Body);

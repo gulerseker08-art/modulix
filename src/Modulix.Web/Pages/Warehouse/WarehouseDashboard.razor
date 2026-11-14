@@ -4,24 +4,24 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Depo ve Antrepo panosu · Modulix</PageTitle>
+<PageTitle>@Texts.Get("warehouse.dashboard.title") · Modulix</PageTitle>
 
 @* Depo ve antrepo panosu. Her bölüm kendi okuma iznine bağlıdır ve sunucuda süzülür: izni olmayana bölüm hiç gelmez (yalnızca gizlenmez).
    Tesis süzgeci lokasyon, doluluk ve hareket bölümlerine uygulanır; beyanname, vekâlet ve stok kartı tesise bağlı değildir. Sayılar adettir. *@
 <AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.FacilitiesRead">
-    <PageHeader Title="Depo ve Antrepo panosu" Icon="warehouse" Subtitle="Tesis, stok ve gümrük işlerinin bugünkü durumu">
-        <select class="form-select dash-filter" aria-label="Tesis" @bind="facility" @bind:after="LoadAsync" disabled="@loading">
-            <option value="">Tüm tesisler</option>
+    <PageHeader Title="@Texts.Get("warehouse.dashboard.title")" Icon="warehouse" Subtitle="@Texts.Get("warehouse.dashboard.subtitle")">
+        <select class="form-select dash-filter" aria-label="@Texts.Get("warehouse.facility")" @bind="facility" @bind:after="LoadAsync" disabled="@loading">
+            <option value="">@Texts.Get("warehouse.allFacilities")</option>
             @foreach (var option in facilities)
             {
                 <option value="@option.Id">@option.Label</option>
             }
         </select>
-        <div class="segmented" role="group" aria-label="Dönem">
+        <div class="segmented" role="group" aria-label="@Texts.Get("warehouse.dashboard.period")">
             @foreach (var option in Periods)
             {
                 <button type="button" class="chip @(days == option ? "active" : null)" aria-pressed="@(days == option ? "true" : "false")" disabled="@loading"
-                        @onclick="() => ChooseDaysAsync(option)">@option gün</button>
+                        @onclick="() => ChooseDaysAsync(option)">@Texts.Get("warehouse.dashboard.days", option)</button>
             }
         </div>
     </PageHeader>
@@ -35,32 +35,32 @@
     {
         <div class="alert alert-danger" role="alert">
             @error
-            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">Tekrar dene</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">@Texts.Get("crm.sales.retry")</button>
         </div>
     }
 
     @if (data is { } d)
     {
-        <div class="dash-kpis" role="group" aria-label="Depo özeti">
+        <div class="dash-kpis" role="group" aria-label="@Texts.Get("warehouse.dashboard.summary")">
             @if (d.Facilities is { } f)
             {
-                <DashKpi Label="Etkin tesis" Icon="warehouse" Value="@Count(f.Active)"
-                         Detail="@(f.CustomsEnabled == 0 ? "Gümrük uzantılı tesis yok" : $"{Count(f.CustomsEnabled)} gümrük uzantılı")" />
+                <DashKpi Label="@Texts.Get("warehouse.dashboard.kpi.facilities")" Icon="warehouse" Value="@Count(f.Active)"
+                         Detail="@(f.CustomsEnabled == 0 ? Texts.Get("warehouse.dashboard.kpi.noCustoms") : Texts.Get("warehouse.dashboard.kpi.customs", Count(f.CustomsEnabled)))" />
             }
             @if (d.Occupancy is { } o)
             {
-                <DashKpi Label="Lokasyon doluluğu" Icon="map-pin" Tone="teal" Value="@(o.Locations == 0 ? "—" : Percent(o.Occupied, o.Locations))"
-                         Detail="@(o.Locations == 0 ? "Stok tutulabilen lokasyon yok" : $"{Count(o.Occupied)} / {Count(o.Locations)} lokasyon dolu")" />
+                <DashKpi Label="@Texts.Get("warehouse.dashboard.kpi.occupancy")" Icon="map-pin" Tone="teal" Value="@(o.Locations == 0 ? "—" : Percent(o.Occupied, o.Locations))"
+                         Detail="@(o.Locations == 0 ? Texts.Get("warehouse.dashboard.kpi.noLocations") : Texts.Get("warehouse.dashboard.kpi.occupied", Count(o.Occupied), Count(o.Locations)))" />
             }
             @if (d.StockItems is { } s)
             {
-                <DashKpi Label="Etkin stok kartı" Icon="package" Tone="success" Value="@Count(s.Active)"
-                         Delta="@(s.NewInPeriod > 0 ? $"+{Count(s.NewInPeriod)} yeni" : null)" DeltaTrend="1" Detail="@($"Son {d.Days} günde eklenen")" />
+                <DashKpi Label="@Texts.Get("warehouse.dashboard.kpi.stockItems")" Icon="package" Tone="success" Value="@Count(s.Active)"
+                         Delta="@(s.NewInPeriod > 0 ? Texts.Get("warehouse.dashboard.kpi.newItems", Count(s.NewInPeriod)) : null)" DeltaTrend="1" Detail="@Texts.Get("warehouse.dashboard.kpi.addedInDays", d.Days)" />
             }
             @if (d.Declarations is { } decl)
             {
-                <DashKpi Label="Taslak beyanname" Icon="clipboard-list" Tone="warning" Value="@Count(InCategory(decl, DraftCategory))"
-                         Detail="@($"{Count(InCategory(decl, RegisteredCategory))} tescilli")" />
+                <DashKpi Label="@Texts.Get("warehouse.dashboard.kpi.drafts")" Icon="clipboard-list" Tone="warning" Value="@Count(InCategory(decl, DraftCategory))"
+                         Detail="@Texts.Get("warehouse.dashboard.kpi.registered", Count(InCategory(decl, RegisteredCategory)))" />
             }
         </div>
 
@@ -69,20 +69,20 @@
                 @if (d.Movements is { } m)
                 {
                     <section class="dash-card" aria-labelledby="wh-movements">
-                        <div class="dash-card-head"><h2 id="wh-movements">Stok hareketleri</h2><span class="small text-muted">Son @d.Days gün · hareket sayısı</span></div>
+                        <div class="dash-card-head"><h2 id="wh-movements">@Texts.Get("nav.app.warehouse.stock-movements")</h2><span class="small text-muted">@Texts.Get("warehouse.dashboard.movements.subtitle", d.Days)</span></div>
                         @if (m.Daily.All(x => x.Inbound == 0 && x.Outbound == 0 && x.Transfer == 0 && x.Adjustment == 0))
                         {
-                            <p class="text-muted mb-0">Bu dönemde stok hareketi yok.</p>
+                            <EmptyState Compact="true" Title="@Texts.Get("warehouse.dashboard.movements.none")" />
                         }
                         else
                         {
-                            <PairColumnChart Title="@($"Son {d.Days} günün günlük giriş ve çıkış hareket sayıları")" FirstName="Giriş" SecondName="Çıkış"
-                                             Items="@(m.Daily.Select(x => new PairColumnChart.Item(x.Day.ToString("d MMM", Turkish), x.Day.ToString("d MMMM yyyy", Turkish), x.Inbound, x.Outbound)).ToList())" />
+                            <PairColumnChart Title="@Texts.Get("warehouse.dashboard.movements.chart", d.Days)" FirstName="@Texts.Get("warehouse.dashboard.movements.in")" SecondName="@Texts.Get("warehouse.dashboard.movements.out")"
+                                             Items="@(m.Daily.Select(x => new PairColumnChart.Item(x.Day.ToString("d MMM", UiLanguage.Culture), x.Day.ToString("d MMMM yyyy", UiLanguage.Culture), x.Inbound, x.Outbound)).ToList())" />
                         }
                         <div class="dash-totals">
-                            <span><strong>@Count(m.Inbound)</strong> giriş</span>
-                            <span><strong>@Count(m.Outbound)</strong> çıkış</span>
-                            <span><strong>@Count(m.Transfer)</strong> transfer</span>
+                            <span>@Texts.Strong("warehouse.dashboard.totals.in", Count(m.Inbound))</span>
+                            <span>@Texts.Strong("warehouse.dashboard.totals.out", Count(m.Outbound))</span>
+                            <span>@Texts.Strong("warehouse.dashboard.totals.transfer", Count(m.Transfer))</span>
                         </div>
                     </section>
                 }
@@ -91,12 +91,12 @@
                 {
                     <section class="dash-card" aria-labelledby="wh-occupancy">
                         <div class="dash-card-head">
-                            <h2 id="wh-occupancy">Tesis bazında doluluk</h2>
-                            <a href="depo/tesisler">Tüm tesisler</a>
+                            <h2 id="wh-occupancy">@Texts.Get("warehouse.dashboard.occupancy.title")</h2>
+                            <a href="depo/tesisler">@Texts.Get("warehouse.allFacilities")</a>
                         </div>
                         @if (occ.ByFacility.Count == 0)
                         {
-                            <p class="text-muted mb-0">Stok tutulabilen lokasyon yok. <a href="depo/lokasyonlar">Lokasyon tanımla</a></p>
+                            <p class="text-muted mb-0">@Texts.Get("warehouse.dashboard.occupancy.none") <a href="depo/lokasyonlar">@Texts.Get("warehouse.dashboard.occupancy.define")</a></p>
                         }
                         else
                         {
@@ -107,7 +107,7 @@
                                     <li>
                                         <div class="dash-list-main">
                                             <a href="depo/lokasyonlar" title="@row.Name">@row.Name</a>
-                                            <small>@row.Code@(row.CustomsEnabled ? " · gümrük uzantılı" : null) · @Count(row.Occupied) / @Count(row.Locations) lokasyon</small>
+                                            <small>@row.Code@(row.CustomsEnabled ? $" · {Texts.Get("warehouse.dashboard.occupancy.customs")}" : null) · @Texts.Get("warehouse.dashboard.occupancy.locations", Count(row.Occupied), Count(row.Locations))</small>
                                         </div>
                                         <div class="dash-meter" aria-hidden="true">
                                             <i class="@(share >= HighOccupancy ? "chart-fill-2" : "chart-fill-0")" style="width:@share.ToString("0.#", CultureInfo.InvariantCulture)%"></i>
@@ -123,10 +123,10 @@
                 @if (d.Movements is { } recent)
                 {
                     <section class="dash-card" aria-labelledby="wh-recent">
-                        <div class="dash-card-head"><h2 id="wh-recent">Son hareketler</h2></div>
+                        <div class="dash-card-head"><h2 id="wh-recent">@Texts.Get("warehouse.dashboard.recent.title")</h2></div>
                         @if (recent.Recent.Count == 0)
                         {
-                            <p class="text-muted mb-0">Henüz stok hareketi yok.</p>
+                            <EmptyState Compact="true" Title="@Texts.Get("warehouse.dashboard.recent.none")" />
                         }
                         else
                         {
@@ -154,12 +154,12 @@
                     var total = decls.ByStatus.Sum(x => x.Count);
                     <section class="dash-card" aria-labelledby="wh-declarations">
                         <div class="dash-card-head">
-                            <h2 id="wh-declarations">Beyanname durumları</h2>
-                            <a href="depo/beyannameler">Beyannameler</a>
+                            <h2 id="wh-declarations">@Texts.Get("warehouse.dashboard.declarations.title")</h2>
+                            <a href="depo/beyannameler">@Texts.Get("nav.app.warehouse.customs-declarations")</a>
                         </div>
                         @if (total == 0)
                         {
-                            <p class="text-muted mb-0">Henüz beyanname yok.</p>
+                            <EmptyState Compact="true" Title="@Texts.Get("warehouse.dashboard.declarations.none")" />
                         }
                         else
                         {
@@ -184,10 +184,10 @@
                 }
 
                 <section class="dash-card" aria-labelledby="wh-attention">
-                    <div class="dash-card-head"><h2 id="wh-attention" class="dash-card-title"><AppIcon Name="alert-circle" Size="18" /> Dikkat gerektirenler</h2></div>
+                    <div class="dash-card-head"><h2 id="wh-attention" class="dash-card-title"><AppIcon Name="alert-circle" Size="18" /> @Texts.Get("warehouse.dashboard.attention.title")</h2></div>
                     @if (Attention(d).Count == 0)
                     {
-                        <p class="text-muted mb-0">Şu an dikkat gerektiren kayıt yok.</p>
+                        <EmptyState Compact="true" Title="@Texts.Get("warehouse.dashboard.attention.none")" />
                     }
                     else
                     {
@@ -207,10 +207,10 @@
                 </section>
 
                 <p class="small text-muted mb-0">
-                    Doluluk, alt lokasyonu olmayan etkin lokasyonların bakiyesi olanlarıdır (kapasite tanımı henüz yok). Günler UTC'ye göre sayılır.
+                    @Texts.Get("warehouse.dashboard.note")
                     @if (d.FacilityId is not null)
                     {
-                        <span>Tesis seçimi beyanname, vekâlet ve stok kartı sayılarını etkilemez.</span>
+                        <span>@Texts.Get("warehouse.dashboard.facilityNote")</span>
                     }
                 </p>
             </div>
@@ -225,7 +225,6 @@
     private const decimal HighOccupancy = 85m;
 
     private static readonly int[] Periods = [7, 14, 30];
-    private static readonly CultureInfo Turkish = new("tr-TR");
 
     private sealed record FacilityOption(Guid Id, string Label);
 
@@ -277,7 +276,7 @@
         }
         else
         {
-            error = result.Error ?? "Pano yüklenemedi.";
+            error = result.Error ?? Texts.Get("warehouse.dashboard.loadFailed");
         }
     }
 
@@ -312,8 +311,8 @@
     private static string ItemText(WarehouseRecentMovementDto row)
     {
         var item = row.StockItemCode is null ? null : $"{row.StockItemCode} {row.StockItemName}";
-        var lot = row.LotNo is null ? null : $"Parti {row.LotNo}";
-        return string.Join(" · ", new[] { item, lot }.Where(x => x is not null)) is { Length: > 0 } text ? text : "Stok hareketi";
+        var lot = row.LotNo is null ? null : Texts.Get("warehouse.dashboard.lot", row.LotNo);
+        return string.Join(" · ", new[] { item, lot }.Where(x => x is not null)) is { Length: > 0 } text ? text : Texts.Get("warehouse.dashboard.movement");
     }
 
     private static string Route(WarehouseRecentMovementDto row) => (row.FromLocation, row.ToLocation) switch
@@ -321,7 +320,7 @@
         ({ } from, { } to) => $"{from} → {to}",
         ({ } from, null) => from,
         (null, { } to) => to,
-        _ => "Lokasyon gösterilmiyor",
+        _ => Texts.Get("warehouse.dashboard.noLocation"),
     };
 
     private IReadOnlyList<AttentionItem> Attention(WarehouseDashboardDto d)
@@ -329,20 +328,20 @@
         var items = new List<AttentionItem>();
         if (d.Attorneys is { Expiring: > 0 } a)
         {
-            items.Add(new("clock", "warning", $"{Count(a.Expiring)} vekâletin süresi {a.WindowDays} gün içinde bitiyor",
-                a.Nearest is { } nearest ? $"En yakın bitiş: {nearest.ToString(Regional.DatePattern, CultureInfo.InvariantCulture)}" : string.Empty, "depo/vekaletler"));
+            items.Add(new("clock", "warning", Texts.Get("warehouse.dashboard.attention.attorneys", Count(a.Expiring), a.WindowDays),
+                a.Nearest is { } nearest ? Texts.Get("warehouse.dashboard.attention.nearest", nearest.ToString(Regional.DatePattern, CultureInfo.InvariantCulture)) : string.Empty, "depo/vekaletler"));
         }
 
         if (d.Declarations is { StaleDrafts: > 0 } decl)
         {
-            items.Add(new("clipboard-list", "danger", $"{Count(decl.StaleDrafts)} beyanname {decl.StaleDraftDays} günden uzun süredir taslakta",
+            items.Add(new("clipboard-list", "danger", Texts.Get("warehouse.dashboard.attention.staleDrafts", Count(decl.StaleDrafts), decl.StaleDraftDays),
                 string.Join(", ", decl.StaleSample.Select(x => x.RegistrationNo)), "depo/beyannameler"));
         }
 
         if (d.Occupancy is { PassiveWithStock: > 0 } occ)
         {
-            items.Add(new("map-pin", "warning", $"{Count(occ.PassiveWithStock)} pasif lokasyonda hâlâ stok var",
-                "Pasif lokasyon yeni yerleştirme almaz; stok boşaltılmalı", "depo/lokasyonlar"));
+            items.Add(new("map-pin", "warning", Texts.Get("warehouse.dashboard.attention.passive", Count(occ.PassiveWithStock)),
+                Texts.Get("warehouse.dashboard.attention.passiveDetail"), "depo/lokasyonlar"));
         }
 
         return items;

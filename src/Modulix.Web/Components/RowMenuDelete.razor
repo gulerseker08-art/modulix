@@ -1,0 +1,22 @@
+@* Satır menüsünde onaylı silme öğesi (docs/design-system/component-catalog.md → RowMenu): tıklanınca menü kapanır ve aynı
+   yerde onay kutusu açılır; silme ancak oradaki kırmızı düğmeyle çalışır. Yalnızca RowMenu içinde kullanılır. *@
+<button type="button" class="view-menu-item is-danger" role="menuitem" disabled="@Disabled" @onclick="Ask">
+    <AppIcon Name="trash" Size="16" /> <span>@(Label ?? Texts.Get("common.delete"))</span>
+</button>
+
+@code {
+    [CascadingParameter] public RowMenu? Menu { get; set; }
+
+    /// <summary>Öğenin ve onay düğmesinin metni; verilmezse "Sil".</summary>
+    [Parameter] public string? Label { get; set; }
+
+    /// <summary>Soru metni; verilmezse "Bu kayıt silinsin mi?".</summary>
+    [Parameter] public string? Question { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public EventCallback OnConfirm { get; set; }
+
+    private void Ask() =>
+        Menu?.Ask(Question ?? Texts.Get("common.confirm.delete"), Label ?? Texts.Get("common.delete"), OnConfirm);
+}

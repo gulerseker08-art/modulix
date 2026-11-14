@@ -289,7 +289,8 @@ public sealed record OpportunityDto(
     int ClosureCycle = 1,
     int CloseDateChangeCount = 0,
     Guid? PrimaryQuoteId = null,
-    List<string>? ServiceScope = null);
+    List<string>? ServiceScope = null,
+    Guid? CampaignId = null);
 
 public sealed record SaveOpportunityRequest(
     string Title,
@@ -321,7 +322,8 @@ public sealed record SaveOpportunityRequest(
     DateOnly? TargetDecisionDate = null,
     string? NextAction = null,
     DateOnly? NextActionDate = null,
-    List<string>? ServiceScope = null);
+    List<string>? ServiceScope = null,
+    Guid? CampaignId = null);
 
 /// <summary>Aktivite tipinin hazır değerleri.</summary>
 public static class ActivityType

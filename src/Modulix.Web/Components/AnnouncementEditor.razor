@@ -56,16 +56,25 @@
                         <label class="form-check-label" for="announcement-pinned">@f.Label</label>
                     </div>
                     break;
-                case "audienceDepartmentKey":
-                    <label class="@f.LabelClass()" for="announcement-audience">@f.Label</label>
-                    <select id="announcement-audience" class="form-select" @bind="form.AudienceDepartmentKey">
-                        <option value="">Bütün çalışanlar</option>
-                        @foreach (var department in Lookups.Choices(HrAccess.DepartmentList, form.AudienceDepartmentKey))
-                        {
-                            <option value="@department.Key">@department.Label</option>
-                        }
-                    </select>
-                    <FieldError Field="audienceDepartmentKey" Errors="errors" />
+                case "audienceBusinessUnitIds":
+                    <label class="@f.LabelClass()" for="announcement-audience-units">@f.Label</label>
+                    <HrAudiencePicker Kind="HrAudiencePicker.AudienceKind.Units" Id="announcement-audience-units" Lookups="Lookups" Selected="form.AudienceUnits"
+                                      SelectedChanged="UnitsChanged" Invalid="@(errors?.ContainsKey("audienceBusinessUnitIds") == true)" />
+                    <FieldError Field="audienceBusinessUnitIds" Errors="errors" />
+                    @if (!form.UnitsTouched && form.AudienceUnits.Count == 0 && form.LegacyAudience is { Length: > 0 } legacy)
+                    {
+                        <small class="text-muted">Eski İK departmanına hedefli: @Lookups.Label(HrAccess.DepartmentList, legacy). Departman seçilince Core departmanına geçer.</small>
+                    }
+                    else
+                    {
+                        <small class="text-muted">Alt departmanlardakiler de dahildir. Departman ve kişi seçilmezse bütün çalışanlara yöneliktir.</small>
+                    }
+                    break;
+                case "audienceUserIds":
+                    <label class="@f.LabelClass()" for="announcement-audience-users">@f.Label</label>
+                    <HrAudiencePicker Kind="HrAudiencePicker.AudienceKind.Users" Id="announcement-audience-users" Lookups="Lookups" Selected="form.AudienceUsers"
+                                      SelectedChanged="UsersChanged" Invalid="@(errors?.ContainsKey("audienceUserIds") == true)" />
+                    <FieldError Field="audienceUserIds" Errors="errors" />
                     break;
                 case "publishOn":
                     <label class="@f.LabelClass()" for="announcement-publish">@f.Label</label>
@@ -110,7 +119,8 @@
             ? new AnnouncementForm
             {
                 Id = a.Id, Version = a.Version, Title = WarehouseLabels.Text(a, "title"), Body = WarehouseLabels.Text(a, "body"),
-                AudienceDepartmentKey = WarehouseLabels.Text(a, "audienceDepartmentKey"), IsPinned = WarehouseLabels.Flag(a, "isPinned"),
+                AudienceUnits = HrLabels.Ids(a, "audienceBusinessUnitIds"), AudienceUsers = HrLabels.Ids(a, "audienceUserIds"),
+                LegacyAudience = WarehouseLabels.Text(a, "audienceDepartmentKey"), IsPinned = WarehouseLabels.Flag(a, "isPinned"),
                 IsPublished = WarehouseLabels.Flag(a, "isPublished"), PublishOn = FleetLabels.Day(WarehouseLabels.Text(a, "publishOn")),
                 ExpiresOn = FleetLabels.Day(WarehouseLabels.Text(a, "expiresOn")), Custom = a.Values["custom"]?.DeepClone().AsObject() ?? [],
             }
@@ -119,22 +129,48 @@
         layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
     }
 
+    // Hedef birden çok Core departmanı ve/veya kişidir (bölüm 23c). Eski İK departman hedefi olan kayıtta departmanlar değiştirilmedikçe gönderilmez
+    // (sunucu eski hedefi korur).
+    private void AddAudience(JsonObject values)
+    {
+        if (form.UnitsTouched || string.IsNullOrEmpty(form.LegacyAudience))
+        {
+            values["audienceBusinessUnitIds"] = HrLabels.IdArray(form.AudienceUnits);
+        }
+
+        values["audienceUserIds"] = HrLabels.IdArray(form.AudienceUsers);
+    }
+
+    private void UnitsChanged(IReadOnlyList<Guid> units)
+    {
+        form.AudienceUnits = units;
+        form.UnitsTouched = true;
+        dirty = true;
+    }
+
+    private void UsersChanged(IReadOnlyList<Guid> users)
+    {
+        form.AudienceUsers = users;
+        dirty = true;
+    }
+
     private async Task SaveAsync()
     {
         busy = true;
         message = null;
         errors = null;
-        var request = new RecordWriteRequest(new JsonObject
+        var values = new JsonObject
         {
             ["title"] = string.IsNullOrWhiteSpace(form.Title) ? null : form.Title.Trim(),
             ["body"] = string.IsNullOrWhiteSpace(form.Body) ? null : form.Body.Trim(),
-            ["audienceDepartmentKey"] = string.IsNullOrEmpty(form.AudienceDepartmentKey) ? null : form.AudienceDepartmentKey,
             ["isPinned"] = form.IsPinned,
             ["isPublished"] = form.IsPublished,
             ["publishOn"] = form.PublishOn?.ToString("yyyy-MM-dd"),
             ["expiresOn"] = form.ExpiresOn?.ToString("yyyy-MM-dd"),
             ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
-        }, form.Version);
+        };
+        AddAudience(values);
+        var request = new RecordWriteRequest(values, form.Version);
         var url = "/api/records/" + EntityKey;
         var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{url}/{id}", request) : await Api.PostAsync<RecordResponse>(url, request);
         busy = false;
@@ -162,7 +198,14 @@
 
         public string? Body { get; set; }
 
-        public string? AudienceDepartmentKey { get; set; }
+        public IReadOnlyList<Guid> AudienceUnits { get; set; } = [];
+
+        public IReadOnlyList<Guid> AudienceUsers { get; set; } = [];
+
+        /// <summary>Eski İK departman hedefi (Core'a eşlenmemiş kayıtta); hedef değiştirilmedikçe korunur.</summary>
+        public string? LegacyAudience { get; init; }
+
+        public bool UnitsTouched { get; set; }
 
         public bool IsPinned { get; set; }
 

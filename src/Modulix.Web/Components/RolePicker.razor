@@ -1,7 +1,7 @@
 @* Rol seçimi (onay kutuları). Seçim, verilen kümede tutulur. *@
 @if (Roles.Count == 0)
 {
-    <p class="text-muted">Tanımlı rol yok.</p>
+    <EmptyState Compact="true" Title="@Texts.Get("admin.rolePicker.none")" />
 }
 else
 {
@@ -16,7 +16,7 @@ else
                     @role.Name
                     @if (role.IsSystem)
                     {
-                        <small class="text-muted"> · tüm izinler@(locked ? "; yalnızca yönetici verebilir" : null)</small>
+                        <small class="text-muted"> · @(locked ? Texts.Get("admin.rolePicker.allPermissionsLocked") : Texts.Get("admin.rolePicker.allPermissions"))</small>
                     }
                 </span>
             </label>

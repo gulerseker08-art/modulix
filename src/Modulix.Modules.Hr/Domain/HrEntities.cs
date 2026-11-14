@@ -89,7 +89,13 @@ public sealed class Employee : HrEntity
 
     public string? JobTitle { get; internal set; }
 
-    /// <summary>Departman (Y9b seçim listesi <c>hr.department</c>); boş olabilir.</summary>
+    /// <summary>
+    /// Departman: Core'un departman ağacından (ADR-0042 bölüm 22). Kullanıcı hesabı bağlı çalışanda kullanıcının Core departmanıdır ve kart kaydedilirken
+    /// ondan alınır; hesabı olmayan çalışanda kartta seçilir.
+    /// </summary>
+    public Guid? BusinessUnitId { get; internal set; }
+
+    /// <summary>Eski İK departman listesi değeri (<c>hr.department</c>); bölüm 22'den sonra yazılmaz, eşleme aracı bununla Core departmanına geçirir.</summary>
     public string? DepartmentKey { get; internal set; }
 
     /// <summary>Bağlı olduğu yönetici (başka bir çalışan kartı); en üst yöneticide boştur.</summary>
@@ -639,7 +645,7 @@ public sealed class ChecklistTask : HrEntity
 /// herkes, doluysa yalnızca o departmandaki çalışanlar (kullanıcının çalışan kartından). Sabitlenmiş duyuru listenin başındadır. Metin düz metindir;
 /// ekranda HTML olarak yorumlanmaz. Okundu bilgisi ayrı kayıtta tutulur (<see cref="AnnouncementRead"/>).
 /// </summary>
-public sealed class Announcement : HrEntity
+public sealed class Announcement : HrEntity, IAudienceContent
 {
     public const int TitleMaxLength = 200;
     public const int BodyMaxLength = 8000;
@@ -648,7 +654,13 @@ public sealed class Announcement : HrEntity
 
     public string Body { get; internal set; } = string.Empty;
 
-    /// <summary>Hedef departman (Y9b <c>hr.department</c>); boşsa bütün çalışanlar.</summary>
+    /// <summary>
+    /// Hedef Core departmanı (ADR-0026, ADR-0042 bölüm 22); alt departmanlar dahildir. Boşsa ve <see cref="AudienceDepartmentKey"/> da boşsa bütün
+    /// çalışanlar.
+    /// </summary>
+    public Guid? AudienceBusinessUnitId { get; internal set; }
+
+    /// <summary>Eski hedef departman (<c>hr.department</c>); yalnızca Core departmanına eşlenmemiş eski kayıtlarda doludur, yeni seçimle temizlenir.</summary>
     public string? AudienceDepartmentKey { get; internal set; }
 
     public bool IsPinned { get; internal set; }
@@ -662,6 +674,65 @@ public sealed class Announcement : HrEntity
     public DateOnly? ExpiresOn { get; internal set; }
 
     public Guid? AuthorUserId { get; internal set; }
+}
+
+/// <summary>
+/// Hedef kitlesi olan içerik (duyuru, anket; ADR-0042 bölüm 23c). Hedefler <see cref="AudienceTarget"/> satırlarıdır; tek departman kolonu ve eski İK
+/// departmanı geçiş için okunur (bölüm 22), yeni seçim onları temizler.
+/// </summary>
+public interface IAudienceContent
+{
+    Guid Id { get; }
+
+    Guid? AudienceBusinessUnitId { get; }
+
+    string? AudienceDepartmentKey { get; }
+}
+
+/// <summary>
+/// Duyuru ya da anketin bir hedefi (ADR-0042 bölüm 23c): bir Core departmanı (alt departmanları dahil) ya da bir kullanıcı; satırda ikisinden yalnızca
+/// biri doludur. İçeriğin hiç hedefi yoksa içerik herkese yöneliktir; varsa hedeflerden birine uyan okur görür. Satırları içeriğin kayıt deposu,
+/// içerikle aynı işlemde yazar.
+/// </summary>
+public sealed class AudienceTarget : HrEntity
+{
+    public const int MaxUnits = 50;
+    public const int MaxUsers = 200;
+
+    /// <summary>Duyurunun ya da anketin kimliği.</summary>
+    public Guid ContentId { get; internal set; }
+
+    public Guid? BusinessUnitId { get; internal set; }
+
+    public Guid? UserId { get; internal set; }
+}
+
+/// <summary>
+/// Duyuruya ya da blog yazısına yorum (ADR-0042 bölüm 23d). İçeriği görebilen okur yazar; yazar kendi yorumunu siler; içeriği yönetme izni olan
+/// yorumu gizler (gizli yorumun metni okura gösterilmez) ya da siler. Metin düz metindir. Yalnızca yorum servisi yazar.
+/// </summary>
+public sealed class ContentComment : HrEntity
+{
+    public const int BodyMaxLength = 2000;
+
+    /// <summary>Duyuru ya da blog yazısının kimliği.</summary>
+    public Guid ContentId { get; internal set; }
+
+    public Guid AuthorUserId { get; internal set; }
+
+    public string Body { get; internal set; } = string.Empty;
+
+    public bool IsHidden { get; internal set; }
+
+    public Guid? HiddenByUserId { get; internal set; }
+}
+
+/// <summary>Duyuru ya da blog yazısının bir kullanıcı tarafından beğenilmesi (içerik başına kullanıcı tekil; ADR-0042 bölüm 23d).</summary>
+public sealed class ContentLike : HrEntity
+{
+    public Guid ContentId { get; internal set; }
+
+    public Guid UserId { get; internal set; }
 }
 
 /// <summary>Duyurunun bir kullanıcı tarafından okunduğu an (duyuru başına kullanıcı tekil). Okur duyuruyu açınca yazılır; değişmez.</summary>
@@ -678,7 +749,7 @@ public sealed class AnnouncementRead : HrEntity
 /// Çalışan anketi (ADR-0042 dilim 7, K8). Taslakken soruları düzenlenir; "yanıta aç" ile hedef kitleye görünür, "kapat" ile yanıt almaz. Kimliği gizli
 /// ankette sonuçlar ve kayıt uçları yanıtlayanı göstermez (denetim kaydı yazanı tutar; bkz. ADR). Durum yalnızca komutla değişir.
 /// </summary>
-public sealed class Survey : HrEntity
+public sealed class Survey : HrEntity, IAudienceContent
 {
     public const int TitleMaxLength = 200;
     public const int DescriptionMaxLength = 2000;
@@ -704,7 +775,13 @@ public sealed class Survey : HrEntity
     /// <summary>Yalnızca oluştururken seçilir; yanıt toplandıktan sonra değişmesi verilen sözü bozar.</summary>
     public bool IsAnonymous { get; internal set; }
 
-    /// <summary>Hedef departman (Y9b <c>hr.department</c>); boşsa bütün çalışanlar.</summary>
+    /// <summary>
+    /// Hedef Core departmanı (ADR-0026, ADR-0042 bölüm 22); alt departmanlar dahildir. Boşsa ve <see cref="AudienceDepartmentKey"/> da boşsa bütün
+    /// çalışanlar.
+    /// </summary>
+    public Guid? AudienceBusinessUnitId { get; internal set; }
+
+    /// <summary>Eski hedef departman (<c>hr.department</c>); yalnızca Core departmanına eşlenmemiş eski kayıtlarda doludur, yeni seçimle temizlenir.</summary>
     public string? AudienceDepartmentKey { get; internal set; }
 
     /// <summary>Bu günden sonra yanıt alınmaz; boşsa elle kapatılana kadar açık.</summary>
@@ -728,9 +805,14 @@ public sealed class SurveyQuestion : HrEntity
     {
         public const string Rating = "rating";
         public const string Choice = "choice";
+
+        /// <summary>Çoklu seçim (ADR-0042 bölüm 23b): seçilen her seçenek ayrı bir cevap satırıdır.</summary>
+        public const string MultiChoice = "multiChoice";
         public const string Text = "text";
 
-        public static IReadOnlyList<string> All { get; } = [Rating, Choice, Text];
+        public static IReadOnlyList<string> All { get; } = [Rating, Choice, MultiChoice, Text];
+
+        public static bool HasOptions(string type) => type is Choice or MultiChoice;
     }
 
     public Guid SurveyId { get; internal set; }
@@ -741,7 +823,7 @@ public sealed class SurveyQuestion : HrEntity
 
     public string QuestionType { get; internal set; } = Types.Rating;
 
-    /// <summary>Tek seçim sorusunun seçenekleri, satır başına bir tane; diğer türlerde boş.</summary>
+    /// <summary>Tek ya da çoklu seçim sorusunun seçenekleri, satır başına bir tane; diğer türlerde boş.</summary>
     public string? Options { get; internal set; }
 
     public bool IsRequired { get; internal set; } = true;
@@ -824,4 +906,33 @@ public sealed class PhotoAlbum : HrEntity
     public DateTimeOffset? PublishedAt { get; internal set; }
 
     public Guid? AuthorUserId { get; internal set; }
+}
+
+/// <summary>
+/// Çalışanın görev dönemi (ADR-0042 bölüm 20, yol haritası M4.2): unvan, departman, yönetici ve çalışma şekli bir başlangıç gününden itibaren geçerlidir.
+/// Satırları yalnızca çalışan kartı yazar (kart açılınca ilk dönem, bu alanlardan biri değişince önceki dönem kapanır ve yenisi açılır; ayrılınca son dönem
+/// ayrılış günüyle kapanır). Elle yazılmaz, değişmez, silinmez; değişikliğin kendisi çalışan kartının denetim kaydındadır. Görünürlüğü çalışan kartınınkidir.
+/// </summary>
+public sealed class EmployeePosition : HrEntity
+{
+    public Guid EmployeeId { get; internal set; }
+
+    public DateOnly StartDate { get; internal set; }
+
+    /// <summary>Dönemin son günü; açık dönemde boş.</summary>
+    public DateOnly? EndDate { get; internal set; }
+
+    public string? JobTitle { get; internal set; }
+
+    public string? DepartmentKey { get; internal set; }
+
+    /// <summary>Core departmanı (bölüm 22).</summary>
+    public Guid? BusinessUnitId { get; internal set; }
+
+    public Guid? ManagerEmployeeId { get; internal set; }
+
+    public string EmploymentType { get; internal set; } = Employee.EmploymentTypes.FullTime;
+
+    /// <summary>Dönemi açan değişikliği yapan kullanıcı.</summary>
+    public Guid? ChangedByUserId { get; internal set; }
 }

@@ -47,8 +47,19 @@ internal sealed class AutomationRunService(
         }
 
         var total = await runs.CountAsync(cancellationToken);
-        var items = await runs.OrderByDescending(r => r.CreatedAt).ThenBy(r => r.Id)
-            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+        // Anahtarlar AutomationRunQuery.SortKeys'tedir; eşit kayıtlar en yeni önce sıralanır.
+        var ordered = query.Sort switch
+        {
+            "createdAt" => runs.OrderBy(r => r.CreatedAt).ThenBy(r => r.Id),
+            "status" => runs.OrderBy(r => r.Status).ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
+            "-status" => runs.OrderByDescending(r => r.Status).ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
+            "entityKey" => runs.OrderBy(r => r.EntityKey).ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
+            "-entityKey" => runs.OrderByDescending(r => r.EntityKey).ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
+            _ => runs.OrderByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
+        };
+        var items = query.Sort is "rule" or "-rule"
+            ? await PageByRuleAsync(runs, query.Sort == "-rule", page, pageSize, cancellationToken)
+            : await ordered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
         return new AutomationRunPage(await SummariesAsync(items, cancellationToken), page, pageSize, total);
     }
 
@@ -216,6 +227,44 @@ internal sealed class AutomationRunService(
         Audit(tenant, run.RuleId, $"İptal edildi ({run.Id:D})");
         await db.SaveChangesAsync(cancellationToken);
         return await GetAsync(runId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Kural adına göre sayfa: satır başına ad sorgusu yapılmaz. Süzülen çalışmalar kurala göre sayılır, kurallar ada göre
+    /// sıralanır ve sayfaya düşen kuralların çalışmaları en yeni önce okunur.
+    /// </summary>
+    private async Task<List<AutomationRun>> PageByRuleAsync(
+        IQueryable<AutomationRun> runs, bool descending, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var counts = await runs.GroupBy(r => r.RuleId).Select(g => new { RuleId = g.Key, Count = g.Count() }).ToListAsync(cancellationToken);
+        var ruleIds = counts.Select(c => c.RuleId).ToList();
+        var names = await db.AutomationRules.AsNoTracking().Where(r => ruleIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, r => r.Name, cancellationToken);
+        var ordered = descending
+            ? counts.OrderByDescending(c => names.GetValueOrDefault(c.RuleId, string.Empty), StringComparer.CurrentCulture).ThenBy(c => c.RuleId)
+            : counts.OrderBy(c => names.GetValueOrDefault(c.RuleId, string.Empty), StringComparer.CurrentCulture).ThenBy(c => c.RuleId);
+
+        var skip = (page - 1) * pageSize;
+        List<AutomationRun> items = [];
+        foreach (var rule in ordered)
+        {
+            if (skip >= rule.Count)
+            {
+                skip -= rule.Count;
+                continue;
+            }
+
+            items.AddRange(await runs.Where(r => r.RuleId == rule.RuleId)
+                .OrderByDescending(r => r.CreatedAt).ThenBy(r => r.Id)
+                .Skip(skip).Take(pageSize - items.Count)
+                .ToListAsync(cancellationToken));
+            skip = 0;
+            if (items.Count >= pageSize)
+            {
+                break;
+            }
+        }
+
+        return items;
     }
 
     private async Task<IReadOnlyList<AutomationRunSummary>> SummariesAsync(IReadOnlyList<AutomationRun> runs, CancellationToken cancellationToken)

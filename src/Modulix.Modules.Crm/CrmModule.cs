@@ -118,6 +118,13 @@ public sealed class CrmModule : IModule
         public const string ForecastsReopen = "crm.forecasts.reopen";
     }
 
+    /// <summary>Başka modüllerin kayıt anahtarları (yalnızca kayıt boru hattıyla ve lookup ile okunur; modül başvurusu yok).</summary>
+    public static class ExternalEntities
+    {
+        /// <summary>Pazarlama kampanyası (ADR-0025): müşteri adayı ve fırsatın <c>campaignId</c> bağının hedefi.</summary>
+        public const string Campaign = "marketing.campaign";
+    }
+
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
     public static class Entities
     {
@@ -782,7 +789,7 @@ public sealed class CrmModule : IModule
         {
             ["title"] = "Başlık", ["companyId"] = "Firma", ["contactId"] = "Kişi", ["stage"] = "Aşama", ["amount"] = "Tutar",
             ["currency"] = "Para birimi", ["expectedCloseDate"] = "Tahmini kapanış", ["probability"] = "Olasılık (%)",
-            ["lostReason"] = "Kaybetme açıklaması", ["sourceLeadId"] = "Kaynak müşteri adayı", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
+            ["lostReason"] = "Kaybetme açıklaması", ["sourceLeadId"] = "Kaynak müşteri adayı", ["campaignId"] = "Kampanya", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar",
             ["opportunityNumber"] = "Fırsat no", ["description"] = "Açıklama", ["status"] = "Durum", ["statusReason"] = "Durum gerekçesi",
             ["priority"] = "Öncelik", ["type"] = "Tür", ["source"] = "Kaynak", ["customerBudget"] = "Müşteri bütçesi",
             ["budgetStatus"] = "Bütçe durumu", ["needDescription"] = "İhtiyaç", ["currentProblem"] = "Mevcut sorun",
@@ -798,7 +805,7 @@ public sealed class CrmModule : IModule
             UserFields = ["ownerId"],
             References = new Dictionary<string, string>
             {
-                ["companyId"] = Entities.Company, ["contactId"] = Entities.Contact, ["sourceLeadId"] = Entities.Lead,
+                ["companyId"] = Entities.Company, ["contactId"] = Entities.Contact, ["sourceLeadId"] = Entities.Lead, ["campaignId"] = ExternalEntities.Campaign,
                 ["winningCompetitorId"] = Entities.OpportunityCompetitor, ["primaryQuoteId"] = Entities.Quote,
             },
         },
@@ -983,7 +990,7 @@ public sealed class CrmModule : IModule
             ["serviceScope"] = "Hizmet kapsamı", ["needDescription"] = "İhtiyaç", ["estimatedBudget"] = "Tahmini bütçe", ["currency"] = "Para birimi",
             ["targetPurchaseDate"] = "Hedef satın alma tarihi", ["industry"] = "Sektör", ["source"] = "Kaynak", ["sourceDetail"] = "Kaynak ayrıntısı",
             ["referrer"] = "Yönlendiren", ["externalSource"] = "Dış kaynak", ["externalSubmissionId"] = "Dış gönderim no",
-            ["utmSource"] = "UTM kaynak", ["utmMedium"] = "UTM ortam", ["utmCampaign"] = "UTM kampanya", ["firstReceivedAt"] = "İlk geliş",
+            ["utmSource"] = "UTM kaynak", ["utmMedium"] = "UTM ortam", ["utmCampaign"] = "UTM kampanya", ["campaignId"] = "Kampanya", ["firstReceivedAt"] = "İlk geliş",
             ["ownerId"] = "Sorumlu", ["assignedAt"] = "Atanma", ["firstContactAt"] = "İlk temas", ["followUpAt"] = "Takip tarihi",
             ["qualifiedAt"] = "Nitelendirilme", ["disqualifiedAt"] = "Elenme", ["disqualificationReason"] = "Eleme nedeni",
             ["convertedAt"] = "Dönüşüm", ["convertedBy"] = "Dönüştüren", ["convertedCompanyId"] = "Dönüşüm firması",
@@ -994,7 +1001,7 @@ public sealed class CrmModule : IModule
             References = new Dictionary<string, string>
             {
                 ["companyId"] = Entities.Company, ["contactId"] = Entities.Contact, ["convertedCompanyId"] = Entities.Company,
-                ["convertedContactId"] = Entities.Contact, ["convertedOpportunityId"] = Entities.Opportunity,
+                ["convertedContactId"] = Entities.Contact, ["convertedOpportunityId"] = Entities.Opportunity, ["campaignId"] = ExternalEntities.Campaign,
             },
         },
     ];
@@ -1180,6 +1187,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<ILeadFormAdmin, LeadFormAdmin>();
         services.AddScoped<LeadIntakeAnchor>();
         services.AddScoped<LeadWorkflowGate>();
+        services.AddScoped<CampaignLinkTrust>();
         services.AddScoped<ILeadQualificationRule, MinimumQualificationRule>();
         services.AddScoped<ILeadWorkflow, LeadWorkflow>();
         services.AddScoped<ILeadConversion, LeadConversion>();

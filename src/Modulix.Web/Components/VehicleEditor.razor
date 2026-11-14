@@ -9,7 +9,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Vehicle is null ? "Yeni araç" : "Araç kartı")</h2>
+            <h2>@(Vehicle is null ? Texts.Get("fleet.vehicle-form.new") : Texts.Get("fleet.vehicle-form.card"))</h2>
             @if (Vehicle is not null)
             {
                 <p>@form.Plate · @Lookups.Label(FleetAccess.VehicleKindList, form.KindKey)</p>
@@ -17,13 +17,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -38,26 +38,26 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Araç özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("fleet.vehicle-form.summary-label")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true"><AppIcon Name="truck" Size="24" /></span>
-                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Plate) ? "Plaka" : form.Plate.ToUpperInvariant())</strong>
-                    <span class="summary-sub">@(string.IsNullOrEmpty(form.KindKey) ? "Araç türü" : Lookups.Label(FleetAccess.VehicleKindList, form.KindKey))</span>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Plate) ? Texts.Get("fleet.vehicle-form.plate") : form.Plate.ToUpperInvariant())</strong>
+                    <span class="summary-sub">@(string.IsNullOrEmpty(form.KindKey) ? Texts.Get("fleet.vehicle-form.kind") : Lookups.Label(FleetAccess.VehicleKindList, form.KindKey))</span>
                 </div>
-                <h3 class="summary-heading">Araç özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("fleet.vehicle-form.summary-label")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Mülkiyet</dt><dd>@FleetLabels.Ownership(form.Ownership)</dd></div>
-                    <div><dt>Durum</dt><dd>@FleetLabels.Status(form.Status)</dd></div>
-                    <div><dt>Kapasite</dt><dd>@FleetLabels.Capacity(form.PayloadKg, "kg")</dd></div>
-                    <div><dt>Kilometre</dt><dd>@FleetLabels.Km(Vehicle?.Values["odometerKm"]?.GetValue<int>())</dd></div>
-                    <div><dt>Sonraki bakım</dt><dd>@(FleetLabels.Day(Vehicle is null ? null : WarehouseLabels.Text(Vehicle, "nextMaintenanceDate")) is { } next ? FleetLabels.Date(next) : "—")</dd></div>
+                    <div><dt>@Texts.Get("fleet.vehicle-form.ownership")</dt><dd>@FleetLabels.Ownership(form.Ownership)</dd></div>
+                    <div><dt>@Texts.Get("fleet.vehicle-form.status")</dt><dd>@FleetLabels.Status(form.Status)</dd></div>
+                    <div><dt>@Texts.Get("fleet.vehicle-form.capacity")</dt><dd>@FleetLabels.Capacity(form.PayloadKg, "kg")</dd></div>
+                    <div><dt>@Texts.Get("fleet.vehicle-form.odometer")</dt><dd>@FleetLabels.Km(Vehicle?.Values["odometerKm"]?.GetValue<int>())</dd></div>
+                    <div><dt>@Texts.Get("fleet.vehicle-form.next-maintenance")</dt><dd>@(FleetLabels.Day(Vehicle is null ? null : WarehouseLabels.Text(Vehicle, "nextMaintenanceDate")) is { } next ? FleetLabels.Date(next) : "—")</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Araç formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("fleet.vehicle-form.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
@@ -65,7 +65,7 @@
                             <label class="@f.LabelClass()" for="vehicle-plate">@f.Label</label>
                             <input id="vehicle-plate" class="form-control" maxlength="20" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Plate" />
                             <FieldError Field="plate" Errors="errors" />
-                            <small class="text-muted">Boşluksuz büyük harfle saklanır (ör. 34ABC123); firmada benzersiz.</small>
+                            <small class="text-muted">@Texts.Get("fleet.vehicle-form.plate-hint")</small>
                             break;
                         case "kindKey":
                             <label class="@f.LabelClass()" for="vehicle-kind">@f.Label</label>
@@ -76,23 +76,23 @@
                                 }
                             </select>
                             <FieldError Field="kindKey" Errors="errors" />
-                            <small class="text-muted">Dorse ve römork "çekilen araç" türüdür; türleri firma ayarlarından yönetebilirsiniz.</small>
+                            <small class="text-muted">@Texts.Get("fleet.vehicle-form.kind-hint")</small>
                             break;
                         case "status":
                             <label class="@f.LabelClass()" for="vehicle-status">@f.Label</label>
                             <select id="vehicle-status" class="form-select" @bind="form.Status">
-                                @foreach (var (key, label) in FleetAccess.Statuses)
+                                @foreach (var (key, label) in FleetLabels.Statuses)
                                 {
                                     <option value="@key">@label</option>
                                 }
                             </select>
                             <FieldError Field="status" Errors="errors" />
-                            <small class="text-muted">Araç silinmez; kullanım dışı aracı "Pasif" yapın.</small>
+                            <small class="text-muted">@Texts.Get("fleet.vehicle-form.status-hint")</small>
                             break;
                         case "ownership":
                             <label class="@f.LabelClass()" for="vehicle-ownership">@f.Label</label>
                             <select id="vehicle-ownership" class="form-select" @bind="form.Ownership" @bind:after="OwnershipChanged">
-                                @foreach (var (key, label) in FleetAccess.Ownerships)
+                                @foreach (var (key, label) in FleetLabels.Ownerships)
                                 {
                                     <option value="@key">@label</option>
                                 }
@@ -101,9 +101,9 @@
                             break;
                         case "carrierPartyId":
                             <label class="@f.LabelClass()" for="vehicle-carrier">@f.Label@(IsSubcontracted ? " *" : "")</label>
-                            <LookupPicker Id="vehicle-carrier" LookupKey="@FleetAccess.VehicleCarrierLookup" @bind-Value="form.CarrierPartyId" Required="IsSubcontracted" Disabled="@(!IsSubcontracted)" Placeholder="@(IsSubcontracted ? "Taşıyıcı firma seçin…" : "Yalnızca taşeron araçta")" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
+                            <LookupPicker Id="vehicle-carrier" LookupKey="@FleetAccess.VehicleCarrierLookup" @bind-Value="form.CarrierPartyId" Required="IsSubcontracted" Disabled="@(!IsSubcontracted)" Placeholder="@(IsSubcontracted ? Texts.Get("fleet.vehicle-form.carrier-placeholder") : Texts.Get("fleet.vehicle-form.carrier-placeholder-disabled"))" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
                             <FieldError Field="carrierPartyId" Errors="errors" />
-                            <small class="text-muted">Yalnızca "Taşıyıcı" rolündeki firmalar listelenir; rol firma kaydından verilir.</small>
+                            <small class="text-muted">@Texts.Get("fleet.vehicle-form.carrier-hint")</small>
                             break;
                         case "brand":
                             <label class="@f.LabelClass()" for="vehicle-brand">@f.Label</label>
@@ -124,7 +124,7 @@
                             <label class="@f.LabelClass()" for="vehicle-vin">@f.Label</label>
                             <input id="vehicle-vin" class="form-control" maxlength="17" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Vin" />
                             <FieldError Field="vin" Errors="errors" />
-                            <small class="text-muted">17 karakter; verilirse firmada benzersiz.</small>
+                            <small class="text-muted">@Texts.Get("fleet.vehicle-form.vin-hint")</small>
                             break;
                         case "payloadKg":
                             <label class="@f.LabelClass()" for="vehicle-payload">@f.Label</label>
@@ -156,8 +156,8 @@
             </LayoutForm>
 
             <div class="form-actions">
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
             </div>
         </div>
     </div>
@@ -193,7 +193,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir araç verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>

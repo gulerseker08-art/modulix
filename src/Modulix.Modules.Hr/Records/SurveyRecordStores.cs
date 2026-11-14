@@ -7,26 +7,19 @@ using Modulix.Modules.Hr.Domain;
 namespace Modulix.Modules.Hr.Records;
 
 /// <summary>
-/// Anketin okura görünme kuralı (ADR-0042 dilim 7): yanıta açık, kapanış günü geçmemiş ve hedef departmanı boş ya da okurun departmanı. "Anket
+/// Anketin okura görünme kuralı (ADR-0042 dilim 7, bölüm 22 ve 23c): yanıta açık, kapanış günü geçmemiş ve hedefi yok ya da hedeflerden biri okurun
+/// Core departmanı, onun bir üst departmanı ya da okurun kendisi (<see cref="HrAudience"/>). "Anket
 /// yönetimi" izni olan bütün anketleri görür; yanıt verebilmek için ise herkes bu kurala uymalıdır.
 /// </summary>
 internal static class SurveyAudience
 {
     public static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
 
-    public static IQueryable<Survey> Available(IQueryable<Survey> source, string? department)
+    public static IQueryable<Survey> Available(HrStoreContext context, IQueryable<Survey> source, HrReader reader)
     {
         var today = Today;
-        return source.Where(s => s.Status == Survey.Statuses.Open && (s.ClosesOn == null || s.ClosesOn >= today)
-            && (s.AudienceDepartmentKey == null || s.AudienceDepartmentKey == department));
-    }
-
-    /// <summary>Kullanıcının etkin çalışan kartındaki departman (kartı yoksa boş; o zaman yalnızca herkese açık anketler).</summary>
-    public static Task<string?> DepartmentAsync(HrStoreContext context, CancellationToken cancellationToken)
-    {
-        var me = context.CurrentUserId ?? Guid.Empty;
-        return context.Data.Set<Employee>().AsNoTracking()
-            .Where(e => e.UserId == me && e.Status != Employee.Statuses.Terminated).Select(e => e.DepartmentKey).FirstOrDefaultAsync(cancellationToken);
+        return HrAudience.Visible(source.Where(s => s.Status == Survey.Statuses.Open && (s.ClosesOn == null || s.ClosesOn >= today)),
+            reader, context.Data.Set<AudienceTarget>().AsNoTracking());
     }
 }
 
@@ -39,6 +32,8 @@ internal sealed class SurveyRecordStore(HrStoreContext context) : HrRecordStore<
     private readonly Dictionary<Guid, int> responseCounts = [];
     private readonly Dictionary<Guid, int> questionCounts = [];
     private readonly HashSet<Guid> respondedByMe = [];
+    private readonly AudienceFields<Survey> audience =
+        new(context, s => s.AudienceBusinessUnitId = null, s => s.AudienceDepartmentKey = null);
 
     public override string EntityKey => HrModule.Entities.Survey;
 
@@ -57,7 +52,7 @@ internal sealed class SurveyRecordStore(HrStoreContext context) : HrRecordStore<
         Field.Text<Survey>("title", Survey.TitleMaxLength, s => s.Title, (s, v) => s.Title = v!, required: true),
         Field.Text<Survey>("description", Survey.DescriptionMaxLength, s => s.Description, (s, v) => s.Description = v),
         Field.Flag<Survey>("isAnonymous", s => s.IsAnonymous, (s, v) => s.IsAnonymous = v, createOnly: true),
-        Field.ListChoice<Survey>("audienceDepartmentKey", HrModule.Lists.Department, s => s.AudienceDepartmentKey, (s, v) => s.AudienceDepartmentKey = v, required: false),
+        .. audience.Fields(),
         Field.Date<Survey>("closesOn", s => s.ClosesOn, (s, v) => s.ClosesOn = v),
         Field.Computed<Survey>("status", s => s.Status),
         Field.Computed<Survey>("authorUserId", s => s.AuthorUserId?.ToString()),
@@ -99,7 +94,7 @@ internal sealed class SurveyRecordStore(HrStoreContext context) : HrRecordStore<
     protected override async Task<IQueryable<Survey>> RestrictAsync(IQueryable<Survey> source, CancellationToken cancellationToken) =>
         await Context.Access.HasPermissionAsync(HrModule.Permissions.SurveysManage, cancellationToken)
             ? source
-            : SurveyAudience.Available(source, await SurveyAudience.DepartmentAsync(Context, cancellationToken));
+            : SurveyAudience.Available(Context, source, await HrAudience.ReaderAsync(Context, cancellationToken));
 
     protected override async Task PrepareAsync(IReadOnlyCollection<Survey> entities, CancellationToken cancellationToken)
     {
@@ -118,10 +113,14 @@ internal sealed class SurveyRecordStore(HrStoreContext context) : HrRecordStore<
 
         var me = Context.CurrentUserId ?? Guid.Empty;
         respondedByMe.UnionWith(await responses.Where(r => r.RespondentUserId == me).Select(r => r.SurveyId).ToListAsync(cancellationToken));
+        await audience.PrepareAsync(entities, cancellationToken);
     }
 
     protected override async Task AppliedAsync(Survey entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
+        // Hedefler (departmanlar ve/veya kişiler; boş: herkes) eski İK departman hedefinin yerini alır.
+        await audience.AppliedAsync(entity, values, isNew, cancellationToken);
+
         if (isNew)
         {
             entity.AuthorUserId = Context.CurrentUserId;
@@ -161,6 +160,7 @@ internal sealed class SurveyRecordStore(HrStoreContext context) : HrRecordStore<
 
         Context.Data.Set<SurveyQuestion>().RemoveRange(
             await Context.Data.Set<SurveyQuestion>().Where(q => q.SurveyId == entity.Id).ToListAsync(cancellationToken));
+        await HrAudience.RemoveAsync(Context, entity.Id, cancellationToken);
     }
 }
 
@@ -202,7 +202,7 @@ internal sealed class SurveyQuestionRecordStore(HrStoreContext context) : HrReco
             return source;
         }
 
-        var visible = SurveyAudience.Available(Context.Data.Set<Survey>().AsNoTracking(), await SurveyAudience.DepartmentAsync(Context, cancellationToken))
+        var visible = SurveyAudience.Available(Context, Context.Data.Set<Survey>().AsNoTracking(), await HrAudience.ReaderAsync(Context, cancellationToken))
             .Select(s => s.Id);
         return source.Where(q => visible.Contains(q.SurveyId));
     }
@@ -210,14 +210,14 @@ internal sealed class SurveyQuestionRecordStore(HrStoreContext context) : HrReco
     protected override async Task AppliedAsync(SurveyQuestion entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
         await EnsureDraftAsync(entity.SurveyId, cancellationToken);
-        if (entity.QuestionType == SurveyQuestion.Types.Choice)
+        if (SurveyQuestion.Types.HasOptions(entity.QuestionType))
         {
             var options = entity.OptionList();
             if (options.Count is < 2 or > SurveyQuestion.MaxOptions || options.Distinct(StringComparer.OrdinalIgnoreCase).Count() != options.Count
                 || options.Any(o => o.Length > SurveyQuestion.OptionMaxLength))
             {
                 throw new RecordValidationException([new RecordFieldError("options",
-                    $"Tek seçim sorusuna satır başına bir tane olmak üzere 2–{SurveyQuestion.MaxOptions} farklı seçenek yazın (her biri en çok {SurveyQuestion.OptionMaxLength} karakter).")]);
+                    $"Seçim sorusuna satır başına bir tane olmak üzere 2–{SurveyQuestion.MaxOptions} farklı seçenek yazın (her biri en çok {SurveyQuestion.OptionMaxLength} karakter).")]);
             }
 
             entity.Options = string.Join('\n', options);
@@ -350,8 +350,8 @@ internal sealed class SurveyAnswerRecordStore(HrStoreContext context) : HrRecord
         entity.SurveyId = await Context.Data.Set<SurveyResponse>().AsNoTracking().Where(r => r.Id == entity.ResponseId).Select(r => r.SurveyId).SingleAsync(cancellationToken);
 }
 
-/// <summary>Yanıt formundaki tek bir sorunun cevabı; sorunun türüne göre puan, seçenek ya da metin.</summary>
-public sealed record SurveyAnswerInput(Guid QuestionId, int? Rating, string? Choice, string? Text);
+/// <summary>Yanıt formundaki tek bir sorunun cevabı; sorunun türüne göre puan, seçenek, seçenekler (çoklu seçim) ya da metin.</summary>
+public sealed record SurveyAnswerInput(Guid QuestionId, int? Rating, string? Choice, string? Text, IReadOnlyList<string>? Choices = null);
 
 /// <summary>Sorunun özet sonucu: cevap sayısı, puan ortalaması, seçenek/puan dağılımı ve metin cevapları (yanıtlayan bilgisi olmadan, alfabetik).</summary>
 public sealed record SurveyQuestionResult(
@@ -460,8 +460,8 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
         }
 
         // Yönetici bütün anketleri görür; yanıt için o da hedef kitlede ve anket yanıta açık olmalıdır.
-        var department = await SurveyAudience.DepartmentAsync(context, cancellationToken);
-        if (!await SurveyAudience.Available(context.Data.Set<Survey>().AsNoTracking(), department).AnyAsync(s => s.Id == surveyId, cancellationToken))
+        var reader = await HrAudience.ReaderAsync(context, cancellationToken);
+        if (!await SurveyAudience.Available(context, context.Data.Set<Survey>().AsNoTracking(), reader).AnyAsync(s => s.Id == surveyId, cancellationToken))
         {
             return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Bu anket şu an size yönelik yanıta açık değil.");
         }
@@ -491,7 +491,8 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
                     return response;
                 }
 
-                foreach (var answer in clean)
+                // Çoklu seçimde seçilen her seçenek ayrı bir cevap satırıdır (sonuçta seçenek başına sayılır).
+                foreach (var answer in clean.SelectMany(a => a.Choices is { } many ? many.Select(c => a with { Choice = c, Choices = null }) : [a]))
                 {
                     var written = await pipeline.CreateAsync(new RecordCommand(HrModule.Entities.SurveyAnswer, null, new JsonObject
                     {
@@ -535,7 +536,7 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
         var questions = await context.Data.Set<SurveyQuestion>().AsNoTracking().Where(q => q.SurveyId == surveyId)
             .OrderBy(q => q.Sequence).ThenBy(q => q.CreatedAt).ToListAsync(cancellationToken);
         var answers = await context.Data.Set<SurveyAnswer>().AsNoTracking().Where(a => a.SurveyId == surveyId)
-            .Select(a => new { a.QuestionId, a.Rating, a.Choice, a.TextValue }).ToListAsync(cancellationToken);
+            .Select(a => new { a.ResponseId, a.QuestionId, a.Rating, a.Choice, a.TextValue }).ToListAsync(cancellationToken);
         var byQuestion = answers.ToLookup(a => a.QuestionId);
         var results = questions.Select(q =>
         {
@@ -543,11 +544,12 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
             IReadOnlyList<(string, int)> counts = q.QuestionType switch
             {
                 SurveyQuestion.Types.Rating => [.. Enumerable.Range(1, 5).Select(r => (r.ToString(CultureInfo.InvariantCulture), mine.Count(a => a.Rating == r)))],
-                SurveyQuestion.Types.Choice => [.. q.OptionList().Select(o => (o, mine.Count(a => a.Choice == o)))],
+                SurveyQuestion.Types.Choice or SurveyQuestion.Types.MultiChoice => [.. q.OptionList().Select(o => (o, mine.Count(a => a.Choice == o)))],
                 _ => [],
             };
             var ratings = mine.Where(a => a.Rating is not null).Select(a => (decimal)a.Rating!.Value).ToList();
-            return new SurveyQuestionResult(q.Id, q.Sequence, q.Text, q.QuestionType, mine.Count,
+            // Cevap sayısı soruyu cevaplayan kişi sayısıdır (çoklu seçimde bir kişinin birden çok satırı olur).
+            return new SurveyQuestionResult(q.Id, q.Sequence, q.Text, q.QuestionType, mine.Select(a => a.ResponseId).Distinct().Count(),
                 ratings.Count == 0 ? null : Math.Round(ratings.Average(), 2),
                 counts, [.. mine.Where(a => a.TextValue is not null).Select(a => a.TextValue!).Order(StringComparer.Ordinal)]);
         }).ToList();
@@ -584,6 +586,7 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
                 SurveyQuestion.Types.Choice when choice is null => null,
                 SurveyQuestion.Types.Choice when !question.OptionList().Contains(choice) => Fail("Seçeneklerden birini seçin."),
                 SurveyQuestion.Types.Choice => new SurveyAnswerInput(question.Id, null, choice, null),
+                SurveyQuestion.Types.MultiChoice => MultiChoice(question, answer, choice),
                 _ when text is null => null,
                 _ when text.Length > SurveyAnswer.TextMaxLength => Fail($"En çok {SurveyAnswer.TextMaxLength} karakter yazın."),
                 _ => new SurveyAnswerInput(question.Id, null, null, text),
@@ -591,6 +594,25 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
             if (value is not null && value.QuestionId != Guid.Empty)
             {
                 clean.Add(value);
+            }
+
+            SurveyAnswerInput? MultiChoice(SurveyQuestion question, SurveyAnswerInput answer, string? single)
+            {
+                List<string> chosen = [.. (answer.Choices ?? (single is null ? [] : [single]))
+                    .Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim())];
+                if (chosen.Count == 0)
+                {
+                    return null;
+                }
+
+                if (chosen.Distinct(StringComparer.Ordinal).Count() != chosen.Count)
+                {
+                    return Fail("Bir seçenek bir kez seçilir.");
+                }
+
+                return chosen.All(question.OptionList().Contains)
+                    ? new SurveyAnswerInput(question.Id, null, null, null, chosen)
+                    : Fail("Seçeneklerden seçin.");
             }
 
             SurveyAnswerInput Fail(string message)

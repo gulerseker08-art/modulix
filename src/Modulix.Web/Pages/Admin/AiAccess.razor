@@ -2,13 +2,13 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Yapay zekâ erişimi · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.ai-access") · Modulix</PageTitle>
 
 @* Firmanın yapay zekâ özelliklerini açıp kapatır (core.ai.enabled). Kayıt Kuruluş ayarlarıyla aynı uçtan geçer; izin ve
    sürüm denetimi sunucudadır, menüde gizlemek yetkilendirme değildir. *@
 <AuthGate Permission="@CoreAccess.ManageSettings">
-    <a class="back-link" href="yonetim">← Yönetim</a>
-    <h1>Yapay zekâ erişimi</h1>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
+    <h1>@Texts.Get("nav.app.admin.ai-access")</h1>
 
     @if (message is not null)
     {
@@ -47,7 +47,7 @@
                 </div>
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || value == setting.Value)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || value == setting.Value)" aria-busy="@(busy ? "true" : null)">@Texts.Get("common.save")</button>
             </div>
         </form>
     }
@@ -78,7 +78,7 @@
     {
         setting = response.Settings.FirstOrDefault(s => s.Key == Key);
         value = setting?.Value ?? string.Empty;
-        message ??= setting is null ? "Yapay zekâ ayarı bulunamadı." : null;
+        message ??= setting is null ? Texts.Get("admin.aiAccess.notFound") : null;
     }
 
     private async Task SaveAsync()
@@ -99,7 +99,7 @@
         if (result.Value is { } saved)
         {
             Load(saved);
-            notice = "Kaydedildi.";
+            notice = Texts.Get("common.saved");
         }
         else
         {

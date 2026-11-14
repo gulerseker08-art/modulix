@@ -51,16 +51,25 @@
                     </div>
                     <small class="text-muted">Sonuçlarda kimin ne yanıtladığı gösterilmez; en az @MinAnonymousResponses yanıt gelince özet görünür. Kaydettikten sonra değişmez.</small>
                     break;
-                case "audienceDepartmentKey":
-                    <label class="@f.LabelClass()" for="survey-audience">@f.Label</label>
-                    <select id="survey-audience" class="form-select" @bind="form.AudienceDepartmentKey">
-                        <option value="">Bütün çalışanlar</option>
-                        @foreach (var department in Lookups.Choices(HrAccess.DepartmentList, form.AudienceDepartmentKey))
-                        {
-                            <option value="@department.Key">@department.Label</option>
-                        }
-                    </select>
-                    <FieldError Field="audienceDepartmentKey" Errors="errors" />
+                case "audienceBusinessUnitIds":
+                    <label class="@f.LabelClass()" for="survey-audience-units">@f.Label</label>
+                    <HrAudiencePicker Kind="HrAudiencePicker.AudienceKind.Units" Id="survey-audience-units" Lookups="Lookups" Selected="form.AudienceUnits"
+                                      SelectedChanged="UnitsChanged" Invalid="@(errors?.ContainsKey("audienceBusinessUnitIds") == true)" />
+                    <FieldError Field="audienceBusinessUnitIds" Errors="errors" />
+                    @if (!form.UnitsTouched && form.AudienceUnits.Count == 0 && form.LegacyAudience is { Length: > 0 } legacy)
+                    {
+                        <small class="text-muted">Eski İK departmanına hedefli: @Lookups.Label(HrAccess.DepartmentList, legacy). Departman seçilince Core departmanına geçer.</small>
+                    }
+                    else
+                    {
+                        <small class="text-muted">Alt departmanlardakiler de dahildir. Departman ve kişi seçilmezse bütün çalışanlara yöneliktir.</small>
+                    }
+                    break;
+                case "audienceUserIds":
+                    <label class="@f.LabelClass()" for="survey-audience-users">@f.Label</label>
+                    <HrAudiencePicker Kind="HrAudiencePicker.AudienceKind.Users" Id="survey-audience-users" Lookups="Lookups" Selected="form.AudienceUsers"
+                                      SelectedChanged="UsersChanged" Invalid="@(errors?.ContainsKey("audienceUserIds") == true)" />
+                    <FieldError Field="audienceUserIds" Errors="errors" />
                     break;
                 case "closesOn":
                     <label class="@f.LabelClass()" for="survey-closes">@f.Label</label>
@@ -101,12 +110,38 @@
             ? new SurveyForm
             {
                 Id = s.Id, Version = s.Version, Title = WarehouseLabels.Text(s, "title"), Description = WarehouseLabels.Text(s, "description"),
-                IsAnonymous = WarehouseLabels.Flag(s, "isAnonymous"), AudienceDepartmentKey = WarehouseLabels.Text(s, "audienceDepartmentKey"),
+                IsAnonymous = WarehouseLabels.Flag(s, "isAnonymous"), AudienceUnits = HrLabels.Ids(s, "audienceBusinessUnitIds"), AudienceUsers = HrLabels.Ids(s, "audienceUserIds"),
+                LegacyAudience = WarehouseLabels.Text(s, "audienceDepartmentKey"),
                 ClosesOn = FleetLabels.Day(WarehouseLabels.Text(s, "closesOn")), Custom = s.Values["custom"]?.DeepClone().AsObject() ?? [],
             }
             : new SurveyForm();
         layout = await Layouts.ForAsync(EntityKey);
         layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    // Hedef birden çok Core departmanı ve/veya kişidir (bölüm 23c). Eski İK departman hedefi olan kayıtta departmanlar değiştirilmedikçe gönderilmez
+    // (sunucu eski hedefi korur).
+    private void AddAudience(JsonObject values)
+    {
+        if (form.UnitsTouched || string.IsNullOrEmpty(form.LegacyAudience))
+        {
+            values["audienceBusinessUnitIds"] = HrLabels.IdArray(form.AudienceUnits);
+        }
+
+        values["audienceUserIds"] = HrLabels.IdArray(form.AudienceUsers);
+    }
+
+    private void UnitsChanged(IReadOnlyList<Guid> units)
+    {
+        form.AudienceUnits = units;
+        form.UnitsTouched = true;
+        dirty = true;
+    }
+
+    private void UsersChanged(IReadOnlyList<Guid> users)
+    {
+        form.AudienceUsers = users;
+        dirty = true;
     }
 
     private async Task SaveAsync()
@@ -118,7 +153,6 @@
         {
             ["title"] = string.IsNullOrWhiteSpace(form.Title) ? null : form.Title.Trim(),
             ["description"] = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
-            ["audienceDepartmentKey"] = string.IsNullOrEmpty(form.AudienceDepartmentKey) ? null : form.AudienceDepartmentKey,
             ["closesOn"] = form.ClosesOn?.ToString("yyyy-MM-dd"),
             ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
         };
@@ -127,6 +161,7 @@
             values["isAnonymous"] = form.IsAnonymous;
         }
 
+        AddAudience(values);
         var request = new RecordWriteRequest(values, form.Version);
         var url = "/api/records/" + EntityKey;
         var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{url}/{id}", request) : await Api.PostAsync<RecordResponse>(url, request);
@@ -157,7 +192,14 @@
 
         public bool IsAnonymous { get; set; }
 
-        public string? AudienceDepartmentKey { get; set; }
+        public IReadOnlyList<Guid> AudienceUnits { get; set; } = [];
+
+        public IReadOnlyList<Guid> AudienceUsers { get; set; } = [];
+
+        /// <summary>Eski İK departman hedefi (Core'a eşlenmemiş kayıtta); hedef değiştirilmedikçe korunur.</summary>
+        public string? LegacyAudience { get; init; }
+
+        public bool UnitsTouched { get; set; }
 
         public DateOnly? ClosesOn { get; set; }
     }

@@ -90,6 +90,12 @@ public sealed class CoreModule : IModule
         /// <summary>İşlem günlüğünde firmanın bütün içe aktarmalarını ve satır hatalarını görür (ADR-0033).</summary>
         public const string ReadImports = "core.imports.read";
 
+        /// <summary>
+        /// Ortak kişi kayıtlarını (<c>core.person</c>) toplu içe aktarır (ADR-0033; ADR-0042 bölüm 21). Kişinin yazma izni kişiyi kullanan modüllerden
+        /// gelir; içe aktarıcı ayrıca o izinlerden birine (ör. çalışan kartı yazma) sahip olmalıdır, kayıt boru hattı bunu denetler.
+        /// </summary>
+        public const string ImportPeople = "core.people.import";
+
         /// <summary>İçe aktarılmış kayıtları gerekçeyle toplu geri alır (ADR-0033, Dilim 4).</summary>
         public const string RollbackImports = "core.imports.rollback";
     }
@@ -126,6 +132,26 @@ public sealed class CoreModule : IModule
         new(Permissions.RunImports, "İçe aktarma başlatır ve kendi içe aktarmalarını görür", "İçe aktarma"),
         new(Permissions.ReadImports, "Firmanın bütün içe aktarmalarını ve satır hatalarını görüntüler", "İçe aktarma"),
         new(Permissions.RollbackImports, "İçe aktarılmış kayıtları toplu geri alır", "İçe aktarma"),
+        new(Permissions.ImportPeople, "Ortak kişi kayıtlarını toplu içe aktarır (kişiyi kullanan bir modülün yazma izniyle birlikte)", "İçe aktarma"),
+    ];
+
+    /// <summary>
+    /// Ortak kişi kaydının içe aktarılması (ADR-0042 bölüm 21). Kişi bir kez girilir, modüller kullanır: çalışan kartı gibi kişiye bağlı kayıtlar
+    /// sonra kişinin e-postasıyla bağlanarak içe aktarılır. Aynı e-postalı kişi olası mükerrerdir (uyarı); kişiler otomatik birleştirilmez.
+    /// </summary>
+    IReadOnlyList<ImportDefinition> IModule.Imports { get; } =
+    [
+        new(SharedEntities.Person, "Kişi", Permissions.ImportPeople,
+        [
+            new("firstName", "Ad", Required: true),
+            new("lastName", "Soyad", Required: true),
+            new("email", "E-posta"),
+            new("phone", "Telefon"),
+            new("title", "Unvan"),
+        ])
+        {
+            MatchRules = [new("email", "email")],
+        },
     ];
 
     /// <summary>Çekirdeğin olay abonelikleri (ADR-0007).</summary>
@@ -660,7 +686,7 @@ public sealed class CoreModule : IModule
         }, "rules"),
         new(AuditedEntityKeys.SubProfile, "Alt profil", null, new Dictionary<string, string>
         {
-            ["name"] = "Ad", ["code"] = "Kod", ["description"] = "Açıklama", ["activity"] = "Bağlı faaliyet", ["status"] = "Durum", ["options"] = "Seçenekler",
+            ["name"] = "Ad", ["code"] = "Kod", ["description"] = "Açıklama", ["activity"] = "Bağlı faaliyet", ["status"] = "Durum", ["options"] = "Seçenekler", ["features"] = "Hizmet özellikleri", ["rules"] = "Kurallar",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>

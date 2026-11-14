@@ -20,7 +20,6 @@ public class HrImportTests
         Assert.Equal(HrModule.Permissions.AssetsManage, asset.CreatePermission);
         Assert.Equal(HrModule.Permissions.LeavesManage, balance.CreatePermission);
         Assert.Equal(HrModule.Permissions.LeavesManage, holiday.CreatePermission);
-        Assert.Null(Catalog.FindImport(HrModule.Entities.Employee)); // kişi kaydı gerektirir; Core kararı (bölüm 19)
 
         // Envanter no ve tatil günü kesin eşleşmedir; izin hakkı çalışana sicil numarasıyla bağlanır.
         Assert.Equal([new ImportMatchRule("assetTag", null, Exact: true)], asset.MatchRules);
@@ -29,6 +28,27 @@ public class HrImportTests
         Assert.Equal((ImportFieldType.Reference, true, HrModule.Entities.Employee), (employee.Type, employee.Required, employee.Reference!.EntityKey));
         Assert.Equal(["employeeNumber"], employee.Reference.Filters);
         Assert.Equal(["assetTag", "name"], asset.Fields.Where(f => f.Required).Select(f => f.Key));
+    }
+
+    [Fact]
+    public void Employees_link_to_people_by_email_and_managers_by_employee_number_after_core_people_are_imported()
+    {
+        var employee = Catalog.FindImport(HrModule.Entities.Employee)!.Value.Definition;
+        var people = Catalog.FindImport("core.person")!.Value;
+
+        Assert.Equal(HrModule.Permissions.EmployeesWrite, employee.CreatePermission);
+        var person = Assert.Single(employee.Fields, f => f.Key == "personId");
+        Assert.Equal((true, "core.person"), (person.Required, person.Reference!.EntityKey));
+        Assert.Equal(["email"], person.Reference.Filters);
+        var manager = Assert.Single(employee.Fields, f => f.Key == "managerEmployeeId");
+        Assert.Equal(HrModule.Entities.Employee, manager.Reference!.EntityKey);
+        Assert.Equal(["employeeNumber"], manager.Reference.Filters);
+        Assert.Equal(["employeeNumber", "personId"], employee.MatchRules.Where(r => r.Exact).Select(r => r.Field));
+
+        // Kişi içe aktarma Core'un ayrı iznidir (ADR-0042 bölüm 21); e-posta olası mükerrerdir, kişiler birleştirilmez.
+        Assert.Equal(("core", "core.people.import"), (people.ModuleKey, people.Definition.CreatePermission));
+        Assert.Equal(["firstName", "lastName"], people.Definition.Fields.Where(f => f.Required).Select(f => f.Key));
+        Assert.Equal([new ImportMatchRule("email", "email")], people.Definition.MatchRules);
     }
 
     [Theory]

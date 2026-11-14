@@ -4,10 +4,10 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>@(IsNew ? "Yeni rol" : role?.Name ?? "Rol") · Modulix</PageTitle>
+<PageTitle>@(IsNew ? Texts.Get("admin.roles.new") : role?.Name ?? Texts.Get("admin.users.role")) · Modulix</PageTitle>
 
 <AuthGate Permission="@CoreAccess.ManageRoles">
-    <a class="back-link" href="yonetim/roller">← Roller</a>
+    <a class="back-link" href="yonetim/roller">← @Texts.Get("nav.app.admin.roles")</a>
 
     @if (notice is not null)
     {
@@ -26,34 +26,31 @@
     else if (IsNew || role is not null)
     {
         <div class="page-header">
-            <h1>@(IsNew ? "Yeni rol" : role!.Name)</h1>
+            <h1>@(IsNew ? Texts.Get("admin.roles.new") : role!.Name)</h1>
             @if (role is { IsSystem: false })
             {
-                <a class="btn btn-outline-secondary" href="yonetim/roller/yeni?kopya=@role.Id">Kopyala</a>
+                <a class="btn btn-outline-secondary" href="yonetim/roller/yeni?kopya=@role.Id">@Texts.Get("admin.roleDetail.copy")</a>
             }
         </div>
 
         @if (role is { IsSystem: true })
         {
-            <div class="alert alert-info">
-                Yönetici rolü tüm izinleri verir; sonradan açılan modüllerin izinleri de kendiliğinden gelir. Adı ve izinleri
-                değiştirilemez, rol silinemez.
-            </div>
+            <div class="alert alert-info">@Texts.Get("admin.roleDetail.systemInfo")</div>
             <PermissionMatrix Permissions="permissions" Selected="AllKeys" ReadOnly="true" />
             <RoleMembers RoleId="role.Id" />
         }
         else
         {
             <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-                <TabBar Tabs="FormTabs" State="tabs" Label="Rol formu bölümleri" Changed="_ => { }" />
+                <TabBar Tabs="FormTabs" State="tabs" Label="@Texts.Get("admin.roleDetail.sections")" Changed="_ => { }" />
                 <TabPanel State="tabs" Key="form-genel">
                 <div class="form-grid">
                     @if (IsNew && templates.Count > 0)
                     {
                         <div>
-                            <label class="form-label" for="template">Şablondan başla</label>
+                            <label class="form-label" for="template">@Texts.Get("admin.roleDetail.template")</label>
                             <select id="template" class="form-select" value="@templateKey" @onchange="e => ApplyTemplate(e.Value as string)">
-                                <option value="">Boş rol</option>
+                                <option value="">@Texts.Get("admin.roleDetail.emptyRole")</option>
                                 @foreach (var template in templates)
                                 {
                                     <option value="@template.Key">@template.Name</option>
@@ -61,12 +58,12 @@
                             </select>
                             @if (Template is { } chosen)
                             {
-                                <small class="text-muted">@chosen.Description Oluşturmadan önce izinleri değiştirebilirsiniz.</small>
+                                <small class="text-muted">@chosen.Description @Texts.Get("admin.roleDetail.templateHint")</small>
                             }
                         </div>
                     }
                     <div>
-                        <label class="form-label" for="roleName">Rol adı *</label>
+                        <label class="form-label" for="roleName">@Texts.Get("admin.roleDetail.name")</label>
                         <input id="roleName" class="form-control" maxlength="100" @bind="name" />
                         <FieldError Field="name" Errors="errors" />
                     </div>
@@ -76,7 +73,7 @@
                 <TabPanel State="tabs" Key="form-izin">
                 @if (!Session.IsAdministrator)
                 {
-                    <p class="text-muted">Yalnızca kendinizde olan izinleri verebilir veya kaldırabilirsiniz; diğerleri kilitli görünür.</p>
+                    <p class="text-muted">@Texts.Get("admin.roleDetail.ownPermissionsOnly")</p>
                 }
 
                 <PermissionMatrix Permissions="permissions" Selected="selected" CanGrant="CanGrant" />
@@ -84,25 +81,19 @@
 
                 @if (skippedFromTemplate > 0)
                 {
-                    <p class="text-muted">Şablondaki @skippedFromTemplate izin sizde olmadığı için eklenmedi.</p>
+                    <p class="text-muted">@Texts.Get("admin.roleDetail.skipped", skippedFromTemplate)</p>
                 }
 
                 @if (HiddenCount > 0)
                 {
-                    <p class="text-muted">
-                        Bu rolde kapalı modüllere ait @HiddenCount izin var. Bu izinler korunur ve modül yeniden açılınca geçerli olur.
-                    </p>
+                    <p class="text-muted">@Texts.Get("admin.roleDetail.hidden", HiddenCount)</p>
                 }
 
                 </TabPanel>
                 <TabPanel State="tabs" Key="form-kapsam">
                 <fieldset class="scope-choice">
-                    <legend class="form-label">Kayıt kapsamı</legend>
-                    <p class="text-muted small">
-                        İzinler hangi tür kayıtları, kapsam hangi kayıtları göreceğini belirler. Sorumlusu olan kayıtlara (firma,
-                        fırsat, aktivite) uygulanır. Kişinin birden fazla rolü varsa her rolün gördüğü kayıtlar birleşir. Departman
-                        kapsamları kişinin <a href="yonetim/departmanlar">departmanına</a> göre belirlenir.
-                    </p>
+                    <legend class="form-label">@Texts.Get("admin.roles.col.scope")</legend>
+                    <p class="text-muted small">@((MarkupString)Texts.Get("admin.roleDetail.scopeHelp", "<a href=\"yonetim/departmanlar\">", "</a>"))</p>
                     @foreach (var option in ScopeOptions)
                     {
                         var id = $"scope-{option}";
@@ -110,13 +101,13 @@
                             <input id="@id" class="form-check-input" type="radio" name="scope" checked="@(scope == option)"
                                    disabled="@(!CanGrantScope(option))" @onchange="() => scope = option" />
                             <label class="form-check-label" for="@id">
-                                <strong>@RecordScopeLabels.Of(option)</strong> <span class="text-muted">@RecordScopeLabels.Describe(option)</span>
+                                <strong>@AdminLabels.Scope(option)</strong> <span class="text-muted">@AdminLabels.ScopeDescription(option)</span>
                             </label>
                         </div>
                     }
                     @if (ScopeOptions.Any(o => !CanGrantScope(o)))
                     {
-                        <small class="text-muted">Kendi kapsamınızdan geniş bir kapsam veremezsiniz.</small>
+                        <small class="text-muted">@Texts.Get("admin.roleDetail.scopeLimit")</small>
                     }
                     <FieldError Field="scope" Errors="errors" />
                 </fieldset>
@@ -125,43 +116,40 @@
                 @if (scopeTypes.Count > 0)
                 {
                     <fieldset class="scope-choice">
-                        <legend class="form-label">Kayıt türüne göre farklı kapsam</legend>
-                        <p class="text-muted small">
-                            Yukarıdaki kapsam bütün kayıt türlerine uygulanır. Bir türde farklı görünürlük gerekiyorsa buradan seçin; seçilmeyen
-                            türde varsayılan kapsam geçerlidir. Platform bir tür için sınır koyduysa o sınırdan geniş seçenekler kapalıdır.
-                        </p>
+                        <legend class="form-label">@Texts.Get("admin.roleDetail.overrides")</legend>
+                        <p class="text-muted small">@Texts.Get("admin.roleDetail.overridesHelp")</p>
                         <table class="table record-table">
-                            <thead><tr><th>Kayıt türü</th><th>Bu rolde</th><th>Platform sınırı</th></tr></thead>
+                            <thead><tr><th>@Texts.Get("admin.roleDetail.col.type")</th><th>@Texts.Get("admin.roleDetail.col.inRole")</th><th>@Texts.Get("admin.roleDetail.col.limit")</th></tr></thead>
                             <tbody>
                                 @foreach (var type in scopeTypes)
                                 {
                                     <tr>
-                                        <td data-label="Kayıt türü" class="primary">@type.Label</td>
-                                        <td data-label="Bu rolde">
-                                            <select class="form-select" aria-label="@($"{type.Label} için kapsam")"
+                                        <td data-label="@Texts.Get("admin.roleDetail.col.type")" class="primary">@type.Label</td>
+                                        <td data-label="@Texts.Get("admin.roleDetail.col.inRole")">
+                                            <select class="form-select" aria-label="@Texts.Get("admin.roleDetail.scopeFor", type.Label)"
                                                     value="@(overrides.TryGetValue(type.EntityKey, out var chosen) ? ((int)chosen).ToString() : string.Empty)"
                                                     @onchange="e => ChooseOverride(type.EntityKey, e.Value as string)">
-                                                <option value="">Varsayılan (@RecordScopeLabels.Of(scope))</option>
+                                                <option value="">@Texts.Get("admin.roleDetail.defaultScope", AdminLabels.Scope(scope))</option>
                                                 @foreach (var option in ScopeOptions)
                                                 {
                                                     <option value="@((int)option)" disabled="@(!WithinLimit(type, option) || !CanGrantOverride(option))">
-                                                        @RecordScopeLabels.Of(option)@(WithinLimit(type, option) ? null : " (platform sınırını aşar)")
+                                                        @AdminLabels.Scope(option)@(WithinLimit(type, option) ? null : " " + Texts.Get("admin.roleDetail.exceedsLimit"))
                                                     </option>
                                                 }
                                             </select>
                                             @if (DefaultExceeds(type))
                                             {
-                                                <small class="text-danger d-block">Varsayılan kapsam platform sınırını aşıyor; bu tür için bir kapsam seçin.</small>
+                                                <small class="text-danger d-block">@Texts.Get("admin.roleDetail.defaultExceeds")</small>
                                             }
                                         </td>
-                                        <td data-label="Platform sınırı">
+                                        <td data-label="@Texts.Get("admin.roleDetail.col.limit")">
                                             @if (type.MaxScope is { } max)
                                             {
-                                                <span class="badge">En fazla: @RecordScopeLabels.Of(max)</span>
+                                                <span class="badge">@Texts.Get("admin.roleDetail.maxScope", AdminLabels.Scope(max))</span>
                                             }
                                             else
                                             {
-                                                <span class="text-muted">Sınır yok</span>
+                                                <span class="text-muted">@Texts.Get("admin.roleDetail.noLimit")</span>
                                             }
                                         </td>
                                     </tr>
@@ -170,7 +158,7 @@
                         </table>
                         @if (scopeTypes.Any(DefaultExceeds))
                         {
-                            <button type="button" class="btn btn-tonal" @onclick="LowerToLimits">Sınırı aşan türleri sınıra indir</button>
+                            <button type="button" class="btn btn-tonal" @onclick="LowerToLimits">@Texts.Get("admin.roleDetail.lowerToLimits")</button>
                         }
                         <FieldError Field="scopeOverrides" Errors="errors" />
                     </fieldset>
@@ -178,11 +166,8 @@
 
                 @* Atanabilir düzey (ADR-0026 K6): bayi gibi departmanlara toplu rol vermek için rol açıkça departmana atanabilir yapılır. *@
                 <fieldset class="scope-choice">
-                    <legend class="form-label">Atanabilir düzey</legend>
-                    <p class="text-muted small">
-                        Rol kullanıcıya doğrudan, bir departmana (departmandaki herkese) ya da ikisine de atanabilir. Departmana atanan
-                        rol, o departmandaki her kullanıcıya izinlerini ve kayıt kapsamını verir.
-                    </p>
+                    <legend class="form-label">@Texts.Get("admin.roles.col.assignLevel")</legend>
+                    <p class="text-muted small">@Texts.Get("admin.roleDetail.assignLevelHelp")</p>
                     @foreach (var option in AssignLevelOptions)
                     {
                         var id = $"level-{option}";
@@ -190,29 +175,25 @@
                             <input id="@id" class="form-check-input" type="radio" name="assign-level" checked="@(assignLevel == option)"
                                    disabled="@(role is { UnitCount: > 0 } && option == RoleAssignLevel.User)"
                                    @onchange="() => assignLevel = option" />
-                            <label class="form-check-label" for="@id"><strong>@RoleAssignLevelLabels.Of(option)</strong></label>
+                            <label class="form-check-label" for="@id"><strong>@AdminLabels.AssignLevel(option)</strong></label>
                         </div>
                     }
                     @if (role is { UnitCount: > 0 })
                     {
-                        <small class="text-muted">Rol @role.UnitCount departmana atanmış; "yalnızca kullanıcıya" yapmak için önce departman atamalarını kaldırın.</small>
+                        <small class="text-muted">@Texts.Get("admin.roleDetail.assignedToUnits", role.UnitCount)</small>
                     }
                     <FieldError Field="assignLevel" Errors="errors" />
                 </fieldset>
 
                 @* Bayi izolasyonu (ADR-0026 K8): kapsam dışı ortak firma/kişiler asgari kimlikle bile görünmesin. *@
                 <fieldset class="scope-choice">
-                    <legend class="form-label">Kapsam dışı ortak kayıtlar</legend>
+                    <legend class="form-label">@Texts.Get("admin.roleDetail.outOfScopeShared")</legend>
                     <div class="form-check">
                         <input id="hide-shared" class="form-check-input" type="checkbox" checked="@hideOutOfScopeShared"
                                @onchange="e => hideOutOfScopeShared = e.Value is true" />
                         <label class="form-check-label" for="hide-shared">
-                            <strong>Kapsam dışı firma ve kişileri gizle</strong>
-                            <span class="text-muted">
-                                Kapalıyken, kayıt kapsamınız dışındaki ortak firma ve kişiler genel arama ve seçim listelerinde yalnızca asgari kimlikle
-                                (ad, vergi numarası) görünür. Açıkken hiç görünmez; sayıya, aramaya ve mükerrer önerisine de girmez. Bayi rolleri
-                                için açık olması önerilir. Kişinin birden fazla rolü varsa, hepsi gizlediğinde gizlenir.
-                            </span>
+                            <strong>@Texts.Get("admin.roleDetail.hideShared")</strong>
+                            <span class="text-muted">@Texts.Get("admin.roleDetail.hideSharedHelp")</span>
                         </label>
                     </div>
                     <FieldError Field="hideOutOfScopeShared" Errors="errors" />
@@ -220,8 +201,8 @@
                 </TabPanel>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@busy">@(IsNew ? "Rolü oluştur" : "Kaydet")</button>
-                    <a class="btn btn-outline-secondary" href="yonetim/roller">Vazgeç</a>
+                    <button type="submit" class="btn btn-primary" disabled="@busy">@(IsNew ? Texts.Get("admin.roleDetail.create") : Texts.Get("common.save"))</button>
+                    <a class="btn btn-outline-secondary" href="yonetim/roller">@Texts.Get("common.dismiss")</a>
                 </div>
             </form>
 
@@ -230,14 +211,14 @@
                 <RoleMembers RoleId="role.Id" />
 
                 <section class="detail-section">
-                    <div class="section-header"><h2>Rolü sil</h2></div>
+                    <div class="section-header"><h2>@Texts.Get("admin.roleDetail.delete")</h2></div>
                     @if (!deleting)
                     {
                         <div class="account-actions">
                             <div>
-                                <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => deleting = true">Rolü sil</button>
+                                <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => deleting = true">@Texts.Get("admin.roleDetail.delete")</button>
                                 <small class="text-muted">
-                                    @(role.MemberCount == 0 ? "Rolün üyesi yok." : $"Rolde {role.MemberCount} kişi var; silmeden önce başka bir role taşınırlar.")
+                                    @(role.MemberCount == 0 ? Texts.Get("admin.roleDetail.noMembers") : Texts.Get("admin.roleDetail.membersMove", role.MemberCount))
                                 </small>
                             </div>
                         </div>
@@ -247,22 +228,19 @@
                         <div class="alert alert-warning confirm" role="alertdialog">
                             @if (role.MemberCount == 0)
                             {
-                                <p>"@role.Name" rolü silinsin mi?</p>
+                                <p>@Texts.Get("admin.roleDetail.deleteQuestion", role.Name)</p>
                             }
                             else if (!Session.Can(CoreAccess.ManageUsers))
                             {
-                                <p>
-                                    Bu rolde @role.MemberCount kişi var. Üyeleri başka bir role taşımak kullanıcıların rolünü değiştirir;
-                                    bunun için kullanıcı yönetme izni de gerekir.
-                                </p>
+                                <p>@Texts.Get("admin.roleDetail.moveNeedsUsers", role.MemberCount)</p>
                             }
                             else
                             {
-                                <p>Bu rolde @role.MemberCount kişi var. Silmeden önce hangi role taşınsınlar?</p>
+                                <p>@Texts.Get("admin.roleDetail.moveQuestion", role.MemberCount)</p>
                                 <div class="mb-3">
-                                    <label class="form-label" for="moveTo">Taşınacak rol</label>
+                                    <label class="form-label" for="moveTo">@Texts.Get("admin.roleDetail.moveTo")</label>
                                     <select id="moveTo" class="form-select" @bind="moveTo">
-                                        <option value="">Seçin</option>
+                                        <option value="">@Texts.Get("support.choose")</option>
                                         @foreach (var target in MoveTargets())
                                         {
                                             <option value="@target.Id">@target.Name</option>
@@ -271,8 +249,8 @@
                                 </div>
                             }
 
-                            <button type="button" class="btn btn-danger" disabled="@(busy || !CanDelete)" @onclick="DeleteAsync">Rolü sil</button>
-                            <button type="button" class="btn btn-outline-secondary" @onclick="() => deleting = false">Vazgeç</button>
+                            <button type="button" class="btn btn-danger" disabled="@(busy || !CanDelete)" @onclick="DeleteAsync">@Texts.Get("admin.roleDetail.delete")</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => deleting = false">@Texts.Get("common.dismiss")</button>
                         </div>
                     }
                 </section>
@@ -321,9 +299,9 @@
 
     private IReadOnlyList<TabItem> FormTabs =>
     [
-        new("form-genel", "Genel", Errors: ErrorCount("name")),
-        new("form-izin", "İzinler", Errors: ErrorCount("permissions")),
-        new("form-kapsam", "Kapsam ve düzey", Errors: ErrorCount("scope", "scopeOverrides", "assignLevel", "hideOutOfScopeShared")),
+        new("form-genel", Texts.Get("crm.quoteDetail.tab.general"), Errors: ErrorCount("name")),
+        new("form-izin", Texts.Get("admin.roles.col.permissions"), Errors: ErrorCount("permissions")),
+        new("form-kapsam", Texts.Get("admin.roleDetail.tab.scope"), Errors: ErrorCount("scope", "scopeOverrides", "assignLevel", "hideOutOfScopeShared")),
     ];
 
     private bool IsNew => RoleId is null;
@@ -362,7 +340,7 @@
         if (RoleId is { } id)
         {
             role = roles.FirstOrDefault(r => r.Id == id);
-            message ??= role is null ? "Rol bulunamadı." : null;
+            message ??= role is null ? Texts.Get("admin.roleDetail.notFound") : null;
             name = role?.Name ?? string.Empty;
             selected = role?.Permissions.ToHashSet() ?? [];
             scope = role?.Scope ?? RecordScope.All;
@@ -374,7 +352,7 @@
         {
             role = null;
             var source = roles.FirstOrDefault(r => r.Id == CopyOf && !r.IsSystem);
-            name = source is null ? string.Empty : $"{source.Name} (kopya)";
+            name = source is null ? string.Empty : Texts.Get("admin.roleDetail.copyName", source.Name);
             selected = source?.Permissions.ToHashSet() ?? [];
             scope = source?.Scope ?? (Session.IsAdministrator ? RecordScope.All : Session.Scope);
             assignLevel = source?.AssignLevel ?? RoleAssignLevel.User;
@@ -502,7 +480,7 @@
         selected = role.Permissions.ToHashSet();
         message = null;
         errors = null;
-        notice = "Rol kaydedildi.";
+        notice = Texts.Get("admin.roleDetail.saved");
     }
 
     private async Task DeleteAsync()

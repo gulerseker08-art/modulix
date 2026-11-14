@@ -121,11 +121,16 @@
             <caption class="visually-hidden">GTİP katalog sürümleri</caption>
             <thead>
                 <tr>
-                    <th scope="col">Sürüm</th><th scope="col">Yürürlük</th><th scope="col">Satır</th><th scope="col">Dosya</th><th scope="col">Yüklendi</th><th scope="col"></th>
+                    <th scope="col"><SortHeader Label="Sürüm" ColumnIcon="type" Asc="name" Desc="-name" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
+                    <th scope="col"><SortHeader Label="Yürürlük" ColumnIcon="calendar" Asc="effectiveFrom" Desc="-effectiveFrom" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
+                    <th scope="col"><SortHeader Label="Satır" ColumnIcon="hash" Asc="entryCount" Desc="-entryCount" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
+                    <th scope="col"><SortHeader Label="Dosya" ColumnIcon="file-text" Asc="file" Desc="-file" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
+                    <th scope="col"><SortHeader Label="Yüklendi" ColumnIcon="clock" Asc="createdAt" Desc="-createdAt" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
+                    <th scope="col"><span class="visually-hidden">Eylemler</span></th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var version in versions)
+                @foreach (var version in ClientSort.Apply(versions, versionSort, VersionColumns))
                 {
                     <tr>
                         <td data-label="Sürüm" class="primary">
@@ -177,13 +182,19 @@
             }
             else if (entries.Items.Count == 0)
             {
-                <p class="text-muted" role="status">Aramaya uyan satır yok.</p>
+                <EmptyState Compact="true" Title="Aramaya uyan satır yok." />
             }
             else
             {
                 <table class="table record-table">
                     <caption class="visually-hidden">Sürümdeki GTİP satırları</caption>
-                    <thead><tr><th scope="col">GTİP</th><th scope="col">Tanım</th><th scope="col">Birim</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th scope="col"><SortHeader Label="GTİP" ColumnIcon="hash" Asc="code" Desc="-code" Value="@entrySort" Default="code" ValueChanged="SortEntriesAsync" /></th>
+                            <th scope="col"><SortHeader Label="Tanım" ColumnIcon="type" Asc="description" Desc="-description" Value="@entrySort" Default="code" ValueChanged="SortEntriesAsync" /></th>
+                            <th scope="col"><SortHeader Label="Birim" ColumnIcon="tag" Asc="unit" Desc="-unit" Value="@entrySort" Default="code" ValueChanged="SortEntriesAsync" /></th>
+                        </tr>
+                    </thead>
                     <tbody>
                         @foreach (var entry in entries.Items)
                         {
@@ -203,6 +214,27 @@
 
 @code {
     private List<GtipVersionDto>? versions;
+
+    // Sürüm listesi tamamı yüklü gelir: istemcide sıralanır (ClientSort). Satırlar sayfalanır: sunucuda sıralanır (GtipEntrySort.Keys).
+    private string versionSort = "";
+    private string entrySort = "code";
+
+    private static readonly Dictionary<string, Func<GtipVersionDto, object?>> VersionColumns = new()
+    {
+        ["name"] = v => v.Name,
+        ["effectiveFrom"] = v => v.EffectiveFrom,
+        ["entryCount"] = v => v.EntryCount,
+        ["file"] = v => v.SourceFileName,
+        ["createdAt"] = v => v.CreatedAt,
+    };
+
+    private void SortVersions(string value) => versionSort = value;
+
+    private async Task SortEntriesAsync(string value)
+    {
+        entrySort = value;
+        await LoadEntriesAsync(1);
+    }
     private GtipVersionDto? selected;
     private GtipEntryPageDto? entries;
     private GtipImportPreviewDto? preview;
@@ -354,7 +386,7 @@
         }
 
         var result = await Api.GetAsync<GtipEntryPageDto>(
-            $"/api/platform/gtip/versions/{selected.Id}/entries?page={page}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}");
+            $"/api/platform/gtip/versions/{selected.Id}/entries?page={page}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}&sort={Uri.EscapeDataString(entrySort)}");
         entries = result.Value;
         if (!result.IsSuccess)
         {

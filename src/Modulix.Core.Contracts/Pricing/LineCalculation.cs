@@ -1,4 +1,4 @@
-namespace Modulix.Core.Pricing;
+namespace Modulix.Core.Contracts.Pricing;
 
 /// <summary>
 /// İndirim kuralı. Yüzde ya da tutar (ikisinden yalnızca biri). <see cref="Stackable"/> yanlışsa başka indirimle birlikte uygulanamaz

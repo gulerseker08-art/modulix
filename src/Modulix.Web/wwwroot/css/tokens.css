@@ -1,0 +1,328 @@
+/* Manrope (OFL), değişken ağırlık 400–800; latin-ext Türkçe karakterleri (İ ı ş ğ) ve ₺ simgesini içerir. Yerelden sunulur. */
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 400 800;
+    font-display: swap;
+    src: url('../fonts/manrope-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 400 800;
+    font-display: swap;
+    src: url('../fonts/manrope-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* =====================================================================
+   Modulix tasarım sistemi — tasarım tokenları (docs/design-system/theme-tokens.md)
+   Bütün renk, tipografi, boşluk, köşe ve gölge değerleri buradan gelir.
+   Bileşen CSS'i yalnızca --mx-* tokenlarını kullanır; sabit renk yazılmaz.
+   ===================================================================== */
+:root,
+[data-theme="light"] {
+    color-scheme: light;
+
+    /* Marka: Modulix paleti lacivert / mavi / turkuaz (referans CRM tasarımı; docs/design-system/theme-tokens.md) */
+    --mx-brand-navy: #101D35;
+    --mx-brand-navy-light: #173B68;
+    --mx-brand-primary: #087DB8;
+    --mx-brand-primary-hover: #066A9C;
+    --mx-brand-primary-rgb: 8, 125, 184;
+    --mx-brand-teal: #00C2C7;
+    --mx-brand-teal-dark: #008F98;
+
+    /* Yüzeyler ve metin: açık mavi-gri zemin, beyaz kart */
+    --mx-background: #F5F8FC;
+    --mx-surface: #FFFFFF;
+    --mx-surface-muted: #EEF5FA;
+    --mx-surface-control: #E6EDF5; /* ikincil düğme dolgusu: sayfa zemininde de seçilir */
+    --mx-surface-hover: #F3F7FB;
+    --mx-border: #DCE5F0;
+    --mx-border-strong: #B9C8DA;
+    --mx-text-primary: #101D35;
+    /* Referanstaki #64748B sayfa zemininde 4.47:1 kaldığı için AA (4.5:1) sağlayan en yakın ton kullanılır. */
+    --mx-text-secondary: #5D6B81;
+    --mx-text-label: #2B3A55;
+    --mx-text-on-brand: #FFFFFF;
+
+    /* Durum (semantik) — marka renklerinden ayrı */
+    --mx-success: #10B981;
+    --mx-warning: #F59E0B;
+    --mx-danger: #EF4444;
+    --mx-info: #0EA5E9;
+    --mx-danger-text: #B91C1C;
+
+    /* Rozet tonları: açık zemin + AA kontrastlı koyu metin */
+    --mx-tone-neutral-bg: #EEF2F7;
+    --mx-tone-neutral-fg: #475569;
+    --mx-tone-brand-bg: #E6F2FA;
+    --mx-tone-brand-fg: #0B5C87;
+    --mx-tone-info-bg: #E0F2FE;
+    --mx-tone-info-fg: #075985;
+    --mx-tone-success-bg: #D1FAE5;
+    --mx-tone-success-fg: #065F46;
+    --mx-tone-warning-bg: #FEF3C7;
+    --mx-tone-warning-fg: #92400E;
+    --mx-tone-danger-bg: #FEE2E2;
+    --mx-tone-danger-fg: #991B1B;
+    --mx-tone-violet-bg: #EDE9FE;
+    --mx-tone-violet-fg: #5B21B6;
+    --mx-tone-teal-bg: #DDF6F7;
+    --mx-tone-teal-fg: #0B6368;
+
+    /* Grafik serileri */
+    --chart-c0: #087DB8;
+    --chart-c1: #00C2C7;
+    --chart-c2: #F59E0B;
+    --chart-c3: #173B68;
+    --chart-c4: #EF4444;
+    --chart-c5: #94A3B8;
+
+    /* Tipografi: Manrope (yerel woff2, latin-ext Türkçe karakterleri içerir) */
+    --mx-font: 'Manrope', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    --mx-fs-page-title: 1.75rem;     /* 28px / 700 */
+    --mx-fs-section-title: 1.125rem; /* 18px / 600 */
+    --mx-fs-card-title: 1rem;        /* 16px / 600 */
+    --mx-fs-body: 0.875rem;          /* 14px */
+    --mx-fs-label: 0.8125rem;        /* 13px / 600 */
+    --mx-fs-helper: 0.75rem;         /* 12px */
+    --mx-fs-table: 0.875rem;         /* 14px */
+    --mx-fs-kpi: 1.5rem;             /* 24px / 700 */
+    --mx-fs-hero: 2.75rem;           /* 44px / 800, pano bandı */
+    --mx-lh-body: 1.5;
+
+    /* Boşluk (4px tabanlı) */
+    --mx-space-1: 0.25rem;
+    --mx-space-2: 0.5rem;
+    --mx-space-3: 0.75rem;
+    --mx-space-4: 1rem;
+    --mx-space-5: 1.25rem;
+    --mx-space-6: 1.5rem;
+    --mx-space-8: 2rem;
+
+    /* Köşe yarıçapları */
+    --mx-radius-input: 9px;
+    --mx-radius-button: 10px;
+    --mx-radius-card: 16px;
+    --mx-radius-drawer: 16px;
+    --mx-radius-modal: 16px;
+    --mx-radius-badge: 999px;
+
+    /* Gölgeler: kartlarda yumuşak, düğmelerde küçük denetim gölgesi (parlama yok) */
+    --mx-shadow-card: 0 1px 2px rgba(16, 29, 53, 0.04), 0 8px 28px rgba(16, 29, 53, 0.06);
+    --mx-shadow-raised: 0 10px 32px rgba(16, 29, 53, 0.10);
+    --mx-shadow-popover: 0 14px 36px rgba(16, 29, 53, 0.16);
+    --mx-shadow-control: 0 1px 2px rgba(16, 29, 53, 0.08);
+
+    /* Düğme dolguları (6.11 seçenek C, 12.11 güncellemesi): birincil lacivert düz, yıkıcı kırmızı düz; metin --mx-text-on-brand (AA) */
+    --mx-fill-primary: var(--mx-brand-navy);
+    --mx-fill-primary-hover: var(--mx-brand-navy-light);
+    --mx-fill-danger: #DC2626;
+    --mx-fill-danger-hover: #B91C1C;
+
+    /* Marka degradesi: birincil düğme, etkin sekme çizgisi, sayaç rozeti, bölüm ikonu (beyaz metinle AA: 4.5:1 ve üzeri) */
+    --mx-gradient-brand: linear-gradient(135deg, #087DB8 0%, #1F5FCB 100%);
+    --mx-gradient-brand-hover: linear-gradient(135deg, #066A9C 0%, #1A52B3 100%);
+    /* Pano bandı: lacivertten maviye; beyaz ana ve ikincil metinle AA (sağ uç #0A5F8F değerinden açık tutulmaz) */
+    --mx-gradient-hero: linear-gradient(115deg, #0B2A52 0%, #0F4478 55%, #0A5F8F 100%);
+    --mx-text-on-hero: #FFFFFF;
+    --mx-text-on-hero-muted: rgba(255, 255, 255, 0.82);
+    --mx-hero-tile: rgba(255, 255, 255, 0.12);
+    --mx-hero-tile-hover: rgba(255, 255, 255, 0.2);
+    --mx-nav-active-bg: linear-gradient(90deg, #E1F4FA, #E5EEFD);
+    /* Birincil eylem (CTA, 12.11.2026 görsel kararı): koyu turkuazdan maviye dolu degrade; beyaz metinle iki uçta da en az 4.5:1 (AA) */
+    --mx-gradient-cta: linear-gradient(135deg, #0A8093 0%, #0B6AA6 100%);
+    --mx-gradient-cta-hover: linear-gradient(135deg, #086F80 0%, #095B91 100%);
+    --mx-shadow-cta: 0 6px 16px rgba(10, 128, 147, 0.28);
+    --mx-shadow-cta-hover: 0 8px 20px rgba(10, 128, 147, 0.36);
+    /* Etkin sekmenin alt çizgisi: turkuazdan maviye */
+    --mx-gradient-tab-line: linear-gradient(90deg, #00C2C7, #087DB8);
+    /* İçerik paneli: sayfa zemininde yüzen yuvarlak açık yüzey */
+    --mx-panel-bg: linear-gradient(180deg, #FCFDFF 0%, #F2F8FD 100%);
+    --mx-panel-border: #E3ECF6;
+    --mx-radius-panel: 24px;
+    --mx-shadow-panel: 0 1px 2px rgba(16, 29, 53, 0.03), 0 16px 48px rgba(16, 29, 53, 0.07);
+    /* Pano göstergesi: zemin, ayırıcı ve dolgular (dash-hero) */
+    --mx-hero-track: rgba(255, 255, 255, 0.14);
+    --mx-hero-line: rgba(255, 255, 255, 0.18);
+    /* Güzergâh haritası (RouteMap): koyu hero zemininde çizilir; iki temada da aynı değerler (beyaz metin AA) */
+    --mx-map-land: #13294F;
+    --mx-map-land-hot: #1B5A9C;
+    --mx-map-line: #2B4B88;
+    --mx-map-dot: #FFFFFF;
+    --mx-map-label: #E6EEFC;
+    --mx-map-route-0: #2DD4BF;
+    --mx-map-route-1: #60A5FA;
+    --mx-map-route-2: #FBBF24;
+    --mx-map-route-3: #C084FC;
+    --mx-hero-fill-realized: #2DD4D8;
+    --mx-hero-fill-weighted: #7FC4EC;
+    --mx-focus-ring: 0 0 0 3px rgba(var(--mx-brand-primary-rgb), 0.28);
+
+    /* Kabuk ölçüleri */
+    --mx-header-height: 4rem;
+    --mx-sidebar-width: 248px;
+    --mx-sidebar-collapsed-width: 72px;
+    --mx-control-height: 36px;
+
+    /* Geriye uyumlu takma adlar (eski --mx-* adları; yeni kodda kullanma) */
+    --mx-navy: var(--mx-brand-navy);
+    --mx-navy-soft: var(--mx-brand-navy-light);
+    --mx-indigo: var(--mx-brand-primary);
+    --mx-indigo-hover: var(--mx-brand-primary-hover);
+    --mx-indigo-rgb: var(--mx-brand-primary-rgb);
+    --mx-teal: var(--mx-brand-teal-dark);
+    --mx-lilac: var(--mx-surface-muted);
+    --mx-cream: var(--mx-background);
+    --mx-ink: var(--mx-text-primary);
+    --mx-muted: var(--mx-text-secondary);
+    --mx-radius: var(--mx-radius-card);
+    --mx-shadow: var(--mx-shadow-card);
+
+    /* Bootstrap'ı aynı tokenlara bağla */
+    --bs-primary: var(--mx-brand-primary);
+    --bs-primary-rgb: var(--mx-brand-primary-rgb);
+    --bs-body-font-family: var(--mx-font);
+    --bs-body-font-size: var(--mx-fs-body);
+    --bs-body-line-height: var(--mx-lh-body);
+    --bs-body-bg: var(--mx-background);
+    --bs-body-color: var(--mx-text-primary);
+    --bs-emphasis-color: var(--mx-text-primary);
+    --bs-secondary-color: var(--mx-text-secondary);
+    --bs-secondary-bg: var(--mx-surface-muted);
+    --bs-tertiary-bg: var(--mx-surface);
+    --bs-border-color: var(--mx-border);
+    --bs-link-color: var(--mx-brand-primary);
+    --bs-link-color-rgb: var(--mx-brand-primary-rgb);
+    --bs-link-hover-color: var(--mx-brand-primary-hover);
+    --bs-link-hover-color-rgb: 6, 106, 156;
+    --bs-border-radius: var(--mx-radius-input);
+    --bs-border-radius-sm: 6px;
+    --bs-border-radius-lg: var(--mx-radius-card);
+    --bs-focus-ring-color: rgba(var(--mx-brand-primary-rgb), 0.28);
+    --bs-danger: var(--mx-danger);
+    --bs-success: var(--mx-success);
+    --bs-warning: var(--mx-warning);
+    --bs-info: var(--mx-info);
+}
+
+/* Koyu tema: aynı token adları, farklı değerler. Bootstrap tarafı data-bs-theme="dark" ile gelir. */
+[data-theme="dark"] {
+    color-scheme: dark;
+
+    /* Koyu lacivert zemin, biraz daha açık kart; turkuaz vurgu kontrollü (glow yok). */
+    --mx-brand-primary: #3BAEE6;
+    --mx-brand-primary-hover: #6CC6F2;
+    --mx-brand-primary-rgb: 59, 174, 230;
+    --mx-focus-ring: 0 0 0 3px rgba(var(--mx-brand-primary-rgb), 0.6); /* koyu zeminde en az 3:1 */
+    --mx-brand-teal: #2DD4D8;
+    --mx-brand-teal-dark: #5EEAEE;
+
+    --mx-background: #0B1322;
+    --mx-surface: #121D33;
+    --mx-surface-muted: #192842;
+    --mx-surface-control: #1E2F4D;
+    --mx-surface-hover: #16233B;
+    --mx-border: #243654;
+    --mx-border-strong: #3A5078;
+    --mx-text-primary: #E6EDF7;
+    --mx-text-secondary: #9FB0C8;
+    --mx-text-label: #C9D4E5;
+    --mx-text-on-brand: #07111F;
+    --mx-danger-text: #F87171;
+
+    --mx-tone-neutral-bg: #1C2A42;
+    --mx-tone-neutral-fg: #C9D4E5;
+    --mx-tone-brand-bg: #0E3652;
+    --mx-tone-brand-fg: #9EDCFF;
+    --mx-tone-info-bg: #0C3247;
+    --mx-tone-info-fg: #7DD3FC;
+    --mx-tone-success-bg: #0B3B2E;
+    --mx-tone-success-fg: #6EE7B7;
+    --mx-tone-warning-bg: #3D2C08;
+    --mx-tone-warning-fg: #FCD34D;
+    --mx-tone-danger-bg: #43161A;
+    --mx-tone-danger-fg: #FCA5A5;
+    --mx-tone-violet-bg: #2B1D52;
+    --mx-tone-violet-fg: #C4B5FD;
+    --mx-tone-teal-bg: #0B3A3F;
+    --mx-tone-teal-fg: #7FE3E6;
+
+    --chart-c0: #3BAEE6;
+    --chart-c1: #2DD4D8;
+    --chart-c2: #FBBF24;
+    --chart-c3: #93C5FD;
+    --chart-c4: #F87171;
+    --chart-c5: #64748B;
+
+    --mx-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --mx-shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.35);
+    --mx-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.5);
+    --mx-shadow-control: 0 1px 2px rgba(0, 0, 0, 0.35);
+
+    /* Koyu temada birincil açık dolgu + koyu metin; yıkıcı açık kırmızı + koyu metin */
+    --mx-fill-primary: #E6EDF7;
+    --mx-fill-primary-hover: #FFFFFF;
+    --mx-fill-danger: #F87171;
+    --mx-fill-danger-hover: #FCA5A5;
+
+    /* Koyu zeminde açık degrade + koyu metin (--mx-text-on-brand) */
+    --mx-gradient-brand: linear-gradient(135deg, #3BAEE6 0%, #6FA8FA 100%);
+    --mx-gradient-brand-hover: linear-gradient(135deg, #6CC6F2 0%, #8DBBFC 100%);
+    --mx-gradient-hero: linear-gradient(115deg, #0A1E3C 0%, #0F3560 55%, #125580 100%);
+    --mx-nav-active-bg: var(--mx-surface-muted);
+    /* Koyu temada CTA açık turkuaz→mavi degrade + koyu metin (--mx-text-on-brand) */
+    --mx-gradient-cta: linear-gradient(135deg, #2DD4D8 0%, #4DB4F2 100%);
+    --mx-gradient-cta-hover: linear-gradient(135deg, #5EEAEE 0%, #7CC8F7 100%);
+    --mx-shadow-cta: 0 6px 16px rgba(45, 212, 216, 0.18);
+    --mx-shadow-cta-hover: 0 8px 20px rgba(45, 212, 216, 0.28);
+    --mx-gradient-tab-line: linear-gradient(90deg, #2DD4D8, #3BAEE6);
+    --mx-panel-bg: linear-gradient(180deg, #0F1A2F 0%, #0D172B 100%);
+    --mx-panel-border: #1B2C48;
+    --mx-shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 48px rgba(0, 0, 0, 0.35);
+    --mx-hero-line: rgba(255, 255, 255, 0.16);
+    --mx-map-land: #13294F;
+    --mx-map-land-hot: #1B5A9C;
+    --mx-map-line: #2B4B88;
+    --mx-map-dot: #FFFFFF;
+    --mx-map-label: #E6EEFC;
+    --mx-map-route-0: #2DD4BF;
+    --mx-map-route-1: #60A5FA;
+    --mx-map-route-2: #FBBF24;
+    --mx-map-route-3: #C084FC;
+
+    --bs-body-bg: var(--mx-background);
+    --bs-body-color: var(--mx-text-primary);
+    --bs-emphasis-color: var(--mx-text-primary);
+    --bs-secondary-color: var(--mx-text-secondary);
+    --bs-secondary-bg: var(--mx-surface-muted);
+    --bs-tertiary-bg: var(--mx-surface);
+    --bs-border-color: var(--mx-border);
+    --bs-link-color: var(--mx-brand-primary);
+    --bs-link-color-rgb: var(--mx-brand-primary-rgb);
+    --bs-link-hover-color: var(--mx-brand-primary-hover);
+    --bs-link-hover-color-rgb: 108, 198, 242;
+}
+
+html, body {
+    font-family: var(--mx-font);
+    font-size: 16px;
+    background: var(--mx-background);
+    color: var(--mx-text-primary);
+}
+
+body {
+    font-size: var(--mx-fs-body);
+    line-height: var(--mx-lh-body);
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--mx-text-primary);
+}

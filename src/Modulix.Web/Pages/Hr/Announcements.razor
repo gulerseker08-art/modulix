@@ -6,7 +6,8 @@
 <PageTitle>Duyurular · Modulix</PageTitle>
 
 @* Duyuru akışı (ADR-0042 dilim 6): kullanıcıya hedeflenen, yayında ve süresi dolmamış duyurular; sabitlenmiş olanlar üstte, okunmamışlar "Yeni"
-   işaretli. Duyuru açılınca okundu yazılır. Hangi duyurunun görüneceğine sunucu karar verir. Metin düz metindir (HTML yorumlanmaz). *@
+   işaretli. Duyuru açılınca okundu yazılır ve ekleri (görsel, belge; ADR-0040 dosyaları, bölüm 23a) listelenir. Hangi duyurunun görüneceğine sunucu karar verir.
+   Metin düz metindir (HTML yorumlanmaz). *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.AnnouncementsRead">
     <PageHeader Title="Duyurular" Icon="bell" Subtitle="@(page is null ? "Kurum içi duyurular." : $"{page.TotalCount} duyuru · {Unread} okunmamış")" />
 
@@ -27,7 +28,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Şu an size yönelik duyuru yok.</p>
+        <EmptyState Compact="true" Title="Şu an size yönelik duyuru yok." />
     }
     else
     {
@@ -48,11 +49,14 @@
                         }
                     </div>
                     <p class="text-muted mb-2">
-                        @HrLabels.Date(WarehouseLabels.Text(announcement, "publishOn"))@(WarehouseLabels.Text(announcement, "audienceDepartmentKey") is { Length: > 0 } dep ? $" · {Lookups.Label(HrAccess.DepartmentList, dep)}" : "")
+                        @HrLabels.Date(WarehouseLabels.Text(announcement, "publishOn"))@(HrLabels.Audience(announcement, Lookups) is var audience && audience != HrLabels.Everyone ? $" · {audience}" : "")
                     </p>
                     @if (open)
                     {
                         <p class="preline mb-2">@WarehouseLabels.Text(announcement, "body")</p>
+                        <AttachmentPanel EntityKey="@HrAccess.AnnouncementEntityKey" RecordId="announcement.Id" Title="Ekler" EmptyText="Bu duyurunun eki yok." />
+                        <ContentDiscussion Route="announcements" CommentEntityKey="@HrAccess.AnnouncementCommentEntityKey" Content="announcement" Lookups="Lookups"
+                                           CanModerate="@Session.Can(HrAccess.AnnouncementsManage)" />
                     }
                     <button type="button" class="btn btn-ghost" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleAsync(announcement)">
                         <AppIcon Name="@(open ? "chevron-down" : "chevron-right")" Size="16" /> @(open ? "Kapat" : "Oku")

@@ -21,11 +21,12 @@
         <AnnouncementEditor @key="selected?.Id" Announcement="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="() => editing = false" />
         @if (selected is not null)
         {
+            <AttachmentPanel EntityKey="@HrAccess.AnnouncementEntityKey" RecordId="selected.Id" CanWrite="true" Title="Ekler" EmptyText="Bu duyurunun eki yok." />
             <section aria-label="Okuyanlar">
                 <div class="list-toolbar mt-3"><h3 class="h6 mb-0 me-auto">Okuyanlar</h3></div>
                 @if (reads is null || reads.Count == 0)
                 {
-                    <p class="text-muted" role="status">Henüz kimse okumadı.</p>
+                    <EmptyState Compact="true" Icon="eye" Title="Henüz kimse okumadı." />
                 }
                 else
                 {
@@ -65,7 +66,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu görünüme uyan duyuru yok.</p>
+        <EmptyState Compact="true" Title="Bu görünüme uyan duyuru yok." />
     }
     else
     {
@@ -92,7 +93,7 @@
                         <td class="row-menu-cell">
                             <RowMenu Label="@($"{WarehouseLabels.Text(announcement, "title")} eylemleri")">
                                 <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenAsync(announcement)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteAsync(announcement)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                <RowMenuDelete OnConfirm="() => DeleteAsync(announcement)" />
                             </RowMenu>
                         </td>
                     </tr>
@@ -235,7 +236,7 @@
     private RenderFragment CellContent(string key, RecordResponse record) => key switch
     {
         "title" => @<text>@WarehouseLabels.Text(record, "title") @if (WarehouseLabels.Flag(record, "isPinned")) { <span class="badge stage-qualified">Sabitlenmiş</span> }</text>,
-        "audience" => @<text>@(WarehouseLabels.Text(record, "audienceDepartmentKey") is { Length: > 0 } dep ? Lookups.Label(HrAccess.DepartmentList, dep) : "Herkes")</text>,
+        "audience" => @<text>@HrLabels.Audience(record, Lookups)</text>,
         "publishOn" => @<text>@HrLabels.Date(WarehouseLabels.Text(record, "publishOn")) – @(WarehouseLabels.Text(record, "expiresOn") is { Length: > 0 } e ? HrLabels.Date(e) : "süresiz")</text>,
         "readCount" => @<text>@WarehouseLabels.Number(record, "readCount")</text>,
         "status" => @<span class="badge @(WarehouseLabels.Flag(record, "isPublished") ? "status-customer" : "status-inactive")">@(WarehouseLabels.Flag(record, "isPublished") ? "Yayında" : "Taslak")</span>,

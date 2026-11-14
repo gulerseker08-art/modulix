@@ -3,35 +3,32 @@
 @inject ApiClient Api
 
 <form class="record-form" novalidate @onsubmit="InviteAsync" @onsubmit:preventDefault>
-    <h2>Kullanıcı davet et</h2>
-    <p class="text-muted">
-        Kişiye şifresini belirleyeceği bir bağlantı gönderilir (7 gün geçerli). E-posta başka bir kuruluşta zaten
-        kullanılıyorsa kişi hemen eklenir ve bilgilendirilir.
-    </p>
+    <h2>@Texts.Get("admin.users.invite")</h2>
+    <p class="text-muted">@Texts.Get("admin.invite.intro")</p>
 
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <FormTabs Title="Kullanıcı bilgileri" Label="Kullanıcı daveti formu bölümleri">
+    <FormTabs Title="@Texts.Get("admin.invite.section")" Label="@Texts.Get("admin.invite.sections")">
     <div class="form-grid">
         <div>
-            <label class="form-label" for="inviteEmail">E-posta *</label>
+            <label class="form-label" for="inviteEmail">@Texts.Get("admin.invite.email")</label>
             <input id="inviteEmail" class="form-control" type="email" autocomplete="off" @bind="email" />
             <FieldError Field="email" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="inviteName">Ad soyad *</label>
+            <label class="form-label" for="inviteName">@Texts.Get("admin.invite.name")</label>
             <input id="inviteName" class="form-control" maxlength="200" @bind="displayName" />
             <FieldError Field="displayName" Errors="errors" />
         </div>
         @if (Units.Count > 0)
         {
             <div>
-                <label class="form-label" for="inviteUnit">Departman</label>
+                <label class="form-label" for="inviteUnit">@Texts.Get("admin.unit")</label>
                 <select id="inviteUnit" class="form-select" @bind="businessUnitId">
-                    <option value="">Varsayılan (kök departman)</option>
+                    <option value="">@Texts.Get("admin.invite.defaultUnit")</option>
                     @foreach (var unit in Units.Where(u => u.IsActive))
                     {
                         <option value="@unit.Id">@unit.PathNames</option>
@@ -41,7 +38,7 @@
             </div>
         }
         <fieldset class="span-all">
-            <legend class="form-label">Roller</legend>
+            <legend class="form-label">@Texts.Get("nav.app.admin.roles")</legend>
             <RolePicker Roles="Roles" Selected="selected" CanGrantAdministrator="CanGrantAdministrator" />
             <FieldError Field="roleIds" Errors="errors" />
         </fieldset>
@@ -49,8 +46,8 @@
     </FormTabs>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@busy">Davet gönder</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("admin.invite.send")</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.dismiss")</button>
     </div>
 </form>
 
