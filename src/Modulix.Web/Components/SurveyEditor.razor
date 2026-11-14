@@ -49,7 +49,7 @@
                         <input id="survey-anonymous" class="form-check-input" type="checkbox" disabled="@(form.Id is not null)" @bind="form.IsAnonymous" />
                         <label class="form-check-label" for="survey-anonymous">@f.Label</label>
                     </div>
-                    <small class="text-muted">Sonuçlarda kimin ne yanıtladığı gösterilmez; en az @MinAnonymousResponses yanıt gelince özet görünür. Kaydettikten sonra değişmez.</small>
+                    <small class="text-muted">Tam anonim: cevaplar yanıtlayana hiçbir yerde (sonuç, denetim kaydı, veritabanı) bağlanmaz; yalnızca kimin katıldığı tutulur. En az @MinAnonymousResponses yanıt gelince özet görünür. Kaydettikten sonra değişmez.</small>
                     break;
                 case "audienceBusinessUnitIds":
                     <label class="@f.LabelClass()" for="survey-audience-units">@f.Label</label>
