@@ -2,66 +2,66 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Platform · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
 @* Platform yönetiminin giriş sayfası (Y4). *@
 <PlatformGate>
-    <h1>Platform</h1>
-    <p class="text-muted">Firmaları, modül haklarını, süreleri ve olay teslimlerini yönetin. Firmaların kayıtları burada görünmez.</p>
+    <h1>@Texts.Get("nav.app.platform")</h1>
+    <p class="text-muted">@Texts.Get("platform.home.intro")</p>
 
     @if (overview is not null)
     {
-        <section class="detail-section" aria-label="Genel bakış">
-            <div class="section-header"><h2>Genel bakış</h2></div>
+        <section class="detail-section" aria-label="@Texts.Get("nav.app.platform.home")">
+            <div class="section-header"><h2>@Texts.Get("nav.app.platform.home")</h2></div>
             <dl class="detail-grid">
                 @foreach (var count in overview.TenantCounts)
                 {
-                    <div><dt>@TenantStateText.Of(count.State)</dt><dd>@count.Count</dd></div>
+                    <div><dt>@PlatformLabels.TenantStateOf(count.State)</dt><dd>@count.Count</dd></div>
                 }
-                <div><dt>Başarısız teslim</dt><dd><a href="platform/olaylar">@(failedDeliveries?.ToString() ?? "—")</a></dd></div>
+                <div><dt>@Texts.Get("platform.home.failedDeliveries")</dt><dd><a href="platform/olaylar">@(failedDeliveries?.ToString() ?? "—")</a></dd></div>
             </dl>
             <p class="text-muted">
-                Süresi yaklaşan haklar:
-                <a href="platform/sure-takvimi">30 günde @overview.ExpiringIn30Days · 60 günde @overview.ExpiringIn60Days · 90 günde @overview.ExpiringIn90Days</a>
+                @Texts.Get("platform.home.expiring")
+                <a href="platform/sure-takvimi">@Texts.Get("platform.home.expiringCounts", overview.ExpiringIn30Days, overview.ExpiringIn60Days, overview.ExpiringIn90Days)</a>
                 @if (overview.Expired > 0)
                 {
-                    <span class="badge user-locked">@overview.Expired hakkın süresi geçti (@overview.ReadOnly salt okunur)</span>
+                    <span class="badge user-locked">@Texts.Get("platform.home.expired", overview.Expired, overview.ReadOnly)</span>
                 }
             </p>
         </section>
     }
 
     <div class="tiles">
-        <a class="tile" href="platform/firmalar"><strong>Firmalar</strong><span>Firma açma, kapatma, ilk yönetici</span></a>
-        <a class="tile" href="platform/moduller"><strong>Modül hakları</strong><span>Firma × modül, aç/kapa</span></a>
+        <a class="tile" href="platform/firmalar"><strong>@Texts.Get("nav.app.platform.tenants")</strong><span>@Texts.Get("platform.home.tile.tenants")</span></a>
+        <a class="tile" href="platform/moduller"><strong>@Texts.Get("nav.app.platform.modules")</strong><span>@Texts.Get("platform.home.tile.modules")</span></a>
         @if (Session.IsPlatformOwner)
         {
-            <a class="tile" href="platform/ekip"><strong>Platform ekibi</strong><span>Roller: Destek, Operasyon, Finans</span></a>
+            <a class="tile" href="platform/ekip"><strong>@Texts.Get("platform.team.title")</strong><span>@Texts.Get("platform.home.tile.team")</span></a>
         }
-        <a class="tile" href="platform/planlar"><strong>Planlar</strong><span>Modül seti ve limitler</span></a>
-        <a class="tile" href="platform/katalog"><strong>Modül kataloğu</strong><span>Modüller, izinler, hazır roller</span></a>
-        <a class="tile" href="platform/sektorler"><strong>Sektörler ve faaliyetler</strong><span>Sektör → grup → faaliyet kataloğu, yetenekler</span></a>
-        <a class="tile" href="platform/firma-sektorleri"><strong>Firma sektörleri</strong><span>Firma ve müşteri adayı sektör listesi</span></a>
-        <a class="tile" href="platform/gtip"><strong>GTİP kataloğu</strong><span>Tarife cetveli sürümleri, Excel/CSV yükleme</span></a>
-        <a class="tile" href="platform/rejim-profilleri"><strong>Rejim profilleri</strong><span>Sürümlü kural paketi: tescil no kuralı, yayın</span></a>
-        <a class="tile" href="platform/saglik"><strong>Sağlık ve kullanım</strong><span>Kuyruk, sürüm, hata oranı, kullanım</span></a>
-        <a class="tile" href="platform/olaylar"><strong>Olaylar</strong><span>Başarısız teslimler, yeniden dene, atla</span></a>
-        <a class="tile" href="platform/sure-takvimi"><strong>Süre takvimi</strong><span>Bitişi yaklaşan modül hakları</span></a>
-        <a class="tile" href="platform/denetim"><strong>Platform denetimi</strong><span>Firmalar arası işlem kaydı</span></a>
+        <a class="tile" href="platform/planlar"><strong>@Texts.Get("platform.plans.title")</strong><span>@Texts.Get("platform.home.tile.plans")</span></a>
+        <a class="tile" href="platform/katalog"><strong>@Texts.Get("nav.app.platform.catalog")</strong><span>@Texts.Get("platform.home.tile.catalog")</span></a>
+        <a class="tile" href="platform/sektorler"><strong>@Texts.Get("platform.home.sectors")</strong><span>@Texts.Get("platform.home.tile.sectors")</span></a>
+        <a class="tile" href="platform/firma-sektorleri"><strong>@Texts.Get("nav.app.platform.industries")</strong><span>@Texts.Get("platform.home.tile.industries")</span></a>
+        <a class="tile" href="platform/gtip"><strong>@Texts.Get("nav.app.platform.gtip")</strong><span>@Texts.Get("platform.home.tile.gtip")</span></a>
+        <a class="tile" href="platform/rejim-profilleri"><strong>@Texts.Get("nav.app.platform.regime-profiles")</strong><span>@Texts.Get("platform.home.tile.regimeProfiles")</span></a>
+        <a class="tile" href="platform/saglik"><strong>@Texts.Get("platform.health.title")</strong><span>@Texts.Get("platform.home.tile.health")</span></a>
+        <a class="tile" href="platform/olaylar"><strong>@Texts.Get("nav.app.platform.events")</strong><span>@Texts.Get("platform.home.tile.events")</span></a>
+        <a class="tile" href="platform/sure-takvimi"><strong>@Texts.Get("platform.expirations.title")</strong><span>@Texts.Get("platform.home.tile.expirations")</span></a>
+        <a class="tile" href="platform/denetim"><strong>@Texts.Get("platform.audit.title")</strong><span>@Texts.Get("platform.home.tile.audit")</span></a>
     </div>
 
     @* Y7b: telefonunu ve kurtarma kodlarını kaybeden kişinin iki adımlı doğrulaması yalnızca buradan sıfırlanır. *@
     <form class="record-form settings-group mt-4" novalidate @onsubmit="ResetTwoFactorAsync" @onsubmit:preventDefault>
-        <h2>İki adımlı doğrulamayı sıfırla</h2>
-        <p class="text-muted">Telefonuna ve kurtarma kodlarına erişemeyen kişi için. Kimliğini doğruladıktan sonra kullanın: doğrulama kapanır, kişinin tüm oturumları kapatılır ve işlem denetim kaydına yazılır.</p>
+        <h2>@Texts.Get("platform.home.resetTitle")</h2>
+        <p class="text-muted">@Texts.Get("platform.home.resetIntro")</p>
         <Notice Text="@notice" Failed="failed" />
         <div class="mb-3">
-            <label class="form-label" for="resetEmail">Kişinin e-postası</label>
+            <label class="form-label" for="resetEmail">@Texts.Get("platform.home.resetEmail")</label>
             <input id="resetEmail" class="form-control" type="email" autocomplete="off" @bind="email" @bind:event="oninput" />
             <FieldError Field="email" Errors="errors" />
         </div>
         <div class="form-actions">
-            <button type="submit" class="btn btn-outline-danger" disabled="@(busy || string.IsNullOrWhiteSpace(email))">Sıfırla</button>
+            <button type="submit" class="btn btn-outline-danger" disabled="@(busy || string.IsNullOrWhiteSpace(email))">@Texts.Get("platform.home.reset")</button>
         </div>
     </form>
 </PlatformGate>
@@ -90,7 +90,7 @@
         errors = result.FieldErrors;
         if (result.IsSuccess)
         {
-            (notice, failed, email) = ($"{target} için iki adımlı doğrulama kapatıldı ve oturumları sonlandırıldı.", false, string.Empty);
+            (notice, failed, email) = (Texts.Get("platform.home.resetDone", target), false, string.Empty);
         }
         else
         {

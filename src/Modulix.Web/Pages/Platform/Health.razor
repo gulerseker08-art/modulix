@@ -1,18 +1,15 @@
 @page "/platform/saglik"
 @inject ApiClient Api
 
-<PageTitle>Sağlık ve kullanım · Platform · Modulix</PageTitle>
+<PageTitle>@Texts.Get("platform.health.title") · @Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
 @* Platform sağlık ve kullanım raporu (ADR-0028 Dilim 6, Y4.3): kuyruk, hata oranı, sürüm, kullanım ve güvenlik olayları. Yalnızca sayı,
    zaman ve firma adı gösterir; ödeme bilgisi, firma kaydı, dosya ya da e-posta içeriği yoktur. Yedek bilgisi uygulamada izlenmez:
    yedekleme veritabanı sunucusundadır (docs/tenant-isletim.md). *@
 <PlatformGate>
-    <a class="back-link" href="platform">← Platform</a>
-    <h1>Sağlık ve kullanım</h1>
-    <p class="text-muted">
-        Kuyruklar, son 24 saatin hata oranı, sürüm, kullanım ve güvenlik olayları. Firma kayıtları, ödeme bilgisi ve dosyalar bu ekranda yoktur.
-        Yedek durumu uygulamada izlenmez; veritabanı sunucusundan ve işletim belgesinden bakılır.
-    </p>
+    <a class="back-link" href="platform">← @Texts.Get("nav.app.platform")</a>
+    <h1>@Texts.Get("platform.health.title")</h1>
+    <p class="text-muted">@Texts.Get("platform.health.intro")</p>
 
     @if (message is not null)
     {
@@ -29,23 +26,23 @@
     else
     {
         <div class="list-toolbar">
-            <span class="text-muted">Rapor zamanı: @CrmLabels.Time(report.GeneratedAt)</span>
-            <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="LoadAsync">Yenile</button>
+            <span class="text-muted">@Texts.Get("platform.health.generatedAt", CrmLabels.Time(report.GeneratedAt))</span>
+            <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="LoadAsync">@Texts.Get("platform.health.refresh")</button>
         </div>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Sürüm</h2></div>
+            <div class="section-header"><h2>@Texts.Get("platform.health.version")</h2></div>
             <dl class="detail-grid">
-                <div><dt>Uygulama</dt><dd>@report.Version.Application</dd></div>
-                <div><dt>Çalışma ortamı</dt><dd>@report.Version.Runtime</dd></div>
-                <div><dt>Son migration</dt><dd>@(report.Version.LastMigration ?? "—")</dd></div>
+                <div><dt>@Texts.Get("platform.health.application")</dt><dd>@report.Version.Application</dd></div>
+                <div><dt>@Texts.Get("platform.health.runtime")</dt><dd>@report.Version.Runtime</dd></div>
+                <div><dt>@Texts.Get("platform.health.lastMigration")</dt><dd>@(report.Version.LastMigration ?? "—")</dd></div>
                 <div>
-                    <dt>Bekleyen migration</dt>
+                    <dt>@Texts.Get("platform.health.pendingMigrations")</dt>
                     <dd>
                         @report.Version.PendingMigrations
                         @if (report.Version.PendingMigrations > 0)
                         {
-                            <span class="badge user-locked">Uygulanmamış</span>
+                            <span class="badge user-locked">@Texts.Get("platform.health.notApplied")</span>
                         }
                     </dd>
                 </div>
@@ -53,88 +50,88 @@
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Kuyruklar</h2></div>
+            <div class="section-header"><h2>@Texts.Get("platform.health.queues")</h2></div>
             <table class="table record-table">
-                <thead><tr><th>Kuyruk</th><th>Bekleyen</th><th>Tutulan</th><th>Başarısız</th><th>En eski bekleyen</th><th>Son 24 saat hata oranı</th></tr></thead>
+                <thead><tr><th>@Texts.Get("platform.health.queue")</th><th>@Texts.Get("platform.health.pending")</th><th>@Texts.Get("platform.health.held")</th><th>@Texts.Get("platform.health.failed")</th><th>@Texts.Get("platform.health.oldestPending")</th><th>@Texts.Get("platform.health.failureRate")</th></tr></thead>
                 <tbody>
                     <tr>
-                        <td data-label="Kuyruk" class="primary">E-posta</td>
-                        <td data-label="Bekleyen">@report.Email.Pending</td>
-                        <td data-label="Tutulan">—</td>
-                        <td data-label="Başarısız">@Failed(report.Email.Failed)</td>
-                        <td data-label="En eski bekleyen">@Age(report.Email.OldestPendingAt)</td>
-                        <td data-label="Son 24 saat hata oranı">@Rate(report.Emails24Hours)</td>
+                        <td data-label="@Texts.Get("platform.health.queue")" class="primary">@Texts.Get("platform.health.emailQueue")</td>
+                        <td data-label="@Texts.Get("platform.health.pending")">@report.Email.Pending</td>
+                        <td data-label="@Texts.Get("platform.health.held")">—</td>
+                        <td data-label="@Texts.Get("platform.health.failed")">@Failed(report.Email.Failed)</td>
+                        <td data-label="@Texts.Get("platform.health.oldestPending")">@Age(report.Email.OldestPendingAt)</td>
+                        <td data-label="@Texts.Get("platform.health.failureRate")">@Rate(report.Emails24Hours)</td>
                     </tr>
                     <tr>
-                        <td data-label="Kuyruk" class="primary">Olay teslimi</td>
-                        <td data-label="Bekleyen">@report.Events.Pending</td>
-                        <td data-label="Tutulan">@report.Events.Held</td>
-                        <td data-label="Başarısız">@Failed(report.Events.Failed) @if (report.Events.Failed > 0) { <a href="platform/olaylar">İncele</a> }</td>
-                        <td data-label="En eski bekleyen">@Age(report.Events.OldestPendingAt)</td>
-                        <td data-label="Son 24 saat hata oranı">@Rate(report.EventDeliveries24Hours)</td>
+                        <td data-label="@Texts.Get("platform.health.queue")" class="primary">@Texts.Get("platform.health.eventQueue")</td>
+                        <td data-label="@Texts.Get("platform.health.pending")">@report.Events.Pending</td>
+                        <td data-label="@Texts.Get("platform.health.held")">@report.Events.Held</td>
+                        <td data-label="@Texts.Get("platform.health.failed")">@Failed(report.Events.Failed) @if (report.Events.Failed > 0) { <a href="platform/olaylar">@Texts.Get("platform.health.inspect")</a> }</td>
+                        <td data-label="@Texts.Get("platform.health.oldestPending")">@Age(report.Events.OldestPendingAt)</td>
+                        <td data-label="@Texts.Get("platform.health.failureRate")">@Rate(report.EventDeliveries24Hours)</td>
                     </tr>
                 </tbody>
             </table>
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Kullanım</h2></div>
+            <div class="section-header"><h2>@Texts.Get("platform.health.usage")</h2></div>
             <dl class="detail-grid">
-                <div><dt>Açık firma</dt><dd>@report.Usage.OperationalTenants</dd></div>
-                <div><dt>Etkin kullanıcı</dt><dd>@report.Usage.ActiveMembers</dd></div>
-                <div><dt>Son 7 günde giriş yapan firma</dt><dd>@report.Usage.SignedInTenants7Days</dd></div>
-                <div><dt>Son 30 günde giriş yapan firma</dt><dd>@report.Usage.SignedInTenants30Days</dd></div>
-                <div><dt>Son 24 saatte görülen oturum</dt><dd>@report.Usage.SessionsSeen24Hours</dd></div>
+                <div><dt>@Texts.Get("platform.health.operationalTenants")</dt><dd>@report.Usage.OperationalTenants</dd></div>
+                <div><dt>@Texts.Get("platform.health.activeMembers")</dt><dd>@report.Usage.ActiveMembers</dd></div>
+                <div><dt>@Texts.Get("platform.health.signedIn7")</dt><dd>@report.Usage.SignedInTenants7Days</dd></div>
+                <div><dt>@Texts.Get("platform.health.signedIn30")</dt><dd>@report.Usage.SignedInTenants30Days</dd></div>
+                <div><dt>@Texts.Get("platform.health.sessions24")</dt><dd>@report.Usage.SessionsSeen24Hours</dd></div>
             </dl>
 
-            <h3>30 gündür giriş yapılmayan firmalar</h3>
+            <h3>@Texts.Get("platform.health.inactive")</h3>
             @if (report.InactiveTenants.Count == 0)
             {
-                <EmptyState Title="Her açık firmada son 30 günde giriş var." />
+                <EmptyState Title="@Texts.Get("platform.health.inactiveEmpty")" />
             }
             else
             {
                 <table class="table record-table">
                     <thead>
                         <tr>
-                            <th scope="col"><SortHeader Label="Firma" ColumnIcon="building" Asc="name" Desc="-name" Value="@inactiveSort" Default="" ValueChanged="@(v => inactiveSort = v)" /></th>
-                            <th scope="col"><SortHeader Label="Son giriş" ColumnIcon="clock" Asc="lastSignIn" Desc="-lastSignIn" Value="@inactiveSort" Default="" ValueChanged="@(v => inactiveSort = v)" /></th>
+                            <th scope="col"><SortHeader Label="@Texts.Get("platform.tenant")" ColumnIcon="building" Asc="name" Desc="-name" Value="@inactiveSort" Default="" ValueChanged="@(v => inactiveSort = v)" /></th>
+                            <th scope="col"><SortHeader Label="@Texts.Get("platform.health.lastSignIn")" ColumnIcon="clock" Asc="lastSignIn" Desc="-lastSignIn" Value="@inactiveSort" Default="" ValueChanged="@(v => inactiveSort = v)" /></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var tenant in ClientSort.Apply(report.InactiveTenants, inactiveSort, InactiveColumns))
                         {
                             <tr>
-                                <td data-label="Firma" class="primary"><a href="platform/firmalar/@tenant.TenantId">@tenant.Name</a></td>
-                                <td data-label="Son giriş">@(tenant.LastSignInAt is { } last ? CrmLabels.Time(last) : "Hiç giriş yok")</td>
+                                <td data-label="@Texts.Get("platform.tenant")" class="primary"><a href="platform/firmalar/@tenant.TenantId">@tenant.Name</a></td>
+                                <td data-label="@Texts.Get("platform.health.lastSignIn")">@(tenant.LastSignInAt is { } last ? CrmLabels.Time(last) : Texts.Get("platform.health.neverSignedIn"))</td>
                             </tr>
                         }
                     </tbody>
                 </table>
-                <p class="text-muted">En eski 10 firma gösterilir.</p>
+                <p class="text-muted">@Texts.Get("platform.health.oldestTen")</p>
             }
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Güvenlik olayları (son 7 gün)</h2></div>
+            <div class="section-header"><h2>@Texts.Get("platform.health.security")</h2></div>
             <table class="table record-table">
                 <thead>
                     <tr>
-                        <th scope="col"><SortHeader Label="Olay" ColumnIcon="shield" Asc="action" Desc="-action" Value="@securitySort" Default="" ValueChanged="@(v => securitySort = v)" /></th>
-                        <th scope="col"><SortHeader Label="Adet" ColumnIcon="hash" Asc="count" Desc="-count" Value="@securitySort" Default="" ValueChanged="@(v => securitySort = v)" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("platform.health.event")" ColumnIcon="shield" Asc="action" Desc="-action" Value="@securitySort" Default="" ValueChanged="@(v => securitySort = v)" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("platform.health.count")" ColumnIcon="hash" Asc="count" Desc="-count" Value="@securitySort" Default="" ValueChanged="@(v => securitySort = v)" /></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var item in ClientSort.Apply(report.SecurityEvents7Days, securitySort, SecurityColumns))
                     {
                         <tr>
-                            <td data-label="Olay" class="primary">@PlatformAuditText.Of(item.Action)</td>
-                            <td data-label="Adet">@item.Count</td>
+                            <td data-label="@Texts.Get("platform.health.event")" class="primary">@PlatformLabels.AuditActionOf(item.Action)</td>
+                            <td data-label="@Texts.Get("platform.health.count")">@item.Count</td>
                         </tr>
                     }
                 </tbody>
             </table>
-            <a href="platform/denetim">Platform denetimi</a>
+            <a href="platform/denetim">@Texts.Get("platform.audit.title")</a>
         </section>
     }
 </PlatformGate>
@@ -154,7 +151,7 @@
 
     private static readonly Dictionary<string, Func<SecurityEventCountDto, object?>> SecurityColumns = new()
     {
-        ["action"] = e => PlatformAuditText.Of(e.Action),
+        ["action"] = e => PlatformLabels.AuditActionOf(e.Action),
         ["count"] = e => e.Count,
     };
     private string? message;
@@ -175,16 +172,16 @@
         new(count > 0 ? $"<span class=\"badge user-locked\">{count}</span>" : "0");
 
     private static string Rate(OutcomeStatsDto stats) =>
-        stats.Succeeded + stats.Failed == 0 ? "İş yok" : $"%{stats.FailureRate * 100:0.#} ({stats.Failed} / {stats.Succeeded + stats.Failed})";
+        stats.Succeeded + stats.Failed == 0 ? Texts.Get("platform.health.noWork") : Texts.Get("platform.health.rate", (stats.FailureRate * 100).ToString("0.#"), stats.Failed, stats.Succeeded + stats.Failed);
 
     private static string Age(DateTimeOffset? since)
     {
         if (since is not { } at)
         {
-            return "Bekleyen yok";
+            return Texts.Get("platform.health.nonePending");
         }
 
         var age = DateTimeOffset.UtcNow - at;
-        return age.TotalHours >= 1 ? $"{(int)age.TotalHours} sa {age.Minutes} dk" : $"{Math.Max(0, (int)age.TotalMinutes)} dk";
+        return age.TotalHours >= 1 ? Texts.Get("platform.age.hoursMinutes", (int)age.TotalHours, age.Minutes) : Texts.Get("platform.age.minutes", Math.Max(0, (int)age.TotalMinutes));
     }
 }

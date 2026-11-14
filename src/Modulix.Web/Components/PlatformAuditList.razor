@@ -6,10 +6,10 @@
 @if (ShowFilter)
 {
     <div class="list-toolbar">
-        <label class="form-label" for="auditAction">İşlem</label>
+        <label class="form-label" for="auditAction">@Texts.Get("platform.auditList.action")</label>
         <select id="auditAction" class="form-select" value="@action" @onchange="e => FilterAsync((string?)e.Value)">
-            <option value="">Tümü</option>
-            @foreach (var (key, text) in PlatformAuditText.All)
+            <option value="">@Texts.Get("support.all")</option>
+            @foreach (var (key, text) in PlatformLabels.AuditActions)
             {
                 <option value="@key">@text</option>
             }
@@ -37,15 +37,15 @@ else
 {
     <table class="table record-table">
         <thead>
-            <tr><th>Zaman</th><th>İşlem</th>@if (TenantId is null) { <th>Firma</th> }<th>Yapan</th><th>Gerekçe</th></tr>
+            <tr><th>@Texts.Get("platform.auditList.time")</th><th>@Texts.Get("platform.auditList.action")</th>@if (TenantId is null) { <th>@Texts.Get("platform.tenant")</th> }<th>@Texts.Get("platform.auditList.actor")</th><th>@Texts.Get("admin.supportAccess.col.reason")</th></tr>
         </thead>
         <tbody>
             @foreach (var item in page.Items)
             {
                 <tr>
-                    <td data-label="Zaman">@CrmLabels.Time(item.OccurredAt)</td>
-                    <td data-label="İşlem" class="primary">
-                        @PlatformAuditText.Of(item.Action)
+                    <td data-label="@Texts.Get("platform.auditList.time")">@CrmLabels.Time(item.OccurredAt)</td>
+                    <td data-label="@Texts.Get("platform.auditList.action")" class="primary">
+                        @PlatformLabels.AuditActionOf(item.Action)
                         @if (Detail(item) is { } detail)
                         {
                             <small class="text-muted d-block">@detail</small>
@@ -53,10 +53,10 @@ else
                     </td>
                     @if (TenantId is null)
                     {
-                        <td data-label="Firma">
+                        <td data-label="@Texts.Get("platform.tenant")">
                             @if (item.TargetTenantId is { } id)
                             {
-                                <a href="platform/firmalar/@id">@(item.TargetTenantName ?? "Silinmiş firma")</a>
+                                <a href="platform/firmalar/@id">@(item.TargetTenantName ?? Texts.Get("platform.auditList.deletedTenant"))</a>
                             }
                             else
                             {
@@ -64,8 +64,8 @@ else
                             }
                         </td>
                     }
-                    <td data-label="Yapan">@(item.ActorName ?? "Silinmiş hesap")</td>
-                    <td data-label="Gerekçe">@(item.Reason ?? "—")</td>
+                    <td data-label="@Texts.Get("platform.auditList.actor")">@(item.ActorName ?? Texts.Get("platform.auditList.deletedAccount"))</td>
+                    <td data-label="@Texts.Get("admin.supportAccess.col.reason")">@(item.Reason ?? "—")</td>
                 </tr>
             }
         </tbody>
@@ -135,7 +135,7 @@ else
             var root = document.RootElement;
             var module = root.TryGetProperty("module", out var m) ? m.GetString() : null;
             var enabled = root.TryGetProperty("enabled", out var e) && e.ValueKind == JsonValueKind.True;
-            return module is null ? null : $"{module}: {(enabled ? "açık" : "kapatıldı")}";
+            return module is null ? null : Texts.Get(enabled ? "platform.auditList.moduleOn" : "platform.auditList.moduleOff", module);
         }
         catch (JsonException)
         {

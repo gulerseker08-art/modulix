@@ -3,38 +3,35 @@
 @inject ApiClient Api
 
 <form class="record-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
-    <h2>Firma aç</h2>
-    <p class="text-muted">
-        İlk yöneticiye şifresini belirleyeceği bir bağlantı gönderilir (7 gün geçerli). E-posta platformda zaten
-        kayıtlıysa kişi hemen eklenir ve bilgilendirilir.
-    </p>
+    <h2>@Texts.Get("platform.tenants.create")</h2>
+    <p class="text-muted">@Texts.Get("platform.createTenant.intro")</p>
 
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <TabBar Tabs="FormTabs" State="tabs" Label="Firma açma formu bölümleri" />
+    <TabBar Tabs="FormTabs" State="tabs" Label="@Texts.Get("platform.createTenant.sections")" />
     <TabPanel State="tabs" Key="form-firma">
     <div class="form-grid">
         <div>
-            <label class="form-label" for="tenantName">Firma adı *</label>
+            <label class="form-label" for="tenantName">@Texts.Get("platform.createTenant.name")</label>
             <input id="tenantName" class="form-control" maxlength="200" @bind="name" @bind:after="SuggestSlug" />
             <FieldError Field="name" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="tenantSlug">Kısa ad *</label>
+            <label class="form-label" for="tenantSlug">@Texts.Get("platform.createTenant.slug")</label>
             <input id="tenantSlug" class="form-control" maxlength="50" @bind="slug" @bind:after="() => slugEdited = true" />
-            <small class="text-muted">Adreslerde kullanılır; a-z, 0-9 ve tire. Sonradan değişmez.</small>
+            <small class="text-muted">@Texts.Get("platform.createTenant.slugHint")</small>
             <FieldError Field="slug" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="adminEmail">İlk yöneticinin e-postası *</label>
+            <label class="form-label" for="adminEmail">@Texts.Get("platform.createTenant.adminEmail")</label>
             <input id="adminEmail" class="form-control" type="email" autocomplete="off" @bind="administratorEmail" />
             <FieldError Field="administratorEmail" Errors="errors" />
         </div>
         <div>
-            <label class="form-label" for="adminName">İlk yöneticinin adı soyadı *</label>
+            <label class="form-label" for="adminName">@Texts.Get("platform.createTenant.adminName")</label>
             <input id="adminName" class="form-control" maxlength="200" @bind="administratorName" />
             <FieldError Field="administratorName" Errors="errors" />
         </div>
@@ -45,9 +42,9 @@
         @if (Profiles.Count > 0)
         {
             <div class="span-all">
-                <label class="form-label" for="tenantProfile">Sektör profili</label>
+                <label class="form-label" for="tenantProfile">@Texts.Get("platform.profile")</label>
                 <select id="tenantProfile" class="form-select" value="@profile" @onchange="e => SelectProfile((string?)e.Value)">
-                    <option value="">Profil yok</option>
+                    <option value="">@Texts.Get("platform.createTenant.noProfile")</option>
                     @foreach (var item in Profiles)
                     {
                         <option value="@item.Key">@item.Name</option>
@@ -55,13 +52,13 @@
                 </select>
                 <small class="text-muted">
                     @(Profiles.FirstOrDefault(p => p.Key == profile)?.Description
-                        ?? "Profil, sektöre göre hazır alanlar ve liste değerleri ekler; modüllerini aşağıda önceden seçer.")
+                        ?? Texts.Get("platform.createTenant.profileHint"))
                 </small>
                 <FieldError Field="profile" Errors="errors" />
             </div>
         }
         <fieldset class="span-all">
-            <legend class="form-label">Açılacak modüller</legend>
+            <legend class="form-label">@Texts.Get("platform.createTenant.modules")</legend>
             @foreach (var module in Modules.Modules)
             {
                 <div class="form-check">
@@ -81,7 +78,7 @@
         @if (Templates.Count > 0)
         {
             <fieldset class="span-all">
-                <legend class="form-label">Hazır roller (isteğe bağlı)</legend>
+                <legend class="form-label">@Texts.Get("platform.createTenant.templates")</legend>
                 @foreach (var template in Templates)
                 {
                     <div class="form-check">
@@ -100,8 +97,8 @@
     }
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@busy">Firmayı aç</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Vazgeç</button>
+        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("platform.createTenant.submit")</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.dismiss")</button>
     </div>
 </form>
 
@@ -137,12 +134,12 @@
         {
             List<TabItem> items =
             [
-                new("form-firma", "Firma ve yönetici", Errors: ErrorCount("name", "slug", "administratorEmail", "administratorName")),
-                new("form-sektor", "Sektör ve modüller", Errors: ErrorCount("profile", "modules")),
+                new("form-firma", Texts.Get("platform.createTenant.tab.tenant"), Errors: ErrorCount("name", "slug", "administratorEmail", "administratorName")),
+                new("form-sektor", Texts.Get("platform.createTenant.tab.sector"), Errors: ErrorCount("profile", "modules")),
             ];
             if (Templates.Count > 0)
             {
-                items.Add(new("form-roller", "Hazır roller", Errors: ErrorCount("roleTemplates")));
+                items.Add(new("form-roller", Texts.Get("platform.templates"), Errors: ErrorCount("roleTemplates")));
             }
 
             return items;

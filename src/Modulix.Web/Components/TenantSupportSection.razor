@@ -3,33 +3,29 @@
 @* Destek erişimi (ADR-0028 Dilim 7, Y1.3): platform hesabına bu firmada gerekçeli, süreli ve salt okunur erişim açar. Erişim firma
    yöneticilerine e-postayla bildirilir, firmanın ve platformun denetim kaydına yazılır; süresi dolunca kendiliğinden kapanır. *@
 <section class="detail-section">
-    <div class="section-header"><h2>Destek erişimi</h2></div>
-    <p class="text-muted">
-        Firma verisine yalnızca bu bölümden, gerekçeyle ve süreli bakılır. Erişim <strong>salt okunurdur</strong> (dışa aktarma, kullanıcı, denetim ve ayar
-        izinleri yoktur), 15 dakika ile 8 saat sürer, firma yöneticilerine e-postayla bildirilir ve süresi dolunca kendiliğinden kapanır.
-        Açtıktan sonra firmayı "Kuruluş değiştir" ile seçersiniz.
-    </p>
+    <div class="section-header"><h2>@Texts.Get("admin.supportAccess.title")</h2></div>
+    <p class="text-muted">@Texts.Strong("platform.support.intro", Texts.Get("admin.supportAccess.readOnly"))</p>
 
     <Notice Text="@notice" Failed="failed" />
 
     @if (Operational)
     {
         <form class="inline-form" novalidate @onsubmit="GrantAsync" @onsubmit:preventDefault>
-            <h3>Erişim aç</h3>
+            <h3>@Texts.Get("platform.support.grant")</h3>
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="supportReason">Gerekçe *</label>
+                    <label class="form-label" for="supportReason">@Texts.Get("platform.reasonRequired")</label>
                     <input id="supportReason" class="form-control" maxlength="500" @bind="reason" @bind:event="oninput" />
                     <FieldError Field="reason" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="supportMinutes">Süre (dakika)</label>
+                    <label class="form-label" for="supportMinutes">@Texts.Get("platform.support.minutes")</label>
                     <input id="supportMinutes" class="form-control" type="number" min="15" max="480" @bind="minutes" />
                     <FieldError Field="minutes" Errors="errors" />
                 </div>
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(reason))">Erişim aç</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(reason))">@Texts.Get("platform.support.grant")</button>
             </div>
         </form>
     }
@@ -37,23 +33,23 @@
     @if (items is not null && items.Count > 0)
     {
         <table class="table record-table">
-            <thead><tr><th>Kişi</th><th>Gerekçe</th><th>Başlangıç</th><th>Bitiş</th><th>Durum</th><th></th></tr></thead>
+            <thead><tr><th>@Texts.Get("admin.supportAccess.col.person")</th><th>@Texts.Get("admin.supportAccess.col.reason")</th><th>@Texts.Get("admin.supportAccess.col.start")</th><th>@Texts.Get("admin.supportAccess.col.end")</th><th>@Texts.Get("common.field.status")</th><th></th></tr></thead>
             <tbody>
                 @foreach (var item in items)
                 {
                     <tr>
-                        <td data-label="Kişi" class="primary">@item.UserName</td>
-                        <td data-label="Gerekçe">@item.Reason</td>
-                        <td data-label="Başlangıç">@CrmLabels.Time(item.GrantedAt)</td>
-                        <td data-label="Bitiş">@CrmLabels.Time(item.EndedAt ?? item.ExpiresAt)</td>
-                        <td data-label="Durum">
+                        <td data-label="@Texts.Get("admin.supportAccess.col.person")" class="primary">@item.UserName</td>
+                        <td data-label="@Texts.Get("admin.supportAccess.col.reason")">@item.Reason</td>
+                        <td data-label="@Texts.Get("admin.supportAccess.col.start")">@CrmLabels.Time(item.GrantedAt)</td>
+                        <td data-label="@Texts.Get("admin.supportAccess.col.end")">@CrmLabels.Time(item.EndedAt ?? item.ExpiresAt)</td>
+                        <td data-label="@Texts.Get("common.field.status")">
                             <span class="badge @(item.State == SupportAccessStateDto.Active ? "user-active" : "user-disabled")">@StateText(item.State)</span>
                         </td>
                         <td class="actions">
-                            <button type="button" class="btn btn-ghost btn-sm" @onclick="() => ToggleReadsAsync(item.Id)">İşlemler</button>
+                            <button type="button" class="btn btn-ghost btn-sm" @onclick="() => ToggleReadsAsync(item.Id)">@Texts.Get("platform.support.reads")</button>
                             @if (item.State == SupportAccessStateDto.Active)
                             {
-                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RevokeAsync(item.Id)">Kapat</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RevokeAsync(item.Id)">@Texts.Get("common.close")</button>
                             }
                         </td>
                     </tr>
@@ -63,11 +59,11 @@
                             <td colspan="6">
                                 @if (reads is null)
                                 {
-                                    <span class="text-muted">Yükleniyor…</span>
+                                    <span class="text-muted">@Texts.Get("common.loading")</span>
                                 }
                                 else if (reads.Count == 0)
                                 {
-                                    <span class="text-muted">Bu erişimde henüz istek yapılmadı.</span>
+                                    <span class="text-muted">@Texts.Get("platform.support.noReads")</span>
                                 }
                                 else
                                 {
@@ -77,7 +73,7 @@
                                             <li><span class="text-muted">@CrmLabels.Time(read.At)</span> <strong>@read.Method</strong> @read.Path</li>
                                         }
                                     </ul>
-                                    <p class="text-muted">En yeni 200 istek. Yalnızca yöntem ve yol kaydedilir; arama metni ve yanıt içeriği saklanmaz.</p>
+                                    <p class="text-muted">@Texts.Get("platform.support.readsNote")</p>
                                 }
                             </td>
                         </tr>
@@ -126,7 +122,7 @@
             return;
         }
 
-        (notice, failed, reason) = ($"Destek erişimi açıldı; {CrmLabels.Time(result.Value!.ExpiresAt)} tarihine kadar salt okunur. Firma yöneticilerine bildirildi.", false, string.Empty);
+        (notice, failed, reason) = (Texts.Get("platform.support.granted", CrmLabels.Time(result.Value!.ExpiresAt)), false, string.Empty);
         await LoadAsync();
         await Changed.InvokeAsync();
     }
@@ -136,7 +132,7 @@
         busy = true;
         var result = await Api.PostAsync<bool>($"/api/platform/support-access/{grantId}/revoke?reason={Uri.EscapeDataString("Platform ekibi kapattı")}", new { });
         busy = false;
-        (notice, failed) = result.IsSuccess ? ("Destek erişimi kapatıldı.", false) : (result.Error, true);
+        (notice, failed) = result.IsSuccess ? (Texts.Get("platform.support.revoked"), false) : (result.Error, true);
         await LoadAsync();
     }
 
@@ -159,8 +155,8 @@
 
     private static string StateText(SupportAccessStateDto state) => state switch
     {
-        SupportAccessStateDto.Active => "Geçerli",
-        SupportAccessStateDto.Expired => "Süresi doldu",
-        _ => "Kapatıldı",
+        SupportAccessStateDto.Active => Texts.Get("admin.supportAccess.state.active"),
+        SupportAccessStateDto.Expired => Texts.Get("admin.supportAccess.state.expired"),
+        _ => Texts.Get("admin.supportAccess.state.revoked"),
     };
 }

@@ -5,7 +5,7 @@
    ve etkilenen rol sayısı platform denetim kaydına yazılır. "Etkiyi göster" kaydetmeden önce kaç kişinin kısılacağını ya da serbest
    kalacağını sunucudan hesaplatır (yazmaz). *@
 <section class="detail-section">
-    <div class="section-header"><h2>Kayıt görünürlüğü</h2></div>
+    <div class="section-header"><h2>@Texts.Get("platform.scopeLimits.title")</h2></div>
     <Notice Text="@notice" Failed="failed" />
 
     @if (state is null)
@@ -17,43 +17,40 @@
     }
     else if (state.Types.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu firmada kapsamı ayarlanabilen bir kayıt türü yok (sahipli kayıt türü olan modüller kapalı)." />
+        <EmptyState Compact="true" Title="@Texts.Get("platform.scopeLimits.empty")" />
     }
     else
     {
-        <p class="text-muted">
-            Firmanın rolleri bir kayıt türünde burada seçtiğiniz kapsamdan geniş görünürlük veremez. Sınır yoksa rol ne verirse o geçerlidir.
-            Değişiklik firmanın bir sonraki isteğinde geçerli olur; rollerin kaydı değişmez, daralan roller okuma sırasında sınıra indirilir.
-        </p>
+        <p class="text-muted">@Texts.Get("platform.scopeLimits.intro")</p>
 
         <form class="inline-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
             <table class="table record-table">
-                <thead><tr><th>Kayıt türü</th><th>En geniş kapsam</th><th>Yönetici</th></tr></thead>
+                <thead><tr><th>@Texts.Get("admin.automation.entity")</th><th>@Texts.Get("platform.scopeLimits.maxScope")</th><th>@Texts.Get("platform.scopeLimits.administrator")</th></tr></thead>
                 <tbody>
                     @foreach (var type in state.Types)
                     {
                         var row = rows[type.EntityKey];
                         <tr>
-                            <td data-label="Kayıt türü" class="primary">@type.Label <small class="text-muted">@type.EntityKey</small></td>
-                            <td data-label="En geniş kapsam">
-                                <select class="form-select" aria-label="@($"{type.Label} için en geniş kapsam")"
+                            <td data-label="@Texts.Get("admin.automation.entity")" class="primary">@type.Label <small class="text-muted">@type.EntityKey</small></td>
+                            <td data-label="@Texts.Get("platform.scopeLimits.maxScope")">
+                                <select class="form-select" aria-label="@Texts.Get("platform.scopeLimits.maxScopeOf", type.Label)"
                                         value="@(row.Max is { } max ? ((int)max).ToString() : string.Empty)"
                                         @onchange="e => { Choose(type.EntityKey, e.Value as string); preview = null; }">
-                                    <option value="">Sınır yok</option>
+                                    <option value="">@Texts.Get("platform.scopeLimits.noLimit")</option>
                                     @foreach (var option in Options)
                                     {
-                                        <option value="@((int)option)">@RecordScopeLabels.Of(option)</option>
+                                        <option value="@((int)option)">@AdminLabels.Scope(option)</option>
                                     }
                                 </select>
                             </td>
-                            <td data-label="Yönetici">
+                            <td data-label="@Texts.Get("platform.scopeLimits.administrator")">
                                 @if (row.Max is not null)
                                 {
                                     var id = $"admin-{type.EntityKey}";
                                     <div class="form-check">
                                         <input id="@id" class="form-check-input" type="checkbox" checked="@row.Admin"
                                                @onchange="e => { row.Admin = e.Value is true; preview = null; }" />
-                                        <label class="form-check-label" for="@id">Yöneticiyi de bağla</label>
+                                        <label class="form-check-label" for="@id">@Texts.Get("platform.scopeLimits.bindAdministrator")</label>
                                     </div>
                                 }
                                 else
@@ -68,51 +65,47 @@
 
             @if (rows.Values.Any(r => r is { Max: not null, Admin: true }))
             {
-                <div class="alert alert-warning">
-                    Yönetici de bağlanırsa en kötü durumda yalnızca kendi kayıtlarını görür ve rol ekranına erişimi sürer. Geri dönüş yolu bu
-                    sınırı gevşetmektir.
-                </div>
+                <div class="alert alert-warning">@Texts.Get("platform.scopeLimits.administratorWarning")</div>
             }
 
             @if (hidden.Count > 0)
             {
-                <p class="text-muted">Modülü kapalı @hidden.Count türün sınırı korunur; modül yeniden açılınca burada görünür.</p>
+                <p class="text-muted">@Texts.Get("platform.scopeLimits.hidden", hidden.Count)</p>
             }
 
             @if (preview is not null)
             {
                 <div class="alert alert-info" role="status" aria-live="polite">
-                    <strong>Etki önizlemesi (henüz kaydedilmedi)</strong>
+                    <strong>@Texts.Get("platform.scopeLimits.previewTitle")</strong>
                     <ul class="mb-0">
-                        <li>Sınırı aşan rol: @preview.AffectedRoleCount (kaydedilirken rol ekranında düzeltilmesi gerekir, okuma sırasında sınıra indirilir).</li>
-                        <li>Yeni kısılacak kişi: @preview.NewlyRestrictedMemberCount, yönetici: @preview.NewlyRestrictedAdministratorCount.</li>
+                        <li>@Texts.Get("platform.scopeLimits.previewRoles", preview.AffectedRoleCount)</li>
+                        <li>@Texts.Get("platform.scopeLimits.previewRestricted", preview.NewlyRestrictedMemberCount, preview.NewlyRestrictedAdministratorCount)</li>
                         @if (preview.ReleasedMemberCount + preview.ReleasedAdministratorCount > 0)
                         {
-                            <li>Serbest kalacak kişi: @preview.ReleasedMemberCount, yönetici: @preview.ReleasedAdministratorCount.</li>
+                            <li>@Texts.Get("platform.scopeLimits.previewReleased", preview.ReleasedMemberCount, preview.ReleasedAdministratorCount)</li>
                         }
                     </ul>
                     @foreach (var impact in preview.Types.Where(t => t.NewlyRestrictedMembers + t.ReleasedMembers + t.NewlyRestrictedAdministrators + t.ReleasedAdministrators + t.AffectedRoles > 0))
                     {
                         <div class="small">
-                            @LabelOf(impact.EntityKey): rol @impact.AffectedRoles · kısılan @impact.NewlyRestrictedMembers · serbest @impact.ReleasedMembers
-                            · yönetici kısılan @impact.NewlyRestrictedAdministrators · serbest @impact.ReleasedAdministrators
+                            @Texts.Get("platform.scopeLimits.previewType", LabelOf(impact.EntityKey), impact.AffectedRoles, impact.NewlyRestrictedMembers, impact.ReleasedMembers, impact.NewlyRestrictedAdministrators, impact.ReleasedAdministrators)
                         </div>
                     }
-                    <div class="small text-muted">Kişi sayıları etkin üyeleri sayar (destek erişimi hariç); bir kişi birden çok türde kısılsa da bir kez sayılır.</div>
+                    <div class="small text-muted">@Texts.Get("platform.scopeLimits.previewNote")</div>
                 </div>
             }
 
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="limitsReason">Gerekçe *</label>
+                    <label class="form-label" for="limitsReason">@Texts.Get("platform.reasonRequired")</label>
                     <input id="limitsReason" class="form-control" maxlength="500" @bind="reason" @bind:event="oninput" />
                     <FieldError Field="reason" Errors="errors" />
                     <FieldError Field="limits" Errors="errors" />
                 </div>
             </div>
             <div class="form-actions">
-                <button type="button" class="btn btn-tonal" disabled="@(busy || !Dirty)" @onclick="PreviewAsync">Etkiyi göster</button>
-                <button type="submit" class="btn btn-primary" disabled="@(busy || !Dirty || string.IsNullOrWhiteSpace(reason))">Sınırları kaydet</button>
+                <button type="button" class="btn btn-tonal" disabled="@(busy || !Dirty)" @onclick="PreviewAsync">@Texts.Get("platform.scopeLimits.preview")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || !Dirty || string.IsNullOrWhiteSpace(reason))">@Texts.Get("platform.scopeLimits.save")</button>
             </div>
         </form>
     }
@@ -214,7 +207,7 @@
         }
 
         (notice, failed, reason) = (
-            $"Kayıt görünürlüğü sınırları kaydedildi. Etkilenen rol sayısı: {result.Value!.AffectedRoleCount}. Değişiklik firmanın bir sonraki isteğinde geçerli olur.",
+            Texts.Get("platform.scopeLimits.saved", result.Value!.AffectedRoleCount),
             false,
             string.Empty);
         await LoadAsync();

@@ -2,51 +2,50 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Platform ekibi · Platform · Modulix</PageTitle>
+<PageTitle>@Texts.Get("platform.team.title") · @Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
 @* Platform ekibi ve rolleri (ADR-0028 Dilim 5). Yalnızca platform sahibi (Owner) yönetir; sunucu her istekte denetler.
    Hesap silinmez: rolleri boşaltmak yalnızca platform erişimini kapatır. Platform sahibi komut satırıyla atanır. *@
 <PlatformGate>
-    <a class="back-link" href="platform">← Platform</a>
-    <h1>Platform ekibi</h1>
+    <a class="back-link" href="platform">← @Texts.Get("nav.app.platform")</a>
+    <h1>@Texts.Get("platform.team.title")</h1>
     <p class="text-muted">
-        <strong>Destek:</strong> izleme, olay yeniden deneme/atlama, iki adımlı doğrulama sıfırlama.
-        <strong>Operasyon:</strong> firma açma, kapatma, askı, modül hakkı, yönetici daveti.
-        <strong>Finans:</strong> plan, abonelik, limit istisnası, modül hakkı koşulları.
-        Roller toplanabilir. Platform hesapları için iki adımlı doğrulama zorunludur. Rolleri kaldırmak hesabı ya da verisini silmez, yalnızca platform erişimini kapatır.
+        @Texts.Strong("platform.team.intro", Texts.Get("platform.team.roleLabel", PlatformLabels.RoleOf(PlatformRoleNames.Support)),
+            Texts.Get("platform.team.roleLabel", PlatformLabels.RoleOf(PlatformRoleNames.Operations)),
+            Texts.Get("platform.team.roleLabel", PlatformLabels.RoleOf(PlatformRoleNames.Finance)))
     </p>
 
     @if (!Session.IsPlatformOwner)
     {
-        <div class="alert alert-warning">Platform ekibini yalnızca platform sahibi yönetir.</div>
+        <div class="alert alert-warning">@Texts.Get("platform.team.ownerOnly")</div>
     }
     else
     {
         <Notice Text="@notice" Failed="failed" />
 
         <form class="record-form settings-group" novalidate @onsubmit="AddAsync" @onsubmit:preventDefault>
-            <h2>Ekibe ekle</h2>
-            <p class="text-muted">Kişinin Modulix hesabı olmalı (bir firmaya davet edilmiş); hesap burada açılmaz.</p>
+            <h2>@Texts.Get("platform.team.add")</h2>
+            <p class="text-muted">@Texts.Get("platform.team.addIntro")</p>
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="teamEmail">E-posta *</label>
+                    <label class="form-label" for="teamEmail">@Texts.Get("admin.invite.email")</label>
                     <input id="teamEmail" class="form-control" type="email" autocomplete="off" @bind="email" @bind:event="oninput" />
                     <FieldError Field="email" Errors="errors" />
                 </div>
             </div>
             <fieldset class="mt-3">
-                <legend class="form-label">Roller</legend>
+                <legend class="form-label">@Texts.Get("nav.app.admin.roles")</legend>
                 @foreach (var role in Assignable)
                 {
                     <div class="form-check">
                         <input id="new-@role" class="form-check-input" type="checkbox" checked="@newRoles.Contains(role)" @onchange="e => Toggle(newRoles, role, (bool)e.Value!)" />
-                        <label class="form-check-label" for="new-@role">@PlatformRoleNames.TextOf(role)</label>
+                        <label class="form-check-label" for="new-@role">@PlatformLabels.RoleOf(role)</label>
                     </div>
                 }
                 <FieldError Field="roles" Errors="errors" />
             </fieldset>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(email) || newRoles.Count == 0)">Ekle</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(email) || newRoles.Count == 0)">@Texts.Get("common.add")</button>
             </div>
         </form>
 
@@ -57,17 +56,17 @@
         else
         {
             <table class="table record-table">
-                <thead><tr><th>Ad</th><th>E-posta</th><th>Roller</th><th>İki adımlı</th><th></th></tr></thead>
+                <thead><tr><th>@Texts.Get("common.field.name")</th><th>@Texts.Get("common.field.email")</th><th>@Texts.Get("nav.app.admin.roles")</th><th>@Texts.Get("admin.users.col.twoFactor")</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var member in members)
                     {
                         <tr>
-                            <td data-label="Ad" class="primary">@member.DisplayName</td>
-                            <td data-label="E-posta">@member.Email</td>
-                            <td data-label="Roller">
+                            <td data-label="@Texts.Get("common.field.name")" class="primary">@member.DisplayName</td>
+                            <td data-label="@Texts.Get("common.field.email")">@member.Email</td>
+                            <td data-label="@Texts.Get("nav.app.admin.roles")">
                                 @if (member.Roles.Contains(PlatformRoleNames.Owner))
                                 {
-                                    <span class="badge user-active">@PlatformRoleNames.TextOf(PlatformRoleNames.Owner)</span>
+                                    <span class="badge user-active">@PlatformLabels.RoleOf(PlatformRoleNames.Owner)</span>
                                 }
                                 else
                                 {
@@ -76,18 +75,18 @@
                                         <label class="me-2">
                                             <input type="checkbox" checked="@member.Roles.Contains(role)" disabled="@busy"
                                                    @onchange="e => ChangeAsync(member, role, (bool)e.Value!)" />
-                                            @PlatformRoleNames.TextOf(role)
+                                            @PlatformLabels.RoleOf(role)
                                         </label>
                                     }
                                 }
                             </td>
-                            <td data-label="İki adımlı">
-                                <span class="badge @(member.TwoFactorEnabled ? "user-active" : "user-locked")">@(member.TwoFactorEnabled ? "Açık" : "Kapalı")</span>
+                            <td data-label="@Texts.Get("admin.users.col.twoFactor")">
+                                <span class="badge @(member.TwoFactorEnabled ? "user-active" : "user-locked")">@(member.TwoFactorEnabled ? Texts.Get("two-factor.on") : Texts.Get("two-factor.off"))</span>
                             </td>
                             <td class="actions">
                                 @if (!member.Roles.Contains(PlatformRoleNames.Owner) && member.UserId != Session.User?.UserId)
                                 {
-                                    <ConfirmAction Disabled="@busy" OnConfirm="() => RemoveAsync(member)">Erişimi kapat</ConfirmAction>
+                                    <ConfirmAction Disabled="@busy" OnConfirm="() => RemoveAsync(member)">@Texts.Get("platform.team.revoke")</ConfirmAction>
                                 }
                             </td>
                         </tr>
@@ -152,7 +151,7 @@
             return;
         }
 
-        (notice, failed, email) = ($"{result.Value!.DisplayName} ekibe eklendi.", false, string.Empty);
+        (notice, failed, email) = (Texts.Get("platform.team.added", result.Value!.DisplayName), false, string.Empty);
         newRoles.Clear();
         await LoadAsync();
     }
@@ -165,11 +164,11 @@
             roles.Add(role);
         }
 
-        await SaveAsync(member, roles, $"{member.DisplayName} için roller güncellendi.");
+        await SaveAsync(member, roles, Texts.Get("platform.team.rolesUpdated", member.DisplayName));
     }
 
     private Task RemoveAsync(PlatformTeamMemberDto member) =>
-        SaveAsync(member, [], $"{member.DisplayName} için platform erişimi kapatıldı; hesabı ve verisi silinmedi.");
+        SaveAsync(member, [], Texts.Get("platform.team.removed", member.DisplayName));
 
     private async Task SaveAsync(PlatformTeamMemberDto member, IReadOnlyList<string> roles, string success)
     {

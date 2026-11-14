@@ -1,17 +1,13 @@
 @page "/platform/olaylar"
 @inject ApiClient Api
 
-<PageTitle>Olaylar · Platform · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.platform.events") · @Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
 @* Olay teslimleri (ADR-0007): bekleyen, bekletilen ve başarısız teslimler; yeniden dene ve atla. Olayın içeriği (payload) gösterilmez. *@
 <PlatformGate>
-    <a class="back-link" href="platform">← Platform</a>
-    <h1>Olaylar</h1>
-    <p class="text-muted">
-        Modüllerin birbirine ve bildirimlere ilettiği olayların abonelere teslimi. Başarısız teslim kendiliğinden yeniden
-        denenir; sınır dolunca burada bekler. Sıralı abonede başarısız teslim, aynı kaydın sonraki teslimlerini bekletir.
-        Yeniden deneme ve atlama firmanın denetim kaydına yazılır.
-    </p>
+    <a class="back-link" href="platform">← @Texts.Get("nav.app.platform")</a>
+    <h1>@Texts.Get("nav.app.platform.events")</h1>
+    <p class="text-muted">@Texts.Get("platform.events.intro")</p>
 
     @if (notice is not null)
     {
@@ -26,31 +22,31 @@
     @if (summary is not null)
     {
         <div class="tiles">
-            <div class="tile"><strong>@summary.Pending</strong><span>Bekleyen</span></div>
-            <div class="tile"><strong>@summary.Held</strong><span>Bekletilen</span></div>
-            <div class="tile"><strong>@summary.Failed</strong><span>Başarısız</span></div>
-            <div class="tile"><strong>@Age(summary.OldestUndispatched)</strong><span>En eski dağıtılmamış olay</span></div>
-            <div class="tile"><strong>@Age(summary.OldestPending)</strong><span>En eski bekleyen teslim</span></div>
+            <div class="tile"><strong>@summary.Pending</strong><span>@Texts.Get("platform.health.pending")</span></div>
+            <div class="tile"><strong>@summary.Held</strong><span>@Texts.Get("platform.events.held")</span></div>
+            <div class="tile"><strong>@summary.Failed</strong><span>@Texts.Get("platform.health.failed")</span></div>
+            <div class="tile"><strong>@Age(summary.OldestUndispatched)</strong><span>@Texts.Get("platform.events.oldestUndispatched")</span></div>
+            <div class="tile"><strong>@Age(summary.OldestPending)</strong><span>@Texts.Get("platform.events.oldestPending")</span></div>
         </div>
 
-        <div class="filters" role="group" aria-label="Durum">
-            <button type="button" class="chip @(state is null ? "active" : null)" @onclick="() => StateAsync(null)">Tümü</button>
+        <div class="filters" role="group" aria-label="@Texts.Get("common.field.status")">
+            <button type="button" class="chip @(state is null ? "active" : null)" @onclick="() => StateAsync(null)">@Texts.Get("support.all")</button>
             @foreach (var value in States)
             {
-                <button type="button" class="chip @(state == value ? "active" : null)" @onclick="() => StateAsync(value)">@EventStateText.Of(value)</button>
+                <button type="button" class="chip @(state == value ? "active" : null)" @onclick="() => StateAsync(value)">@PlatformLabels.EventStateOf(value)</button>
             }
         </div>
 
         <form class="record-form audit-filters" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <div class="row g-2">
                 <div class="col-sm-6 col-lg-3">
-                    <label class="form-label" for="eventTenant">Firma kimliği</label>
-                    <input id="eventTenant" class="form-control" @bind="tenantId" placeholder="Tümü" />
+                    <label class="form-label" for="eventTenant">@Texts.Get("platform.events.tenantId")</label>
+                    <input id="eventTenant" class="form-control" @bind="tenantId" placeholder="@Texts.Get("support.all")" />
                 </div>
                 <div class="col-sm-6 col-lg-3">
-                    <label class="form-label" for="eventSubscription">Abonelik</label>
+                    <label class="form-label" for="eventSubscription">@Texts.Get("platform.events.subscription")</label>
                     <select id="eventSubscription" class="form-select" @bind="subscription">
-                        <option value="">Tümü</option>
+                        <option value="">@Texts.Get("support.all")</option>
                         @foreach (var key in summary.Subscriptions)
                         {
                             <option value="@key">@key</option>
@@ -58,9 +54,9 @@
                     </select>
                 </div>
                 <div class="col-sm-6 col-lg-2">
-                    <label class="form-label" for="eventType">Olay türü</label>
+                    <label class="form-label" for="eventType">@Texts.Get("platform.events.eventType")</label>
                     <select id="eventType" class="form-select" @bind="eventType">
-                        <option value="">Tümü</option>
+                        <option value="">@Texts.Get("support.all")</option>
                         @foreach (var type in summary.EventTypes)
                         {
                             <option value="@type">@type</option>
@@ -68,18 +64,18 @@
                     </select>
                 </div>
                 <div class="col-sm-6 col-lg-2">
-                    <label class="form-label" for="eventFrom">Başlangıç (UTC)</label>
+                    <label class="form-label" for="eventFrom">@Texts.Get("platform.events.from")</label>
                     <input id="eventFrom" class="form-control" type="date" @bind="from" />
                 </div>
                 <div class="col-sm-6 col-lg-2">
-                    <label class="form-label" for="eventTo">Bitiş (UTC)</label>
+                    <label class="form-label" for="eventTo">@Texts.Get("platform.events.to")</label>
                     <input id="eventTo" class="form-control" type="date" @bind="to" />
                 </div>
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-outline-secondary">Süz</button>
-                <button type="button" class="btn btn-outline-primary" disabled="@(busy || page is not { TotalCount: > 0 })" @onclick="() => ActAsync(Retry, null)">Süzülenleri yeniden dene</button>
-                <button type="button" class="btn btn-outline-danger" disabled="@(busy || page is not { TotalCount: > 0 })" @onclick="() => ActAsync(Skip, null)">Süzülenleri atla</button>
+                <button type="submit" class="btn btn-outline-secondary">@Texts.Get("platform.events.filter")</button>
+                <button type="button" class="btn btn-outline-primary" disabled="@(busy || page is not { TotalCount: > 0 })" @onclick="() => ActAsync(Retry, null)">@Texts.Get("platform.events.retryFiltered")</button>
+                <button type="button" class="btn btn-outline-danger" disabled="@(busy || page is not { TotalCount: > 0 })" @onclick="() => ActAsync(Skip, null)">@Texts.Get("platform.events.skipFiltered")</button>
             </div>
         </form>
     }
@@ -93,51 +89,51 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Title="Teslim yok." />
+        <EmptyState Title="@Texts.Get("platform.events.empty")" />
     }
     else
     {
         <table class="table record-table">
             <thead>
                 <tr>
-                    <th scope="col"><SortHeader Label="Açılış" ColumnIcon="calendar" Asc="createdAt" Desc="-createdAt" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><SortHeader Label="Firma" ColumnIcon="building" Asc="tenant" Desc="-tenant" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><SortHeader Label="Abonelik" ColumnIcon="repeat" Asc="subscription" Desc="-subscription" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
-                    <th scope="col">Olay</th>
-                    <th scope="col">Kayıt</th>
-                    <th scope="col">Durum</th>
-                    <th scope="col"><SortHeader Label="Deneme" ColumnIcon="hash" Asc="attemptCount" Desc="-attemptCount" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
-                    <th scope="col">Son hata</th>
-                    <th scope="col"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("platform.openedAt")" ColumnIcon="calendar" Asc="createdAt" Desc="-createdAt" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("platform.tenant")" ColumnIcon="building" Asc="tenant" Desc="-tenant" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("platform.events.subscription")" ColumnIcon="repeat" Asc="subscription" Desc="-subscription" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col">@Texts.Get("platform.health.event")</th>
+                    <th scope="col">@Texts.Get("platform.events.record")</th>
+                    <th scope="col">@Texts.Get("common.field.status")</th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("platform.events.attempts")" ColumnIcon="hash" Asc="attemptCount" Desc="-attemptCount" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col">@Texts.Get("platform.events.lastError")</th>
+                    <th scope="col"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var delivery in page.Items)
                 {
                     <tr>
-                        <td data-label="Açılış">@CrmLabels.Time(delivery.CreatedAt)</td>
-                        <td data-label="Firma" class="primary"><a href="platform/firmalar/@delivery.TenantId">@delivery.TenantName</a></td>
-                        <td data-label="Abonelik"><code>@delivery.Subscription</code></td>
-                        <td data-label="Olay">@delivery.EventType <small class="text-muted">@delivery.EventId</small></td>
-                        <td data-label="Kayıt">@delivery.EntityKey <small class="text-muted">@delivery.RecordId@(delivery.Sequence is { } seq ? $" · #{seq}" : null)</small></td>
-                        <td data-label="Durum">
-                            @EventStateText.Of(delivery.State)
+                        <td data-label="@Texts.Get("platform.openedAt")">@CrmLabels.Time(delivery.CreatedAt)</td>
+                        <td data-label="@Texts.Get("platform.tenant")" class="primary"><a href="platform/firmalar/@delivery.TenantId">@delivery.TenantName</a></td>
+                        <td data-label="@Texts.Get("platform.events.subscription")"><code>@delivery.Subscription</code></td>
+                        <td data-label="@Texts.Get("platform.health.event")">@delivery.EventType <small class="text-muted">@delivery.EventId</small></td>
+                        <td data-label="@Texts.Get("platform.events.record")">@delivery.EntityKey <small class="text-muted">@delivery.RecordId@(delivery.Sequence is { } seq ? $" · #{seq}" : null)</small></td>
+                        <td data-label="@Texts.Get("common.field.status")">
+                            @PlatformLabels.EventStateOf(delivery.State)
                             @if (delivery.HoldingBack > 0)
                             {
-                                <span class="badge user-locked" title="Aynı kaydın sonraki teslimleri bunu bekliyor.">@delivery.HoldingBack teslimi bekletiyor</span>
+                                <span class="badge user-locked" title="@Texts.Get("platform.events.holdingTitle")">@Texts.Get("platform.events.holding", delivery.HoldingBack)</span>
                             }
                             @if (delivery.State == EventDeliveryStateDto.Pending && delivery.AttemptCount > 0)
                             {
-                                <small class="text-muted d-block">Sonraki deneme @CrmLabels.Time(delivery.NextAttemptAt)</small>
+                                <small class="text-muted d-block">@Texts.Get("platform.events.nextAttempt", CrmLabels.Time(delivery.NextAttemptAt))</small>
                             }
                         </td>
-                        <td data-label="Deneme">@delivery.AttemptCount</td>
-                        <td data-label="Son hata"><small>@delivery.LastError</small></td>
+                        <td data-label="@Texts.Get("platform.events.attempts")">@delivery.AttemptCount</td>
+                        <td data-label="@Texts.Get("platform.events.lastError")"><small>@delivery.LastError</small></td>
                         <td data-label="">
                             @if (delivery.State is EventDeliveryStateDto.Failed or EventDeliveryStateDto.Pending or EventDeliveryStateDto.Held)
                             {
-                                <button type="button" class="btn btn-sm btn-outline-primary" disabled="@busy" @onclick="() => ActAsync(Retry, delivery.Id)">Yeniden dene</button>
-                                <button type="button" class="btn btn-sm btn-outline-danger" disabled="@busy" @onclick="() => ActAsync(Skip, delivery.Id)">Atla</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" disabled="@busy" @onclick="() => ActAsync(Retry, delivery.Id)">@Texts.Get("admin.automationRun.retry")</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" disabled="@busy" @onclick="() => ActAsync(Skip, delivery.Id)">@Texts.Get("platform.events.skip")</button>
                             }
                         </td>
                     </tr>
@@ -207,7 +203,7 @@
     {
         if (!string.IsNullOrWhiteSpace(tenantId) && !Guid.TryParse(tenantId, out _))
         {
-            message = "Firma kimliği geçerli değil.";
+            message = Texts.Get("platform.events.invalidTenant");
             return;
         }
 
@@ -236,8 +232,8 @@
         {
             var changed = result.Value!.Changed;
             notice = changed == 0
-                ? "Değişen teslim yok: teslim çalışıyor veya bitmiş olabilir."
-                : action == Retry ? $"{changed} teslim yeniden denenecek." : $"{changed} teslim atlandı.";
+                ? Texts.Get("platform.events.noChange")
+                : Texts.Get(action == Retry ? "platform.events.retried" : "platform.events.skipped", changed);
             await LoadSummaryAsync();
             await LoadAsync(page?.Page ?? 1);
         }
@@ -271,6 +267,6 @@
         }
 
         var age = DateTimeOffset.UtcNow - at;
-        return age.TotalMinutes < 1 ? "1 dk'dan az" : age.TotalHours < 1 ? $"{age.TotalMinutes:0} dk" : $"{age.TotalHours:0.#} sa";
+        return age.TotalMinutes < 1 ? Texts.Get("platform.age.lessThanMinute") : age.TotalHours < 1 ? Texts.Get("platform.age.minutes", age.TotalMinutes.ToString("0")) : Texts.Get("platform.age.hours", age.TotalHours.ToString("0.#"));
     }
 }
