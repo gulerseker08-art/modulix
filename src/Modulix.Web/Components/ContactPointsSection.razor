@@ -104,8 +104,10 @@
                     </div>
                     @if (CanWrite)
                     {
-                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(item)">@Texts.Get("common.edit")</button>
-                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">@Texts.Get("common.delete")</button>
+                        <RowMenu Label="@Texts.Get("common.rowActionsOf", item.Value)">
+                            <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(item)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
+                            <button type="button" class="view-menu-item is-danger" role="menuitem" disabled="@busy" @onclick="() => DeleteAsync(item)"><AppIcon Name="trash" Size="16" /> <span>@Texts.Get("common.delete")</span></button>
+                        </RowMenu>
                     }
                 </li>
             }

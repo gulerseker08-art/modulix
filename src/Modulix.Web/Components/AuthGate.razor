@@ -6,7 +6,7 @@
 
 @if (!Session.IsLoaded)
 {
-    <p class="text-muted">@Texts.Get("common.loading")</p>
+    <LoadingState />
 }
 else if (Session.IsSignedIn && (Session.HasActiveTenant || AllowWithoutTenant) && (!Session.TwoFactorRequired || AllowWithoutTwoFactor))
 {

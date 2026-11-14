@@ -1,0 +1,93 @@
+@page "/ik/anketler"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>Anketler · Modulix</PageTitle>
+
+@* Anketlerim (ADR-0042 dilim 7): kullanıcıya yönelik yanıta açık anketler; yanıtlananlar işaretli, yanıtlanmayanlar formla yanıtlanır. Hangi anketin
+   görüneceğine ve yanıtın kabulüne sunucu karar verir. *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.SurveysRespond">
+    <PageHeader Title="Anketler" Icon="clipboard-list" Subtitle="@(page is null ? "Size yönelik anketler." : $"{page.TotalCount} açık anket · {Waiting} yanıt bekliyor")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (notice is not null)
+    {
+        <div class="alert alert-success" role="status">@notice</div>
+    }
+
+    @if (answering is not null)
+    {
+        <SurveyAnswerForm @key="answering.Id" Survey="answering" Submitted="SubmittedAsync" Cancelled="() => answering = null" />
+    }
+
+    @if (page is null)
+    {
+        <LoadingState />
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Şu an size yönelik açık anket yok.</p>
+    }
+    else
+    {
+        <ul class="list-unstyled" aria-label="Açık anketler">
+            @foreach (var survey in page.Items)
+            {
+                var done = WarehouseLabels.Flag(survey, "respondedByMe");
+                <li class="summary-card mb-3">
+                    <div class="list-toolbar mb-1">
+                        <h2 class="h6 mb-0 me-auto">@WarehouseLabels.Text(survey, "title")</h2>
+                        @if (WarehouseLabels.Flag(survey, "isAnonymous"))
+                        {
+                            <span class="badge status-inactive">Kimliği gizli</span>
+                        }
+                        <span class="badge @(done ? "status-customer" : "stage-negotiation")">@(done ? "Yanıtlandı" : "Yanıt bekliyor")</span>
+                    </div>
+                    <p class="text-muted mb-2">
+                        @WarehouseLabels.Number(survey, "questionCount") soru@(WarehouseLabels.Text(survey, "closesOn") is { Length: > 0 } closes ? $" · son gün {HrLabels.Date(closes)}" : "")
+                    </p>
+                    @if (!done)
+                    {
+                        <button type="button" class="btn btn-tonal" @onclick="() => { answering = survey; notice = null; }">Yanıtla</button>
+                    }
+                </li>
+            }
+        </ul>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private RecordPageResponse? page;
+    private RecordResponse? answering;
+    private string? message;
+    private string? notice;
+
+    private int Waiting => page?.Items.Count(s => !WarehouseLabels.Flag(s, "respondedByMe")) ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.SurveysRespond))
+        {
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var result = await Api.GetAsync<RecordPageResponse>($"/api/records/{HrAccess.SurveyEntityKey}?available=true&page={pageNumber}&pageSize={ListPaging.Size}");
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private async Task SubmittedAsync(RecordResponse survey)
+    {
+        answering = null;
+        notice = "Yanıtınız alındı. Teşekkürler.";
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

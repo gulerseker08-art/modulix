@@ -1,0 +1,149 @@
+@* Süreç şablonu formu (ADR-0042 dilim 5). Düzen firmanın form düzenine (ADR-0021) göre çizilir. Tür yalnızca oluştururken seçilir; ad tür içinde
+   tektir (sunucu denetler). Şablon değişikliği başlatılmış süreçleri etkilemez. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+@inject ToastService Toasts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Template is null ? "Yeni süreç şablonu" : "Süreç şablonu")</h2>
+            <p>@HrLabels.ChecklistKind(form.Kind)</p>
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Şablon bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
+            {
+                case "name":
+                    <label class="@f.LabelClass()" for="template-name">@f.Label</label>
+                    <input id="template-name" class="form-control" maxlength="150" required aria-required="true" @bind="form.Name" />
+                    <FieldError Field="name" Errors="errors" />
+                    break;
+                case "kind":
+                    <label class="@f.LabelClass()" for="template-kind">@f.Label</label>
+                    <select id="template-kind" class="form-select" disabled="@(form.Id is not null)" @bind="form.Kind">
+                        @foreach (var (key, label) in HrAccess.ChecklistKinds)
+                        {
+                            <option value="@key">@label</option>
+                        }
+                    </select>
+                    <FieldError Field="kind" Errors="errors" />
+                    break;
+                case "isActive":
+                    <div class="form-check mt-4">
+                        <input id="template-active" class="form-check-input" type="checkbox" @bind="form.IsActive" />
+                        <label class="form-check-label" for="template-active">@f.Label</label>
+                    </div>
+                    break;
+                case "description":
+                    <label class="@f.LabelClass()" for="template-description">@f.Label</label>
+                    <textarea id="template-description" class="form-control" rows="2" maxlength="1000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                    <FieldError Field="description" Errors="errors" />
+                    break;
+            }
+        </Field>
+    </LayoutForm>
+</form>
+
+@code {
+    private const string EntityKey = HrAccess.ChecklistTemplateEntityKey;
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private TemplateForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    [Parameter] public RecordResponse? Template { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        form = Template is { } t
+            ? new TemplateForm
+            {
+                Id = t.Id, Version = t.Version, Name = WarehouseLabels.Text(t, "name"), Kind = WarehouseLabels.Text(t, "kind"),
+                IsActive = WarehouseLabels.Flag(t, "isActive", true), Description = WarehouseLabels.Text(t, "description"),
+                Custom = t.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new TemplateForm();
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var values = new JsonObject
+        {
+            ["name"] = string.IsNullOrWhiteSpace(form.Name) ? null : form.Name.Trim(),
+            ["isActive"] = form.IsActive,
+            ["description"] = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            values["kind"] = form.Kind;
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var url = "/api/records/" + EntityKey;
+        var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{url}/{id}", request) : await Api.PostAsync<RecordResponse>(url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            Toasts.Success(Texts.Get("common.saved"));
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class TemplateForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string? Name { get; set; }
+
+        public string Kind { get; set; } = "onboarding";
+
+        public bool IsActive { get; set; } = true;
+
+        public string? Description { get; set; }
+    }
+}

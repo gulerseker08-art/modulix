@@ -22,6 +22,10 @@
             <CredentialsPanel OwnerEntityKey="@HrAccess.EmployeeEntityKey" OwnerId="selected.Id" Category="@CredentialAccess.Employee" Lookups="Lookups"
                               CanWrite="@Session.Can(HrAccess.EmployeesWrite)" Title="Özlük belgeleri"
                               EmptyText="Bu çalışana henüz belge eklenmedi (iş sözleşmesi, sağlık raporu, diploma, sertifika…)." />
+            @if (Session.Can(HrAccess.AssetsRead))
+            {
+                <AssetAssignmentList Title="Zimmetler" EmptyText="Bu çalışana zimmetlenmiş demirbaş yok." Query="@($"employeeId={selected.Id}")" ShowEmployee="false" />
+            }
         }
     }
 
@@ -65,7 +69,7 @@
 
     @if (page is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (page.Items.Count == 0)
     {

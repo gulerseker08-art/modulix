@@ -40,7 +40,7 @@
     {
         @if (error is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <LoadingState />
         }
     }
     else
@@ -123,7 +123,7 @@
 
         @if (d.Shipments is { } mapShipments)
         {
-            <RouteMap Routes="mapShipments.Routes" />
+            <RouteMap Routes="mapShipments.Routes" International="mapShipments.International" />
         }
 
         <div class="dash-grid">

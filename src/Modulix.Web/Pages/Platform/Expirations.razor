@@ -29,12 +29,12 @@
     {
         @if (message is null)
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
     }
     else if (items.Count == 0)
     {
-        <p class="text-muted">Bu pencerede bitişi gelen hak yok.</p>
+        <EmptyState Title="Bu pencerede bitişi gelen hak yok." />
     }
     else
     {

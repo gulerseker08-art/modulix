@@ -212,7 +212,7 @@ public class CrmTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFacto
         using var client = await LoginAsync(ayse.Email!);
 
         var company = await PostAsync<CompanyDto>(client, "/api/crm/companies", new SaveCompanyRequest(
-            "Delta A.Ş.", Address: "Atatürk Cad. 1", Industry: "Gıda", Status: CompanyStatus.Customer,
+            "Delta A.Ş.", Address: "Atatürk Cad. 1", Industry: "Gıda ve içecek", Status: CompanyStatus.Customer,
             Source: CompanySource.Referral, Tags: "öncelikli, ihracat"));
         Assert.Equal(ayse.Id, company.OwnerId);
         Assert.Equal(CompanyStatus.Customer, company.Status);

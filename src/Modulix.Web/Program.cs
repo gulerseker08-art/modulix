@@ -15,6 +15,7 @@ builder.Services.AddScoped<LookupCatalog>();
 builder.Services.AddScoped<FormLayouts>();
 builder.Services.AddScoped<ActivityOptions>();
 builder.Services.AddScoped<AppNavigation>();
+builder.Services.AddScoped<ToastService>();
 builder.Services.AddTransient<CrmLookups>();
 
 await builder.Build().RunAsync();

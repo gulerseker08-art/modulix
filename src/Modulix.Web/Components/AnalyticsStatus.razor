@@ -1,18 +1,18 @@
 @* Satış analizi ekranlarının ortak yükleme / hata / yetkisiz durumu. 403 yeniden denenmez; diğer hatalarda "Tekrar dene" çıkar. *@
 @if (Loading)
 {
-    <p class="text-muted" role="status">Yükleniyor…</p>
+    <LoadingState />
 }
 
 @if (Forbidden)
 {
-    <div class="alert alert-warning" role="alert">Bu analiz için gerekli izniniz yok. @Error</div>
+    <div class="alert alert-warning" role="alert">@Texts.Get("crm.sales.analyticsForbidden") @Error</div>
 }
 else if (Error is not null)
 {
     <div class="alert alert-danger" role="alert">
         @Error
-        <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@Loading" @onclick="OnRetry">Tekrar dene</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@Loading" @onclick="OnRetry">@Texts.Get("crm.sales.retry")</button>
     </div>
 }
 

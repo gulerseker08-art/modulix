@@ -8,7 +8,7 @@
 {
     <section class="detail-section" aria-labelledby="related-orders-title">
         <div class="section-header">
-            <h2 id="related-orders-title">@Title</h2>
+            <h2 id="related-orders-title">@TitleText</h2>
         </div>
         @if (error is not null)
         {
@@ -16,33 +16,33 @@
         }
         else if (items is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (items.Count == 0)
         {
-            <p class="text-muted">İlişkili sipariş yok.</p>
+            <EmptyState Title="@Texts.Get("orders.related.empty")" />
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">@Title</caption>
+                <caption class="visually-hidden">@TitleText</caption>
                 <thead>
-                    <tr><th scope="col">Sipariş</th><th scope="col">Durum</th><th scope="col">Devir</th><th scope="col">Gerçekleşme</th><th scope="col" class="text-end">Tutar</th></tr>
+                    <tr><th scope="col">@Texts.Get("orders.col.order")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("orders.col.handover")</th><th scope="col">@Texts.Get("orders.col.fulfillment")</th><th scope="col" class="text-end">@Texts.Get("orders.col.amount")</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var o in items)
                     {
                         <tr>
-                            <td data-label="Sipariş" class="primary"><a href="siparisler/@o.Id">@o.Title</a> <small class="text-muted">@o.Number</small></td>
-                            <td data-label="Durum"><span class="badge stage-@OrderLabels.StatusBadge(o.Status)">@OrderLabels.Label(OrderLabels.Statuses, o.Status)</span></td>
-                            <td data-label="Devir"><span class="badge stage-@OrderLabels.HandoverBadge(o.HandoverStatus)">@OrderLabels.Label(OrderLabels.Handovers, o.HandoverStatus)</span></td>
-                            <td data-label="Gerçekleşme"><span class="badge stage-@OrderLabels.FulfillmentBadge(o.FulfillmentStatus)">@OrderLabels.Label(OrderLabels.Fulfillments, o.FulfillmentStatus)</span></td>
-                            <td data-label="Tutar" class="text-end">@OrderLabels.Money(o.GrossTotal, o.Currency)</td>
+                            <td data-label="@Texts.Get("orders.col.order")" class="primary"><a href="siparisler/@o.Id">@o.Title</a> <small class="text-muted">@o.Number</small></td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@OrderLabels.StatusBadge(o.Status)">@OrderLabels.Label(OrderLabels.Statuses, o.Status)</span></td>
+                            <td data-label="@Texts.Get("orders.col.handover")"><span class="badge stage-@OrderLabels.HandoverBadge(o.HandoverStatus)">@OrderLabels.Label(OrderLabels.Handovers, o.HandoverStatus)</span></td>
+                            <td data-label="@Texts.Get("orders.col.fulfillment")"><span class="badge stage-@OrderLabels.FulfillmentBadge(o.FulfillmentStatus)">@OrderLabels.Label(OrderLabels.Fulfillments, o.FulfillmentStatus)</span></td>
+                            <td data-label="@Texts.Get("orders.col.amount")" class="text-end">@OrderLabels.Money(o.GrossTotal, o.Currency)</td>
                         </tr>
                     }
                 </tbody>
             </table>
-            <p class="small text-muted">Sipariş tutarıdır; tahsilat, fatura ya da gelir değildir. Para birimleri toplanmaz.</p>
+            <p class="small text-muted">@Texts.Get("orders.related.note")</p>
         }
     </section>
 }
@@ -52,7 +52,9 @@
     private string? error;
     private string? loadedFor;
 
-    [Parameter] public string Title { get; set; } = "Siparişler";
+    [Parameter] public string? Title { get; set; }
+
+    private string TitleText => Title ?? Texts.Get("orders.related.title");
 
     /// <summary>Ortak müşteri (taraf) kaydı; firma kartında firmanın <c>PartyId</c> değeri.</summary>
     [Parameter] public Guid? PartyId { get; set; }

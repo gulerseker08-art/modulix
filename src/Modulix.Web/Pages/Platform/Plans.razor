@@ -68,11 +68,11 @@
 
     @if (plans is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (plans.Count == 0)
     {
-        <p class="text-muted">Henüz plan yok.</p>
+        <EmptyState Title="Henüz plan yok." />
     }
     else
     {

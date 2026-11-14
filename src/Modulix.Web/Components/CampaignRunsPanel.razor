@@ -13,7 +13,7 @@
     <h2 id="content-title" class="h5">İçerik sürümleri</h2>
     @if (contents is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (contents.Count == 0)
     {
@@ -69,7 +69,7 @@
     <h2 id="runs-title" class="h5">Çalıştırmalar</h2>
     @if (runs is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (runs.Count == 0)
     {

@@ -76,7 +76,7 @@ builder.Services.AddModulixAuth();
 builder.Services.AddModulixTenancy();
 
 builder.Services.AddModulixModules(ModulixModules.Create());
-builder.Services.AddScoped<Modulix.Core.Contracts.Activities.IFollowUpActivities, Modulix.Api.Contracts.HostFollowUpActivities>();
+builder.Services.AddScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, Modulix.Api.Contracts.HostFollowUpActivities>();
 
 // Sektör profilleri (Y9c): tanımlar açılışta modül kataloğuna göre doğrulanır.
 builder.Services.AddSingleton(sp => new SectorProfileCatalog(SectorProfiles.Create(), sp.GetRequiredService<ModuleCatalog>()));

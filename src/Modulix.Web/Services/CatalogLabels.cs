@@ -3,21 +3,47 @@ namespace Modulix.Web.Services;
 /// <summary>Ürün kataloğu sabit listelerinin Türkçe etiketleri (ADR-0018); anahtarlar sunucudaki CatalogRules ile aynıdır.</summary>
 public static class CatalogLabels
 {
-    public static IReadOnlyList<(string Key, string Label)> Kinds { get; } = [("Product", "Ürün"), ("Service", "Hizmet")];
+    private static readonly (string Key, string Label)[] KindSource = [("Product", "Ürün"), ("Service", "Hizmet")];
 
-    public static IReadOnlyList<(string Key, string Label)> Statuses { get; } =
+    private static readonly (string Key, string Label)[] StatusSource =
         [("Draft", "Taslak"), ("Active", "Aktif"), ("Inactive", "Pasif"), ("Withdrawn", "Satıştan kaldırıldı")];
 
-    public static IReadOnlyList<(string Key, string Label)> ChargeTypes { get; } = [("OneTime", "Tek seferlik"), ("Recurring", "Periyodik")];
+    private static readonly (string Key, string Label)[] ChargeTypeSource = [("OneTime", "Tek seferlik"), ("Recurring", "Periyodik")];
 
-    public static IReadOnlyList<(string Key, string Label)> RecurringPeriods { get; } =
+    private static readonly (string Key, string Label)[] RecurringPeriodSource =
         [("Monthly", "Aylık"), ("Quarterly", "Üç aylık"), ("Yearly", "Yıllık")];
 
-    public static IReadOnlyList<(string Key, string Label)> DeliveryModes { get; } =
+    private static readonly (string Key, string Label)[] DeliveryModeSource =
         [("OnSite", "Yerinde"), ("Remote", "Uzaktan"), ("Shipped", "Sevkiyatla"), ("Digital", "Dijital")];
 
-    public static IReadOnlyList<(string Key, string Label)> UnitGroups { get; } =
+    private static readonly (string Key, string Label)[] UnitGroupSource =
         [("count", "Adet"), ("weight", "Ağırlık"), ("length", "Uzunluk"), ("time", "Süre"), ("volume", "Hacim"), ("area", "Alan")];
+
+    // Ürün türü ve periyot adları teklif kalemi tablolarıyla aynıdır; aynı anahtarlar kullanılır (ADR-0034, dilim 8c).
+    public const string KindGroup = QuoteLabels.LineKindGroup;
+    public const string StatusGroup = "crm.product-status";
+    public const string ChargeTypeGroup = "crm.product-charge";
+    public const string RecurringPeriodGroup = QuoteLabels.PeriodGroup;
+    public const string DeliveryModeGroup = "crm.product-delivery";
+    public const string UnitGroupGroup = "crm.unit-group";
+
+    // Türkçe ad kaynak metindir (ADR-0034); etkin dilin sözlüğünde `{grup}.{anahtar küçük harf}` yoksa o gösterilir.
+    // Özellik olarak tanımlıdır: metinler sınıf yüklenirken değil, her okunuşta çözülür (sözlük sonradan yüklenir).
+    public static IReadOnlyList<(string Key, string Label)> Kinds => Translate(KindGroup, KindSource);
+
+    public static IReadOnlyList<(string Key, string Label)> Statuses => Translate(StatusGroup, StatusSource);
+
+    public static IReadOnlyList<(string Key, string Label)> ChargeTypes => Translate(ChargeTypeGroup, ChargeTypeSource);
+
+    public static IReadOnlyList<(string Key, string Label)> RecurringPeriods => Translate(RecurringPeriodGroup, RecurringPeriodSource);
+
+    public static IReadOnlyList<(string Key, string Label)> DeliveryModes => Translate(DeliveryModeGroup, DeliveryModeSource);
+
+    // Ölçü birimi grupları Ölçü birimleri ekranındadır (ADR-0034, dilim 9b).
+    public static IReadOnlyList<(string Key, string Label)> UnitGroups => Translate(UnitGroupGroup, UnitGroupSource);
+
+    private static IReadOnlyList<(string Key, string Label)> Translate(string group, (string Key, string Label)[] source) =>
+        [.. source.Select(x => (x.Key, CrmText.Of(group, x.Key, x.Label)))];
 
     public static string Label(IReadOnlyList<(string Key, string Label)> list, string? key) =>
         list.FirstOrDefault(x => x.Key == key).Label ?? key ?? "—";

@@ -2,8 +2,10 @@
 @inject SessionState Session
 @inject ApiClient Api
 @inject NavigationManager Navigation
+@inject AppNavigation Apps
 
-@* Genel arama (AppHeader): yazdıkça firma, kişi, fırsat, lead ve tekliflerde arar (docs/design-system/component-catalog.md).
+@* Genel arama ve komut paleti (AppHeader): Ctrl+K ile açılır; yazdıkça önce menüdeki ekranları (anında), sonra firma, kişi,
+   fırsat, lead ve teklifleri arar (docs/design-system/component-catalog.md).
    Ayrı bir genel arama uç noktası yoktur; yalnızca kullanıcının izni olan kayıt türlerinin mevcut liste uç noktaları
    çağrılır. Tenant, yetki ve kayıt kapsamı süzgeçleri o uç noktalarda, sunucuda uygulanır. *@
 <div class="global-search" @onkeydown="OnKeyDown">
@@ -13,23 +15,17 @@
            placeholder="@Texts.Get("shell.search.placeholder")" role="combobox" aria-autocomplete="list"
            aria-expanded="@(open ? "true" : "false")" aria-controls="global-search-results"
            aria-activedescendant="@(open && active >= 0 ? OptionId(active) : null)"
-           value="@query" @oninput="OnInputAsync" @onfocus="OnFocus" />
+           aria-keyshortcuts="Control+K Meta+K" value="@query" @oninput="OnInputAsync" @onfocus="OnFocus" />
+    @if (query.Length == 0)
+    {
+        <kbd class="global-search-kbd" aria-hidden="true">Ctrl K</kbd>
+    }
 
     @if (open)
     {
         <div class="global-search-backdrop" @onclick="Close"></div>
         <div id="global-search-results" class="global-search-panel" role="listbox" aria-label="@Texts.Get("shell.search.results")">
-            @if (busy)
-            {
-                <p class="global-search-state" role="status">
-                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @Texts.Get("shell.search.busy")
-                </p>
-            }
-            else if (groups.Count == 0)
-            {
-                <p class="global-search-state" role="status">@Texts.Get("common.noResultFor", query)</p>
-            }
-            else
+            @if (groups.Count > 0)
             {
                 int index = 0;
                 @foreach (SearchGroup group in groups)
@@ -38,7 +34,10 @@
                         <div class="global-search-group-title">
                             <AppIcon Name="@group.Icon" Size="16" />
                             @group.Label
-                            <span class="global-search-count">@group.TotalCount.ToString("N0", Regional.Numbers)</span>
+                            @if (group.ListRoute is not null)
+                            {
+                                <span class="global-search-count">@group.TotalCount.ToString("N0", Regional.Numbers)</span>
+                            }
                         </div>
                         @foreach (SearchItem item in group.Items)
                         {
@@ -53,12 +52,23 @@
                                 }
                             </a>
                         }
-                        @if (group.TotalCount > group.Items.Count)
+                        @if (group.ListRoute is not null && group.TotalCount > group.Items.Count)
                         {
                             <a class="global-search-more" href="@group.ListRoute" @onclick="Close">@Texts.Get("shell.search.more", group.Label)</a>
                         }
                     </div>
                 }
+            }
+
+            @if (busy)
+            {
+                <p class="global-search-state" role="status">
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @Texts.Get("shell.search.busy")
+                </p>
+            }
+            else if (groups.Count == 0)
+            {
+                <p class="global-search-state" role="status">@Texts.Get("common.noResultFor", query)</p>
             }
 
             @if (failed.Count > 0)
@@ -75,7 +85,8 @@
 
     private sealed record SearchItem(string Title, string? Detail, string Href);
 
-    private sealed record SearchGroup(string Label, string Icon, string ListRoute, IReadOnlyList<SearchItem> Items, int TotalCount);
+    /// <summary><c>ListRoute</c> boşsa grup bir kayıt listesi değildir (ekranlar): sayı ve "tümünü ara" bağlantısı çizilmez.</summary>
+    private sealed record SearchGroup(string Label, string Icon, string? ListRoute, IReadOnlyList<SearchItem> Items, int TotalCount);
 
     private string query = "";
     private bool open;
@@ -114,7 +125,11 @@
         pending = cts;
         open = true;
         busy = true;
-        active = -1;
+
+        // Ekranlar istemcide, beklemeden eşleşir; kayıt sonuçları gelince altına eklenir.
+        groups = ScreenGroup(text) is { } screens ? [screens] : [];
+        failed.Clear();
+        active = groups.Count > 0 ? 0 : -1;
 
         // Debounce: kullanıcı yazmayı bırakınca sorgu gider; araya yeni tuş girince önceki sorgu iptal olur.
         try
@@ -146,7 +161,7 @@
         if (crm && Session.Can(CrmAccess.CompaniesRead))
         {
             tasks.Add(FetchAsync<CompanyDto>(Texts.Get("crm.companies.title"), "building", "crm/firmalar", "/api/crm/companies", text, failures,
-                c => new SearchItem(c.Name, Join(c.Industry, c.City), $"crm/firmalar/{c.Id}")));
+                c => new SearchItem(c.Name, Join(c.IndustryName ?? c.LegacyIndustry, c.City), $"crm/firmalar/{c.Id}")));
         }
 
         if (crm && Session.Can(CrmAccess.ContactsRead))
@@ -179,11 +194,38 @@
             return;
         }
 
-        groups = results.Where(g => g is not null).Select(g => g!).ToList();
+        List<SearchGroup> found = results.Where(g => g is not null).Select(g => g!).ToList();
+        if (ScreenGroup(text) is { } screens)
+        {
+            found.Insert(0, screens);
+        }
+
+        groups = found;
         failed.Clear();
         failed.AddRange(failures);
         busy = false;
         active = groups.Count > 0 ? 0 : -1;
+    }
+
+    /// <summary>Kullanıcının menüsünde görünen ekranlardan adı sorguyla eşleşenler; menüde gizli ekran burada da çıkmaz.</summary>
+    private SearchGroup? ScreenGroup(string text)
+    {
+        List<ScreenLink> screens = [];
+        foreach (AppDefinition root in Apps.Roots())
+        {
+            string area = AppNames.Of(root);
+            if (root.Route is not null)
+            {
+                screens.Add(new ScreenLink(area, root.Route, root.Icon));
+            }
+
+            screens.AddRange(Apps.MenuEntries(root.Id).Where(e => e.Link is not null).Select(e => new ScreenLink(e.Name, e.Link!, e.App.Icon, area)));
+        }
+
+        List<SearchItem> items = ScreenSearch.Find(screens, text, Limit)
+            .Select(s => new SearchItem(s.Name, s.Area, s.Href))
+            .ToList();
+        return items.Count == 0 ? null : new SearchGroup(Texts.Get("shell.search.screens"), "dashboard", null, items, items.Count);
     }
 
     private async Task<SearchGroup?> FetchAsync<T>(string label, string icon, string listRoute, string url, string text,

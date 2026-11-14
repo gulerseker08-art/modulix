@@ -10,7 +10,7 @@ using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Leads;
 using Modulix.Modules.Crm.Opportunities;
 using Modulix.Modules.Crm.Pricing;
-using Modulix.Core.Contracts.Sales;
+using Modulix.Modules.Crm.Contracts.Sales;
 using Modulix.Modules.Crm.Quotes;
 using Modulix.Modules.Crm.Records;
 using Modulix.Modules.Crm.Reporting;
@@ -1163,9 +1163,9 @@ public sealed class CrmModule : IModule
         services.AddScoped<IActivityLinkTarget, ContactLinkTarget>();
         services.AddScoped<IActivityLinkTarget, OpportunityLinkTarget>();
         services.AddScoped<IActivityLinkTarget, LeadLinkTarget>();
-        services.AddScoped<Modulix.Core.Contracts.Activities.IFollowUpActivities, CrmFollowUpActivities>();
+        services.AddScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, CrmFollowUpActivities>();
         // Ana bilgisayarın (API) sistem kimliği köprüsü bu doğrudan uygulamayı kendi CRM sistem kimliği altında çağırır (aşağıdaki "crm.follow-up" aboneliği).
-        services.AddKeyedScoped<Modulix.Core.Contracts.Activities.IFollowUpActivities, CrmFollowUpActivities>("direct");
+        services.AddKeyedScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, CrmFollowUpActivities>("direct");
         services.AddScoped<CrmFollowUpAnchor>();
         services.AddScoped<CrmFollowUpActivities>();
         services.AddScoped<CrmAutomationRecordSource>();

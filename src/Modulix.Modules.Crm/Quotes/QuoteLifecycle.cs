@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
-using Modulix.Core.Contracts.Sales;
+using Modulix.Modules.Crm.Contracts.Sales;
 using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Opportunities;

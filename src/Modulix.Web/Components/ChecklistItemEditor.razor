@@ -1,0 +1,176 @@
+@* Şablon adımı formu (ADR-0042 dilim 5). Düzen firmanın form düzenine (ADR-0021) göre çizilir. Gün farkı sürecin başlangıç tarihine eklenir (çıkış
+   sürecinde eksi olabilir); "zimmet iadesi" görevi yalnızca çıkış şablonunda olur (sunucu denetler). *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+@inject ToastService Toasts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Item is null ? "Yeni adım" : "Adım")</h2>
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Adım bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
+            {
+                case "title":
+                    <label class="@f.LabelClass()" for="item-title">@f.Label</label>
+                    <input id="item-title" class="form-control" maxlength="200" required aria-required="true" placeholder="ör. Bilgisayar hazırlansın" @bind="form.Title" />
+                    <FieldError Field="title" Errors="errors" />
+                    break;
+                case "sequence":
+                    <label class="@f.LabelClass()" for="item-sequence">@f.Label</label>
+                    <input id="item-sequence" class="form-control" type="number" min="1" max="10000" placeholder="Son adımdan sonra" @bind="form.Sequence" />
+                    <FieldError Field="sequence" Errors="errors" />
+                    break;
+                case "responsibleRole":
+                    <label class="@f.LabelClass()" for="item-responsible">@f.Label</label>
+                    <select id="item-responsible" class="form-select" @bind="form.ResponsibleRole">
+                        @foreach (var (key, label) in HrAccess.ChecklistResponsibles)
+                        {
+                            <option value="@key">@label</option>
+                        }
+                    </select>
+                    <FieldError Field="responsibleRole" Errors="errors" />
+                    break;
+                case "dueOffsetDays":
+                    <label class="@f.LabelClass()" for="item-offset">@f.Label</label>
+                    <input id="item-offset" class="form-control" type="number" min="-365" max="365" @bind="form.DueOffsetDays" />
+                    <FieldError Field="dueOffsetDays" Errors="errors" />
+                    <small class="text-muted">Başlangıç gününe eklenir (ör. -3: başlangıçtan 3 gün önce).</small>
+                    break;
+                case "taskType":
+                    <label class="@f.LabelClass()" for="item-type">@f.Label</label>
+                    <select id="item-type" class="form-select" @bind="form.TaskType">
+                        @foreach (var (key, label) in HrAccess.ChecklistTaskTypes.Where(t => t.Key != "assetReturn" || Kind == "offboarding"))
+                        {
+                            <option value="@key">@label</option>
+                        }
+                    </select>
+                    <FieldError Field="taskType" Errors="errors" />
+                    break;
+                case "description":
+                    <label class="@f.LabelClass()" for="item-description">@f.Label</label>
+                    <textarea id="item-description" class="form-control" rows="2" maxlength="1000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
+                    <FieldError Field="description" Errors="errors" />
+                    break;
+            }
+        </Field>
+    </LayoutForm>
+</form>
+
+@code {
+    private const string EntityKey = HrAccess.ChecklistTemplateItemEntityKey;
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private ItemForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    [Parameter, EditorRequired] public Guid TemplateId { get; set; }
+
+    /// <summary>Şablonun türü (zimmet iadesi yalnızca çıkışta).</summary>
+    [Parameter] public string Kind { get; set; } = "onboarding";
+
+    [Parameter] public RecordResponse? Item { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        form = Item is { } i
+            ? new ItemForm
+            {
+                Id = i.Id, Version = i.Version, Title = WarehouseLabels.Text(i, "title"), Sequence = WarehouseLabels.Number(i, "sequence"),
+                ResponsibleRole = WarehouseLabels.Text(i, "responsibleRole"), DueOffsetDays = WarehouseLabels.Number(i, "dueOffsetDays"),
+                TaskType = WarehouseLabels.Text(i, "taskType"), Description = WarehouseLabels.Text(i, "description"),
+                Custom = i.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new ItemForm();
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var values = new JsonObject
+        {
+            ["title"] = string.IsNullOrWhiteSpace(form.Title) ? null : form.Title.Trim(),
+            ["sequence"] = form.Sequence,
+            ["responsibleRole"] = form.ResponsibleRole,
+            ["dueOffsetDays"] = form.DueOffsetDays,
+            ["taskType"] = form.TaskType,
+            ["description"] = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            values["templateId"] = TemplateId.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var url = "/api/records/" + EntityKey;
+        var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{url}/{id}", request) : await Api.PostAsync<RecordResponse>(url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            Toasts.Success(Texts.Get("common.saved"));
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class ItemForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string? Title { get; set; }
+
+        public int? Sequence { get; set; }
+
+        public string ResponsibleRole { get; set; } = "hr";
+
+        public int DueOffsetDays { get; set; }
+
+        public string TaskType { get; set; } = "manual";
+
+        public string? Description { get; set; }
+    }
+}

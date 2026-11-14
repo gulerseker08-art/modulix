@@ -5,50 +5,50 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Satış analizi · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.salesAnalysis.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.ReportsRead">
     <div class="page-header">
         <div>
-            <h1>Satış analizi</h1>
+            <h1>@Texts.Get("crm.salesAnalysis.title")</h1>
             <p class="text-muted mb-0">
-                Teklif ve lead kohortları ile aşama dönüşümü. Kohort, seçili dönemde oluşan kayıtların sonradan nereye vardığını izler; güncel durum dağılımı değildir.
-                Veriler yetkiniz ve veri kapsamınızla sınırlıdır.
+                @Texts.Get("crm.salesAnalysis.intro")
+                @Texts.Get("crm.sales.scopeNote")
             </p>
         </div>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="crm/satis-gorunumu">Satış görünümü</a>
-            <a class="btn btn-outline-secondary" href="crm/ekip-performansi">Ekip performansı</a>
-            <a class="btn btn-outline-secondary" href="crm/veri-kalitesi">Veri kalitesi</a>
+            <a class="btn btn-outline-secondary" href="crm/satis-gorunumu">@Texts.Get("crm.salesOverview.title")</a>
+            <a class="btn btn-outline-secondary" href="crm/ekip-performansi">@Texts.Get("crm.salesTeam.title")</a>
+            <a class="btn btn-outline-secondary" href="crm/veri-kalitesi">@Texts.Get("crm.dataQuality.title")</a>
         </div>
     </div>
 
-    <div class="filters" role="group" aria-label="Dönem türü">
+    <div class="filters" role="group" aria-label="@Texts.Get("crm.sales.periodKind")">
         <div class="segmented">
             @foreach (var (key, label) in SalesLabels.PeriodKinds)
             {
                 <button type="button" class="chip @(kind == key ? "active" : null)" aria-pressed="@(kind == key ? "true" : "false")" disabled="@Busy" @onclick="() => ChooseKindAsync(key)">@label</button>
             }
         </div>
-        <button type="button" class="btn btn-outline-secondary" disabled="@Busy" @onclick="() => ShiftAsync(-1)">← Önceki dönem</button>
-        <button type="button" class="btn btn-outline-secondary" disabled="@Busy" @onclick="TodayAsync">Bugün</button>
-        <button type="button" class="btn btn-outline-secondary" disabled="@Busy" @onclick="() => ShiftAsync(1)">Sonraki dönem →</button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@Busy" @onclick="() => ShiftAsync(-1)">@Texts.Get("crm.sales.previousPeriod")</button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@Busy" @onclick="TodayAsync">@Texts.Get("crm.sales.today")</button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@Busy" @onclick="() => ShiftAsync(1)">@Texts.Get("crm.sales.nextPeriod")</button>
     </div>
 
-    <form class="form-grid mb-3" @onsubmit="ReloadAsync" @onsubmit:preventDefault aria-label="Analiz süzgeçleri">
+    <form class="form-grid mb-3" @onsubmit="ReloadAsync" @onsubmit:preventDefault aria-label="@Texts.Get("crm.salesAnalysis.filters")">
         <div class="span-3">
-            <label class="form-label" for="sa-date">Dönemdeki bir gün</label>
+            <label class="form-label" for="sa-date">@Texts.Get("crm.sales.anchorDay")</label>
             <input id="sa-date" class="form-control" type="date" @bind="anchor" @bind:after="ReloadAsync" />
         </div>
         <div class="span-3">
-            <label class="form-label" for="sa-asof">Kesim günü</label>
+            <label class="form-label" for="sa-asof">@Texts.Get("crm.salesAnalysis.asOf")</label>
             <input id="sa-asof" class="form-control" type="date" aria-describedby="sa-asof-help" @bind="asOf" @bind:after="ReloadAsync" />
-            <div id="sa-asof-help" class="form-text">İsteğe bağlı. Boşsa şimdiki durum; geçmiş bir gün verirseniz sonuçlar o güne kadarki verilerle hesaplanır.</div>
+            <div id="sa-asof-help" class="form-text">@Texts.Get("crm.salesAnalysis.asOfHelp")</div>
         </div>
         <div class="span-4">
-            <label class="form-label" for="sa-owner">Kullanıcı (sorumlu)</label>
+            <label class="form-label" for="sa-owner">@Texts.Get("crm.sales.ownerFilter")</label>
             <select id="sa-owner" class="form-select" @bind="owner" @bind:after="ReloadAsync">
-                <option value="">Tüm kullanıcılar</option>
+                <option value="">@Texts.Get("crm.sales.allUsers")</option>
                 @foreach (var member in Lookups.Members)
                 {
                     <option value="@member.UserId">@member.DisplayName</option>
@@ -56,13 +56,13 @@
             </select>
         </div>
         <div class="span-3">
-            <label class="form-label" for="sa-currency">Para birimi</label>
+            <label class="form-label" for="sa-currency">@Texts.Get("crm.sales.currency")</label>
             <input id="sa-currency" class="form-control" maxlength="3" placeholder="@Regional.Currency" aria-describedby="sa-currency-help" @bind="currency" @bind:after="ReloadAsync" />
-            <div id="sa-currency-help" class="form-text">Boşsa firmanın raporlama para birimi (3 harf, ör. USD).</div>
+            <div id="sa-currency-help" class="form-text">@Texts.Get("crm.sales.currencyHelp")</div>
         </div>
     </form>
 
-    <TabBar Tabs="Tabs" State="tabs" Label="Analiz bölümleri" Changed="OnTabChangedAsync" />
+    <TabBar Tabs="Tabs" State="tabs" Label="@Texts.Get("crm.salesAnalysis.sections")" Changed="OnTabChangedAsync" />
 
     @if (tabs.Active == QuotesTab)
     {
@@ -73,44 +73,44 @@
                 var q = qr.Data;
                 <AnalyticsFrame T="QuoteCohortDto" Report="qr">
                     <p class="small text-muted">
-                        Teklif ailesi, aynı teklifin revizyonlarının bütünüdür; aile, ilk sunulduğu dönemin kohortuna girer. Kesim zamanı: @CrmLabels.Time(q.AsOf).
+                        @Texts.Get("crm.salesAnalysis.q.intro", CrmLabels.Time(q.AsOf))
                     </p>
                     @if (!q.Mature)
                     {
-                        <div class="alert alert-warning" role="status"><strong>Kohort olgun değil.</strong> Dönem henüz bitmedi ya da kesim günü dönem sonundan önce; bekleyen teklifler sonradan kabul edilebilir, oranlar değişebilir.</div>
+                        <div class="alert alert-warning" role="status"><strong>@Texts.Get("crm.salesAnalysis.immature")</strong> @Texts.Get("crm.salesAnalysis.q.immature")</div>
                     }
 
                     @if (q.Families == 0)
                     {
-                        <p class="text-muted">Bu dönemde sunulan teklif yok.</p>
+                        <p class="text-muted">@Texts.Get("crm.salesAnalysis.q.empty")</p>
                     }
                     else
                     {
-                        <div class="kpi-grid" role="group" aria-label="Teklif kohortu özeti">
-                            <SalesKpiCard Label="Teklif ailesi" Icon="file-text" Tone="info" Value="@SalesLabels.Count(q.Families)" Detail="@($"{q.Accepted} kabul edildi, {q.Pending} beklemede")" />
-                            <SalesKpiCard Label="Kabul oranı" Icon="percent" Tone="success" Value="@SalesAnalysisLabels.Rate(q.AcceptanceRatePercent)"
-                                          Detail="@(q.AcceptanceRatePercent is null ? "Oran hesaplanamadı" : $"Kabul edilen aile {q.Accepted} / {q.Families}")" />
-                            <SalesKpiCard Label="Kabul süresi" Icon="calendar" Tone="brand" Value="@SalesAnalysisLabels.Days(q.AverageDaysToAccept)"
-                                          Detail="@($"Ortalama · medyan {SalesAnalysisLabels.Days(q.MedianDaysToAccept)}")" />
-                            <SalesKpiCard Label="Kabul edilen net tutar" Icon="coins" Tone="success"
+                        <div class="kpi-grid" role="group" aria-label="@Texts.Get("crm.salesAnalysis.q.summary")">
+                            <SalesKpiCard Label="@Texts.Get("crm.salesAnalysis.q.families")" Icon="file-text" Tone="info" Value="@SalesLabels.Count(q.Families)" Detail="@Texts.Get("crm.salesAnalysis.q.familiesDetail", q.Accepted, q.Pending)" />
+                            <SalesKpiCard Label="@Texts.Get("crm.salesAnalysis.q.acceptanceRate")" Icon="percent" Tone="success" Value="@SalesAnalysisLabels.Rate(q.AcceptanceRatePercent)"
+                                          Detail="@(q.AcceptanceRatePercent is null ? Texts.Get("crm.salesAnalysis.rateUnavailable") : Texts.Get("crm.salesAnalysis.q.acceptedOf", q.Accepted, q.Families))" />
+                            <SalesKpiCard Label="@Texts.Get("crm.salesAnalysis.q.timeToAccept")" Icon="calendar" Tone="brand" Value="@SalesAnalysisLabels.Days(q.AverageDaysToAccept)"
+                                          Detail="@Texts.Get("crm.salesAnalysis.averageMedian", SalesAnalysisLabels.Days(q.MedianDaysToAccept))" />
+                            <SalesKpiCard Label="@Texts.Get("crm.salesAnalysis.q.acceptedNet")" Icon="coins" Tone="success"
                                           Value="@(qr.AmountsVisible ? CrmLabels.Amount(q.AcceptedNet.Amount, qr.Currency) : SalesAnalysisLabels.NoAmountPermission)"
-                                          Detail="@(qr.AmountsVisible ? $"{q.AcceptedNet.Count} kabul edilen teklif (vergi hariç)" : "Bu değer tutar iznini ister")"
+                                          Detail="@(qr.AmountsVisible ? Texts.Get("crm.salesAnalysis.q.acceptedNetDetail", q.AcceptedNet.Count) : Texts.Get("crm.sales.needsAmountPermission"))"
                                           Partial="@(qr.AmountsVisible && q.AcceptedNet.IsPartial)" PartialHint="@SalesLabels.PartialHint(q.AcceptedNet)" />
                         </div>
 
                         <section class="detail-section" aria-labelledby="sa-q-outcome">
-                            <div class="section-header"><h2 id="sa-q-outcome">Sonuç dağılımı (teklif ailesi)</h2></div>
+                            <div class="section-header"><h2 id="sa-q-outcome">@Texts.Get("crm.salesAnalysis.q.outcomes")</h2></div>
                             <table class="table record-table">
-                                <caption class="visually-hidden">Teklif ailelerinin sonuçlara göre dağılımı</caption>
+                                <caption class="visually-hidden">@Texts.Get("crm.salesAnalysis.q.outcomesCaption")</caption>
                                 <thead>
-                                    <tr><th scope="col">Sonuç</th><th scope="col">Aile sayısı</th></tr>
+                                    <tr><th scope="col">@Texts.Get("crm.salesAnalysis.col.outcome")</th><th scope="col">@Texts.Get("crm.salesAnalysis.col.familyCount")</th></tr>
                                 </thead>
                                 <tbody>
                                     @foreach (var (outcomeLabel, outcomeCount) in SalesAnalysisLabels.QuoteOutcomes(q))
                                     {
                                         <tr>
-                                            <td data-label="Sonuç" class="primary">@outcomeLabel</td>
-                                            <td data-label="Aile sayısı">@SalesLabels.Count(outcomeCount)</td>
+                                            <td data-label="@Texts.Get("crm.salesAnalysis.col.outcome")" class="primary">@outcomeLabel</td>
+                                            <td data-label="@Texts.Get("crm.salesAnalysis.col.familyCount")">@SalesLabels.Count(outcomeCount)</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -118,49 +118,49 @@
                         </section>
 
                         <section class="detail-section" aria-labelledby="sa-q-revision">
-                            <div class="section-header"><h2 id="sa-q-revision">Revizyonlar ve kabul oranı</h2></div>
+                            <div class="section-header"><h2 id="sa-q-revision">@Texts.Get("crm.salesAnalysis.q.revisions")</h2></div>
                             <table class="table record-table">
-                                <caption class="visually-hidden">Revizyon sayıları ve kabul oranları</caption>
+                                <caption class="visually-hidden">@Texts.Get("crm.salesAnalysis.q.revisionsCaption")</caption>
                                 <thead>
-                                    <tr><th scope="col">Ölçüt</th><th scope="col">Değer</th></tr>
+                                    <tr><th scope="col">@Texts.Get("crm.salesAnalysis.col.measure")</th><th scope="col">@Texts.Get("crm.salesAnalysis.col.value")</th></tr>
                                 </thead>
                                 <tbody>
-                                    <tr><td data-label="Ölçüt" class="primary">Müşteriye sunulan revizyon</td><td data-label="Değer">@SalesLabels.Count(q.PresentedRevisions)</td></tr>
+                                    <tr><td data-label="@Texts.Get("crm.salesAnalysis.col.measure")" class="primary">@Texts.Get("crm.salesAnalysis.q.presentedRevisions")</td><td data-label="@Texts.Get("crm.salesAnalysis.col.value")">@SalesLabels.Count(q.PresentedRevisions)</td></tr>
                                     <tr>
-                                        <td data-label="Ölçüt" class="primary">Aile başına ortalama revizyon</td>
-                                        <td data-label="Değer">@(q.AverageRevisionsPerFamily is { } perFamily ? perFamily.ToString("0.##", Regional.Numbers) : SalesAnalysisLabels.NoData)</td>
+                                        <td data-label="@Texts.Get("crm.salesAnalysis.col.measure")" class="primary">@Texts.Get("crm.salesAnalysis.q.revisionsPerFamily")</td>
+                                        <td data-label="@Texts.Get("crm.salesAnalysis.col.value")">@(q.AverageRevisionsPerFamily is { } perFamily ? perFamily.ToString("0.##", Regional.Numbers) : SalesAnalysisLabels.NoData)</td>
                                     </tr>
-                                    <tr><td data-label="Ölçüt" class="primary">Aile kabul oranı</td><td data-label="Değer">@SalesAnalysisLabels.Rate(q.AcceptanceRatePercent)</td></tr>
-                                    <tr><td data-label="Ölçüt" class="primary">Revizyon kabul oranı</td><td data-label="Değer">@SalesAnalysisLabels.Rate(q.RevisionAcceptanceRatePercent)</td></tr>
+                                    <tr><td data-label="@Texts.Get("crm.salesAnalysis.col.measure")" class="primary">@Texts.Get("crm.salesAnalysis.q.familyRate")</td><td data-label="@Texts.Get("crm.salesAnalysis.col.value")">@SalesAnalysisLabels.Rate(q.AcceptanceRatePercent)</td></tr>
+                                    <tr><td data-label="@Texts.Get("crm.salesAnalysis.col.measure")" class="primary">@Texts.Get("crm.salesAnalysis.q.revisionRate")</td><td data-label="@Texts.Get("crm.salesAnalysis.col.value")">@SalesAnalysisLabels.Rate(q.RevisionAcceptanceRatePercent)</td></tr>
                                 </tbody>
                             </table>
                             <p class="small text-muted mt-2">
-                                Aile kabul oranı, teklif ailelerinden kabul edilenlerin payıdır; revizyon kabul oranı ise sunulan her revizyonu ayrı sayar.
-                                Bir teklif kabul edilmeden önce çok revizyon gerektiriyorsa revizyon oranı genellikle aile oranının altında kalır; ikisi arasındaki fark, revizyonların kabulü nasıl etkilediğini gösterir.
+                                @Texts.Get("crm.salesAnalysis.q.rateNote1")
+                                @Texts.Get("crm.salesAnalysis.q.rateNote2")
                             </p>
                         </section>
 
                         <section class="detail-section" aria-labelledby="sa-q-owner">
-                            <div class="section-header"><h2 id="sa-q-owner">Sorumlu bazında</h2></div>
+                            <div class="section-header"><h2 id="sa-q-owner">@Texts.Get("crm.sales.byOwner")</h2></div>
                             @if (q.ByOwner.Count == 0)
                             {
-                                <p class="text-muted">Sorumlu kırılımı yok.</p>
+                                <EmptyState Title="@Texts.Get("crm.salesAnalysis.noOwnerBreakdown")" />
                             }
                             else
                             {
                                 <table class="table record-table">
-                                    <caption class="visually-hidden">Teklif kohortunun sorumluya göre dağılımı</caption>
+                                    <caption class="visually-hidden">@Texts.Get("crm.salesAnalysis.q.ownerCaption")</caption>
                                     <thead>
-                                        <tr><th scope="col">Sorumlu</th><th scope="col">Teklif ailesi</th><th scope="col">Kabul edilen</th><th scope="col">Kabul oranı</th></tr>
+                                        <tr><th scope="col">@Texts.Get("common.field.owner")</th><th scope="col">@Texts.Get("crm.salesAnalysis.q.families")</th><th scope="col">@Texts.Get("crm.salesAnalysis.outcome.accepted")</th><th scope="col">@Texts.Get("crm.salesAnalysis.q.acceptanceRate")</th></tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var row in q.ByOwner)
                                         {
                                             <tr>
-                                                <td data-label="Sorumlu" class="primary">@SalesAnalysisLabels.Owner(Lookups, row.OwnerId)</td>
-                                                <td data-label="Teklif ailesi">@SalesLabels.Count(row.Families)</td>
-                                                <td data-label="Kabul edilen">@SalesLabels.Count(row.Accepted)</td>
-                                                <td data-label="Kabul oranı">@SalesAnalysisLabels.Rate(row.AcceptanceRatePercent)</td>
+                                                <td data-label="@Texts.Get("common.field.owner")" class="primary">@SalesAnalysisLabels.Owner(Lookups, row.OwnerId)</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.q.families")">@SalesLabels.Count(row.Families)</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.outcome.accepted")">@SalesLabels.Count(row.Accepted)</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.q.acceptanceRate")">@SalesAnalysisLabels.Rate(row.AcceptanceRatePercent)</td>
                                             </tr>
                                         }
                                     </tbody>
@@ -181,61 +181,61 @@
             {
                 var l = lr.Data;
                 <AnalyticsFrame T="LeadCohortDto" Report="lr">
-                    <p class="small text-muted">Kohort: seçili dönemde alınan müşteri adayları. Kesim zamanı: @CrmLabels.Time(l.AsOf).</p>
+                    <p class="small text-muted">@Texts.Get("crm.salesAnalysis.l.intro", CrmLabels.Time(l.AsOf))</p>
                     @if (!l.Mature)
                     {
                         <div class="alert alert-warning" role="status">
-                            <strong>Kohort olgun değil.</strong> Dönem bitişinden sonra @l.MaturityDays gün geçmedi; dönüşüm oranı sonradan artabilir. Bu oranı kesin sonuç gibi yorumlamayın.
+                            <strong>@Texts.Get("crm.salesAnalysis.immature")</strong> @Texts.Get("crm.salesAnalysis.l.immature", l.MaturityDays)
                         </div>
                     }
 
                     @if (l.Leads == 0)
                     {
-                        <p class="text-muted">Bu dönemde alınan müşteri adayı yok.</p>
+                        <p class="text-muted">@Texts.Get("crm.salesAnalysis.l.empty")</p>
                     }
                     else
                     {
-                        <div class="kpi-grid" role="group" aria-label="Müşteri adayı kohortu özeti">
-                            <SalesKpiCard Label="Kohort" Icon="inbox" Tone="info" Value="@SalesLabels.Count(l.Leads)" Detail="Dönemde alınan müşteri adayı" />
-                            <SalesKpiCard Label="Dönüşen" Icon="check-circle" Tone="success" Value="@SalesLabels.Count(l.Converted)" Detail="Fırsata dönüşen" />
-                            <SalesKpiCard Label="Elenen" Icon="shield" Tone="danger" Value="@SalesLabels.Count(l.Disqualified)" Detail="Uygun değil diye elenen" />
-                            <SalesKpiCard Label="Açık" Icon="layers" Tone="brand" Value="@SalesLabels.Count(l.Open)" Detail="Henüz sonuçlanmamış" />
-                            <SalesKpiCard Label="Uygun müşteri adayı" Icon="user-check" Tone="info" Value="@SalesLabels.Count(l.Eligible)" Detail="Elenenler hariç kohort" />
+                        <div class="kpi-grid" role="group" aria-label="@Texts.Get("crm.salesAnalysis.l.summary")">
+                            <SalesKpiCard Label="@Texts.Get("crm.salesAnalysis.l.cohort")" Icon="inbox" Tone="info" Value="@SalesLabels.Count(l.Leads)" Detail="@Texts.Get("crm.salesAnalysis.l.cohortDetail")" />
+                            <SalesKpiCard Label="@Texts.Get("crm.salesAnalysis.l.converted")" Icon="check-circle" Tone="success" Value="@SalesLabels.Count(l.Converted)" Detail="@Texts.Get("crm.salesAnalysis.l.convertedDetail")" />
+                            <SalesKpiCard Label="@Texts.Get("crm.salesAnalysis.l.disqualified")" Icon="shield" Tone="danger" Value="@SalesLabels.Count(l.Disqualified)" Detail="@Texts.Get("crm.salesAnalysis.l.disqualifiedDetail")" />
+                            <SalesKpiCard Label="@Texts.Get("crm.opportunityReport.col.open")" Icon="layers" Tone="brand" Value="@SalesLabels.Count(l.Open)" Detail="@Texts.Get("crm.salesAnalysis.l.openDetail")" />
+                            <SalesKpiCard Label="@Texts.Get("crm.salesAnalysis.l.eligible")" Icon="user-check" Tone="info" Value="@SalesLabels.Count(l.Eligible)" Detail="@Texts.Get("crm.salesAnalysis.l.eligibleDetail")" />
                         </div>
 
                         <section class="detail-section" aria-labelledby="sa-l-rates">
-                            <div class="section-header"><h2 id="sa-l-rates">Dönüşüm oranı</h2></div>
-                            <div class="kpi-grid" role="group" aria-label="Müşteri adayı dönüşüm oranları">
-                                <SalesKpiCard Label="Tüm kohorta göre" Icon="percent" Tone="success" Value="@SalesAnalysisLabels.Rate(l.RateOfAllPercent)"
-                                              Detail="@($"Dönüşen {l.Converted} / kohort {l.Leads}")" />
-                                <SalesKpiCard Label="Uygun müşteri adaylarına göre" Icon="percent" Tone="success" Value="@SalesAnalysisLabels.Rate(l.RateOfEligiblePercent)"
-                                              Detail="@(l.Eligible == 0 ? "Uygun müşteri adayı yok" : $"Dönüşen {l.Converted} / uygun {l.Eligible}")" />
-                                <SalesKpiCard Label="Dönüşme süresi" Icon="calendar" Tone="brand" Value="@SalesAnalysisLabels.Days(l.AverageDaysToConvert)"
-                                              Detail="@($"Ortalama · medyan {SalesAnalysisLabels.Days(l.MedianDaysToConvert)}")" />
+                            <div class="section-header"><h2 id="sa-l-rates">@Texts.Get("crm.salesAnalysis.l.rate")</h2></div>
+                            <div class="kpi-grid" role="group" aria-label="@Texts.Get("crm.salesAnalysis.l.rates")">
+                                <SalesKpiCard Label="@Texts.Get("crm.salesAnalysis.l.rateOfAll")" Icon="percent" Tone="success" Value="@SalesAnalysisLabels.Rate(l.RateOfAllPercent)"
+                                              Detail="@Texts.Get("crm.salesAnalysis.l.rateOfAllDetail", l.Converted, l.Leads)" />
+                                <SalesKpiCard Label="@Texts.Get("crm.salesAnalysis.l.rateOfEligible")" Icon="percent" Tone="success" Value="@SalesAnalysisLabels.Rate(l.RateOfEligiblePercent)"
+                                              Detail="@(l.Eligible == 0 ? Texts.Get("crm.salesAnalysis.l.noEligible") : Texts.Get("crm.salesAnalysis.l.rateOfEligibleDetail", l.Converted, l.Eligible))" />
+                                <SalesKpiCard Label="@Texts.Get("crm.salesAnalysis.l.timeToConvert")" Icon="calendar" Tone="brand" Value="@SalesAnalysisLabels.Days(l.AverageDaysToConvert)"
+                                              Detail="@Texts.Get("crm.salesAnalysis.averageMedian", SalesAnalysisLabels.Days(l.MedianDaysToConvert))" />
                             </div>
                         </section>
 
                         <section class="detail-section" aria-labelledby="sa-l-source">
-                            <div class="section-header"><h2 id="sa-l-source">Kaynak bazında</h2></div>
+                            <div class="section-header"><h2 id="sa-l-source">@Texts.Get("crm.salesAnalysis.l.bySource")</h2></div>
                             @if (l.BySource.Count == 0)
                             {
-                                <p class="text-muted">Kaynak kırılımı yok.</p>
+                                <EmptyState Title="@Texts.Get("crm.salesAnalysis.l.noSourceBreakdown")" />
                             }
                             else
                             {
                                 <table class="table record-table">
-                                    <caption class="visually-hidden">Müşteri adayı kohortunun kaynağa göre dağılımı</caption>
+                                    <caption class="visually-hidden">@Texts.Get("crm.salesAnalysis.l.sourceCaption")</caption>
                                     <thead>
-                                        <tr><th scope="col">Kaynak</th><th scope="col">Müşteri adayı</th><th scope="col">Dönüşen</th><th scope="col">Dönüşüm oranı</th></tr>
+                                        <tr><th scope="col">@Texts.Get("crm.salesAnalysis.col.source")</th><th scope="col">@Texts.Get("crm.salesAnalysis.col.lead")</th><th scope="col">@Texts.Get("crm.salesAnalysis.l.converted")</th><th scope="col">@Texts.Get("crm.salesAnalysis.l.rate")</th></tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var row in l.BySource)
                                         {
                                             <tr>
-                                                <td data-label="Kaynak" class="primary">@(string.IsNullOrWhiteSpace(row.Source) ? "Kaynak yok" : Lookups.Label(CrmLeadLists.Source, row.Source))</td>
-                                                <td data-label="Lead">@SalesLabels.Count(row.Leads)</td>
-                                                <td data-label="Dönüşen">@SalesLabels.Count(row.Converted)</td>
-                                                <td data-label="Dönüşüm oranı">@SalesAnalysisLabels.Rate(row.RatePercent)</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.col.source")" class="primary">@(string.IsNullOrWhiteSpace(row.Source) ? Texts.Get("crm.salesAnalysis.noSource") : Lookups.Label(CrmLeadLists.Source, row.Source))</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.col.lead")">@SalesLabels.Count(row.Leads)</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.l.converted")">@SalesLabels.Count(row.Converted)</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.l.rate")">@SalesAnalysisLabels.Rate(row.RatePercent)</td>
                                             </tr>
                                         }
                                     </tbody>
@@ -257,55 +257,55 @@
                 var s = sr.Data;
                 <AnalyticsFrame T="StageFlowDto" Report="sr">
                     <div class="alert alert-info" role="note">
-                        <strong>Bu, güncel aşama dağılımı değildir.</strong> Seçili dönemde oluşturulan fırsatların (kohort) aşamalar arasındaki tarihsel dönüşümüdür; kohort dışındaki açık fırsatlar burada görünmez.
-                        Güncel dağılım için Satış görünümü sayfasına bakın.
+                        <strong>@Texts.Get("crm.salesAnalysis.s.notCurrent")</strong> @Texts.Get("crm.salesAnalysis.s.notCurrentNote")
+                        @Texts.Get("crm.salesAnalysis.s.seeOverview")
                     </div>
                     <p class="small text-muted">
-                        Kohort büyüklüğü: <strong>@SalesLabels.Count(s.Cohort)</strong> fırsat ·
-                        Tarihçe izlemesi başlangıcı: <strong>@(s.TrackingStart is { } tracking ? SalesAnalysisLabels.TrackingStart(tracking) : "izleme başlamadı")</strong> ·
-                        Kesim zamanı: @CrmLabels.Time(s.AsOf)
+                        @Texts.Strong("crm.salesAnalysis.s.cohortSize", SalesLabels.Count(s.Cohort)) ·
+                        @Texts.Strong("crm.salesAnalysis.s.trackingStart", s.TrackingStart is { } tracking ? SalesAnalysisLabels.TrackingStart(tracking) : Texts.Get("crm.salesAnalysis.s.notTracking")) ·
+                        @Texts.Get("crm.salesAnalysis.asOfTime", CrmLabels.Time(s.AsOf))
                     </p>
 
                     @if (s.Cohort == 0 || s.Rows.Count == 0)
                     {
                         <div class="alert alert-secondary" role="status">
-                            <strong>Veri yok</strong> — tarihçe izlemesi başlamadan önce açılan fırsatlar için dönüşüm üretilmez. Bu dönemde izlenen fırsat bulunamadı.
+                            <strong>@SalesAnalysisLabels.NoData</strong> — @Texts.Get("crm.salesAnalysis.s.empty")
                         </div>
                     }
                     else
                     {
                         var ordered = s.Rows.OrderBy(r => r.Order).ToList();
                         <section class="detail-section" aria-labelledby="sa-s-chart">
-                            <div class="section-header"><h2 id="sa-s-chart">Aşama akışı</h2></div>
-                            <BarChart Title="Aşamaya giren tekil fırsat adedi"
+                            <div class="section-header"><h2 id="sa-s-chart">@Texts.Get("crm.salesAnalysis.s.flow")</h2></div>
+                            <BarChart Title="@Texts.Get("crm.salesAnalysis.s.enteredChart")"
                                       Slices="@ordered.Select(r => new ChartSlice(Lookups.Label(CrmLists.OpportunityStage, r.Stage), r.Entered)).ToList()" />
-                            <BarChart Title="Bir sonraki aşamaya ilerleyen fırsat adedi"
+                            <BarChart Title="@Texts.Get("crm.salesAnalysis.s.advancedChart")"
                                       Slices="@ordered.Select(r => new ChartSlice(Lookups.Label(CrmLists.OpportunityStage, r.Stage), r.Advanced)).ToList()" />
-                            <p class="small text-muted">İlk grafik her aşamaya girmiş tekil fırsatları, ikincisi o aşamadan sonraki aşamaya geçenleri gösterir. Ayrıntılar aşağıdaki tablodadır.</p>
+                            <p class="small text-muted">@Texts.Get("crm.salesAnalysis.s.chartNote")</p>
                         </section>
 
                         <section class="detail-section" aria-labelledby="sa-s-table">
-                            <div class="section-header"><h2 id="sa-s-table">Aşama dönüşüm tablosu</h2></div>
+                            <div class="section-header"><h2 id="sa-s-table">@Texts.Get("crm.salesAnalysis.s.table")</h2></div>
                             <div class="table-responsive">
                                 <table class="table record-table">
-                                    <caption class="visually-hidden">Oluşturulma kohortunun aşamalara göre tarihsel dönüşümü</caption>
+                                    <caption class="visually-hidden">@Texts.Get("crm.salesAnalysis.s.tableCaption")</caption>
                                     <thead>
                                         <tr>
-                                            <th scope="col">Aşama</th><th scope="col">Girmiş tekil fırsat</th><th scope="col">İlerleyen</th><th scope="col">İlerleme</th>
-                                            <th scope="col">Bu aşamadan kaybedilen</th><th scope="col">Bu aşamadan kazanılan</th><th scope="col">Şu an burada</th>
+                                            <th scope="col">@Texts.Get("crm.opportunities.col.stage")</th><th scope="col">@Texts.Get("crm.salesAnalysis.s.entered")</th><th scope="col">@Texts.Get("crm.salesAnalysis.s.advanced")</th><th scope="col">@Texts.Get("crm.salesAnalysis.s.advanceRate")</th>
+                                            <th scope="col">@Texts.Get("crm.salesAnalysis.s.lostFrom")</th><th scope="col">@Texts.Get("crm.salesAnalysis.s.wonFrom")</th><th scope="col">@Texts.Get("crm.salesAnalysis.s.stillHere")</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var row in ordered)
                                         {
                                             <tr>
-                                                <td data-label="Aşama" class="primary">@Lookups.Label(CrmLists.OpportunityStage, row.Stage)</td>
-                                                <td data-label="Girmiş tekil fırsat">@SalesLabels.Count(row.Entered)</td>
-                                                <td data-label="İlerleyen">@SalesLabels.Count(row.Advanced)</td>
-                                                <td data-label="İlerleme">@SalesAnalysisLabels.Rate(row.AdvanceRatePercent)</td>
-                                                <td data-label="Bu aşamadan kaybedilen">@SalesLabels.Count(row.LostFrom)</td>
-                                                <td data-label="Bu aşamadan kazanılan">@SalesLabels.Count(row.WonFrom)</td>
-                                                <td data-label="Şu an burada">@SalesLabels.Count(row.StillHere)</td>
+                                                <td data-label="@Texts.Get("crm.opportunities.col.stage")" class="primary">@Lookups.Label(CrmLists.OpportunityStage, row.Stage)</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.s.entered")">@SalesLabels.Count(row.Entered)</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.s.advanced")">@SalesLabels.Count(row.Advanced)</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.s.advanceRate")">@SalesAnalysisLabels.Rate(row.AdvanceRatePercent)</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.s.lostFrom")">@SalesLabels.Count(row.LostFrom)</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.s.wonFrom")">@SalesLabels.Count(row.WonFrom)</td>
+                                                <td data-label="@Texts.Get("crm.salesAnalysis.s.stillHere")">@SalesLabels.Count(row.StillHere)</td>
                                             </tr>
                                         }
                                     </tbody>
@@ -340,9 +340,9 @@
         public int RequestId { get; set; }
     }
 
-    private static readonly IReadOnlyList<TabItem> Tabs =
+    private static IReadOnlyList<TabItem> Tabs =>
     [
-        new(QuotesTab, "Teklif kohortu"), new(LeadsTab, "Müşteri adayı dönüşümü"), new(StagesTab, "Aşama dönüşümü"),
+        new(QuotesTab, Texts.Get("crm.salesAnalysis.tab.quotes")), new(LeadsTab, Texts.Get("crm.salesAnalysis.tab.leads")), new(StagesTab, Texts.Get("crm.salesAnalysis.tab.stages")),
     ];
 
     private readonly TabState tabs = new(QuotesTab);

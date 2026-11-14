@@ -3,16 +3,16 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Satış devri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("orders.handover-page.title") · Modulix</PageTitle>
 
 <AuthGate Module="@OrdersAccess.ModuleKey" Permission="@OrdersAccess.OrdersRead">
     <div class="page-header">
         <div>
-            <h1>Satış devri@(order is null ? null : " · " + order.Number)</h1>
-            <p class="text-muted mb-0">Satış sorumlusu devir kaydını hazırlar; sistem zorunlu bilgi ve kontrol listesini denetler; operasyon kabul eder ya da gerekçeyle bilgi ister. Gönderilen devir karara bağlanana kadar değişmez.</p>
+            <h1>@Texts.Get("orders.handover-page.title")@(order is null ? null : " · " + order.Number)</h1>
+            <p class="text-muted mb-0">@Texts.Get("orders.handover-page.intro")</p>
         </div>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="siparisler/@OrderId">Siparişe dön</a>
+            <a class="btn btn-outline-secondary" href="siparisler/@OrderId">@Texts.Get("orders.handover-page.back")</a>
         </div>
     </div>
 
@@ -20,22 +20,22 @@
 
     @if (notFoundOrder)
     {
-        <div class="alert alert-warning" role="alert">Sipariş bulunamadı ya da erişim yetkiniz yok. <a href="siparisler">Siparişlere dön</a></div>
+        <div class="alert alert-warning" role="alert">@Texts.Get("orders.detail.not-found") <a href="siparisler">@Texts.Get("orders.detail.back-to-list")</a></div>
     }
     else if (loading)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (detail is null)
     {
-        <p class="text-muted">Bu sipariş için henüz devir kaydı yok.</p>
+        <p class="text-muted">@Texts.Get("orders.handover-page.none")</p>
         @if (Session.Can(OrderHandoverAccess.HandoversWrite))
         {
-            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="CreateAsync">Devir kaydı hazırla</button>
+            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="CreateAsync">@Texts.Get("orders.handover-page.create")</button>
         }
         else
         {
-            <p class="text-muted">Devir kaydı hazırlamak için '@OrderHandoverAccess.HandoversWrite' izni gerekir.</p>
+            <p class="text-muted">@Texts.Get("orders.handover-page.permission", OrderHandoverAccess.HandoversWrite)</p>
         }
     }
     else
@@ -43,23 +43,23 @@
         var h = detail.Handover;
         <p>
             <span class="badge stage-@OrderLabels.HandoverBadge(h.Status)">@OrderLabels.Label(OrderLabels.Handovers, h.Status)</span>
-            @if (h.Round > 0) { <span class="text-muted"> · Gönderim turu @h.Round</span> }
-            @if (h.SentAt is { } sentAt) { <span class="text-muted"> · Gönderen @Lookups.MemberName(h.SentBy), @CrmLabels.Time(sentAt)</span> }
-            @if (h.AcceptedAt is { } acceptedAt) { <span class="text-muted"> · Kabul eden @Lookups.MemberName(h.AcceptedBy), @CrmLabels.Time(acceptedAt)</span> }
+            @if (h.Round > 0) { <span class="text-muted">@Texts.Get("orders.handover-page.round", h.Round)</span> }
+            @if (h.SentAt is { } sentAt) { <span class="text-muted">@Texts.Get("orders.handover-page.sent-by", Lookups.MemberName(h.SentBy), CrmLabels.Time(sentAt))</span> }
+            @if (h.AcceptedAt is { } acceptedAt) { <span class="text-muted">@Texts.Get("orders.handover-page.accepted-by", Lookups.MemberName(h.AcceptedBy), CrmLabels.Time(acceptedAt))</span> }
         </p>
 
         @if (h.Status == "InfoRequested" && !string.IsNullOrEmpty(h.InfoRequest))
         {
-            <div class="alert alert-warning" role="status"><strong>Operasyon bilgi istedi:</strong> @h.InfoRequest</div>
+            <div class="alert alert-warning" role="status"><strong>@Texts.Get("orders.handover-page.info-requested")</strong> @h.InfoRequest</div>
         }
 
         @if (Editable)
         {
             <section aria-labelledby="missing-title">
-                <h2 id="missing-title" class="h6">Gönderim için eksikler</h2>
+                <h2 id="missing-title" class="h6">@Texts.Get("orders.handover-page.missing")</h2>
                 @if (detail.Missing.Count == 0)
                 {
-                    <p class="text-success" role="status">Zorunlu bilgi ve kontrol listesi tamam; devir gönderilebilir.</p>
+                    <p class="text-success" role="status">@Texts.Get("orders.handover-page.missing-ok")</p>
                 }
                 else
                 {
@@ -71,14 +71,14 @@
         }
 
         <section aria-labelledby="actions-title">
-            <h2 id="actions-title">İşlemler</h2>
+            <h2 id="actions-title">@Texts.Get("orders.handover-page.actions")</h2>
             @if (detail.Actions.Count == 0)
             {
-                <p class="text-muted">Bu devir için yapabileceğiniz işlem yok.</p>
+                <p class="text-muted">@Texts.Get("orders.handover-page.no-actions")</p>
             }
             else
             {
-                <div class="header-actions" role="group" aria-label="Devir işlemleri">
+                <div class="header-actions" role="group" aria-label="@Texts.Get("orders.handover-page.actions-group")">
                     @foreach (var action in detail.Actions)
                     {
                         <button type="button" class="btn @(action.Action == "send" || action.Action == "accept" ? "btn-primary" : "btn-outline-secondary")"
@@ -102,12 +102,12 @@
                         }
                         @if (chosen.Action == "accept")
                         {
-                            <label class="form-label mt-2" for="accept-responsible">Sorumlu operasyon kullanıcısı (isteğe bağlı)</label>
+                            <label class="form-label mt-2" for="accept-responsible">@Texts.Get("orders.handover-page.accept-responsible")</label>
                             <LookupPicker Id="accept-responsible" LookupKey="orders.handover.responsible" @bind-Value="responsible" Placeholder="@(h.ResponsibleUserId is null ? "—" : Lookups.MemberName(h.ResponsibleUserId))" />
                         }
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">Onayla: @ActionLabel(chosen, h.Status)</button>
-                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => selected = null">Vazgeç</button>
+                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("orders.actions.confirm", ActionLabel(chosen, h.Status))</button>
+                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => selected = null">@Texts.Get("common.dismiss")</button>
                         </div>
                     </form>
                 }
@@ -115,80 +115,80 @@
         </section>
 
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <TabBar Tabs="FormTabs" State="tabs" Label="Devir formu bölümleri" />
+            <TabBar Tabs="FormTabs" State="tabs" Label="@Texts.Get("orders.handover-page.tabs-label")" />
             <fieldset disabled="@(!Editable || busy)">
-                <legend class="visually-hidden">Devir bilgileri</legend>
+                <legend class="visually-hidden">@Texts.Get("orders.handover-page.legend")</legend>
                 @if (!Editable)
                 {
-                    <p class="text-muted">@(h.Status == "Accepted" ? "Kabul edilen devir değişmez; sonraki değişiklikler için siparişte değişiklik talebi açın." : "Gönderilen devir karara bağlanana kadar değişmez.")</p>
+                    <p class="text-muted">@Texts.Get(h.Status == "Accepted" ? "orders.handover-page.locked-accepted" : "orders.handover-page.locked-sent")</p>
                 }
                 <TabPanel State="tabs" Key="form-kapsam">
                 <div class="form-grid">
-                    <div class="span-12"><label class="form-label" for="f-scope">Satılan kapsam (zorunlu)</label><textarea id="f-scope" class="form-control" rows="2" maxlength="4000" @bind="form.Scope"></textarea></div>
-                    <div class="span-12"><label class="form-label" for="f-out">Kapsam dışı işler</label><textarea id="f-out" class="form-control" rows="2" maxlength="4000" @bind="form.OutOfScope"></textarea></div>
-                    <div class="span-12"><label class="form-label" for="f-deliverables">Teslim edilecek çıktılar (zorunlu)</label><textarea id="f-deliverables" class="form-control" rows="2" maxlength="4000" @bind="form.Deliverables"></textarea></div>
-                    <div class="span-12"><label class="form-label" for="f-commitments">Müşteriye verilen taahhütler</label><textarea id="f-commitments" class="form-control" rows="2" maxlength="4000" @bind="form.Commitments"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-scope">@Texts.Get("orders.handover-page.f.scope")</label><textarea id="f-scope" class="form-control" rows="2" maxlength="4000" @bind="form.Scope"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-out">@Texts.Get("orders.handover-page.f.out-of-scope")</label><textarea id="f-out" class="form-control" rows="2" maxlength="4000" @bind="form.OutOfScope"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-deliverables">@Texts.Get("orders.handover-page.f.deliverables")</label><textarea id="f-deliverables" class="form-control" rows="2" maxlength="4000" @bind="form.Deliverables"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-commitments">@Texts.Get("orders.header-field.commitments")</label><textarea id="f-commitments" class="form-control" rows="2" maxlength="4000" @bind="form.Commitments"></textarea></div>
                 </div>
                 </TabPanel>
                 <TabPanel State="tabs" Key="form-lokasyon">
                 <div class="form-grid">
-                    <div class="span-12"><label class="form-label" for="f-location">Lokasyon (zorunlu)</label><input id="f-location" class="form-control" maxlength="1000" @bind="form.Location" /></div>
-                    <div class="span-4"><label class="form-label" for="f-contact">Müşteri tarafı ilgili kişi (zorunlu)</label><input id="f-contact" class="form-control" maxlength="300" @bind="form.ContactName" /></div>
-                    <div class="span-4"><label class="form-label" for="f-phone">Telefon</label><input id="f-phone" class="form-control" maxlength="300" @bind="form.ContactPhone" /></div>
-                    <div class="span-4"><label class="form-label" for="f-email">E-posta</label><input id="f-email" type="email" class="form-control" maxlength="254" @bind="form.ContactEmail" /><FieldError Field="contactEmail" Errors="errors" /></div>
-                    <div class="span-12"><small class="text-muted">İlgili kişi için telefon ya da e-postadan en az biri zorunludur.</small></div>
+                    <div class="span-12"><label class="form-label" for="f-location">@Texts.Get("orders.handover-page.f.location")</label><input id="f-location" class="form-control" maxlength="1000" @bind="form.Location" /></div>
+                    <div class="span-4"><label class="form-label" for="f-contact">@Texts.Get("orders.handover-page.f.contact")</label><input id="f-contact" class="form-control" maxlength="300" @bind="form.ContactName" /></div>
+                    <div class="span-4"><label class="form-label" for="f-phone">@Texts.Get("orders.handover-page.f.phone")</label><input id="f-phone" class="form-control" maxlength="300" @bind="form.ContactPhone" /></div>
+                    <div class="span-4"><label class="form-label" for="f-email">@Texts.Get("orders.handover-page.f.email")</label><input id="f-email" type="email" class="form-control" maxlength="254" @bind="form.ContactEmail" /><FieldError Field="contactEmail" Errors="errors" /></div>
+                    <div class="span-12"><small class="text-muted">@Texts.Get("orders.handover-page.contact-note")</small></div>
                 </div>
                 </TabPanel>
                 <TabPanel State="tabs" Key="form-tarih">
                 <div class="form-grid">
-                    <div class="span-4"><label class="form-label" for="f-start">Hedef başlangıç (zorunlu)</label><input id="f-start" type="date" class="form-control" @bind="form.TargetStartDate" /></div>
-                    <div class="span-4"><label class="form-label" for="f-end">Hedef bitiş</label><input id="f-end" type="date" class="form-control" @bind="form.TargetEndDate" /><FieldError Field="targetEndDate" Errors="errors" /></div>
+                    <div class="span-4"><label class="form-label" for="f-start">@Texts.Get("orders.handover-page.f.start")</label><input id="f-start" type="date" class="form-control" @bind="form.TargetStartDate" /></div>
+                    <div class="span-4"><label class="form-label" for="f-end">@Texts.Get("orders.handover-page.f.end")</label><input id="f-end" type="date" class="form-control" @bind="form.TargetEndDate" /><FieldError Field="targetEndDate" Errors="errors" /></div>
                     <div class="span-4">
-                        <label class="form-label" for="f-priority">Öncelik</label>
+                        <label class="form-label" for="f-priority">@Texts.Get("orders.handover-page.f.priority")</label>
                         <select id="f-priority" class="form-select" @bind="form.Priority">
-                            @foreach (var p in Priorities) { <option value="@p.Key">@p.Label</option> }
+                            @foreach (var p in OrderLabels.Priorities) { <option value="@p.Key">@p.Label</option> }
                         </select>
                     </div>
-                    <div class="span-6"><label class="form-label" for="f-resp">Sorumlu operasyon kullanıcısı</label><LookupPicker Id="f-resp" LookupKey="orders.handover.responsible" @bind-Value="form.ResponsibleUserId" Placeholder="—" ReadOnly="@(!Editable)" /></div>
-                    <div class="span-6"><label class="form-label" for="f-team">Sorumlu operasyon ekibi</label><input id="f-team" class="form-control" maxlength="300" @bind="form.ResponsibleTeam" /></div>
-                    <div class="span-12"><small class="text-muted">Sorumlu kullanıcı ya da ekipten en az biri zorunludur.</small></div>
+                    <div class="span-6"><label class="form-label" for="f-resp">@Texts.Get("orders.handover-page.f.responsible")</label><LookupPicker Id="f-resp" LookupKey="orders.handover.responsible" @bind-Value="form.ResponsibleUserId" Placeholder="—" ReadOnly="@(!Editable)" /></div>
+                    <div class="span-6"><label class="form-label" for="f-team">@Texts.Get("orders.handover-page.f.team")</label><input id="f-team" class="form-control" maxlength="300" @bind="form.ResponsibleTeam" /></div>
+                    <div class="span-12"><small class="text-muted">@Texts.Get("orders.handover-page.responsible-note")</small></div>
                 </div>
                 </TabPanel>
                 <TabPanel State="tabs" Key="form-belge">
                 <div class="form-grid">
-                    <div class="span-12"><label class="form-label" for="f-docs">Gerekli belgeler</label><textarea id="f-docs" class="form-control" rows="2" maxlength="4000" @bind="form.RequiredDocuments"></textarea></div>
-                    <div class="span-12"><label class="form-label" for="f-pre">Müşteri ön koşulları</label><textarea id="f-pre" class="form-control" rows="2" maxlength="4000" @bind="form.CustomerPrerequisites"></textarea></div>
-                    <div class="span-12"><label class="form-label" for="f-pay">Ödeme ve sözleşme onayı koşulları (varsa)</label><textarea id="f-pay" class="form-control" rows="2" maxlength="4000" @bind="form.PaymentConditions"></textarea></div>
-                    <div class="span-12"><label class="form-label" for="f-risks">Riskler</label><textarea id="f-risks" class="form-control" rows="2" maxlength="4000" @bind="form.Risks"></textarea></div>
-                    <div class="span-12"><label class="form-label" for="f-special">Özel talepler</label><textarea id="f-special" class="form-control" rows="2" maxlength="4000" @bind="form.SpecialRequests"></textarea></div>
-                    <div class="span-12"><label class="form-label" for="f-deps">Bağımlılıklar</label><textarea id="f-deps" class="form-control" rows="2" maxlength="4000" @bind="form.Dependencies"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-docs">@Texts.Get("orders.handover-page.f.documents")</label><textarea id="f-docs" class="form-control" rows="2" maxlength="4000" @bind="form.RequiredDocuments"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-pre">@Texts.Get("orders.handover-page.f.prerequisites")</label><textarea id="f-pre" class="form-control" rows="2" maxlength="4000" @bind="form.CustomerPrerequisites"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-pay">@Texts.Get("orders.handover-page.f.payment")</label><textarea id="f-pay" class="form-control" rows="2" maxlength="4000" @bind="form.PaymentConditions"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-risks">@Texts.Get("orders.handover-page.f.risks")</label><textarea id="f-risks" class="form-control" rows="2" maxlength="4000" @bind="form.Risks"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-special">@Texts.Get("orders.handover-page.f.special")</label><textarea id="f-special" class="form-control" rows="2" maxlength="4000" @bind="form.SpecialRequests"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-deps">@Texts.Get("orders.handover-page.f.dependencies")</label><textarea id="f-deps" class="form-control" rows="2" maxlength="4000" @bind="form.Dependencies"></textarea></div>
                 </div>
                 </TabPanel>
                 <TabPanel State="tabs" Key="form-kabul">
                 <div class="form-grid">
-                    <div class="span-12"><label class="form-label" for="f-complete">Tamamlanma kriterleri (zorunlu)</label><textarea id="f-complete" class="form-control" rows="2" maxlength="4000" @bind="form.CompletionCriteria"></textarea></div>
-                    <div class="span-12"><label class="form-label" for="f-accept">Müşteri kabul kriterleri (zorunlu)</label><textarea id="f-accept" class="form-control" rows="2" maxlength="4000" @bind="form.AcceptanceCriteria"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-complete">@Texts.Get("orders.handover-page.f.completion")</label><textarea id="f-complete" class="form-control" rows="2" maxlength="4000" @bind="form.CompletionCriteria"></textarea></div>
+                    <div class="span-12"><label class="form-label" for="f-accept">@Texts.Get("orders.handover-page.f.acceptance")</label><textarea id="f-accept" class="form-control" rows="2" maxlength="4000" @bind="form.AcceptanceCriteria"></textarea></div>
                 </div>
                 </TabPanel>
             </fieldset>
             @if (Editable)
             {
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Devir bilgilerini kaydet</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("orders.handover-page.save")</button></div>
             }
         </form>
 
         <section aria-labelledby="checklist-title">
-            <h2 id="checklist-title">Kontrol listesi</h2>
+            <h2 id="checklist-title">@Texts.Get("orders.handover-page.checklist")</h2>
             <ul class="list-unstyled">
                 @foreach (var item in detail.Items)
                 {
                     <li class="form-check">
                         <input class="form-check-input" type="checkbox" id="item-@item.Id" checked="@item.IsDone" disabled="@(!Editable || busy)" @onchange="e => ToggleAsync(item, (bool)e.Value!)" />
-                        <label class="form-check-label" for="item-@item.Id">@item.Text@(item.IsRequired ? null : " (isteğe bağlı)")</label>
+                        <label class="form-check-label" for="item-@item.Id">@item.Text@(item.IsRequired ? null : Texts.Get("orders.handover-page.optional"))</label>
                         @if (item.IsDone && item.DoneAt is { } doneAt) { <small class="text-muted"> · @Lookups.MemberName(item.DoneBy), @CrmLabels.Time(doneAt)</small> }
                         @if (Editable && !item.IsDefault)
                         {
-                            <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteItemAsync(item)">Sil</button>
+                            <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => DeleteItemAsync(item)">@Texts.Get("common.delete")</button>
                         }
                     </li>
                 }
@@ -196,21 +196,21 @@
             @if (Editable)
             {
                 <form class="search" novalidate @onsubmit="AddItemAsync" @onsubmit:preventDefault>
-                    <label class="visually-hidden" for="new-item">Yeni kontrol listesi maddesi</label>
-                    <input id="new-item" class="form-control" maxlength="300" placeholder="Kendi maddenizi ekleyin (zorunlu sayılır)" @bind="newItem" />
-                    <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(newItem))">Madde ekle</button>
+                    <label class="visually-hidden" for="new-item">@Texts.Get("orders.handover-page.new-item")</label>
+                    <input id="new-item" class="form-control" maxlength="300" placeholder="@Texts.Get("orders.handover-page.new-item-placeholder")" @bind="newItem" />
+                    <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(newItem))">@Texts.Get("orders.handover-page.add-item")</button>
                 </form>
             }
         </section>
 
         <section aria-labelledby="handover-history-title">
-            <h2 id="handover-history-title">Devir geçmişi</h2>
+            <h2 id="handover-history-title">@Texts.Get("orders.handover-page.history")</h2>
             <ol class="history-list">
                 @foreach (var e in detail.History)
                 {
                     <li>
-                        <strong>@HistoryLabel(e.Kind)</strong>@(e.Round > 0 ? $" (tur {e.Round})" : null)
-                        <span class="text-muted"> · @CrmLabels.Time(e.At) · @(Lookups.MemberName(e.ActorId) is { Length: > 0 } actor ? actor : "sistem")</span>
+                        <strong>@HistoryLabel(e.Kind)</strong>@(e.Round > 0 ? Texts.Get("orders.handover-page.round-note", e.Round) : null)
+                        <span class="text-muted"> · @CrmLabels.Time(e.At) · @(Lookups.MemberName(e.ActorId) is { Length: > 0 } actor ? actor : Texts.Get("orders.change.system"))</span>
                         @if (!string.IsNullOrEmpty(e.Note)) { <div>@e.Note</div> }
                     </li>
                 }
@@ -221,8 +221,6 @@
 
 @code {
     [Parameter] public Guid OrderId { get; set; }
-
-    private static readonly (string Key, string Label)[] Priorities = [("Low", "Düşük"), ("Normal", "Normal"), ("High", "Yüksek"), ("Urgent", "Acil")];
 
     private OrderDto? order;
     private HandoverDetailDto? detail;
@@ -236,11 +234,11 @@
 
     private IReadOnlyList<TabItem> FormTabs =>
     [
-        new("form-kapsam", "Kapsam ve çıktılar", Errors: ErrorCount("scope", "outOfScope", "deliverables", "commitments")),
-        new("form-lokasyon", "Lokasyon ve iletişim", Errors: ErrorCount("location", "contactName", "contactPhone", "contactEmail")),
-        new("form-tarih", "Tarih ve sorumluluk", Errors: ErrorCount("targetStartDate", "targetEndDate", "priority", "responsibleUserId", "responsibleTeam")),
-        new("form-belge", "Belgeler ve riskler", Errors: ErrorCount("requiredDocuments", "customerPrerequisites", "paymentConditions", "risks", "specialRequests", "dependencies")),
-        new("form-kabul", "Kabul kriterleri", Errors: ErrorCount("completionCriteria", "acceptanceCriteria")),
+        new("form-kapsam", Texts.Get("orders.handover-page.tab.scope"), Errors: ErrorCount("scope", "outOfScope", "deliverables", "commitments")),
+        new("form-lokasyon", Texts.Get("orders.handover-page.tab.location"), Errors: ErrorCount("location", "contactName", "contactPhone", "contactEmail")),
+        new("form-tarih", Texts.Get("orders.handover-page.tab.dates"), Errors: ErrorCount("targetStartDate", "targetEndDate", "priority", "responsibleUserId", "responsibleTeam")),
+        new("form-belge", Texts.Get("orders.handover-page.tab.documents"), Errors: ErrorCount("requiredDocuments", "customerPrerequisites", "paymentConditions", "risks", "specialRequests", "dependencies")),
+        new("form-kabul", Texts.Get("orders.handover-page.tab.acceptance"), Errors: ErrorCount("completionCriteria", "acceptanceCriteria")),
     ];
     private string? notice;
     private bool failed;
@@ -326,7 +324,7 @@
         var result = await Api.PostAsync<HandoverDetailDto>($"/api/orders/orders/{OrderId}/handover", new { });
         busy = false;
         failed = !result.IsSuccess;
-        notice = result.IsSuccess ? "Devir kaydı hazırlandı; varsayılan kontrol listesi eklendi." : result.Error;
+        notice = result.IsSuccess ? Texts.Get("orders.handover-page.created") : result.Error;
         await LoadAsync();
     }
 
@@ -345,7 +343,7 @@
         failed = !result.IsSuccess;
         errors = result.FieldErrors;
         tabs.RevealFirstFailing(FormTabs);
-        notice = result.IsSuccess ? "Devir bilgileri kaydedildi." : result.Error;
+        notice = result.IsSuccess ? Texts.Get("orders.handover-page.saved") : result.Error;
         await LoadAsync();
     }
 
@@ -367,7 +365,7 @@
         var result = await Api.PostAsync<HandoverItemDto>("/api/orders/handover-items", new SaveHandoverItemRequest(detail.Handover.Id, newItem.Trim()));
         busy = false;
         failed = !result.IsSuccess;
-        notice = result.IsSuccess ? "Madde eklendi." : result.Error;
+        notice = result.IsSuccess ? Texts.Get("orders.handover-page.item-added") : result.Error;
         if (result.IsSuccess) { newItem = string.Empty; }
         await LoadAsync();
     }
@@ -379,7 +377,7 @@
         var result = await Api.DeleteAsync($"/api/orders/handover-items/{item.Id}?version={item.Version}");
         busy = false;
         failed = !result.IsSuccess;
-        notice = result.IsSuccess ? "Madde silindi." : result.Error;
+        notice = result.IsSuccess ? Texts.Get("orders.handover-page.item-deleted") : result.Error;
         await LoadAsync();
     }
 
@@ -400,7 +398,7 @@
         if (busy || detail is null || selected is not { } action) { return; }
         if (action.RequiresNote && string.IsNullOrWhiteSpace(note))
         {
-            noteError = action.Action == "request-info" ? "Bilgi istemek için gerekçe zorunludur." : "Yeniden göndermek için neyin tamamlandığını yazın.";
+            noteError = Texts.Get(action.Action == "request-info" ? "orders.handover-page.info-required" : "orders.handover-page.resubmit-required");
             return;
         }
 
@@ -409,7 +407,7 @@
             new HandoverActionRequest(detail.Handover.Version, string.IsNullOrWhiteSpace(note) ? null : note.Trim(), responsible));
         busy = false;
         failed = !result.IsSuccess;
-        notice = result.IsSuccess ? $"{ActionLabel(action, detail.Handover.Status)}: işlem tamamlandı." : result.Error;
+        notice = result.IsSuccess ? Texts.Get("orders.handover-page.action-done", ActionLabel(action, detail.Handover.Status)) : result.Error;
         selected = null;
         var refreshed = await Api.GetAsync<OrderDto>($"/api/orders/orders/{OrderId}");
         order = refreshed.Value ?? order;
@@ -418,27 +416,27 @@
 
     private static string ActionLabel(HandoverActionDto action, string status) => action.Action switch
     {
-        "send" => status == "InfoRequested" ? "Yeniden gönder" : "Operasyona gönder",
-        "request-info" => "Bilgi iste",
-        "accept" => "Devri kabul et",
+        "send" => Texts.Get(status == "InfoRequested" ? "orders.handover-page.action.resend" : "orders.handover-page.action.send"),
+        "request-info" => Texts.Get("orders.handover-page.action.request-info"),
+        "accept" => Texts.Get("orders.handover-page.action.accept"),
         _ => action.Action,
     };
 
     private static string NoteLabel(HandoverActionDto action) => action.Action switch
     {
-        "request-info" => "Bilgi isteği gerekçesi (zorunlu)",
-        "send" => "Neyin tamamlandığı (zorunlu)",
-        _ => "Kabul notu (isteğe bağlı)",
+        "request-info" => Texts.Get("orders.handover-page.note.request-info"),
+        "send" => Texts.Get("orders.handover-page.note.send"),
+        _ => Texts.Get("orders.handover-page.note.accept"),
     };
 
     private static string HistoryLabel(string kind) => kind switch
     {
-        "Created" => "Devir kaydı hazırlandı",
-        "Sent" => "Operasyona gönderildi",
-        "Resubmitted" => "Bilgi sonrası yeniden gönderildi",
-        "InfoRequested" => "Operasyon bilgi istedi",
-        "Accepted" => "Operasyon kabul etti",
-        "WaitingEscalated" => "Kabul gecikmesi takibi açıldı",
+        "Created" => Texts.Get("orders.handover-page.history.created"),
+        "Sent" => Texts.Get("orders.handover-page.history.sent"),
+        "Resubmitted" => Texts.Get("orders.handover-page.history.resubmitted"),
+        "InfoRequested" => Texts.Get("orders.handover-page.history.inforequested"),
+        "Accepted" => Texts.Get("orders.handover-page.history.accepted"),
+        "WaitingEscalated" => Texts.Get("orders.handover-page.history.waitingescalated"),
         _ => kind,
     };
 }

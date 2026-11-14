@@ -33,6 +33,21 @@ public sealed class HrModule : IModule
         public const string ExpensesApprove = "hr.expenses.approve";
         public const string ExpensesManage = "hr.expenses.manage";
         public const string ExpensesPay = "hr.expenses.pay";
+        public const string AssetsRead = "hr.assets.read";
+        public const string AssetsManage = "hr.assets.manage";
+        public const string ChecklistsRead = "hr.checklists.read";
+        public const string ChecklistsManage = "hr.checklists.manage";
+        public const string AnnouncementsRead = "hr.announcements.read";
+        public const string AnnouncementsManage = "hr.announcements.manage";
+        public const string SurveysRespond = "hr.surveys.respond";
+        public const string SurveysManage = "hr.surveys.manage";
+
+        /// <summary>Tek tek cevap kayıtları ve denetim kaydındaki cevap değerleri; hiçbir rol şablonunda yoktur (sonuçlar özetten görülür).</summary>
+        public const string SurveysAnswers = "hr.surveys.answers";
+        public const string BlogRead = "hr.blog.read";
+        public const string BlogManage = "hr.blog.manage";
+        public const string GalleryRead = "hr.gallery.read";
+        public const string GalleryManage = "hr.gallery.manage";
     }
 
     public static class Entities
@@ -43,6 +58,20 @@ public sealed class HrModule : IModule
         public const string Holiday = "hr.holiday";
         public const string ExpenseClaim = "hr.expense-claim";
         public const string ExpenseLine = "hr.expense-line";
+        public const string Asset = "hr.asset";
+        public const string AssetAssignment = "hr.asset-assignment";
+        public const string ChecklistTemplate = "hr.checklist-template";
+        public const string ChecklistTemplateItem = "hr.checklist-template-item";
+        public const string EmployeeChecklist = "hr.employee-checklist";
+        public const string ChecklistTask = "hr.checklist-task";
+        public const string Announcement = "hr.announcement";
+        public const string AnnouncementRead = "hr.announcement-read";
+        public const string Survey = "hr.survey";
+        public const string SurveyQuestion = "hr.survey-question";
+        public const string SurveyResponse = "hr.survey-response";
+        public const string SurveyAnswer = "hr.survey-answer";
+        public const string BlogPost = "hr.blog-post";
+        public const string PhotoAlbum = "hr.photo-album";
     }
 
     public static class Lists
@@ -50,6 +79,16 @@ public sealed class HrModule : IModule
         public const string Department = "hr.department";
         public const string LeaveType = "hr.leave-type";
         public const string ExpenseType = "hr.expense-type";
+        public const string AssetCategory = "hr.asset-category";
+    }
+
+    /// <summary>Demirbaş kategorileri (dilim 4): raporlar ve işe giriş/çıkış listeleri kategoriye bakar.</summary>
+    public static class AssetCategories
+    {
+        public const string It = "it";
+        public const string Access = "access";
+        public const string Furniture = "furniture";
+        public const string Equipment = "equipment";
     }
 
     /// <summary>Masraf türü kategorileri (dilim 3): raporlar kategoriye bakar; vergi ve harcırah sınırları koda yazılmaz (ADR-0042 bölüm 8).</summary>
@@ -95,6 +134,19 @@ public sealed class HrModule : IModule
         new(Permissions.ExpensesApprove, "Onaylayanı olduğu masraf beyanlarını onaylar, iade eder ve reddeder", "Masraf onayı"),
         new(Permissions.ExpensesManage, "Herkes adına beyan açar ve düzenler, her beyana karar verir ve iptal eder", "Masraf yönetimi"),
         new(Permissions.ExpensesPay, "Onaylanmış masraf beyanlarını ödendi olarak işaretler", "Masraf ödemesi"),
+        new(Permissions.AssetsRead, "Demirbaşları ve zimmetleri görüntüler (kayıt kapsamına göre: çalışan kendi zimmetlerini)", "Zimmet"),
+        new(Permissions.AssetsManage, "Demirbaş ekler ve düzenler, zimmetler, iade alır", "Zimmet"),
+        new(Permissions.ChecklistsRead, "İşe giriş/çıkış süreçlerini ve görevlerini görüntüler, kendisine atanan görevi tamamlar (kayıt kapsamına göre)", "İşe giriş ve çıkış"),
+        new(Permissions.ChecklistsManage, "Süreç şablonlarını yönetir, süreç başlatır, her görevi tamamlar, atlar ve süreci iptal eder", "İşe giriş ve çıkış"),
+        new(Permissions.AnnouncementsRead, "Kendisine hedeflenen yayındaki duyuruları okur", "Duyurular"),
+        new(Permissions.AnnouncementsManage, "Duyuru yazar, yayınlar, sabitler ve kimin okuduğunu görür", "Duyurular"),
+        new(Permissions.SurveysRespond, "Kendisine yönelik açık anketleri yanıtlar", "Anketler"),
+        new(Permissions.SurveysManage, "Anket hazırlar, yanıta açar, kapatır ve özet sonuçları görür", "Anketler"),
+        new(Permissions.SurveysAnswers, "Tek tek cevap kayıtlarını görür (kimliği gizli anketler hariç); varsayılan rollerde yoktur", "Anketler"),
+        new(Permissions.BlogRead, "Yayındaki blog yazılarını ve eklerini okur", "Blog"),
+        new(Permissions.BlogManage, "Blog yazısı yazar, yayınlar, ek ekler ve kaldırır", "Blog"),
+        new(Permissions.GalleryRead, "Yayındaki fotoğraf albümlerini görür", "Galeri"),
+        new(Permissions.GalleryManage, "Albüm açar, fotoğraf ekler ve kaldırır, albümü yayınlar", "Galeri"),
     ];
 
     /// <summary>Denetim kaydında görünen kayıt türleri (Y5); hassas alanların değeri denetim kaydında gizlenir.</summary>
@@ -164,6 +216,97 @@ public sealed class HrModule : IModule
         {
             References = new Dictionary<string, string> { ["claimId"] = Entities.ExpenseClaim },
         },
+        new(Entities.Asset, "Demirbaş", Permissions.AssetsRead, new Dictionary<string, string>
+        {
+            ["assetTag"] = "Envanter numarası", ["name"] = "Ad", ["categoryKey"] = "Kategori", ["serialNumber"] = "Seri numarası",
+            ["brand"] = "Marka", ["model"] = "Model", ["purchaseDate"] = "Alış tarihi", ["purchaseCost"] = "Alış tutarı", ["currency"] = "Para birimi",
+            ["status"] = "Durum", ["notes"] = "Notlar", ["currentEmployeeId"] = "Zimmetli çalışan",
+        }, "assetTag")
+        {
+            References = new Dictionary<string, string> { ["currentEmployeeId"] = Entities.Employee },
+        },
+        new(Entities.AssetAssignment, "Zimmet", Permissions.AssetsRead, new Dictionary<string, string>
+        {
+            ["assetId"] = "Demirbaş", ["employeeId"] = "Çalışan", ["assignedOn"] = "Teslim tarihi", ["expectedReturnOn"] = "Beklenen iade",
+            ["conditionOut"] = "Teslimdeki durum", ["status"] = "Durum", ["acknowledgedAt"] = "Teslim onayı", ["returnedOn"] = "İade tarihi",
+            ["conditionIn"] = "İadedeki durum", ["closedByUserId"] = "Kapatan",
+        }, "assetTag")
+        {
+            References = new Dictionary<string, string> { ["assetId"] = Entities.Asset, ["employeeId"] = Entities.Employee },
+            UserFields = ["assignedByUserId", "closedByUserId", "employeeUserId"],
+        },
+        new(Entities.ChecklistTemplate, "Süreç şablonu", Permissions.ChecklistsRead, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["kind"] = "Tür", ["description"] = "Açıklama", ["isActive"] = "Etkin",
+        }, "name"),
+        new(Entities.ChecklistTemplateItem, "Şablon adımı", Permissions.ChecklistsRead, new Dictionary<string, string>
+        {
+            ["templateId"] = "Şablon", ["sequence"] = "Sıra", ["title"] = "Başlık", ["description"] = "Açıklama", ["responsibleRole"] = "Sorumlu",
+            ["dueOffsetDays"] = "Gün farkı", ["taskType"] = "Görev türü",
+        }, "title")
+        {
+            References = new Dictionary<string, string> { ["templateId"] = Entities.ChecklistTemplate },
+        },
+        new(Entities.EmployeeChecklist, "İşe giriş/çıkış süreci", Permissions.ChecklistsRead, new Dictionary<string, string>
+        {
+            ["employeeId"] = "Çalışan", ["templateId"] = "Şablon", ["startDate"] = "Başlangıç", ["status"] = "Durum", ["cancelReason"] = "İptal gerekçesi",
+        }, "name")
+        {
+            References = new Dictionary<string, string> { ["employeeId"] = Entities.Employee, ["templateId"] = Entities.ChecklistTemplate },
+            UserFields = ["employeeUserId", "startedByUserId"],
+        },
+        new(Entities.ChecklistTask, "Süreç görevi", Permissions.ChecklistsRead, new Dictionary<string, string>
+        {
+            ["checklistId"] = "Süreç", ["title"] = "Başlık", ["dueDate"] = "Son tarih", ["status"] = "Durum", ["note"] = "Not",
+            ["assigneeUserId"] = "Sorumlu", ["completedByUserId"] = "Tamamlayan",
+        }, "title")
+        {
+            References = new Dictionary<string, string> { ["checklistId"] = Entities.EmployeeChecklist },
+            UserFields = ["assigneeUserId", "completedByUserId", "employeeUserId"],
+        },
+        new(Entities.Announcement, "Duyuru", Permissions.AnnouncementsRead, new Dictionary<string, string>
+        {
+            ["title"] = "Başlık", ["body"] = "Metin", ["audienceDepartmentKey"] = "Hedef departman", ["isPinned"] = "Sabitlenmiş",
+            ["isPublished"] = "Yayında", ["publishOn"] = "Başlangıç", ["expiresOn"] = "Bitiş",
+        }, "title")
+        {
+            UserFields = ["authorUserId"],
+        },
+        new(Entities.Survey, "Anket", Permissions.SurveysManage, new Dictionary<string, string>
+        {
+            ["title"] = "Başlık", ["description"] = "Açıklama", ["isAnonymous"] = "Kimliği gizli", ["audienceDepartmentKey"] = "Hedef departman",
+            ["closesOn"] = "Kapanış", ["status"] = "Durum",
+        }, "title")
+        {
+            UserFields = ["authorUserId"],
+        },
+        new(Entities.SurveyQuestion, "Anket sorusu", Permissions.SurveysManage, new Dictionary<string, string>
+        {
+            ["surveyId"] = "Anket", ["text"] = "Soru", ["questionType"] = "Tür", ["options"] = "Seçenekler", ["isRequired"] = "Zorunlu",
+        }, "text")
+        {
+            References = new Dictionary<string, string> { ["surveyId"] = Entities.Survey },
+        },
+        // Cevap değerleri denetim kaydında yalnızca bu izinle görünür (kimliği gizli anket; ADR-0042 dilim 7). Hassas alan yapılmaz: hassas alanı
+        // izni olmayan yazamaz, cevabı ise her yanıtlayan yazar.
+        new(Entities.SurveyAnswer, "Anket cevabı", Permissions.SurveysAnswers, new Dictionary<string, string>
+        {
+            ["questionId"] = "Soru", ["rating"] = "Puan", ["choice"] = "Seçim", ["text"] = "Metin",
+        }, "questionId"),
+        new(Entities.BlogPost, "Blog yazısı", Permissions.BlogRead, new Dictionary<string, string>
+        {
+            ["title"] = "Başlık", ["summary"] = "Özet", ["body"] = "Metin", ["isPublished"] = "Yayında",
+        }, "title")
+        {
+            UserFields = ["authorUserId"],
+        },
+        new(Entities.PhotoAlbum, "Fotoğraf albümü", Permissions.GalleryRead, new Dictionary<string, string>
+        {
+            ["title"] = "Başlık", ["description"] = "Açıklama", ["eventDate"] = "Etkinlik günü", ["isPublished"] = "Yayında",
+        }, "title")
+        {
+            UserFields = ["authorUserId"],
+        },
         new(Entities.Holiday, "Resmî tatil", Permissions.LeavesRead, new Dictionary<string, string>
         {
             ["date"] = "Tarih", ["name"] = "Ad", ["halfDay"] = "Yarım gün",
@@ -182,6 +325,15 @@ public sealed class HrModule : IModule
         new(Entities.LeaveBalance, "İzin hakkı"),
         new(Entities.ExpenseClaim, "Masraf beyanı"),
         new(Entities.ExpenseLine, "Masraf satırı"),
+        new(Entities.Asset, "Demirbaş"),
+        new(Entities.AssetAssignment, "Zimmet"),
+        new(Entities.ChecklistTemplate, "Süreç şablonu"),
+        new(Entities.ChecklistTemplateItem, "Şablon adımı"),
+        new(Entities.Announcement, "Duyuru"),
+        new(Entities.Survey, "Anket"),
+        new(Entities.SurveyQuestion, "Anket sorusu"),
+        new(Entities.BlogPost, "Blog yazısı"),
+        new(Entities.PhotoAlbum, "Fotoğraf albümü"),
     ];
 
     /// <summary>Departman (Y9b): hazır değerler örnektir; firma kendi departmanlarını ekler. Kod departmanın adına bakmaz.</summary>
@@ -259,6 +411,35 @@ public sealed class HrModule : IModule
         {
             Default = "Taxi",
         },
+
+        // Demirbaş kategorisi (Y9b): hazır değerler örnektir; firma ekler. Araçlar Filo modülündedir.
+        new(
+            Lists.AssetCategory,
+            "Demirbaş kategorisi",
+            Entities.Asset,
+            "categoryKey",
+            Required: true,
+            [
+                new(AssetCategories.It, "Bilişim"),
+                new(AssetCategories.Access, "Giriş ve kimlik"),
+                new(AssetCategories.Furniture, "Mobilya"),
+                new(AssetCategories.Equipment, "Ekipman ve alet"),
+            ],
+            [
+                new("Laptop", "Dizüstü bilgisayar", AssetCategories.It),
+                new("Desktop", "Masaüstü bilgisayar", AssetCategories.It),
+                new("Monitor", "Monitör", AssetCategories.It),
+                new("Phone", "Cep telefonu", AssetCategories.It),
+                new("SimCard", "Hat (SIM kart)", AssetCategories.It),
+                new("AccessCard", "Giriş kartı", AssetCategories.Access),
+                new("Key", "Anahtar", AssetCategories.Access),
+                new("Furniture", "Masa ve sandalye", AssetCategories.Furniture),
+                new("Tool", "El aleti", AssetCategories.Equipment),
+                new("Ppe", "İş güvenliği ekipmanı", AssetCategories.Equipment),
+            ])
+        {
+            Default = "Laptop",
+        },
     ];
 
     IReadOnlyList<LookupDefinition> IModule.Lookups => HrLookupDefinitions.All;
@@ -292,6 +473,12 @@ public sealed class HrModule : IModule
             new(Entities.Employee, "Çalışan", Permissions.EmployeesRead) { LabelField = "fullName" },
             new(Entities.LeaveRequest, "İzin talebi", Permissions.LeavesRead) { LabelField = "employeeName" },
             new(Entities.ExpenseClaim, "Masraf beyanı", Permissions.ExpensesRead) { LabelField = "title" },
+            new(Entities.AssetAssignment, "Zimmet", Permissions.AssetsRead) { LabelField = "assetTag" },
+            new(Entities.ChecklistTask, "Süreç görevi", Permissions.ChecklistsRead) { LabelField = "title" },
+            new(Entities.Announcement, "Duyuru", Permissions.AnnouncementsManage) { LabelField = "title" },
+            new(Entities.Survey, "Anket", Permissions.SurveysManage) { LabelField = "title" },
+            new(Entities.BlogPost, "Blog yazısı", Permissions.BlogManage) { LabelField = "title" },
+            new(Entities.PhotoAlbum, "Fotoğraf albümü", Permissions.GalleryManage) { LabelField = "title" },
         ],
         Events =
         [
@@ -301,6 +488,18 @@ public sealed class HrModule : IModule
             new("hr.leave-request.updated", Entities.LeaveRequest, DomainEventTypes.RecordUpdated, "İzin talebinin durumu değişti"),
             new("hr.expense-claim.created", Entities.ExpenseClaim, DomainEventTypes.RecordCreated, "Masraf beyanı açıldı"),
             new("hr.expense-claim.updated", Entities.ExpenseClaim, DomainEventTypes.RecordUpdated, "Masraf beyanı güncellendi"),
+            new("hr.asset-assignment.created", Entities.AssetAssignment, DomainEventTypes.RecordCreated, "Demirbaş zimmetlendi"),
+            new("hr.asset-assignment.updated", Entities.AssetAssignment, DomainEventTypes.RecordUpdated, "Zimmet onaylandı ya da kapandı"),
+            new("hr.checklist-task.created", Entities.ChecklistTask, DomainEventTypes.RecordCreated, "Süreç görevi açıldı"),
+            new("hr.checklist-task.updated", Entities.ChecklistTask, DomainEventTypes.RecordUpdated, "Süreç görevi tamamlandı ya da değişti"),
+            new("hr.announcement.created", Entities.Announcement, DomainEventTypes.RecordCreated, "Duyuru yazıldı"),
+            new("hr.announcement.updated", Entities.Announcement, DomainEventTypes.RecordUpdated, "Duyuru güncellendi ya da yayınlandı"),
+            new("hr.survey.created", Entities.Survey, DomainEventTypes.RecordCreated, "Anket hazırlandı"),
+            new("hr.survey.updated", Entities.Survey, DomainEventTypes.RecordUpdated, "Anket güncellendi, yanıta açıldı ya da kapandı"),
+            new("hr.blog-post.created", Entities.BlogPost, DomainEventTypes.RecordCreated, "Blog yazısı yazıldı"),
+            new("hr.blog-post.updated", Entities.BlogPost, DomainEventTypes.RecordUpdated, "Blog yazısı güncellendi ya da yayınlandı"),
+            new("hr.photo-album.created", Entities.PhotoAlbum, DomainEventTypes.RecordCreated, "Fotoğraf albümü açıldı"),
+            new("hr.photo-album.updated", Entities.PhotoAlbum, DomainEventTypes.RecordUpdated, "Fotoğraf albümü güncellendi ya da yayınlandı"),
         ],
         Fields =
         [
@@ -342,6 +541,33 @@ public sealed class HrModule : IModule
                 ],
             },
             new(Entities.ExpenseClaim, "totalAmount", "Toplam", AutomationFieldType.Number),
+            new(Entities.AssetAssignment, "assetTag", "Envanter numarası", AutomationFieldType.Text),
+            new(Entities.AssetAssignment, "status", "Durum", AutomationFieldType.Choice)
+            {
+                Options =
+                [
+                    new(Domain.AssetAssignment.Statuses.Active, "Zimmette"), new(Domain.AssetAssignment.Statuses.Returned, "İade alındı"),
+                    new(Domain.AssetAssignment.Statuses.Lost, "Kayıp"),
+                ],
+            },
+            new(Entities.AssetAssignment, "expectedReturnOn", "Beklenen iade", AutomationFieldType.Date),
+            new(Entities.ChecklistTask, "title", "Başlık", AutomationFieldType.Text),
+            new(Entities.ChecklistTask, "status", "Durum", AutomationFieldType.Choice)
+            {
+                Options = [new(Domain.ChecklistTask.Statuses.Open, "Açık"), new(Domain.ChecklistTask.Statuses.Done, "Tamamlandı"), new(Domain.ChecklistTask.Statuses.Skipped, "Atlandı")],
+            },
+            new(Entities.ChecklistTask, "dueDate", "Son tarih", AutomationFieldType.Date),
+            new(Entities.Announcement, "title", "Başlık", AutomationFieldType.Text),
+            new(Entities.Announcement, "isPublished", "Yayında", AutomationFieldType.Boolean),
+            new(Entities.Survey, "title", "Başlık", AutomationFieldType.Text),
+            new(Entities.Survey, "status", "Durum", AutomationFieldType.Choice)
+            {
+                Options = [new(Domain.Survey.Statuses.Draft, "Taslak"), new(Domain.Survey.Statuses.Open, "Yanıta açık"), new(Domain.Survey.Statuses.Closed, "Kapalı")],
+            },
+            new(Entities.BlogPost, "title", "Başlık", AutomationFieldType.Text),
+            new(Entities.BlogPost, "isPublished", "Yayında", AutomationFieldType.Boolean),
+            new(Entities.PhotoAlbum, "title", "Başlık", AutomationFieldType.Text),
+            new(Entities.PhotoAlbum, "isPublished", "Yayında", AutomationFieldType.Boolean),
         ],
     };
 
@@ -355,7 +581,15 @@ public sealed class HrModule : IModule
                 Permissions.EmployeesRead, Permissions.EmployeesWrite, Permissions.EmployeesPersonal,
                 Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove, Permissions.LeavesManage,
                 Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.ExpensesManage,
+                Permissions.AssetsRead, Permissions.AssetsManage, Permissions.ChecklistsRead, Permissions.ChecklistsManage,
+                Permissions.AnnouncementsRead, Permissions.AnnouncementsManage, Permissions.SurveysRespond, Permissions.SurveysManage,
+                Permissions.BlogRead, Permissions.BlogManage, Permissions.GalleryRead, Permissions.GalleryManage,
             ]),
+        new(
+            "hr.asset-keeper",
+            "Demirbaş sorumlusu",
+            "Demirbaşları ve bütün zimmetleri yönetir: demirbaş ekler, zimmetler, iade alır; izin, masraf ve özlük verisine erişmez.",
+            [Permissions.EmployeesRead, Permissions.AssetsRead, Permissions.AssetsManage, Permissions.ChecklistsRead]),
         new(
             "hr.finance",
             "Finans (masraf ödemesi)",
@@ -365,7 +599,8 @@ public sealed class HrModule : IModule
             "hr.staff",
             "Çalışan (rehber)",
             "Rehberi ve organizasyon şemasını görüntüler, kendi izin hakkını görür ve kendi adına izin talebi açar; özlük bilgilerini göremez.",
-            [Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.ExpensesRead, Permissions.ExpensesRequest])
+            [Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.AssetsRead,
+                Permissions.ChecklistsRead, Permissions.AnnouncementsRead, Permissions.SurveysRespond, Permissions.BlogRead, Permissions.GalleryRead])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
         },
@@ -375,7 +610,8 @@ public sealed class HrModule : IModule
             "Çalışan izinlerine ek olarak onaylayanı olduğu (astlarının) izin taleplerini görür, onaylar ve reddeder.",
             [
                 Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove,
-                Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove,
+                Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.AssetsRead,
+                Permissions.ChecklistsRead, Permissions.AnnouncementsRead, Permissions.SurveysRespond, Permissions.BlogRead, Permissions.GalleryRead,
             ])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
@@ -394,5 +630,23 @@ public sealed class HrModule : IModule
         services.AddScoped<IRecordStore, ExpenseClaimRecordStore>();
         services.AddScoped<IRecordStore, ExpenseLineRecordStore>();
         services.AddScoped<IExpenseWorkflow, ExpenseWorkflow>();
+        services.AddScoped<IRecordStore, AssetRecordStore>();
+        services.AddScoped<IRecordStore, AssetAssignmentRecordStore>();
+        services.AddScoped<IAssetWorkflow, AssetWorkflow>();
+        services.AddScoped<IRecordStore, ChecklistTemplateRecordStore>();
+        services.AddScoped<IRecordStore, ChecklistTemplateItemRecordStore>();
+        services.AddScoped<IRecordStore, EmployeeChecklistRecordStore>();
+        services.AddScoped<IRecordStore, ChecklistTaskRecordStore>();
+        services.AddScoped<IChecklistWorkflow, ChecklistWorkflow>();
+        services.AddScoped<IRecordStore, AnnouncementRecordStore>();
+        services.AddScoped<IRecordStore, AnnouncementReadRecordStore>();
+        services.AddScoped<IAnnouncementService, AnnouncementService>();
+        services.AddScoped<IRecordStore, SurveyRecordStore>();
+        services.AddScoped<IRecordStore, SurveyQuestionRecordStore>();
+        services.AddScoped<IRecordStore, SurveyResponseRecordStore>();
+        services.AddScoped<IRecordStore, SurveyAnswerRecordStore>();
+        services.AddScoped<ISurveyService, SurveyService>();
+        services.AddScoped<IRecordStore, BlogPostRecordStore>();
+        services.AddScoped<IRecordStore, PhotoAlbumRecordStore>();
     }
 }

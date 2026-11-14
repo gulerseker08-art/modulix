@@ -5,49 +5,49 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Satış görünümü · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.salesOverview.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.ReportsRead">
     <div class="page-header">
         <div>
-            <h1>Satış görünümü</h1>
+            <h1>@Texts.Get("crm.salesOverview.title")</h1>
             <p class="text-muted mb-0">
-                Tutarlar raporlama para biriminde, vergi hariç net tutardır. Veriler yetkiniz ve veri kapsamınızla sınırlıdır; her kart, sayısını veren fırsat listesini açar.
+                @Texts.Get("crm.salesOverview.intro")
             </p>
         </div>
         <div class="header-actions">
             @if (Session.Can(SalesAccess.TargetsRead))
             {
-                <a class="btn btn-outline-secondary" href="crm/satis-hedefleri">Satış hedefleri</a>
+                <a class="btn btn-outline-secondary" href="crm/satis-hedefleri">@Texts.Get("crm.salesOverview.targetsLink")</a>
             }
             @if (Session.Can(SalesAccess.ForecastsRead))
             {
-                <a class="btn btn-outline-secondary" href="crm/satis-tahmini">Satış tahmini</a>
+                <a class="btn btn-outline-secondary" href="crm/satis-tahmini">@Texts.Get("crm.salesOverview.forecastLink")</a>
             }
         </div>
     </div>
 
-    <div class="filters" role="group" aria-label="Dönem türü">
+    <div class="filters" role="group" aria-label="@Texts.Get("crm.sales.periodKind")">
         <div class="segmented">
             @foreach (var (key, label) in SalesLabels.PeriodKinds)
             {
                 <button type="button" class="chip @(kind == key ? "active" : null)" aria-pressed="@(kind == key ? "true" : "false")" disabled="@loading" @onclick="() => ChooseKindAsync(key)">@label</button>
             }
         </div>
-        <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="() => ShiftAsync(-1)">← Önceki dönem</button>
-        <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="TodayAsync">Bugün</button>
-        <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="() => ShiftAsync(1)">Sonraki dönem →</button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="() => ShiftAsync(-1)">@Texts.Get("crm.sales.previousPeriod")</button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="TodayAsync">@Texts.Get("crm.sales.today")</button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@loading" @onclick="() => ShiftAsync(1)">@Texts.Get("crm.sales.nextPeriod")</button>
     </div>
 
-    <form class="form-grid mb-3" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="Görünüm süzgeçleri">
+    <form class="form-grid mb-3" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="@Texts.Get("crm.salesOverview.filters")">
         <div class="span-3">
-            <label class="form-label" for="so-date">Dönemdeki bir gün</label>
+            <label class="form-label" for="so-date">@Texts.Get("crm.sales.anchorDay")</label>
             <input id="so-date" class="form-control" type="date" @bind="anchor" @bind:after="LoadAsync" />
         </div>
         <div class="span-4">
-            <label class="form-label" for="so-owner">Kullanıcı (sorumlu)</label>
+            <label class="form-label" for="so-owner">@Texts.Get("crm.sales.ownerFilter")</label>
             <select id="so-owner" class="form-select" @bind="owner" @bind:after="LoadAsync">
-                <option value="">Tüm kullanıcılar</option>
+                <option value="">@Texts.Get("crm.sales.allUsers")</option>
                 @foreach (var member in Lookups.Members)
                 {
                     <option value="@member.UserId">@member.DisplayName</option>
@@ -55,24 +55,24 @@
             </select>
         </div>
         <div class="span-3">
-            <label class="form-label" for="so-currency">Para birimi</label>
+            <label class="form-label" for="so-currency">@Texts.Get("crm.sales.currency")</label>
             <input id="so-currency" class="form-control" maxlength="3" placeholder="@Regional.Currency" aria-describedby="so-currency-help" @bind="currency" @bind:after="LoadAsync" />
-            <div id="so-currency-help" class="form-text">Boşsa firmanın raporlama para birimi (3 harf, ör. USD).</div>
+            <div id="so-currency-help" class="form-text">@Texts.Get("crm.sales.currencyHelp")</div>
         </div>
     </form>
 
     @if (loading)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
 
     @if (error is not null)
     {
         <div class="alert @(forbidden ? "alert-warning" : "alert-danger")" role="alert">
-            @(forbidden ? "Bu görünümü açma yetkiniz yok. " : null)@error
+            @(forbidden ? Texts.Get("crm.salesOverview.forbidden") + " " : null)@error
             @if (!forbidden)
             {
-                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">Tekrar dene</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">@Texts.Get("crm.sales.retry")</button>
             }
         </div>
     }
@@ -81,29 +81,29 @@
     {
         var r = report;
         <p class="small text-muted" role="status">
-            <strong>@r.PeriodLabel</strong> (@SalesLabels.Period(r.PeriodStart, r.PeriodEnd)) · bugün @CrmLabels.Date(r.Today) · para birimi <strong>@r.Currency</strong>
+            @SalesLabels.PeriodLine(r.PeriodLabel, r.PeriodStart, r.PeriodEnd, r.Today, r.Currency)
             @if (r.ScopeLimited)
             {
-                <span class="badge tag">Veri kapsamınız kısıtlı</span>
+                <span class="badge tag">@Texts.Get("crm.sales.scopeLimitedBadge")</span>
             }
         </p>
 
         @if (r.ScopeLimited)
         {
-            <div class="alert alert-info" role="status">Veri kapsamınız kısıtlı: yalnızca yetkili olduğunuz fırsatlar hesaba katıldı.</div>
+            <div class="alert alert-info" role="status">@Texts.Get("crm.sales.scopeLimited")</div>
         }
         @if (!r.AmountsVisible)
         {
-            <div class="alert alert-info" role="status">Tutarları görme yetkiniz yok; tutar toplamları gösterilmiyor, yalnızca adetler vardır.</div>
+            <div class="alert alert-info" role="status">@Texts.Get("crm.salesOverview.noAmounts")</div>
         }
         @if (r.Truncated)
         {
-            <div class="alert alert-warning" role="status">Okuma sınırına ulaşıldı; toplamlar eksik olabilir. Kullanıcı ya da dönem seçerek daraltın.</div>
+            <div class="alert alert-warning" role="status">@Texts.Get("crm.salesOverview.truncated")</div>
         }
         @if (r.Warnings.Count > 0)
         {
             <div class="alert alert-warning" role="status">
-                <strong>Verilerle ilgili uyarılar</strong>
+                <strong>@Texts.Get("crm.sales.warnings")</strong>
                 <ul class="mb-0">
                     @foreach (var warning in r.Warnings)
                     {
@@ -115,50 +115,50 @@
 
         @if (IsEmpty(r))
         {
-            <p class="text-muted">Bu dönem ve süzgeç için gösterilecek fırsat yok.</p>
+            <p class="text-muted">@Texts.Get("crm.salesOverview.empty")</p>
         }
 
-        <div class="kpi-grid" role="group" aria-label="Satış özeti">
-            <SalesKpiCard Label="Gerçekleşen" Icon="check-circle" Tone="success" Value="@MoneyText(r.Realized, r)" Detail="@($"{r.Realized.Count} kazanılan fırsat")"
+        <div class="kpi-grid" role="group" aria-label="@Texts.Get("crm.salesOverview.summary")">
+            <SalesKpiCard Label="@Texts.Get("crm.sales-card.realized")" Icon="check-circle" Tone="success" Value="@MoneyText(r.Realized, r)" Detail="@Texts.Get("crm.salesOverview.realizedDetail", r.Realized.Count)"
                           Partial="@(r.AmountsVisible && r.Realized.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.Realized)"
                           Pressed="@(openCard == SalesCards.Realized)" Controls="so-detail" OnClick="() => OpenCardAsync(SalesCards.Realized)" />
-            <SalesKpiCard Label="Açık pipeline" Icon="layers" Tone="info" Value="@MoneyText(r.OpenPipeline, r)" Detail="@($"{r.OpenPipeline.Count} açık fırsat (tüm kapanış tarihleri)")"
+            <SalesKpiCard Label="@Texts.Get("crm.sales-card.openpipeline")" Icon="layers" Tone="info" Value="@MoneyText(r.OpenPipeline, r)" Detail="@Texts.Get("crm.salesOverview.pipelineDetail", r.OpenPipeline.Count)"
                           Partial="@(r.AmountsVisible && r.OpenPipeline.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.OpenPipeline)"
                           Pressed="@(openCard == SalesCards.OpenPipeline)" Controls="so-detail" OnClick="() => OpenCardAsync(SalesCards.OpenPipeline)" />
-            <SalesKpiCard Label="Bu dönem beklenen" Icon="calendar" Tone="brand" Value="@MoneyText(r.ExpectedOpen, r)" Detail="@($"{r.ExpectedOpen.Count} açık fırsat, kapanışı bu dönemde")"
+            <SalesKpiCard Label="@Texts.Get("crm.sales-card.expectedopen")" Icon="calendar" Tone="brand" Value="@MoneyText(r.ExpectedOpen, r)" Detail="@Texts.Get("crm.salesOverview.expectedDetail", r.ExpectedOpen.Count)"
                           Partial="@(r.AmountsVisible && r.ExpectedOpen.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.ExpectedOpen)"
                           Pressed="@(openCard == SalesCards.ExpectedOpen)" Controls="so-detail" OnClick="() => OpenCardAsync(SalesCards.ExpectedOpen)" />
-            <SalesKpiCard Label="Ağırlıklı tahmin" Icon="percent" Tone="brand" Value="@MoneyText(r.WeightedOpen, r)" Detail="@WeightedDetail(r)"
+            <SalesKpiCard Label="@Texts.Get("crm.sales-card.weightedopen")" Icon="percent" Tone="brand" Value="@MoneyText(r.WeightedOpen, r)" Detail="@WeightedDetail(r)"
                           Partial="@(r.AmountsVisible && r.WeightedOpen.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.WeightedOpen)"
                           Pressed="@(openCard == SalesCards.WeightedOpen)" Controls="so-detail" OnClick="() => OpenCardAsync(SalesCards.WeightedOpen)" />
-            <SalesKpiCard Label="Dönem öngörüsü" Icon="trending-up" Tone="info" Value="@(r.AmountsVisible ? CrmLabels.Amount(r.Outlook, r.Currency) : NoAmountText)"
-                          Detail="Gerçekleşen + ağırlıklı tahmin"
-                          Partial="@(r.AmountsVisible && (r.Realized.IsPartial || r.WeightedOpen.IsPartial))" PartialHint="Gerçekleşen ya da ağırlıklı tahmin kısmi veriyle hesaplandı." />
-            <SalesKpiCard Label="Kazanma oranı" Icon="target" Tone="success" Value="@(r.WinRatePercent is { } rate ? SalesLabels.Percent(rate) : "Veri yok")"
+            <SalesKpiCard Label="@Texts.Get("crm.salesOverview.outlook")" Icon="trending-up" Tone="info" Value="@(r.AmountsVisible ? CrmLabels.Amount(r.Outlook, r.Currency) : NoAmountText)"
+                          Detail="@Texts.Get("crm.salesOverview.outlookDetail")"
+                          Partial="@(r.AmountsVisible && (r.Realized.IsPartial || r.WeightedOpen.IsPartial))" PartialHint="@Texts.Get("crm.salesOverview.outlookPartial")" />
+            <SalesKpiCard Label="@Texts.Get("crm.opportunityReport.winRate")" Icon="target" Tone="success" Value="@(r.WinRatePercent is { } rate ? SalesLabels.Percent(rate) : SalesAnalysisLabels.NoData)"
                           Detail="@WinRateDetail(r)" />
         </div>
 
         <div class="filters">
             <button type="button" class="btn btn-outline-secondary btn-sm" aria-pressed="@(openCard == SalesCards.Lost ? "true" : "false")" aria-controls="so-detail" disabled="@detailLoading"
-                    @onclick="() => OpenCardAsync(SalesCards.Lost)">Kaybedilen fırsatları listele (@r.LostCount)</button>
+                    @onclick="() => OpenCardAsync(SalesCards.Lost)">@Texts.Get("crm.salesOverview.listLost", r.LostCount)</button>
         </div>
 
         @if (openCard is not null)
         {
             <section id="so-detail" class="detail-section" aria-labelledby="so-detail-title" aria-busy="@(detailLoading ? "true" : "false")">
                 <div class="section-header">
-                    <h2 id="so-detail-title" tabindex="-1" @ref="detailHeading">@SalesLabels.Label(SalesLabels.Cards, openCard) fırsatları</h2>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CloseDetail">Kapat</button>
+                    <h2 id="so-detail-title" tabindex="-1" @ref="detailHeading">@Texts.Get("crm.salesOverview.cardTitle", SalesLabels.Label(SalesLabels.Cards, openCard))</h2>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CloseDetail">@Texts.Get("common.close")</button>
                 </div>
                 @if (detailLoading)
                 {
-                    <p class="text-muted" role="status">Liste yükleniyor…</p>
+                    <p class="text-muted" role="status">@Texts.Get("crm.salesOverview.listLoading")</p>
                 }
                 else if (detailError is not null)
                 {
                     <div class="alert alert-danger" role="alert">
                         @detailError
-                        <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="() => RetryDetailAsync(openCard)">Tekrar dene</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="() => RetryDetailAsync(openCard)">@Texts.Get("crm.sales.retry")</button>
                     </div>
                 }
                 else if (detail is not null)
@@ -166,18 +166,18 @@
                     var d = detail;
                     <p>
                         <strong>@d.PeriodLabel</strong> (@SalesLabels.Period(d.PeriodStart, d.PeriodEnd)) ·
-                        @d.RowCount fırsat
+                        @Texts.Get("crm.salesOverview.opportunityCount", d.RowCount)
                         @if (d.AmountsVisible)
                         {
-                            <text> · toplam <strong>@CrmLabels.Amount(d.Total.Amount, d.Currency)</strong></text>
+                            <text> · @Texts.Strong("crm.salesOverview.total", CrmLabels.Amount(d.Total.Amount, d.Currency))</text>
                             @if (d.Total.IsPartial)
                             {
-                                <text> </text><span class="badge stage-onhold">Kısmi</span><text> @SalesLabels.PartialHint(d.Total)</text>
+                                <text> </text><span class="badge stage-onhold">@Texts.Get("crm.sales.partial")</span><text> @SalesLabels.PartialHint(d.Total)</text>
                             }
                         }
                         else
                         {
-                            <text> · tutarları görme yetkiniz yok</text>
+                            <text> · @Texts.Get("crm.salesOverview.noAmountsShort")</text>
                         }
                     </p>
                     @if (d.Rows.Count > 0)
@@ -186,34 +186,34 @@
                     }
                     @if (d.Truncated || d.RowCount > d.Rows.Count)
                     {
-                        <div class="alert alert-warning" role="status">Liste kısaltıldı: @d.Rows.Count satır gösteriliyor, toplam @d.RowCount fırsat. Kullanıcı ya da dönem seçerek daraltın.</div>
+                        <div class="alert alert-warning" role="status">@Texts.Get("crm.salesOverview.listTruncated", d.Rows.Count, d.RowCount)</div>
                     }
                     @if (d.Rows.Count == 0)
                     {
-                        <p class="text-muted">Bu kartta fırsat yok.</p>
+                        <EmptyState Title="@Texts.Get("crm.salesOverview.cardEmpty")" />
                     }
                     else
                     {
                         <table class="table record-table">
-                            <caption class="visually-hidden">@SalesLabels.Label(SalesLabels.Cards, d.Card) fırsatları</caption>
+                            <caption class="visually-hidden">@Texts.Get("crm.salesOverview.cardTitle", SalesLabels.Label(SalesLabels.Cards, d.Card))</caption>
                             <thead>
                                 <tr>
-                                    <th scope="col">No</th><th scope="col">Başlık</th><th scope="col">Sorumlu</th><th scope="col">Aşama</th>
+                                    <th scope="col">@Texts.Get("crm.dataQuality.col.number")</th><th scope="col">@Texts.Get("crm.dataQuality.col.title")</th><th scope="col">@Texts.Get("common.field.owner")</th><th scope="col">@Texts.Get("crm.opportunities.col.stage")</th>
                                     @if (d.AmountsVisible)
                                     {
-                                        <th scope="col">Kaynak tutar</th><th scope="col">Dönüştürülen tutar (@d.Currency)</th><th scope="col">Olasılık</th>
+                                        <th scope="col">@Texts.Get("crm.salesOverview.col.sourceAmount")</th><th scope="col">@Texts.Get("crm.salesOverview.col.convertedIn", d.Currency)</th><th scope="col">@Texts.Get("crm.forecast-adjustment.probability")</th>
                                     }
-                                    <th scope="col">Beklenen kapanış</th><th scope="col">Gerçek kapanış</th>
+                                    <th scope="col">@Texts.Get("crm.salesOverview.col.expectedClose")</th><th scope="col">@Texts.Get("crm.salesOverview.col.actualClose")</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var row in d.Rows)
                                 {
                                     <tr>
-                                        <td data-label="No" class="primary"><a href="crm/firsatlar/@row.Id">@row.OpportunityNumber</a></td>
-                                        <td data-label="Başlık">@row.Title</td>
-                                        <td data-label="Sorumlu">@(row.OwnerId is null ? "Atanmadı" : Lookups.MemberName(row.OwnerId))</td>
-                                        <td data-label="Aşama">
+                                        <td data-label="@Texts.Get("crm.dataQuality.col.number")" class="primary"><a href="crm/firsatlar/@row.Id">@row.OpportunityNumber</a></td>
+                                        <td data-label="@Texts.Get("crm.dataQuality.col.title")">@row.Title</td>
+                                        <td data-label="@Texts.Get("common.field.owner")">@(row.OwnerId is null ? Texts.Get("crm.leads.unassigned") : Lookups.MemberName(row.OwnerId))</td>
+                                        <td data-label="@Texts.Get("crm.opportunities.col.stage")">
                                             <span class="badge stage-@Lookups.Badge(CrmLists.OpportunityStage, row.Stage)">@Lookups.Label(CrmLists.OpportunityStage, row.Stage)</span>
                                             @if (row.Status != OpportunityStatus.Open)
                                             {
@@ -222,8 +222,8 @@
                                         </td>
                                         @if (d.AmountsVisible)
                                         {
-                                            <td data-label="Kaynak tutar">@(row.SourceAmount is { } source ? CrmLabels.Amount(source, row.SourceCurrency) : "—")</td>
-                                            <td data-label="Dönüştürülen tutar">
+                                            <td data-label="@Texts.Get("crm.salesOverview.col.sourceAmount")">@(row.SourceAmount is { } source ? CrmLabels.Amount(source, row.SourceCurrency) : "—")</td>
+                                            <td data-label="@Texts.Get("crm.salesOverview.col.converted")">
                                                 @(row.Amount is { } converted ? CrmLabels.Amount(converted, d.Currency) : "—")
                                                 @if (row.Issue is not null)
                                                 {
@@ -231,13 +231,13 @@
                                                 }
                                                 @if (row.RateUsed is { } rateUsed)
                                                 {
-                                                    <small class="text-muted">kur @rateUsed.ToString("0.####", Regional.Numbers)</small>
+                                                    <small class="text-muted">@Texts.Get("crm.salesOverview.rate", rateUsed.ToString("0.####", Regional.Numbers))</small>
                                                 }
                                             </td>
-                                            <td data-label="Olasılık">@(row.Probability is { } probability ? $"%{probability}" : "—")</td>
+                                            <td data-label="@Texts.Get("crm.forecast-adjustment.probability")">@(row.Probability is { } probability ? $"%{probability}" : "—")</td>
                                         }
-                                        <td data-label="Beklenen kapanış">@(row.ExpectedCloseDate is { } expected ? CrmLabels.Date(expected) : "—")</td>
-                                        <td data-label="Gerçek kapanış">@(row.ActualCloseDate is { } actual ? CrmLabels.Date(actual) : "—")</td>
+                                        <td data-label="@Texts.Get("crm.salesOverview.col.expectedClose")">@(row.ExpectedCloseDate is { } expected ? CrmLabels.Date(expected) : "—")</td>
+                                        <td data-label="@Texts.Get("crm.salesOverview.col.actualClose")">@(row.ActualCloseDate is { } actual ? CrmLabels.Date(actual) : "—")</td>
                                     </tr>
                                 }
                             </tbody>
@@ -248,40 +248,40 @@
         }
 
         <section class="detail-section" aria-labelledby="so-targets">
-            <div class="section-header"><h2 id="so-targets">Hedefler</h2></div>
-            <SalesTargetBlock Title="Tutar hedefi" Block="r.AmountTarget" Hidden="@(r.AmountsVisible ? null : "Tutarları görme yetkiniz olmadığından tutar hedefi gösterilmiyor.")" />
-            <SalesTargetBlock Title="Adet hedefi" Block="r.CountTarget" />
+            <div class="section-header"><h2 id="so-targets">@Texts.Get("crm.salesOverview.targets")</h2></div>
+            <SalesTargetBlock Title="@Texts.Get("crm.salesOverview.amountTarget")" Block="r.AmountTarget" Hidden="@(r.AmountsVisible ? null : Texts.Get("crm.salesOverview.amountTargetHidden"))" />
+            <SalesTargetBlock Title="@Texts.Get("crm.salesOverview.countTarget")" Block="r.CountTarget" />
         </section>
 
         <section class="detail-section" aria-labelledby="so-stage">
-            <div class="section-header"><h2 id="so-stage">Aşama dağılımı (açık fırsatlar)</h2></div>
+            <div class="section-header"><h2 id="so-stage">@Texts.Get("crm.salesOverview.byStage")</h2></div>
             @if (r.ByStage.Count == 0)
             {
-                <p class="text-muted">Açık fırsat yok.</p>
+                <p class="text-muted">@Texts.Get("crm.sales.noOpen")</p>
             }
             else
             {
-                <BarChart Title="@($"Aşamaya göre açık fırsat {(r.AmountsVisible ? $"tutarı ({r.Currency})" : "adedi")}")"
+                <BarChart Title="@(r.AmountsVisible ? Texts.Get("crm.salesOverview.stageChartAmount", r.Currency) : Texts.Get("crm.salesOverview.stageChartCount"))"
                           Slices="@r.ByStage.Select(s => new ChartSlice(Lookups.Label(CrmLists.OpportunityStage, s.Stage), r.AmountsVisible ? s.Amount : s.Count)).ToList()" />
                 <table class="table record-table">
-                    <caption class="visually-hidden">Aşama dağılımı</caption>
+                    <caption class="visually-hidden">@Texts.Get("crm.salesOverview.stageCaption")</caption>
                     <thead>
                         <tr>
-                            <th scope="col">Aşama</th><th scope="col">Adet</th>
-                            @if (r.AmountsVisible) { <th scope="col">Tutar</th><th scope="col">Ağırlıklı tutar</th><th scope="col">Kısmi veri</th> }
+                            <th scope="col">@Texts.Get("crm.opportunities.col.stage")</th><th scope="col">@Texts.Get("crm.sales.col.count")</th>
+                            @if (r.AmountsVisible) { <th scope="col">@Texts.Get("crm.sales.col.amount")</th><th scope="col">@Texts.Get("crm.salesOverview.col.weightedAmount")</th><th scope="col">@Texts.Get("crm.salesOverview.col.partialData")</th> }
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var s in r.ByStage)
                         {
                             <tr>
-                                <td data-label="Aşama" class="primary">@Lookups.Label(CrmLists.OpportunityStage, s.Stage)</td>
-                                <td data-label="Adet">@s.Count</td>
+                                <td data-label="@Texts.Get("crm.opportunities.col.stage")" class="primary">@Lookups.Label(CrmLists.OpportunityStage, s.Stage)</td>
+                                <td data-label="@Texts.Get("crm.sales.col.count")">@s.Count</td>
                                 @if (r.AmountsVisible)
                                 {
-                                    <td data-label="Tutar">@CrmLabels.Amount(s.Amount, r.Currency)</td>
-                                    <td data-label="Ağırlıklı tutar">@CrmLabels.Amount(s.Weighted, r.Currency)</td>
-                                    <td data-label="Kısmi veri">@(s.MissingAmountCount + s.MissingRateCount > 0 ? $"{s.MissingAmountCount} tutarsız, {s.MissingRateCount} kursuz fırsat" : "—")</td>
+                                    <td data-label="@Texts.Get("crm.sales.col.amount")">@CrmLabels.Amount(s.Amount, r.Currency)</td>
+                                    <td data-label="@Texts.Get("crm.salesOverview.col.weightedAmount")">@CrmLabels.Amount(s.Weighted, r.Currency)</td>
+                                    <td data-label="@Texts.Get("crm.salesOverview.col.partialData")">@(s.MissingAmountCount + s.MissingRateCount > 0 ? Texts.Get("crm.salesOverview.partialValue", s.MissingAmountCount, s.MissingRateCount) : "—")</td>
                                 }
                             </tr>
                         }
@@ -291,28 +291,28 @@
         </section>
 
         <section class="detail-section" aria-labelledby="so-trend">
-            <div class="section-header"><h2 id="so-trend">Son @r.Trend.Count dönemin gerçekleşeni</h2></div>
+            <div class="section-header"><h2 id="so-trend">@Texts.Get("crm.salesOverview.trend", r.Trend.Count)</h2></div>
             @if (r.Trend.Count == 0)
             {
-                <p class="text-muted">Trend verisi yok.</p>
+                <p class="text-muted">@Texts.Get("crm.salesOverview.noTrend")</p>
             }
             else
             {
-                <BarChart Title="@($"Dönemlere göre gerçekleşen {(r.AmountsVisible ? $"tutar ({r.Currency})" : "adet")}")"
-                          Slices="@r.Trend.Select(t => new ChartSlice(t.Partial ? $"{t.Label} (kısmi)" : t.Label, r.AmountsVisible ? t.Realized : t.WonCount)).ToList()" />
+                <BarChart Title="@(r.AmountsVisible ? Texts.Get("crm.salesOverview.trendChartAmount", r.Currency) : Texts.Get("crm.salesOverview.trendChartCount"))"
+                          Slices="@r.Trend.Select(t => new ChartSlice(t.Partial ? Texts.Get("crm.salesOverview.partialLabel", t.Label) : t.Label, r.AmountsVisible ? t.Realized : t.WonCount)).ToList()" />
                 <table class="table record-table">
-                    <caption class="visually-hidden">Dönemlere göre gerçekleşen</caption>
+                    <caption class="visually-hidden">@Texts.Get("crm.salesOverview.trendCaption")</caption>
                     <thead>
-                        <tr><th scope="col">Dönem</th><th scope="col">Tarihler</th><th scope="col">Kazanılan adet</th>@if (r.AmountsVisible) { <th scope="col">Gerçekleşen tutar</th> }</tr>
+                        <tr><th scope="col">@Texts.Get("crm.salesOverview.col.period")</th><th scope="col">@Texts.Get("crm.salesOverview.col.dates")</th><th scope="col">@Texts.Get("crm.sales-metric.woncount")</th>@if (r.AmountsVisible) { <th scope="col">@Texts.Get("crm.salesOverview.col.realizedAmount")</th> }</tr>
                     </thead>
                     <tbody>
                         @foreach (var t in r.Trend)
                         {
                             <tr>
-                                <td data-label="Dönem" class="primary">@t.Label @(t.Partial ? "(kısmi veri)" : null)</td>
-                                <td data-label="Tarihler">@SalesLabels.Period(t.Start, t.End)</td>
-                                <td data-label="Kazanılan adet">@t.WonCount</td>
-                                @if (r.AmountsVisible) { <td data-label="Gerçekleşen tutar">@CrmLabels.Amount(t.Realized, r.Currency)</td> }
+                                <td data-label="@Texts.Get("crm.salesOverview.col.period")" class="primary">@t.Label @(t.Partial ? Texts.Get("crm.salesOverview.partialData") : null)</td>
+                                <td data-label="@Texts.Get("crm.salesOverview.col.dates")">@SalesLabels.Period(t.Start, t.End)</td>
+                                <td data-label="@Texts.Get("crm.sales-metric.woncount")">@t.WonCount</td>
+                                @if (r.AmountsVisible) { <td data-label="@Texts.Get("crm.salesOverview.col.realizedAmount")">@CrmLabels.Amount(t.Realized, r.Currency)</td> }
                             </tr>
                         }
                     </tbody>
@@ -321,40 +321,40 @@
         </section>
 
         <section class="detail-section" aria-labelledby="so-overdue">
-            <div class="section-header"><h2 id="so-overdue">Gecikmiş açık fırsatlar (@r.OverdueOpenCount)</h2></div>
+            <div class="section-header"><h2 id="so-overdue">@Texts.Get("crm.salesOverview.overdue", r.OverdueOpenCount)</h2></div>
             @if (r.Overdue.Count == 0)
             {
-                <p class="text-muted">Beklenen kapanış tarihi geçmiş açık fırsat yok.</p>
+                <EmptyState Title="@Texts.Get("crm.salesOverview.noOverdue")" />
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Beklenen kapanış tarihi geçmiş açık fırsatlar</caption>
+                    <caption class="visually-hidden">@Texts.Get("crm.salesOverview.overdueCaption")</caption>
                     <thead>
-                        <tr><th scope="col">No</th><th scope="col">Başlık</th><th scope="col">Sorumlu</th><th scope="col">Beklenen kapanış</th>@if (r.AmountsVisible) { <th scope="col">Tutar</th> }</tr>
+                        <tr><th scope="col">@Texts.Get("crm.dataQuality.col.number")</th><th scope="col">@Texts.Get("crm.dataQuality.col.title")</th><th scope="col">@Texts.Get("common.field.owner")</th><th scope="col">@Texts.Get("crm.salesOverview.col.expectedClose")</th>@if (r.AmountsVisible) { <th scope="col">@Texts.Get("crm.sales.col.amount")</th> }</tr>
                     </thead>
                     <tbody>
                         @foreach (var o in r.Overdue)
                         {
                             <tr>
-                                <td data-label="No" class="primary"><a href="crm/firsatlar/@o.Id">@o.OpportunityNumber</a></td>
-                                <td data-label="Başlık">@o.Title</td>
-                                <td data-label="Sorumlu">@(o.OwnerId is null ? "Atanmadı" : Lookups.MemberName(o.OwnerId))</td>
-                                <td data-label="Beklenen kapanış">@(o.ExpectedCloseDate is { } due ? CrmLabels.Date(due) : "—")</td>
-                                @if (r.AmountsVisible) { <td data-label="Tutar">@(o.Amount is { } amount ? CrmLabels.Amount(amount, o.Currency) : "Tutar yok")</td> }
+                                <td data-label="@Texts.Get("crm.dataQuality.col.number")" class="primary"><a href="crm/firsatlar/@o.Id">@o.OpportunityNumber</a></td>
+                                <td data-label="@Texts.Get("crm.dataQuality.col.title")">@o.Title</td>
+                                <td data-label="@Texts.Get("common.field.owner")">@(o.OwnerId is null ? Texts.Get("crm.leads.unassigned") : Lookups.MemberName(o.OwnerId))</td>
+                                <td data-label="@Texts.Get("crm.salesOverview.col.expectedClose")">@(o.ExpectedCloseDate is { } due ? CrmLabels.Date(due) : "—")</td>
+                                @if (r.AmountsVisible) { <td data-label="@Texts.Get("crm.sales.col.amount")">@(o.Amount is { } amount ? CrmLabels.Amount(amount, o.Currency) : Texts.Get("crm.sales-issue.missingamount"))</td> }
                             </tr>
                         }
                     </tbody>
                 </table>
                 @if (r.OverdueOpenCount > r.Overdue.Count)
                 {
-                    <p class="small text-muted">En eski @r.Overdue.Count fırsat gösteriliyor; toplam @r.OverdueOpenCount.</p>
+                    <p class="small text-muted">@Texts.Get("crm.salesOverview.overdueTruncated", r.Overdue.Count, r.OverdueOpenCount)</p>
                 }
             }
         </section>
 
         <details class="detail-section">
-            <summary><strong>Hesap açıklaması</strong></summary>
+            <summary><strong>@Texts.Get("crm.sales.definitions")</strong></summary>
             <ul class="small text-muted mt-2">
                 @foreach (var definition in r.Definitions)
                 {
@@ -366,7 +366,7 @@
 </AuthGate>
 
 @code {
-    private const string NoAmountText = "Yetkiniz yok";
+    private static string NoAmountText => SalesAnalysisLabels.NoAmountPermission;
 
     private string kind = SalesPeriodKinds.Month;
     private DateOnly anchor = DateOnly.FromDateTime(Regional.Now.DateTime);
@@ -514,10 +514,10 @@
         r.AmountsVisible ? CrmLabels.Amount(total.Amount, r.Currency) : NoAmountText;
 
     private static string WeightedDetail(SalesOverviewDto r) =>
-        $"{r.WeightedOpen.Count} fırsat" + (r.WeightedMissingProbabilityCount > 0 ? $" · {r.WeightedMissingProbabilityCount} fırsatın olasılığı yok (toplama girmedi)" : null);
+        Texts.Get("crm.salesOverview.opportunityCount", r.WeightedOpen.Count) + (r.WeightedMissingProbabilityCount > 0 ? " · " + Texts.Get("crm.salesOverview.missingProbability", r.WeightedMissingProbabilityCount) : null);
 
     private static string WinRateDetail(SalesOverviewDto r) =>
-        r.WinRatePercent is null ? "Bu dönemde sonuçlanan fırsat yok" : $"Kazanılan {r.WonCount} · kaybedilen {r.LostCount}";
+        r.WinRatePercent is null ? Texts.Get("crm.salesOverview.noClosed") : Texts.Get("crm.salesOverview.winRateDetail", r.WonCount, r.LostCount);
 
     private async Task RetryDetailAsync(string? card)
     {

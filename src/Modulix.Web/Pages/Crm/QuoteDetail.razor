@@ -7,29 +7,29 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
 
-<PageTitle>@(quote?.Title ?? "Yeni teklif") · Modulix</PageTitle>
+<PageTitle>@(quote?.Title ?? Texts.Get("crm.quotes.new")) · Modulix</PageTitle>
 
 <NavigationLock ConfirmExternalNavigation="@(dirty || lineDirty)" OnBeforeInternalNavigation="ConfirmLeaveAsync" />
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.QuotesRead">
     @if (notFound)
     {
-        <div class="alert alert-warning" role="alert">Teklif bulunamadı ya da erişim yetkiniz yok. <a href="crm/teklifler">Tekliflere dön</a></div>
+        <div class="alert alert-warning" role="alert">@Texts.Get("crm.quoteCompare.notFound") <a href="crm/teklifler">@Texts.Get("crm.quoteCompare.backToList")</a></div>
     }
     else if (Id is not null && quote is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <LoadingState />
     }
     else
     {
         <div class="page-header">
             <div>
-                <h1>@(quote?.Title ?? "Yeni teklif")</h1>
+                <h1>@(quote?.Title ?? Texts.Get("crm.quotes.new"))</h1>
                 @if (quote is not null)
                 {
                     <p class="text-muted mb-0">
-                        @if (isPrimaryQuote) { <span class="badge stage-won">Fırsatın esas teklifi</span> }
-                        @quote.QuoteNumber · Revizyon V@(quote.RevisionNo)
+                        @if (isPrimaryQuote) { <span class="badge stage-won">@Texts.Get("crm.quoteDetail.primaryBadge")</span> }
+                        @quote.QuoteNumber · @Texts.Get("crm.quoteDetail.revision", quote.RevisionNo)
                         <span class="badge stage-@QuoteLabels.StatusBadge(quote.Status)">@QuoteLabels.Label(QuoteLabels.Statuses, quote.Status)</span>
                         <span class="badge stage-@QuoteLabels.ApprovalBadge(quote.ApprovalStatus)">@QuoteLabels.Label(QuoteLabels.Approvals, quote.ApprovalStatus)</span>
                         <span class="badge stage-open">@QuoteLabels.Label(QuoteLabels.Deliveries, quote.DeliveryStatus)</span>
@@ -37,7 +37,7 @@
                 }
             </div>
             <div class="header-actions">
-                <a class="btn btn-outline-secondary" href="crm/teklifler">Listeye dön</a>
+                <a class="btn btn-outline-secondary" href="crm/teklifler">@Texts.Get("crm.quoteDetail.backToList")</a>
             </div>
         </div>
 
@@ -46,20 +46,20 @@
         @if (quote is not null && !Draft)
         {
             <div class="alert alert-info" role="status">
-                Bu sürüm <strong>@QuoteLabels.Label(QuoteLabels.Statuses, quote.Status).ToLowerInvariant()</strong> durumunda ve salt okunurdur.
-                Ticari değişiklik için yeni revizyon açın; kabul edilmiş teklifte sonraki değişiklikler ayrı süreçtir.
-                @if (!string.IsNullOrWhiteSpace(quote.StatusReason)) { <span> Gerekçe: @quote.StatusReason</span> }
+                @Texts.Strong("crm.quoteDetail.readOnly", QuoteLabels.Label(QuoteLabels.Statuses, quote.Status).ToLowerInvariant())
+                @Texts.Get("crm.quoteDetail.readOnlyHelp")
+                @if (!string.IsNullOrWhiteSpace(quote.StatusReason)) { <span> @Texts.Get("crm.quoteShare.reason", quote.StatusReason)</span> }
             </div>
         }
 
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <TabBar Tabs="HeaderTabs" State="headerTabs" Label="Teklif formu bölümleri" />
+            <TabBar Tabs="HeaderTabs" State="headerTabs" Label="@Texts.Get("crm.quoteDetail.formSections")" />
             <fieldset disabled="@(!CanEditHeader || busy)">
-                <legend class="visually-hidden">Genel bilgiler</legend>
+                <legend class="visually-hidden">@Texts.Get("crm.quoteDetail.generalInfo")</legend>
                 @if (errors is { Count: > 0 })
                 {
                     <div class="alert alert-danger" role="alert">
-                        <strong>Kaydetmeden önce şunları düzeltin:</strong>
+                        <strong>@Texts.Get("common.errorSummary")</strong>
                         <ul class="mb-0">
                             @foreach (var (field, messages) in errors)
                             {
@@ -71,71 +71,71 @@
                 <TabPanel State="headerTabs" Key="form-genel">
                 <div class="form-grid" @oninput="() => dirty = true">
                     <div class="span-all">
-                        <label class="form-label" for="q-title">Başlık *</label>
+                        <label class="form-label" for="q-title">@Texts.Get("crm.quoteDetail.field.title")</label>
                         <input id="q-title" class="form-control" maxlength="200" @bind="form.Title" aria-invalid="@(errors?.ContainsKey("title") == true)" />
                         <FieldError Field="title" Errors="errors" />
                     </div>
                     <div>
-                        <label class="form-label" for="companyId">Müşteri (firma) *</label>
+                        <label class="form-label" for="companyId">@Texts.Get("crm.quoteDetail.field.company")</label>
                         <LookupPicker Id="companyId" LookupKey="crm.quote.company" @bind-Value="form.CompanyId" Required="true"
                                       Invalid="@(errors?.ContainsKey("companyId") == true)" ReadOnly="@(!CanEditHeader)" />
                         <FieldError Field="companyId" Errors="errors" />
                     </div>
                     <div>
-                        <label class="form-label" for="contactId">Müşteri yetkilisi</label>
+                        <label class="form-label" for="contactId">@Texts.Get("crm.quoteDetail.field.contact")</label>
                         <LookupPicker Id="contactId" LookupKey="crm.quote.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Placeholder="—"
                                       Invalid="@(errors?.ContainsKey("contactId") == true)" ReadOnly="@(!CanEditHeader)" />
                         <FieldError Field="contactId" Errors="errors" />
                     </div>
                     <div>
-                        <label class="form-label" for="opportunityId">Fırsat (isteğe bağlı)</label>
+                        <label class="form-label" for="opportunityId">@Texts.Get("crm.quoteDetail.field.opportunity")</label>
                         <LookupPicker Id="opportunityId" LookupKey="crm.quote.opportunity" @bind-Value="form.OpportunityId" ParentId="form.CompanyId" Placeholder="—"
                                       Invalid="@(errors?.ContainsKey("opportunityId") == true)" ReadOnly="@(!CanEditHeader)" />
                         <FieldError Field="opportunityId" Errors="errors" />
                     </div>
                     <div>
-                        <label class="form-label" for="ownerId">Sorumlu</label>
-                        <LookupPicker Id="ownerId" LookupKey="crm.quote.owner" @bind-Value="form.OwnerId" Placeholder="@(quote is null ? "Ben" : "—")" ReadOnly="@(!CanEditHeader)" />
+                        <label class="form-label" for="ownerId">@Texts.Get("common.field.owner")</label>
+                        <LookupPicker Id="ownerId" LookupKey="crm.quote.owner" @bind-Value="form.OwnerId" Placeholder="@(quote is null ? Texts.Get("common.me") : "—")" ReadOnly="@(!CanEditHeader)" />
                     </div>
                 </div>
                 </TabPanel>
                 <TabPanel State="headerTabs" Key="form-fiyat">
                 <div class="form-grid" @oninput="() => dirty = true">
                     <div>
-                        <label class="form-label" for="priceListId">Fiyat listesi</label>
-                        <LookupPicker Id="priceListId" LookupKey="crm.quote.price-list" @bind-Value="form.PriceListId" Placeholder="Varsayılan seçim"
+                        <label class="form-label" for="priceListId">@Texts.Get("crm.quoteDetail.field.priceList")</label>
+                        <LookupPicker Id="priceListId" LookupKey="crm.quote.price-list" @bind-Value="form.PriceListId" Placeholder="@Texts.Get("crm.quoteDetail.field.priceListPlaceholder")"
                                       Invalid="@(errors?.ContainsKey("priceListId") == true)" ReadOnly="@(!CanEditHeader)" />
                         <FieldError Field="priceListId" Errors="errors" />
                     </div>
                     <div>
-                        <label class="form-label" for="q-currency">Para birimi *</label>
+                        <label class="form-label" for="q-currency">@Texts.Get("crm.quoteDetail.field.currency")</label>
                         <input id="q-currency" class="form-control" maxlength="3" @bind="form.Currency" />
                         <FieldError Field="currency" Errors="errors" />
                     </div>
                     <div>
-                        <label class="form-label" for="q-valid">Geçerlilik bitişi</label>
+                        <label class="form-label" for="q-valid">@Texts.Get("crm.quoteDetail.field.validUntil")</label>
                         <input id="q-valid" type="datetime-local" class="form-control" @bind="form.ValidUntil" />
                         <FieldError Field="validUntil" Errors="errors" />
-                        @if (quote is null && defaultValidityDays > 0) { <small class="text-muted">Boş bırakılırsa @defaultValidityDays gün önerilir.</small> }
+                        @if (quote is null && defaultValidityDays > 0) { <small class="text-muted">@Texts.Get("crm.quoteDetail.validityHint", defaultValidityDays)</small> }
                     </div>
                     <div>
-                        <label class="form-label" for="q-tax">Fiyatlandırma biçimi</label>
+                        <label class="form-label" for="q-tax">@Texts.Get("crm.quoteDetail.field.pricing")</label>
                         <select id="q-tax" class="form-select" @bind="form.PriceIncludesTax">
-                            <option value="@false">Fiyatlar vergi hariç</option>
-                            <option value="@true">Fiyatlar vergi dahil</option>
+                            <option value="@false">@Texts.Get("crm.quoteDetail.taxExcluded")</option>
+                            <option value="@true">@Texts.Get("crm.quoteDetail.taxIncluded")</option>
                         </select>
                         <FieldError Field="priceIncludesTax" Errors="errors" />
                     </div>
                     @if (Session.Can(CrmAccess.QuotesDiscount) || (quote?.DocumentDiscountKind ?? "None") != "None")
                     {
                         <div>
-                            <label class="form-label" for="q-dk">Genel indirim</label>
+                            <label class="form-label" for="q-dk">@Texts.Get("crm.quoteDetail.field.documentDiscount")</label>
                             <select id="q-dk" class="form-select" @bind="form.DocumentDiscountKind" disabled="@(!Session.Can(CrmAccess.QuotesDiscount))">
                                 @foreach (var kind in QuoteLabels.DiscountKinds) { <option value="@kind.Key">@kind.Label</option> }
                             </select>
                         </div>
                         <div>
-                            <label class="form-label" for="q-dv">Genel indirim değeri</label>
+                            <label class="form-label" for="q-dv">@Texts.Get("crm.quoteDetail.field.documentDiscountValue")</label>
                             <input id="q-dv" type="number" step="0.01" min="0" class="form-control" @bind="form.DocumentDiscountValue"
                                    disabled="@(!Session.Can(CrmAccess.QuotesDiscount) || form.DocumentDiscountKind == "None")" />
                             <FieldError Field="documentDiscountValue" Errors="errors" />
@@ -146,19 +146,19 @@
                 <TabPanel State="headerTabs" Key="form-kosul">
                 <div class="form-grid" @oninput="() => dirty = true">
                     <div class="span-all">
-                        <label class="form-label" for="q-pay">Ödeme koşulları</label>
+                        <label class="form-label" for="q-pay">@Texts.Get("crm.quoteDetail.field.paymentTerms")</label>
                         <textarea id="q-pay" class="form-control" rows="2" maxlength="4000" @bind="form.PaymentTerms"></textarea>
                     </div>
                     <div class="span-all">
-                        <label class="form-label" for="q-del">Teslimat koşulları</label>
+                        <label class="form-label" for="q-del">@Texts.Get("crm.quoteDetail.field.deliveryTerms")</label>
                         <textarea id="q-del" class="form-control" rows="2" maxlength="4000" @bind="form.DeliveryTerms"></textarea>
                     </div>
                     <div class="span-all">
-                        <label class="form-label" for="q-com">Ticari koşullar</label>
+                        <label class="form-label" for="q-com">@Texts.Get("crm.quoteDetail.field.commercialTerms")</label>
                         <textarea id="q-com" class="form-control" rows="3" maxlength="4000" @bind="form.CommercialTerms"></textarea>
                     </div>
                     <div class="span-all">
-                        <label class="form-label" for="q-int">İç notlar <small class="text-muted">(müşteriye gösterilmez)</small></label>
+                        <label class="form-label" for="q-int">@Texts.Get("crm.quoteDetail.field.internalNotes") <small class="text-muted">@Texts.Get("crm.quoteDetail.field.internalNotesHint")</small></label>
                         <textarea id="q-int" class="form-control" rows="2" maxlength="4000" @bind="form.InternalNotes"></textarea>
                     </div>
                 </div>
@@ -167,8 +167,8 @@
             @if (CanEditHeader)
             {
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@busy">@(quote is null ? "Taslağı oluştur" : "Kaydet")</button>
-                    @if (dirty) { <span class="text-muted" role="status">Kaydedilmemiş değişiklikler var.</span> }
+                    <button type="submit" class="btn btn-primary" disabled="@busy">@(quote is null ? Texts.Get("crm.quoteDetail.createDraft") : Texts.Get("common.save"))</button>
+                    @if (dirty) { <span class="text-muted" role="status">@Texts.Get("crm.quoteDetail.unsaved")</span> }
                 </div>
             }
         </form>
@@ -176,22 +176,22 @@
         @if (quote is not null)
         {
             <section aria-labelledby="lines-title">
-                <h2 id="lines-title">Kalemler</h2>
+                <h2 id="lines-title">@Texts.Get("crm.quoteCompare.lines")</h2>
                 @if (Draft && Session.Can(CrmAccess.QuotesWrite) && lineForm is null)
                 {
-                    <button type="button" class="btn btn-outline-primary" @onclick="NewLine">Kalem ekle</button>
+                    <button type="button" class="btn btn-outline-primary" @onclick="NewLine">@Texts.Get("crm.quoteDetail.addLine")</button>
                 }
 
                 @if (lineForm is not null)
                 {
                     <form class="record-form" novalidate @onsubmit="SaveLineAsync" @onsubmit:preventDefault>
-                        <h3>@(lineForm.Id is null ? "Yeni kalem" : "Kalemi düzenle")</h3>
+                        <h3>@(lineForm.Id is null ? Texts.Get("crm.quoteDetail.newLine") : Texts.Get("crm.quoteDetail.editLine"))</h3>
                         @if (lineMessage is not null) { <div class="alert alert-danger" role="alert">@lineMessage</div> }
-                        <TabBar Tabs="LineTabs" State="lineTabs" Label="Kalem formu bölümleri" />
+                        <TabBar Tabs="LineTabs" State="lineTabs" Label="@Texts.Get("crm.quoteDetail.lineSections")" />
                         <TabPanel State="lineTabs" Key="line-kalem">
                         <div class="form-grid" @oninput="() => lineDirty = true">
                             <div>
-                                <label class="form-label" for="l-kind">Tür</label>
+                                <label class="form-label" for="l-kind">@Texts.Get("crm.quoteDetail.line.kind")</label>
                                 <select id="l-kind" class="form-select" @bind="lineForm.Kind">
                                     @foreach (var kind in QuoteLabels.LineKinds.Where(k => k.Key != "Free" || Session.Can(CrmAccess.QuotesManualPrice)))
                                     {
@@ -203,30 +203,30 @@
                             @if (lineForm.Kind != "Free")
                             {
                                 <div>
-                                    <label class="form-label" for="l-product">Ürün / hizmet</label>
-                                    <LookupPicker Id="l-product" LookupKey="crm.quote-line.product" @bind-Value="lineForm.ProductId" Placeholder="Katalogdan seçin"
+                                    <label class="form-label" for="l-product">@Texts.Get("crm.quoteDetail.line.product")</label>
+                                    <LookupPicker Id="l-product" LookupKey="crm.quote-line.product" @bind-Value="lineForm.ProductId" Placeholder="@Texts.Get("crm.quoteDetail.line.productPlaceholder")"
                                                   Invalid="@(lineErrors?.ContainsKey("productId") == true)" />
                                     <FieldError Field="productId" Errors="lineErrors" />
                                 </div>
                             }
                             <div>
-                                <label class="form-label" for="l-name">Ad @(lineForm.ProductId is null ? "*" : "(boşsa üründen)")</label>
+                                <label class="form-label" for="l-name">@(lineForm.ProductId is null ? Texts.Get("crm.quoteDetail.line.nameRequired") : Texts.Get("crm.quoteDetail.line.nameFromProduct"))</label>
                                 <input id="l-name" class="form-control" maxlength="200" @bind="lineForm.Name" />
                                 <FieldError Field="name" Errors="lineErrors" />
                             </div>
                             <div>
-                                <label class="form-label" for="l-qty">Miktar *</label>
+                                <label class="form-label" for="l-qty">@Texts.Get("crm.quoteDetail.line.quantity")</label>
                                 <input id="l-qty" type="number" step="any" min="0" class="form-control" @bind="lineForm.Quantity" />
                                 <FieldError Field="quantity" Errors="lineErrors" />
                             </div>
                             <div>
-                                <label class="form-label" for="l-price">Birim fiyat @(lineForm.ProductId is not null ? "(boşsa fiyat listesinden)" : "*")</label>
+                                <label class="form-label" for="l-price">@(lineForm.ProductId is not null ? Texts.Get("crm.quoteDetail.line.unitPriceFromList") : Texts.Get("crm.quoteDetail.line.unitPriceRequired"))</label>
                                 <input id="l-price" type="number" step="any" min="0" class="form-control" @bind="lineForm.UnitPrice"
                                        disabled="@(lineForm.ProductId is not null && !Session.Can(CrmAccess.QuotesManualPrice))" />
                                 <FieldError Field="unitPrice" Errors="lineErrors" />
                             </div>
                             <div class="span-all">
-                                <label class="form-label" for="l-desc">Açıklama</label>
+                                <label class="form-label" for="l-desc">@Texts.Get("crm.quoteDetail.line.description")</label>
                                 <textarea id="l-desc" class="form-control" rows="2" maxlength="2000" @bind="lineForm.Description"></textarea>
                             </div>
                         </div>
@@ -234,7 +234,7 @@
                         <TabPanel State="lineTabs" Key="line-vergi">
                         <div class="form-grid" @oninput="() => lineDirty = true">
                             <div>
-                                <label class="form-label" for="l-tax">Vergi oranı (%)</label>
+                                <label class="form-label" for="l-tax">@Texts.Get("crm.quoteDetail.line.taxRate")</label>
                                 <input id="l-tax" type="number" step="any" min="0" max="100" class="form-control" @bind="lineForm.TaxRatePercent"
                                        disabled="@(lineForm.ProductId is not null)" />
                                 <FieldError Field="taxRatePercent" Errors="lineErrors" />
@@ -242,19 +242,19 @@
                             @if (Session.Can(CrmAccess.QuotesDiscount))
                             {
                                 <div>
-                                    <label class="form-label" for="l-dk">İndirim</label>
+                                    <label class="form-label" for="l-dk">@Texts.Get("crm.quoteDetail.line.discount")</label>
                                     <select id="l-dk" class="form-select" @bind="lineForm.DiscountKind">
                                         @foreach (var kind in QuoteLabels.DiscountKinds) { <option value="@kind.Key">@kind.Label</option> }
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="form-label" for="l-dv">İndirim değeri</label>
+                                    <label class="form-label" for="l-dv">@Texts.Get("crm.quoteDetail.line.discountValue")</label>
                                     <input id="l-dv" type="number" step="0.01" min="0" class="form-control" @bind="lineForm.DiscountValue" disabled="@(lineForm.DiscountKind == "None")" />
                                     <FieldError Field="discountValue" Errors="lineErrors" />
                                 </div>
                             }
                             <div>
-                                <label class="form-label" for="l-period">Faturalama</label>
+                                <label class="form-label" for="l-period">@Texts.Get("crm.quoteDetail.line.billing")</label>
                                 <select id="l-period" class="form-select" @bind="lineForm.RecurringPeriod">
                                     @foreach (var period in QuoteLabels.Periods) { <option value="@period.Key">@period.Label</option> }
                                 </select>
@@ -263,7 +263,7 @@
                             @if (Session.Can(CrmAccess.QuoteCostsRead))
                             {
                                 <div>
-                                    <label class="form-label" for="l-cost">Birim maliyet <small class="text-muted">(yalnızca yetkililer)</small></label>
+                                    <label class="form-label" for="l-cost">@Texts.Get("crm.quoteDetail.line.unitCost") <small class="text-muted">@Texts.Get("crm.quoteDetail.line.authorizedOnly")</small></label>
                                     <input id="l-cost" type="number" step="any" min="0" class="form-control" @bind="lineForm.UnitCost" />
                                 </div>
                             }
@@ -272,7 +272,7 @@
                         <TabPanel State="lineTabs" Key="line-rol">
                         <div class="form-grid" @oninput="() => lineDirty = true">
                             <div>
-                                <label class="form-label" for="l-role">Kalemin rolü</label>
+                                <label class="form-label" for="l-role">@Texts.Get("crm.quoteDetail.line.role")</label>
                                 <select id="l-role" class="form-select" @bind="lineForm.Role">
                                     @foreach (var role in QuoteLabels.Roles) { <option value="@role.Key">@role.Label</option> }
                                 </select>
@@ -280,7 +280,7 @@
                             @if (lineForm.Role == "PackageChild")
                             {
                                 <div>
-                                    <label class="form-label" for="l-parent">Paket ana kalemi *</label>
+                                    <label class="form-label" for="l-parent">@Texts.Get("crm.quoteDetail.line.parent")</label>
                                     <select id="l-parent" class="form-select" @bind="lineForm.ParentStableKey">
                                         <option value="">—</option>
                                         @foreach (var package in lines.Where(l => l.Role != "PackageChild" && l.Id != lineForm.Id))
@@ -295,32 +295,32 @@
                             {
                                 <div class="form-check">
                                     <input id="l-sel" type="checkbox" class="form-check-input" @bind="lineForm.IsSelected" />
-                                    <label class="form-check-label" for="l-sel">Seçili (ana toplama dahil)</label>
+                                    <label class="form-check-label" for="l-sel">@Texts.Get("crm.quoteDetail.line.selected")</label>
                                 </div>
                             }
                         </div>
                         </TabPanel>
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">Kalemi kaydet</button>
-                            <button type="button" class="btn btn-outline-secondary" @onclick="CancelLine">Vazgeç</button>
+                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.quoteDetail.line.save")</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CancelLine">@Texts.Get("common.dismiss")</button>
                         </div>
                     </form>
                 }
 
                 @if (lines.Count == 0)
                 {
-                    <p class="text-muted">Henüz kalem yok. Onaya göndermek ya da sunmak için en az bir kalem ekleyin.</p>
+                    <EmptyState Title="@Texts.Get("crm.quoteDetail.noLines")" />
                 }
                 else
                 {
                     <table class="table record-table">
-                        <caption class="visually-hidden">Teklif kalemleri</caption>
+                        <caption class="visually-hidden">@Texts.Get("crm.quoteDetail.linesCaption")</caption>
                         <thead>
                             <tr>
-                                <th scope="col">#</th><th scope="col">Kalem</th><th scope="col" class="text-end">Miktar</th><th scope="col" class="text-end">Birim fiyat</th>
-                                <th scope="col" class="text-end">İndirim</th><th scope="col" class="text-end">Vergi %</th><th scope="col" class="text-end">Net</th>
-                                <th scope="col" class="text-end">Toplam</th>
-                                @if (ShowCost) { <th scope="col" class="text-end">Maliyet</th> }
+                                <th scope="col">#</th><th scope="col">@Texts.Get("crm.quoteDetail.col.line")</th><th scope="col" class="text-end">@Texts.Get("crm.quoteDetail.col.quantity")</th><th scope="col" class="text-end">@Texts.Get("crm.quoteDetail.col.unitPrice")</th>
+                                <th scope="col" class="text-end">@Texts.Get("crm.quoteDetail.line.discount")</th><th scope="col" class="text-end">@Texts.Get("crm.quoteDetail.col.tax")</th><th scope="col" class="text-end">@Texts.Get("crm.quoteDetail.col.net")</th>
+                                <th scope="col" class="text-end">@Texts.Get("crm.quotes.col.total")</th>
+                                @if (ShowCost) { <th scope="col" class="text-end">@Texts.Get("crm.quoteDetail.col.cost")</th> }
                                 <th scope="col"></th>
                             </tr>
                         </thead>
@@ -329,30 +329,30 @@
                             {
                                 <tr class="@(line.Included ? null : "text-muted")">
                                     <td data-label="#">@line.Position</td>
-                                    <td data-label="Kalem" class="primary">
+                                    <td data-label="@Texts.Get("crm.quoteDetail.col.line")" class="primary">
                                         @if (line.Role == "PackageChild") { <span aria-hidden="true">↳ </span> }
                                         @line.Name
                                         @if (!string.IsNullOrWhiteSpace(line.ProductCode)) { <small class="text-muted">@line.ProductCode</small> }
                                         @if (line.Role != "Standard" && line.Role != "PackageChild")
                                         {
-                                            <span class="badge stage-onhold">@QuoteLabels.Label(QuoteLabels.Roles, line.Role)@(line.Included ? " · seçili" : " · ana toplamda değil")</span>
+                                            <span class="badge stage-onhold">@QuoteLabels.Label(QuoteLabels.Roles, line.Role) · @(line.Included ? Texts.Get("crm.quoteDetail.selectedBadge") : Texts.Get("crm.quoteDetail.notInTotalBadge"))</span>
                                         }
-                                        @if (line.Role == "PackageChild") { <span class="badge stage-open">Paket bileşeni (bilgi, toplamda yok)</span> }
+                                        @if (line.Role == "PackageChild") { <span class="badge stage-open">@Texts.Get("crm.quoteDetail.packageChildBadge")</span> }
                                         @if (!string.IsNullOrEmpty(line.RecurringPeriod)) { <span class="badge stage-qualified">@QuoteLabels.Label(QuoteLabels.Periods, line.RecurringPeriod)</span> }
                                         @if (!string.IsNullOrWhiteSpace(line.Description)) { <div class="small text-muted">@line.Description</div> }
                                     </td>
-                                    <td data-label="Miktar" class="text-end">@line.Quantity.ToString("0.######")@(string.IsNullOrWhiteSpace(line.UnitName) ? null : " " + line.UnitName)</td>
-                                    <td data-label="Birim fiyat" class="text-end">@line.UnitPrice.ToString("N2")</td>
-                                    <td data-label="İndirim" class="text-end">@((line.LineDiscount + line.DocumentDiscountShare).ToString("N2"))</td>
-                                    <td data-label="Vergi %" class="text-end">@line.TaxRatePercent.ToString("0.##")</td>
-                                    <td data-label="Net" class="text-end">@(line.Role == "PackageChild" ? "—" : line.Net.ToString("N2"))</td>
-                                    <td data-label="Toplam" class="text-end">@(line.Role == "PackageChild" ? "—" : line.Gross.ToString("N2"))</td>
-                                    @if (ShowCost) { <td data-label="Maliyet" class="text-end">@(line.UnitCost is { } cost ? cost.ToString("N2") : "—")</td> }
+                                    <td data-label="@Texts.Get("crm.quoteDetail.col.quantity")" class="text-end">@line.Quantity.ToString("0.######")@(string.IsNullOrWhiteSpace(line.UnitName) ? null : " " + line.UnitName)</td>
+                                    <td data-label="@Texts.Get("crm.quoteDetail.col.unitPrice")" class="text-end">@line.UnitPrice.ToString("N2")</td>
+                                    <td data-label="@Texts.Get("crm.quoteDetail.line.discount")" class="text-end">@((line.LineDiscount + line.DocumentDiscountShare).ToString("N2"))</td>
+                                    <td data-label="@Texts.Get("crm.quoteDetail.col.tax")" class="text-end">@line.TaxRatePercent.ToString("0.##")</td>
+                                    <td data-label="@Texts.Get("crm.quoteDetail.col.net")" class="text-end">@(line.Role == "PackageChild" ? "—" : line.Net.ToString("N2"))</td>
+                                    <td data-label="@Texts.Get("crm.quotes.col.total")" class="text-end">@(line.Role == "PackageChild" ? "—" : line.Gross.ToString("N2"))</td>
+                                    @if (ShowCost) { <td data-label="@Texts.Get("crm.quoteDetail.col.cost")" class="text-end">@(line.UnitCost is { } cost ? cost.ToString("N2") : "—")</td> }
                                     <td class="actions">
                                         @if (Draft && Session.Can(CrmAccess.QuotesWrite))
                                         {
-                                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditLine(line)" aria-label="@line.Name kalemini düzenle">Düzenle</button>
-                                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => DeleteLineAsync(line)" aria-label="@line.Name kalemini sil">Sil</button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditLine(line)" aria-label="@Texts.Get("crm.quoteDetail.editLineOf", line.Name)">@Texts.Get("common.edit")</button>
+                                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => DeleteLineAsync(line)" aria-label="@Texts.Get("crm.quoteDetail.deleteLineOf", line.Name)">@Texts.Get("common.delete")</button>
                                         }
                                     </td>
                                 </tr>
@@ -363,30 +363,30 @@
             </section>
 
             <section aria-labelledby="totals-title" class="quote-totals">
-                <h2 id="totals-title">Tutar ve vergi özeti <small class="text-muted">(@quote.Currency · sunucu hesabı)</small></h2>
+                <h2 id="totals-title">@Texts.Get("crm.quoteDetail.totals.title") <small class="text-muted">@Texts.Get("crm.quoteDetail.totals.note", quote.Currency)</small></h2>
                 <dl class="summary-list">
-                    <div><dt>Liste toplamı</dt><dd>@QuoteLabels.Money(quote.ListTotal, quote.Currency)</dd></div>
-                    <div><dt>İndirimler</dt><dd>@QuoteLabels.Money(quote.DiscountTotal, quote.Currency)</dd></div>
-                    <div><dt>Net (matrah)</dt><dd>@QuoteLabels.Money(quote.NetTotal, quote.Currency)</dd></div>
-                    <div><dt>Vergi</dt><dd>@QuoteLabels.Money(quote.TaxTotal, quote.Currency)</dd></div>
-                    <div><dt><strong>Genel toplam (tek seferlik)</strong></dt><dd><strong>@QuoteLabels.Money(quote.GrossTotal, quote.Currency)</strong></dd></div>
+                    <div><dt>@Texts.Get("crm.quoteDetail.totals.list")</dt><dd>@QuoteLabels.Money(quote.ListTotal, quote.Currency)</dd></div>
+                    <div><dt>@Texts.Get("crm.quoteDetail.totals.discounts")</dt><dd>@QuoteLabels.Money(quote.DiscountTotal, quote.Currency)</dd></div>
+                    <div><dt>@Texts.Get("crm.quoteDetail.totals.net")</dt><dd>@QuoteLabels.Money(quote.NetTotal, quote.Currency)</dd></div>
+                    <div><dt>@Texts.Get("crm.quoteDetail.totals.tax")</dt><dd>@QuoteLabels.Money(quote.TaxTotal, quote.Currency)</dd></div>
+                    <div><dt><strong>@Texts.Get("crm.quoteDetail.totals.gross")</strong></dt><dd><strong>@QuoteLabels.Money(quote.GrossTotal, quote.Currency)</strong></dd></div>
                     @if (quote.OptionalNet > 0)
                     {
-                        <div><dt>Opsiyonel/alternatif (ana toplamdan ayrı, net)</dt><dd>@QuoteLabels.Money(quote.OptionalNet, quote.Currency)</dd></div>
+                        <div><dt>@Texts.Get("crm.quoteDetail.totals.optional")</dt><dd>@QuoteLabels.Money(quote.OptionalNet, quote.Currency)</dd></div>
                     }
                     @foreach (var period in Recurring())
                     {
-                        <div><dt>Tekrarlayan · @QuoteLabels.Label(QuoteLabels.Periods, period.Period) (sözleşme süresi olmadan toplam hesaplanmaz)</dt><dd>@QuoteLabels.Money(period.Gross, quote.Currency)</dd></div>
+                        <div><dt>@Texts.Get("crm.quoteDetail.totals.recurring", QuoteLabels.Label(QuoteLabels.Periods, period.Period))</dt><dd>@QuoteLabels.Money(period.Gross, quote.Currency)</dd></div>
                     }
                 </dl>
-                @if (quote.CalculatedAt is { } calculated) { <small class="text-muted">Son hesap: @CrmLabels.Time(calculated)</small> }
+                @if (quote.CalculatedAt is { } calculated) { <small class="text-muted">@Texts.Get("crm.quoteDetail.totals.calculatedAt", CrmLabels.Time(calculated))</small> }
             </section>
 
             @* Hizmet kapsamı (ADR-0029 Dilim F3): sunum anında bağlı fırsattan, adlarıyla sabitlenir; sonradan fırsat ya da katalog değişse de aynı kalır. *@
             @if (quote.ServiceScopeSnapshot is { Count: > 0 } scopeSnapshot)
             {
                 <section aria-labelledby="scope-title">
-                    <h2 id="scope-title">Hizmet kapsamı <small class="text-muted">(sunum anında fırsattan sabitlendi)</small></h2>
+                    <h2 id="scope-title">@Texts.Get("crm.quoteDetail.scope.title") <small class="text-muted">@Texts.Get("crm.quoteDetail.scope.note")</small></h2>
                     <p>
                         @foreach (var item in scopeSnapshot)
                         {
@@ -397,11 +397,11 @@
             }
 
             <section aria-labelledby="actions-title">
-                <h2 id="actions-title">İşlemler</h2>
+                <h2 id="actions-title">@Texts.Get("crm.quoteDetail.actions.title")</h2>
                 @if (requirement is { Required: true })
                 {
                     <div class="alert alert-info" role="status">
-                        <strong>Bu teklif müşteriye sunulmadan önce iç onay gerektiriyor.</strong>
+                        <strong>@Texts.Get("crm.quoteDetail.approvalRequired")</strong>
                         <ul class="mb-0">
                             @foreach (var match in requirement.Matches)
                             {
@@ -411,7 +411,7 @@
                         </ul>
                         @if (requirement.Steps.Count > 1)
                         {
-                            <div class="small">Onay adımları: @string.Join(" → ", requirement.Steps.Select(s => $"{s.Step}. {(s.Approvers.Count == 0 ? "herkes" : string.Join("/", s.Approvers.Select(a => Lookups.MemberName(a))))}{(s.Completed ? " ✓" : string.Empty)}"))</div>
+                            <div class="small">@Texts.Get("crm.quoteDetail.approvalSteps", string.Join(" → ", requirement.Steps.Select(s => $"{s.Step}. {(s.Approvers.Count == 0 ? Texts.Get("crm.quoteDetail.anyone") : string.Join("/", s.Approvers.Select(a => Lookups.MemberName(a))))}{(s.Completed ? " ✓" : string.Empty)}")))</div>
                         }
                         @if (requirement.Note is not null) { <div class="small">@requirement.Note</div> }
                     </div>
@@ -419,15 +419,15 @@
                 @if (reasonAction is not null)
                 {
                     <form class="record-form" novalidate @onsubmit="ConfirmReasonAsync" @onsubmit:preventDefault>
-                        <label class="form-label" for="reason">@(reasonAction == "revise" ? "Revizyon oluştur" : QuoteLabels.Action(reasonAction)) için gerekçe *</label>
+                        <label class="form-label" for="reason">@Texts.Get("crm.quoteDetail.reasonFor", reasonAction == "revise" ? Texts.Get("crm.quoteDetail.revise") : QuoteLabels.Action(reasonAction))</label>
                         <textarea id="reason" class="form-control" rows="2" maxlength="500" @bind="reasonText"></textarea>
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">Onayla</button>
-                            <button type="button" class="btn btn-outline-secondary" @onclick="() => reasonAction = null">Vazgeç</button>
+                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.quoteDetail.confirm")</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => reasonAction = null">@Texts.Get("common.dismiss")</button>
                         </div>
                     </form>
                 }
-                <div class="header-actions" role="group" aria-label="Teklif işlemleri">
+                <div class="header-actions" role="group" aria-label="@Texts.Get("crm.quoteDetail.actions.label")">
                     @foreach (var action in actions.Where(a => a.Allowed))
                     {
                         <button type="button" class="btn @(action.Action is "present" or "approve" ? "btn-primary" : "btn-outline-secondary")" disabled="@busy"
@@ -435,11 +435,11 @@
                     }
                     @if (Session.Can(CrmAccess.QuotesWrite) && CanRevise)
                     {
-                        <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="StartRevise">Revizyon oluştur</button>
+                        <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="StartRevise">@Texts.Get("crm.quoteDetail.revise")</button>
                     }
                     @if (Session.Can(CrmAccess.QuotesWrite))
                     {
-                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="DuplicateAsync">Çoğalt (yeni teklif)</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="DuplicateAsync">@Texts.Get("crm.quoteDetail.duplicate")</button>
                     }
                 </div>
                 @if (actions.Any(a => !a.Allowed))
@@ -461,25 +461,25 @@
             @if (quote.Status == "Accepted" && Session.IsModuleEnabled(ContractsAccess.ModuleKey) && Session.Can(ContractsAccess.ContractsWrite) && Session.Can(ContractsAccess.FinancialsRead))
             {
                 <section aria-labelledby="quote-contract-title">
-                    <h2 id="quote-contract-title">Sözleşme</h2>
-                    <p class="text-muted">Kabul edilen bu teklif revizyonundan sözleşme taslağı oluşturabilirsiniz; fiyatlar teklifin kabul anındaki halidir ve teklif sonradan değişse de sözleşmeyi etkilemez.</p>
-                    <a class="btn btn-primary" href="sozlesmeler/tekliften/@quote.Id">Sözleşme oluştur</a>
+                    <h2 id="quote-contract-title">@Texts.Get("crm.quoteDetail.contract.title")</h2>
+                    <p class="text-muted">@Texts.Get("crm.quoteDetail.contract.note")</p>
+                    <a class="btn btn-primary" href="sozlesmeler/tekliften/@quote.Id">@Texts.Get("crm.quoteDetail.contract.create")</a>
                 </section>
             }
 
             @if (quote.Status == "Accepted" && Session.IsModuleEnabled(OrdersAccess.ModuleKey) && Session.Can(OrdersAccess.OrdersCreate) && Session.Can(OrdersAccess.FinancialsRead))
             {
                 <section aria-labelledby="quote-order-title">
-                    <h2 id="quote-order-title">Sipariş</h2>
-                    <p class="text-muted">Müşterinin kabul ettiği bu teklif revizyonundan sipariş oluşturabilirsiniz; fiyatlar ve koşullar kabul anındaki halidir. Bir teklif kalemi, kabul edilen miktarın üzerinde siparişe alınamaz.</p>
-                    <a class="btn btn-primary" href="siparisler/tekliften/@quote.Id">Sipariş oluştur</a>
+                    <h2 id="quote-order-title">@Texts.Get("crm.quoteDetail.order.title")</h2>
+                    <p class="text-muted">@Texts.Get("crm.quoteDetail.order.note")</p>
+                    <a class="btn btn-primary" href="siparisler/tekliften/@quote.Id">@Texts.Get("crm.quoteDetail.order.create")</a>
                 </section>
             }
 
             @if (family.Count > 1)
             {
                 <section aria-labelledby="rev-title">
-                    <h2 id="rev-title">Revizyonlar</h2>
+                    <h2 id="rev-title">@Texts.Get("crm.quoteDetail.revisions")</h2>
                     <ul>
                         @foreach (var revision in family.OrderByDescending(r => r.RevisionNo))
                         {
@@ -487,8 +487,8 @@
                                 <a href="crm/teklifler/@revision.Id">V@(revision.RevisionNo)</a>
                                 — <span class="badge stage-@QuoteLabels.StatusBadge(revision.Status)">@QuoteLabels.Label(QuoteLabels.Statuses, revision.Status)</span>
                                 @QuoteLabels.Money(revision.GrossTotal, revision.Currency)
-                                @if (revision.Id == quote.Id) { <text>(bu sayfa)</text> }
-                                else { <a href="crm/teklifler/@quote.Id/karsilastir?with=@revision.Id">Bununla karşılaştır</a> }
+                                @if (revision.Id == quote.Id) { <text>@Texts.Get("crm.quoteDetail.thisPage")</text> }
+                                else { <a href="crm/teklifler/@quote.Id/karsilastir?with=@revision.Id">@Texts.Get("crm.quoteDetail.compareWith")</a> }
                             </li>
                         }
                     </ul>
@@ -496,10 +496,10 @@
             }
 
             <section aria-labelledby="hist-title">
-                <h2 id="hist-title">Geçmiş</h2>
+                <h2 id="hist-title">@Texts.Get("common.history.tab")</h2>
                 @if (history.Count == 0)
                 {
-                    <p class="text-muted">Kayıt yok.</p>
+                    <p class="text-muted">@Texts.Get("common.noRecords")</p>
                 }
                 else
                 {
@@ -541,16 +541,16 @@
 
     private IReadOnlyList<TabItem> HeaderTabs =>
     [
-        new("form-genel", "Genel", Errors: ErrorCount(errors, "title", "companyId", "contactId", "opportunityId")),
-        new("form-fiyat", "Fiyat ve indirim", Errors: ErrorCount(errors, "priceListId", "currency", "validUntil", "priceIncludesTax", "documentDiscountValue")),
-        new("form-kosul", "Koşullar ve notlar", Errors: ErrorCount(errors, "paymentTerms", "deliveryTerms", "commercialTerms", "internalNotes")),
+        new("form-genel", Texts.Get("crm.quoteDetail.tab.general"), Errors: ErrorCount(errors, "title", "companyId", "contactId", "opportunityId")),
+        new("form-fiyat", Texts.Get("crm.quoteDetail.tab.pricing"), Errors: ErrorCount(errors, "priceListId", "currency", "validUntil", "priceIncludesTax", "documentDiscountValue")),
+        new("form-kosul", Texts.Get("crm.quoteDetail.tab.terms"), Errors: ErrorCount(errors, "paymentTerms", "deliveryTerms", "commercialTerms", "internalNotes")),
     ];
 
     private IReadOnlyList<TabItem> LineTabs =>
     [
-        new("line-kalem", "Kalem", Errors: ErrorCount(lineErrors, "kind", "productId", "name", "quantity", "unitPrice", "description")),
-        new("line-vergi", "Vergi ve indirim", Errors: ErrorCount(lineErrors, "taxRatePercent", "discountValue", "recurringPeriod")),
-        new("line-rol", "Paket ve rol", Errors: ErrorCount(lineErrors, "parentStableKey")),
+        new("line-kalem", Texts.Get("crm.quoteDetail.col.line"), Errors: ErrorCount(lineErrors, "kind", "productId", "name", "quantity", "unitPrice", "description")),
+        new("line-vergi", Texts.Get("crm.quoteDetail.tab.lineTax"), Errors: ErrorCount(lineErrors, "taxRatePercent", "discountValue", "recurringPeriod")),
+        new("line-rol", Texts.Get("crm.quoteDetail.tab.lineRole"), Errors: ErrorCount(lineErrors, "parentStableKey")),
     ];
     private IReadOnlyDictionary<string, string[]>? errors;
     private IReadOnlyDictionary<string, string[]>? lineErrors;
@@ -618,7 +618,7 @@
 
     private async Task ConfirmLeaveAsync(LocationChangingContext context)
     {
-        if ((dirty || lineDirty) && !await Js.InvokeAsync<bool>("confirm", "Kaydedilmemiş değişiklikler var. Sayfadan ayrılmak istiyor musunuz?"))
+        if ((dirty || lineDirty) && !await Js.InvokeAsync<bool>("confirm", Texts.Get("crm.quoteDetail.leaveConfirm")))
         {
             context.PreventNavigation();
         }
@@ -642,7 +642,7 @@
         {
             errors = result.FieldErrors;
             headerTabs.RevealFirstFailing(HeaderTabs);
-            Notify(result.Status == System.Net.HttpStatusCode.Conflict ? $"{result.Error} Sayfayı yenileyip tekrar deneyin." : result.Error, failed: true);
+            Notify(result.Status == System.Net.HttpStatusCode.Conflict ? Texts.Get("crm.quoteDetail.conflictRetry", result.Error) : result.Error, failed: true);
             return;
         }
 
@@ -655,7 +655,7 @@
         }
 
         quote = result.Value;
-        Notify("Taslak kaydedildi. Toplamlar sunucuda yeniden hesaplandı.");
+        Notify(Texts.Get("crm.quoteDetail.draftSaved"));
         await LoadAsync(quote!.Id);
     }
 
@@ -706,7 +706,7 @@
 
         lineForm = null;
         lineDirty = false;
-        Notify("Kalem kaydedildi; toplamlar yeniden hesaplandı.");
+        Notify(Texts.Get("crm.quoteDetail.lineSaved"));
         await LoadAsync(quote.Id);
     }
 
@@ -716,7 +716,7 @@
         busy = true;
         var result = await Api.DeleteAsync($"/api/crm/quote-lines/{line.Id}?version={line.Version}");
         busy = false;
-        Notify(result.IsSuccess ? "Kalem silindi." : result.Error, failed: !result.IsSuccess);
+        Notify(result.IsSuccess ? Texts.Get("crm.quoteDetail.lineDeleted") : result.Error, failed: !result.IsSuccess);
         await LoadAsync(quote.Id);
     }
 
@@ -736,7 +736,7 @@
     {
         if (string.IsNullOrWhiteSpace(reasonText))
         {
-            Notify("Gerekçe zorunludur.", failed: true);
+            Notify(Texts.Get("crm.quoteDetail.reasonRequired"), failed: true);
             return;
         }
 
@@ -759,12 +759,12 @@
         busy = false;
         if (result.IsSuccess)
         {
-            Notify($"{QuoteLabels.Action(action)}: tamamlandı.");
+            Notify(Texts.Get("crm.quoteApprovals.done", QuoteLabels.Action(action)));
         }
         else
         {
             Notify(result.Status == System.Net.HttpStatusCode.Conflict
-                ? $"{result.Error} Kayıt başka biri tarafından değişmiş olabilir; güncel hali yüklendi."
+                ? Texts.Get("crm.quoteDetail.conflictReloaded", result.Error)
                 : result.Error, failed: true);
         }
 

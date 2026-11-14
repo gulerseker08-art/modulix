@@ -1,0 +1,161 @@
+@* Anket sorusu formu (ADR-0042 dilim 7). Düzen firmanın form düzenine (ADR-0021) göre çizilir. Soru yalnızca taslak ankette eklenir ve değişir
+   (sunucu denetler). Tek seçim sorusunda seçenekler satır başına bir tanedir (2–20). *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+@inject ToastService Toasts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Question is null ? "Yeni soru" : "Soru")</h2>
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Soru bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
+            {
+                case "text":
+                    <label class="@f.LabelClass()" for="question-text">@f.Label</label>
+                    <input id="question-text" class="form-control" maxlength="500" required aria-required="true" placeholder="ör. İş yükünüzden ne kadar memnunsunuz?" @bind="form.Text" />
+                    <FieldError Field="text" Errors="errors" />
+                    break;
+                case "sequence":
+                    <label class="@f.LabelClass()" for="question-sequence">@f.Label</label>
+                    <input id="question-sequence" class="form-control" type="number" min="1" max="10000" placeholder="Son sorudan sonra" @bind="form.Sequence" />
+                    <FieldError Field="sequence" Errors="errors" />
+                    break;
+                case "isRequired":
+                    <div class="form-check mt-4">
+                        <input id="question-required" class="form-check-input" type="checkbox" @bind="form.IsRequired" />
+                        <label class="form-check-label" for="question-required">@f.Label</label>
+                    </div>
+                    break;
+                case "questionType":
+                    <label class="@f.LabelClass()" for="question-type">@f.Label</label>
+                    <select id="question-type" class="form-select" @bind="form.QuestionType">
+                        @foreach (var (key, label) in HrAccess.QuestionTypes)
+                        {
+                            <option value="@key">@label</option>
+                        }
+                    </select>
+                    <FieldError Field="questionType" Errors="errors" />
+                    break;
+                case "options":
+                    <label class="@f.LabelClass()" for="question-options">@f.Label</label>
+                    <textarea id="question-options" class="form-control" rows="5" maxlength="2000" disabled="@(form.QuestionType != "choice")"
+                              placeholder="@("Evet\nKısmen\nHayır")" @bind="form.Options"></textarea>
+                    <FieldError Field="options" Errors="errors" />
+                    <small class="text-muted">Yalnızca tek seçim sorusunda kullanılır.</small>
+                    break;
+            }
+        </Field>
+    </LayoutForm>
+</form>
+
+@code {
+    private const string EntityKey = HrAccess.SurveyQuestionEntityKey;
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private QuestionForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    [Parameter, EditorRequired] public Guid SurveyId { get; set; }
+
+    [Parameter] public RecordResponse? Question { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        form = Question is { } q
+            ? new QuestionForm
+            {
+                Id = q.Id, Version = q.Version, Text = WarehouseLabels.Text(q, "text"), Sequence = WarehouseLabels.Number(q, "sequence"),
+                QuestionType = WarehouseLabels.Text(q, "questionType") ?? "rating", Options = WarehouseLabels.Text(q, "options"),
+                IsRequired = WarehouseLabels.Flag(q, "isRequired"), Custom = q.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new QuestionForm();
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var values = new JsonObject
+        {
+            ["text"] = string.IsNullOrWhiteSpace(form.Text) ? null : form.Text.Trim(),
+            ["sequence"] = form.Sequence,
+            ["questionType"] = form.QuestionType,
+            ["options"] = form.QuestionType == "choice" && !string.IsNullOrWhiteSpace(form.Options) ? form.Options.Trim() : null,
+            ["isRequired"] = form.IsRequired,
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        };
+        if (form.Id is null)
+        {
+            values["surveyId"] = SurveyId.ToString();
+        }
+
+        var request = new RecordWriteRequest(values, form.Version);
+        var url = "/api/records/" + EntityKey;
+        var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{url}/{id}", request) : await Api.PostAsync<RecordResponse>(url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            Toasts.Success(Texts.Get("common.saved"));
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class QuestionForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string? Text { get; set; }
+
+        public int? Sequence { get; set; }
+
+        public string QuestionType { get; set; } = "rating";
+
+        public string? Options { get; set; }
+
+        public bool IsRequired { get; set; } = true;
+    }
+}

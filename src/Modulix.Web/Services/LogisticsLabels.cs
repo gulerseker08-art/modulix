@@ -50,8 +50,16 @@ public static class LogisticsLabels
         _ => "status-inactive",
     };
 
-    /// <summary>Güzergâh: "İstanbul → Ankara".</summary>
-    public static string Route(RecordResponse record) => $"{WarehouseLabels.Text(record, "pickupCity")} → {WarehouseLabels.Text(record, "deliveryCity")}";
+    /// <summary>Güzergâh: "İstanbul → Ankara"; Türkiye dışındaki uç ülke koduyla yazılır: "Hamburg (DE) → İstanbul" (ADR-0043).</summary>
+    public static string Route(RecordResponse record) => $"{Place(record, "pickupCity", "pickupCountry")} → {Place(record, "deliveryCity", "deliveryCountry")}";
+
+    private static string Place(RecordResponse record, string cityField, string countryField)
+    {
+        var city = WarehouseLabels.Text(record, cityField);
+        var country = WarehouseLabels.Text(record, countryField);
+        return country.Length == 0 || country == CountryCatalog.DefaultCode ? city : $"{city} ({country})";
+    }
+
     public static string DriverType(string? key) => LogisticsAccess.DriverTypes.FirstOrDefault(t => t.Key == key).Label ?? key ?? string.Empty;
 
     public static string DeliveryOutcome(string? key) => LogisticsAccess.DeliveryOutcomes.FirstOrDefault(o => o.Key == key).Label ?? key ?? string.Empty;

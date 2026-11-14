@@ -15,11 +15,11 @@
 
     @if (items is null)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (items.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("crm.quoteApprovals.empty")</p>
+        <EmptyState Title="@Texts.Get("crm.quoteApprovals.empty")" />
     }
     else
     {

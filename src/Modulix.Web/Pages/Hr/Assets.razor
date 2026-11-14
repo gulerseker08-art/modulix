@@ -1,0 +1,306 @@
+@page "/ik/demirbaslar"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Demirbaşlar · Modulix</PageTitle>
+
+@* Demirbaşlar (ADR-0042 dilim 4): envanter, durum ve şu anki zimmetli çalışan; kart açılınca zimmet geçmişi, zimmetleme, iade ve tutanak.
+   "Kendi" kapsamındaki kullanıcı yalnızca üzerindeki demirbaşları görür (sunucuda). *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.AssetsRead">
+    <PageHeader Title="Demirbaşlar" Icon="package" Subtitle="@(page is null ? "Demirbaşları, zimmetleri ve iadeleri yönetin." : $"{page.TotalCount} kayıt")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <AssetEditor Asset="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
+        @if (selected is not null)
+        {
+            @if (assigning)
+            {
+                <AssetAssignmentEditor AssetId="selected.Id" AssetLabel="@($"{WarehouseLabels.Text(selected, "assetTag")} · {WarehouseLabels.Text(selected, "name")}")"
+                                       Lookups="Lookups" Saved="AssignedAsync" Cancelled="() => assigning = false" />
+            }
+            <AssetAssignmentList @ref="history" Title="Zimmet geçmişi" EmptyText="Bu demirbaş hiç zimmetlenmedi." Query="@($"assetId={selected.Id}")" ShowAsset="false" Changed="AssignmentChangedAsync">
+                <AddButton>
+                    @if (Session.Can(HrAccess.AssetsManage) && WarehouseLabels.Text(selected, "status") == "inStock" && !assigning)
+                    {
+                        <button type="button" class="btn btn-tonal" @onclick="() => assigning = true"><AppIcon Name="user-check" Size="16" /> Zimmetle</button>
+                    }
+                </AddButton>
+            </AssetAssignmentList>
+        }
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Demirbaş görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Demirbaş ara" placeholder="Envanter no, ad, seri no, marka veya model ara" @bind="search" />
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="@(string.IsNullOrEmpty(categoryKey) ? 0 : 1)" />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(HrAccess.AssetsManage) && !editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni demirbaş</button>
+        }
+    </div>
+
+    @if (filtersOpen || !string.IsNullOrEmpty(categoryKey))
+    {
+        <div class="filters">
+            <select class="form-select" aria-label="Kategori" @bind="categoryKey" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm kategoriler</option>
+                @foreach (var category in Lookups.ValuesOf(HrAccess.AssetCategoryList))
+                {
+                    <option value="@category.Key">@category.Label</option>
+                }
+            </select>
+        </div>
+    }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan demirbaş yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) demirbaş listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Demirbaşlar</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var asset in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, asset)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(asset, "assetTag")} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(asset)"><AppIcon Name="@(Session.Can(HrAccess.AssetsManage) ? "pencil" : "eye")" Size="16" /> <span>@(Session.Can(HrAccess.AssetsManage) ? "Düzenle ve zimmetle" : "Aç")</span></button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + HrAccess.AssetEntityKey;
+
+    private const string AllViews = "all";
+
+    // Sıralama anahtarları kayıt deposunun beyanıdır (AssetRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("assetTag", "Envanter no", "hash", "assetTag", "-assetTag", Locked: true),
+        new("name", "Ad", "package", "name", "-name"),
+        new("category", "Kategori", "tag", "categoryKey", "-categoryKey"),
+        new("serial", "Seri no", "type", DefaultVisible: false),
+        new("holder", "Zimmetli", "user"),
+        new("purchaseDate", "Alış tarihi", "calendar", "purchaseDate", "-purchaseDate", DefaultVisible: false),
+        new("status", "Durum", "check-circle", "status", "-status"),
+    ];
+
+    private readonly GridViewState grid = new("hr.assets", "assetTag");
+    private PersonalGridViews views = default!;
+    private AssetAssignmentList? history;
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private bool assigning;
+    private bool filtersOpen;
+    private string? message;
+    private string? search;
+    private string view = AllViews;
+    private string? status;
+    private string? categoryKey;
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, "hr.assets");
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.AssetsRead))
+        {
+            await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(HrAccess.AssetEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(AllViews, "Tüm demirbaşlar", Icon: "list"),
+        new("inStock", "Depoda", Icon: "package"),
+        new("assigned", "Zimmetli", Icon: "user-check"),
+        new("maintenance", "Bakımda", Icon: "wrench"),
+        new("retired,lost", "Hurda ve kayıp", Icon: "x"),
+        .. views.Options,
+    ];
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            status = filters.GetValueOrDefault("status");
+            categoryKey = filters.GetValueOrDefault("categoryKey");
+        }
+        else
+        {
+            grid.Reset();
+            status = key == AllViews ? null : key;
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(
+        status is { } s ? ("status", s) : null,
+        string.IsNullOrEmpty(categoryKey) ? null : ("categoryKey", categoryKey));
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (status is { } s)
+        {
+            url += $"&status={s}";
+        }
+
+        if (!string.IsNullOrEmpty(categoryKey))
+        {
+            url += $"&categoryKey={Uri.EscapeDataString(categoryKey)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse asset) => @<td data-label="@column.Label" class="@(column.Key == "assetTag" ? "primary" : null)">@CellContent(column.Key, asset)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse asset) => key switch
+    {
+        "assetTag" => @<text>@WarehouseLabels.Text(asset, "assetTag")</text>,
+        "name" => @<text>@WarehouseLabels.Text(asset, "name")</text>,
+        "category" => @<text>@Lookups.Label(HrAccess.AssetCategoryList, WarehouseLabels.Text(asset, "categoryKey"))</text>,
+        "serial" => @<text>@(WarehouseLabels.Text(asset, "serialNumber") is { Length: > 0 } serial ? serial : "—")</text>,
+        "holder" => @<text>@(WarehouseLabels.Text(asset, "currentEmployeeName") is { Length: > 0 } holder ? holder : "—")</text>,
+        "purchaseDate" => @<text>@HrLabels.Date(WarehouseLabels.Text(asset, "purchaseDate"))</text>,
+        "status" => @<span class="badge @HrLabels.AssetStatusBadge(WarehouseLabels.Text(asset, "status"))">@HrLabels.AssetStatus(WarehouseLabels.Text(asset, "status"))</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.AssetEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, asset.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private void Open(RecordResponse? asset)
+    {
+        selected = asset;
+        editing = true;
+        assigning = false;
+        message = null;
+    }
+
+    private void Close() => editing = false;
+
+    private async Task SavedAsync(RecordResponse saved)
+    {
+        selected = saved;
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private async Task AssignedAsync()
+    {
+        assigning = false;
+        await RefreshSelectedAsync();
+        if (history is not null)
+        {
+            await history.ReloadAsync();
+        }
+    }
+
+    private async Task AssignmentChangedAsync() => await RefreshSelectedAsync();
+
+    /// <summary>Zimmet değişince demirbaşın durumu ve sürümü sunucudan yeniden okunur.</summary>
+    private async Task RefreshSelectedAsync()
+    {
+        if (selected is not null && (await Api.GetAsync<RecordResponse>($"{Url}/{selected.Id}")).Value is { } fresh)
+        {
+            selected = fresh;
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

@@ -1,0 +1,393 @@
+@page "/ik/anket-yonetimi"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Anket yönetimi · Modulix</PageTitle>
+
+@* Anket yönetimi (ADR-0042 dilim 7): anket hazırlama (sekmeli form), sorular (yalnızca taslakta), yanıta açma ve kapatma (sunucudan gelen eylemler) ve
+   özet sonuçlar. Yanıtlayanlar çalışanların "Anketler" ekranından yanıtlar. *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.SurveysManage">
+    <PageHeader Title="Anket yönetimi" Icon="clipboard-list" Subtitle="@(page is null ? "Anket hazırlayın, yanıta açın ve sonuçları izleyin." : $"{page.TotalCount} anket")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <SurveyEditor @key="selected?.Id" Survey="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
+        @if (selected is not null)
+        {
+            <LeaveActionsBar Record="selected" BaseUrl="/api/hr/surveys" Changed="ChangedAsync" />
+
+            <section aria-label="Sorular">
+                <div class="list-toolbar mt-3">
+                    <h3 class="h6 mb-0 me-auto">Sorular</h3>
+                    @if (IsDraft && question is null && !addingQuestion)
+                    {
+                        <button type="button" class="btn btn-tonal" @onclick="() => addingQuestion = true"><AppIcon Name="plus" Size="16" /> Soru ekle</button>
+                    }
+                </div>
+                @if (!IsDraft)
+                {
+                    <p class="text-muted">Yanıta açılmış anketin soruları değiştirilmez.</p>
+                }
+                @if (addingQuestion || question is not null)
+                {
+                    <SurveyQuestionEditor @key="question?.Id" SurveyId="selected.Id" Question="question" Lookups="Lookups" Saved="QuestionSavedAsync"
+                                          Cancelled="() => { question = null; addingQuestion = false; }" />
+                }
+                @if (questions is null)
+                {
+                    <LoadingState Kind="LoadingKind.Table" />
+                }
+                else if (questions.Count == 0)
+                {
+                    <p class="text-muted" role="status">Henüz soru yok. Yanıta açmadan önce en az bir soru ekleyin.</p>
+                }
+                else
+                {
+                    <table class="table record-table">
+                        <caption class="visually-hidden">Anket soruları</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col"><AppIcon Name="hash" Size="14" /> Sıra</th>
+                                <th scope="col"><AppIcon Name="message-square" Size="14" /> Soru</th>
+                                <th scope="col"><AppIcon Name="list" Size="14" /> Tür</th>
+                                <th scope="col"><AppIcon Name="tag" Size="14" /> Zorunlu</th>
+                                <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var q in questions)
+                            {
+                                <tr>
+                                    <td data-label="Sıra">@WarehouseLabels.Number(q, "sequence")</td>
+                                    <td data-label="Soru" class="primary">@WarehouseLabels.Text(q, "text")</td>
+                                    <td data-label="Tür">@HrLabels.QuestionType(WarehouseLabels.Text(q, "questionType"))</td>
+                                    <td data-label="Zorunlu">@(WarehouseLabels.Flag(q, "isRequired") ? "Evet" : "Hayır")</td>
+                                    <td class="row-menu-cell">
+                                        @if (IsDraft)
+                                        {
+                                            <RowMenu Label="@($"{WarehouseLabels.Text(q, "text")} eylemleri")">
+                                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => { question = q; addingQuestion = false; }"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteQuestionAsync(q)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                            </RowMenu>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </section>
+
+            @if (!IsDraft)
+            {
+                <SurveyResultsView @key="(selected.Id, selected.Version)" SurveyId="selected.Id" />
+            }
+        }
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Anket görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Anket ara" placeholder="Başlık ya da açıklamada ara" @bind="search" />
+        </form>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (!editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => OpenAsync(null)"><AppIcon Name="plus" Size="16" /> Yeni anket</button>
+        }
+    </div>
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan anket yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) anket listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Anketler</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var survey in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, survey)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(survey, "title")} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenAsync(survey)"><AppIcon Name="pencil" Size="16" /> <span>Aç</span></button>
+                                @if (WarehouseLabels.Number(survey, "responseCount") == 0)
+                                {
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteAsync(survey)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                }
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + HrAccess.SurveyEntityKey;
+
+    private const string AllViews = "all";
+
+    // Sıralama anahtarları kayıt deposunun beyanıdır (SurveyRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("title", "Başlık", "clipboard-list", "title", "-title", Locked: true),
+        new("audience", "Hedef", "users"),
+        new("identity", "Kimlik", "eye"),
+        new("questionCount", "Soru", "message-square"),
+        new("responseCount", "Yanıt", "check"),
+        new("closesOn", "Kapanış", "calendar", "closesOn", "-closesOn"),
+        new("status", "Durum", "tag", "status", "-status"),
+    ];
+
+    private readonly GridViewState grid = new("hr.survey-admin", "-createdAt");
+    private PersonalGridViews views = default!;
+    private string view = "status=draft";
+    private (string Key, string Value)? filter = ("status", "draft");
+
+    private RecordPageResponse? page;
+    private List<RecordResponse>? questions;
+    private RecordResponse? selected;
+    private RecordResponse? question;
+    private bool addingQuestion;
+    private bool editing;
+    private string? message;
+    private string? search;
+
+    private bool IsDraft => selected is not null && WarehouseLabels.Text(selected, "status") == "draft";
+
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new("status=draft", "Taslak", Icon: "pencil"),
+        new("status=open", "Yanıta açık", Icon: "clipboard-list"),
+        new("status=closed", "Kapalı", Icon: "history"),
+        new("all", "Tüm anketler", Icon: "list"),
+        .. views.Options,
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, "hr.survey-admin");
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.SurveysManage))
+        {
+            await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(HrAccess.SurveyEntityKey)
+                .Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            filter = GridFilters.Parse(saved.Filters).Select(p => ((string, string)?)(p.Key, p.Value)).FirstOrDefault();
+        }
+        else
+        {
+            grid.Reset();
+            filter = key == AllViews ? null : (key.Split('=')[0], key.Split('=')[1]);
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(filter);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (filter is { } f)
+        {
+            url += $"&{f.Key}={Uri.EscapeDataString(f.Value)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse record) =>
+        @<td data-label="@column.Label" class="@(column.Key == "title" ? "primary" : null)">@CellContent(column.Key, record)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse record) => key switch
+    {
+        "title" => @<text>@WarehouseLabels.Text(record, "title")</text>,
+        "audience" => @<text>@(WarehouseLabels.Text(record, "audienceDepartmentKey") is { Length: > 0 } dep ? Lookups.Label(HrAccess.DepartmentList, dep) : "Herkes")</text>,
+        "identity" => @<text>@(WarehouseLabels.Flag(record, "isAnonymous") ? "Gizli" : "Açık")</text>,
+        "questionCount" => @<text>@WarehouseLabels.Number(record, "questionCount")</text>,
+        "responseCount" => @<text>@WarehouseLabels.Number(record, "responseCount")</text>,
+        "closesOn" => @<text>@(WarehouseLabels.Text(record, "closesOn") is { Length: > 0 } c ? HrLabels.Date(c) : "—")</text>,
+        "status" => @<span class="badge @HrLabels.SurveyStatusBadge(WarehouseLabels.Text(record, "status"))">@HrLabels.SurveyStatus(WarehouseLabels.Text(record, "status"))</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.SurveyEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, record.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private async Task OpenAsync(RecordResponse? survey)
+    {
+        selected = survey;
+        editing = true;
+        question = null;
+        addingQuestion = false;
+        await LoadQuestionsAsync();
+    }
+
+    private void Close()
+    {
+        editing = false;
+        selected = null;
+    }
+
+    private async Task LoadQuestionsAsync()
+    {
+        questions = null;
+        if (selected is not null)
+        {
+            var result = await Api.GetAsync<RecordPageResponse>($"/api/records/{HrAccess.SurveyQuestionEntityKey}?surveyId={selected.Id}&pageSize=200");
+            questions = result.Value?.Items.ToList() ?? [];
+        }
+    }
+
+    private async Task SavedAsync(RecordResponse saved)
+    {
+        // Yeni anket kaydedilince açık kalır: sorular eklenebilsin.
+        var wasNew = selected is null;
+        selected = saved;
+        if (!wasNew)
+        {
+            editing = false;
+            selected = null;
+        }
+        else
+        {
+            await LoadQuestionsAsync();
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private async Task ChangedAsync(RecordResponse changed)
+    {
+        selected = changed;
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private async Task QuestionSavedAsync(RecordResponse saved)
+    {
+        question = null;
+        addingQuestion = false;
+        await LoadQuestionsAsync();
+        await RefreshSelectedAsync();
+    }
+
+    private async Task DeleteQuestionAsync(RecordResponse q)
+    {
+        var result = await Api.DeleteAsync($"/api/records/{HrAccess.SurveyQuestionEntityKey}/{q.Id}?version={q.Version}");
+        message = result.IsSuccess ? null : result.Error;
+        await LoadQuestionsAsync();
+        await RefreshSelectedAsync();
+    }
+
+    private async Task RefreshSelectedAsync()
+    {
+        if (selected is not null && (await Api.GetAsync<RecordResponse>($"{Url}/{selected.Id}")).Value is { } fresh)
+        {
+            selected = fresh;
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private async Task DeleteAsync(RecordResponse survey)
+    {
+        var result = await Api.DeleteAsync($"{Url}/{survey.Id}?version={survey.Version}");
+        message = result.IsSuccess ? null : result.Error;
+        if (result.IsSuccess && selected?.Id == survey.Id)
+        {
+            Close();
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

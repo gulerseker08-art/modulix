@@ -1,0 +1,175 @@
+@* Duyuru formu (ADR-0042 dilim 6). Düzen firmanın form düzenine (ADR-0021) göre çizilir. Metin düz metindir (satır sonları korunur, HTML
+   yorumlanmaz). Hedef departman boşsa bütün çalışanlar görür; "Yayında" işaretlenmeden okurlar görmez. *@
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject FormLayouts Layouts
+@inject ToastService Toasts
+
+<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+    <div class="form-toolbar">
+        <div>
+            <h2>@(Announcement is null ? "Yeni duyuru" : "Duyuru")</h2>
+            @if (Announcement is not null)
+            {
+                <p>@WarehouseLabels.Number(Announcement, "readCount") kişi okudu</p>
+            }
+        </div>
+        <div class="form-toolbar-actions">
+            <UnsavedChanges IsDirty="() => dirty" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+        </div>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+    @if (layoutError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@layoutError</div>
+    }
+
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Duyuru bölümleri">
+        <Field Context="f">
+            @switch (f.Key)
+            {
+                case "title":
+                    <label class="@f.LabelClass()" for="announcement-title">@f.Label</label>
+                    <input id="announcement-title" class="form-control" maxlength="200" required aria-required="true" @bind="form.Title" />
+                    <FieldError Field="title" Errors="errors" />
+                    break;
+                case "body":
+                    <label class="@f.LabelClass()" for="announcement-body">@f.Label</label>
+                    <textarea id="announcement-body" class="form-control" rows="8" maxlength="8000" required aria-required="true" @bind="form.Body"></textarea>
+                    <FieldError Field="body" Errors="errors" />
+                    break;
+                case "isPublished":
+                    <div class="form-check mt-4">
+                        <input id="announcement-published" class="form-check-input" type="checkbox" @bind="form.IsPublished" />
+                        <label class="form-check-label" for="announcement-published">@f.Label</label>
+                    </div>
+                    break;
+                case "isPinned":
+                    <div class="form-check mt-4">
+                        <input id="announcement-pinned" class="form-check-input" type="checkbox" @bind="form.IsPinned" />
+                        <label class="form-check-label" for="announcement-pinned">@f.Label</label>
+                    </div>
+                    break;
+                case "audienceDepartmentKey":
+                    <label class="@f.LabelClass()" for="announcement-audience">@f.Label</label>
+                    <select id="announcement-audience" class="form-select" @bind="form.AudienceDepartmentKey">
+                        <option value="">Bütün çalışanlar</option>
+                        @foreach (var department in Lookups.Choices(HrAccess.DepartmentList, form.AudienceDepartmentKey))
+                        {
+                            <option value="@department.Key">@department.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="audienceDepartmentKey" Errors="errors" />
+                    break;
+                case "publishOn":
+                    <label class="@f.LabelClass()" for="announcement-publish">@f.Label</label>
+                    <input id="announcement-publish" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PublishOn" />
+                    <FieldError Field="publishOn" Errors="errors" />
+                    break;
+                case "expiresOn":
+                    <label class="@f.LabelClass()" for="announcement-expires">@f.Label</label>
+                    <input id="announcement-expires" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ExpiresOn" />
+                    <FieldError Field="expiresOn" Errors="errors" />
+                    <small class="text-muted">Boşsa süresiz.</small>
+                    break;
+            }
+        </Field>
+    </LayoutForm>
+</form>
+
+@code {
+    private const string EntityKey = HrAccess.AnnouncementEntityKey;
+
+    private bool dirty;
+    private FormLayoutDto? layout;
+    private string? layoutError;
+    private AnnouncementForm form = new();
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    [Parameter] public RecordResponse? Announcement { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public EventCallback<RecordResponse> Saved { get; set; }
+
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        form = Announcement is { } a
+            ? new AnnouncementForm
+            {
+                Id = a.Id, Version = a.Version, Title = WarehouseLabels.Text(a, "title"), Body = WarehouseLabels.Text(a, "body"),
+                AudienceDepartmentKey = WarehouseLabels.Text(a, "audienceDepartmentKey"), IsPinned = WarehouseLabels.Flag(a, "isPinned"),
+                IsPublished = WarehouseLabels.Flag(a, "isPublished"), PublishOn = FleetLabels.Day(WarehouseLabels.Text(a, "publishOn")),
+                ExpiresOn = FleetLabels.Day(WarehouseLabels.Text(a, "expiresOn")), Custom = a.Values["custom"]?.DeepClone().AsObject() ?? [],
+            }
+            : new AnnouncementForm { PublishOn = DateOnly.FromDateTime(DateTime.Today) };
+        layout = await Layouts.ForAsync(EntityKey);
+        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var request = new RecordWriteRequest(new JsonObject
+        {
+            ["title"] = string.IsNullOrWhiteSpace(form.Title) ? null : form.Title.Trim(),
+            ["body"] = string.IsNullOrWhiteSpace(form.Body) ? null : form.Body.Trim(),
+            ["audienceDepartmentKey"] = string.IsNullOrEmpty(form.AudienceDepartmentKey) ? null : form.AudienceDepartmentKey,
+            ["isPinned"] = form.IsPinned,
+            ["isPublished"] = form.IsPublished,
+            ["publishOn"] = form.PublishOn?.ToString("yyyy-MM-dd"),
+            ["expiresOn"] = form.ExpiresOn?.ToString("yyyy-MM-dd"),
+            ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
+        }, form.Version);
+        var url = "/api/records/" + EntityKey;
+        var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{url}/{id}", request) : await Api.PostAsync<RecordResponse>(url, request);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            dirty = false;
+            Toasts.Success(Texts.Get("common.saved"));
+            await Saved.InvokeAsync(result.Value!);
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.Error;
+    }
+
+    private sealed class AnnouncementForm
+    {
+        public JsonObject Custom { get; set; } = [];
+
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string? Title { get; set; }
+
+        public string? Body { get; set; }
+
+        public string? AudienceDepartmentKey { get; set; }
+
+        public bool IsPinned { get; set; }
+
+        public bool IsPublished { get; set; }
+
+        public DateOnly? PublishOn { get; set; }
+
+        public DateOnly? ExpiresOn { get; set; }
+    }
+}

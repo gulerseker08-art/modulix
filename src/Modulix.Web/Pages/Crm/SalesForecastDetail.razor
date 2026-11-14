@@ -6,14 +6,14 @@
 @inject CrmLookups Lookups
 @inject NavigationManager Navigation
 
-<PageTitle>Satış tahmini · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.salesForecasts.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@SalesAccess.ForecastsRead">
-    <a class="back-link" href="crm/satis-tahmini">← Satış tahminleri</a>
+    <a class="back-link" href="crm/satis-tahmini">← @Texts.Get("crm.salesForecasts.caption")</a>
 
     @if (loading && detail is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
 
     @if (loadError is not null)
@@ -22,7 +22,7 @@
             @loadError
             @if (loadStatus is not (HttpStatusCode.Forbidden or HttpStatusCode.NotFound))
             {
-                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">Tekrar dene</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">@Texts.Get("crm.sales.retry")</button>
             }
         </div>
     }
@@ -39,37 +39,37 @@
 
         <div class="page-header">
             <div>
-                <h1>Satış tahmini <span class="badge stage-@SalesLabels.StatusBadge(h.Status)">@SalesLabels.Status(h.Status)</span></h1>
+                <h1>@Texts.Get("crm.salesForecasts.title") <span class="badge stage-@SalesLabels.StatusBadge(h.Status)">@SalesLabels.Status(h.Status)</span></h1>
                 <p class="text-muted mb-0">
                     @SalesLabels.PeriodKind(h.PeriodKind) · @SalesLabels.Period(h.PeriodStart, h.PeriodEnd) ·
-                    @(h.ScopeType == SalesTargetScopes.User ? $"Kullanıcı: {Lookups.MemberName(h.ScopeUserId)}" : "Tüm firma") ·
-                    para birimi @currency · sürüm V@(h.VersionNo)
+                    @(h.ScopeType == SalesTargetScopes.User ? Texts.Get("crm.salesForecasts.userScope", Lookups.MemberName(h.ScopeUserId)) : Texts.Get("crm.sales-scope.tenant")) ·
+                    @Texts.Get("crm.salesForecastDetail.currencyVersion", currency, h.VersionNo)
                 </p>
             </div>
             <div class="header-actions">
                 @if (cap.CanWrite)
                 {
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="RefreshAsync">Yenile</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="RefreshAsync">@Texts.Get("crm.sales.refresh")</button>
                 }
                 @if (cap.CanSubmit)
                 {
-                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SubmitAsync">Sun</button>
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SubmitAsync">@Texts.Get("crm.salesForecastDetail.submit")</button>
                 }
                 @if (cap.CanReturn)
                 {
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick='() => StartPending("return")'>Taslağa geri çek</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick='() => StartPending("return")'>@Texts.Get("crm.salesForecastDetail.return")</button>
                 }
                 @if (cap.CanLock)
                 {
-                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick='() => StartPending("lock")'>Kilitle</button>
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick='() => StartPending("lock")'>@Texts.Get("crm.salesForecastDetail.lock")</button>
                 }
                 @if (cap.CanReopen)
                 {
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick='() => StartPending("reopen")'>Yeniden aç</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick='() => StartPending("reopen")'>@Texts.Get("crm.salesForecastDetail.reopen")</button>
                 }
                 @if (cap.CanDelete)
                 {
-                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick='() => StartPending("delete")'>Sil</button>
+                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick='() => StartPending("delete")'>@Texts.Get("common.delete")</button>
                 }
             </div>
         </div>
@@ -83,61 +83,61 @@
                 {
                     <p class="small text-muted">
                         @(pending == "return"
-                            ? "Sunulan tahmin taslağa döner ve yeniden düzenlenebilir."
-                            : "Kilitli tahmin değişmez; yeniden açmak bu tahminin bir kopyası olarak YENİ bir sürüm (taslak) üretir. Kilitli sürüm olduğu gibi kalır.")
+                            ? Texts.Get("crm.salesForecastDetail.returnHelp")
+                            : Texts.Get("crm.salesForecastDetail.reopenHelp"))
                     </p>
                     <div>
-                        <label class="form-label required" for="sfd-reason">Gerekçe</label>
+                        <label class="form-label required" for="sfd-reason">@Texts.Get("crm.salesForecastDetail.reason")</label>
                         <textarea id="sfd-reason" class="form-control" rows="2" maxlength="500" required aria-required="true" @bind="reason"></textarea>
                         <FieldError Field="reason" Errors="actionErrors" />
                     </div>
                 }
                 else if (pending == "lock")
                 {
-                    <p>Tahmin kilitlenecek: dönem sonunda gerçekleşenle karşılaştırılarak doğruluğu ölçülür ve artık değiştirilemez. Kilitlensin mi?</p>
+                    <p>@Texts.Get("crm.salesForecastDetail.lockConfirm")</p>
                 }
                 else if (pending == "delete")
                 {
-                    <p>Bu taslak tahmin, düzeltmeleri ve geçmişiyle birlikte silinecek. Bu işlem geri alınamaz. Silinsin mi?</p>
+                    <p>@Texts.Get("crm.salesForecastDetail.deleteConfirm")</p>
                 }
                 <div class="form-actions">
                     <button type="submit" class="btn @(pending == "delete" ? "btn-danger" : "btn-primary")" disabled="@busy">
                         @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
                         @PendingConfirmText(pending)
                     </button>
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelPending">Vazgeç</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelPending">@Texts.Get("common.dismiss")</button>
                 </div>
             </form>
         }
 
         <dl class="detail-grid">
-            <div><dt>Son yenileme</dt><dd>@(h.RefreshedAt is { } refreshed ? CrmLabels.Time(refreshed) : "—")</dd></div>
+            <div><dt>@Texts.Get("crm.salesForecastDetail.refreshedAt")</dt><dd>@(h.RefreshedAt is { } refreshed ? CrmLabels.Time(refreshed) : "—")</dd></div>
             @if (h.SubmittedAt is { } submittedAt)
             {
-                <div><dt>Sunuldu</dt><dd>@CrmLabels.Time(submittedAt)@(h.SubmittedBy is { } submitter ? $" · {Lookups.MemberName(submitter)}" : null)</dd></div>
+                <div><dt>@SalesLabels.Status(ForecastStatuses.Submitted)</dt><dd>@CrmLabels.Time(submittedAt)@(h.SubmittedBy is { } submitter ? $" · {Lookups.MemberName(submitter)}" : null)</dd></div>
             }
             @if (h.LockedAt is { } lockedAt)
             {
-                <div><dt>Kilitlendi</dt><dd>@CrmLabels.Time(lockedAt)@(h.LockedBy is { } locker ? $" · {Lookups.MemberName(locker)}" : null)</dd></div>
+                <div><dt>@SalesLabels.Status(ForecastStatuses.Locked)</dt><dd>@CrmLabels.Time(lockedAt)@(h.LockedBy is { } locker ? $" · {Lookups.MemberName(locker)}" : null)</dd></div>
             }
             @if (h.ReturnReason is not null)
             {
-                <div><dt>Taslağa geri çekme gerekçesi</dt><dd>@h.ReturnReason</dd></div>
+                <div><dt>@Texts.Get("crm.salesForecastDetail.returnReason")</dt><dd>@h.ReturnReason</dd></div>
             }
             @if (h.ReopenReason is not null)
             {
-                <div><dt>Yeniden açma gerekçesi</dt><dd>@h.ReopenReason</dd></div>
+                <div><dt>@Texts.Get("crm.salesForecastDetail.reopenReason")</dt><dd>@h.ReopenReason</dd></div>
             }
             @if (h.PreviousSubmissionId is { } previousId)
             {
-                <div><dt>Önceki sürüm</dt><dd><a href="crm/satis-tahmini/@previousId">@VersionText(previousId)</a></dd></div>
+                <div><dt>@Texts.Get("crm.salesForecastDetail.previousVersion")</dt><dd><a href="crm/satis-tahmini/@previousId">@VersionText(previousId)</a></dd></div>
             }
         </dl>
 
         @if (d.Warnings.Count > 0)
         {
             <div class="alert alert-warning" role="status">
-                <strong>Verilerle ilgili uyarılar</strong>
+                <strong>@Texts.Get("crm.sales.warnings")</strong>
                 <ul class="mb-0">
                     @foreach (var warning in d.Warnings)
                     {
@@ -148,120 +148,119 @@
         }
         @if (!d.AmountsVisible)
         {
-            <div class="alert alert-info" role="status">Tutarları görme yetkiniz yok; tutarlar ve senaryolar gösterilmiyor.</div>
+            <div class="alert alert-info" role="status">@Texts.Get("crm.salesForecastDetail.noAmounts")</div>
         }
         else if (!d.ItemsVisible)
         {
-            <div class="alert alert-info" role="status">Fırsat kayıtlarını görme yetkiniz yok; fırsat satırları gösterilmiyor.</div>
+            <div class="alert alert-info" role="status">@Texts.Get("crm.salesForecastDetail.noItemsAccess")</div>
         }
 
         <section class="detail-section" aria-labelledby="sfd-scenarios">
-            <div class="section-header"><h2 id="sfd-scenarios">Senaryolar</h2></div>
+            <div class="section-header"><h2 id="sfd-scenarios">@Texts.Get("crm.salesForecastDetail.scenarios")</h2></div>
             @if (d.Scenarios is { } s)
             {
-                <div class="kpi-grid" role="group" aria-label="Tahmin senaryoları">
-                    <SalesKpiCard Label="Gerçekleşen" Icon="check-circle" Tone="success" Value="@CrmLabels.Amount(s.Realized, currency)"
-                                  Detail="@(d.RealizedLive ? "Dönemde kazanılan (canlı)" : "Kilit anındaki değer")"
-                                  Partial="@h.RealizedPartial" PartialHint="Bazı kazanılan fırsatların tutarı ya da kuru yok." />
-                    <SalesKpiCard Label="Taahhüt" Icon="target" Tone="info" Value="@CrmLabels.Amount(s.CommitScenario, currency)" Detail="Gerçekleşen + Taahhüt kategorisi" />
-                    <SalesKpiCard Label="İyimser" Icon="trending-up" Tone="brand" Value="@CrmLabels.Amount(s.OptimisticScenario, currency)" Detail="Gerçekleşen + Taahhüt + En iyi durum" />
-                    <SalesKpiCard Label="Ağırlıklı" Icon="percent" Tone="brand" Value="@CrmLabels.Amount(s.WeightedScenario, currency)" Detail="Gerçekleşen + olasılıkla ağırlıklı açık tutar" />
+                <div class="kpi-grid" role="group" aria-label="@Texts.Get("crm.salesForecastDetail.scenariosAria")">
+                    <SalesKpiCard Label="@SalesLabels.Label(SalesLabels.Cards, SalesCards.Realized)" Icon="check-circle" Tone="success" Value="@CrmLabels.Amount(s.Realized, currency)"
+                                  Detail="@(d.RealizedLive ? Texts.Get("crm.salesForecastDetail.realizedLive") : Texts.Get("crm.salesForecastDetail.realizedLocked"))"
+                                  Partial="@h.RealizedPartial" PartialHint="@Texts.Get("crm.salesForecastDetail.realizedPartial")" />
+                    <SalesKpiCard Label="@SalesLabels.Category(ForecastCategories.Commit)" Icon="target" Tone="info" Value="@CrmLabels.Amount(s.CommitScenario, currency)" Detail="@Texts.Get("crm.salesForecastDetail.commitDetail")" />
+                    <SalesKpiCard Label="@Texts.Get("crm.salesForecastDetail.optimistic")" Icon="trending-up" Tone="brand" Value="@CrmLabels.Amount(s.OptimisticScenario, currency)" Detail="@Texts.Get("crm.salesForecastDetail.optimisticDetail")" />
+                    <SalesKpiCard Label="@Texts.Get("crm.salesForecastDetail.weighted")" Icon="percent" Tone="brand" Value="@CrmLabels.Amount(s.WeightedScenario, currency)" Detail="@Texts.Get("crm.salesForecastDetail.weightedDetail")" />
                 </div>
                 <p class="small text-muted">
-                    Senaryolar ayrı ayrıdır ve birbirine eklenmez: ağırlıklı tahmin, kategori toplamlarının üstüne eklenen bir tutar değildir.
+                    @Texts.Get("crm.salesForecastDetail.scenariosNote")
                 </p>
             }
             else
             {
-                <p class="text-muted">Senaryo toplamları yetkiniz ya da veri kapsamınız nedeniyle gösterilemiyor.</p>
+                <p class="text-muted">@Texts.Get("crm.salesForecastDetail.scenariosHidden")</p>
             }
         </section>
 
         <section class="detail-section" aria-labelledby="sfd-categories">
-            <div class="section-header"><h2 id="sfd-categories">Kategoriler</h2></div>
+            <div class="section-header"><h2 id="sfd-categories">@Texts.Get("crm.salesForecastDetail.categories")</h2></div>
             @if (!d.AmountsVisible || d.ByCategory.Count == 0)
             {
-                <p class="text-muted">@(d.AmountsVisible ? "Kategori toplamı yok." : "Tutarları görme yetkiniz yok.")</p>
+                <p class="text-muted">@(d.AmountsVisible ? Texts.Get("crm.salesForecastDetail.noCategoryTotals") : Texts.Get("crm.salesForecastDetail.noAmountsShort"))</p>
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Kategori özeti; kategoriler birbirini dışlar</caption>
-                    <thead><tr><th scope="col">Kategori</th><th scope="col">Fırsat</th><th scope="col">Tutar</th><th scope="col">Ağırlıklı tutar</th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("crm.salesForecastDetail.categoriesCaption")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("crm.salesForecastDetail.col.category")</th><th scope="col">@Texts.Get("crm.opportunity.single")</th><th scope="col">@Texts.Get("crm.sales.col.amount")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.weightedAmount")</th></tr></thead>
                     <tbody>
                         @foreach (var total in d.ByCategory)
                         {
                             <tr>
-                                <td data-label="Kategori" class="primary"><span class="badge stage-@SalesLabels.CategoryBadge(total.Category)">@SalesLabels.Category(total.Category)</span></td>
-                                <td data-label="Fırsat">@total.Count</td>
-                                <td data-label="Tutar">@CrmLabels.Amount(total.Amount, currency)</td>
-                                <td data-label="Ağırlıklı tutar">@CrmLabels.Amount(total.Weighted, currency)</td>
+                                <td data-label="@Texts.Get("crm.salesForecastDetail.col.category")" class="primary"><span class="badge stage-@SalesLabels.CategoryBadge(total.Category)">@SalesLabels.Category(total.Category)</span></td>
+                                <td data-label="@Texts.Get("crm.opportunity.single")">@total.Count</td>
+                                <td data-label="@Texts.Get("crm.sales.col.amount")">@CrmLabels.Amount(total.Amount, currency)</td>
+                                <td data-label="@Texts.Get("crm.salesForecastDetail.col.weightedAmount")">@CrmLabels.Amount(total.Weighted, currency)</td>
                             </tr>
                         }
                     </tbody>
                 </table>
-                <p class="small text-muted">Her fırsat yalnızca bir kategoridedir (Taahhüt, En iyi durum, Pipeline, Hariç).</p>
+                <p class="small text-muted">@Texts.Get("crm.salesForecastDetail.categoriesNote")</p>
             }
         </section>
 
         <section class="detail-section" aria-labelledby="sfd-note">
-            <div class="section-header"><h2 id="sfd-note">Not</h2></div>
+            <div class="section-header"><h2 id="sfd-note">@Texts.Get("crm.salesForecastDetail.note")</h2></div>
             @if (cap.CanWrite)
             {
                 <form @onsubmit="SaveNoteAsync" @onsubmit:preventDefault>
-                    <label class="form-label" for="sfd-note-text">Tahmin notu</label>
+                    <label class="form-label" for="sfd-note-text">@Texts.Get("crm.salesForecastDetail.noteLabel")</label>
                     <textarea id="sfd-note-text" class="form-control" rows="2" maxlength="1000" @bind="noteText"></textarea>
                     <FieldError Field="note" Errors="actionErrors" />
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-outline-primary btn-sm" disabled="@busy">Notu kaydet</button>
+                        <button type="submit" class="btn btn-outline-primary btn-sm" disabled="@busy">@Texts.Get("crm.salesForecastDetail.saveNote")</button>
                     </div>
                 </form>
             }
             else
             {
-                <p>@(h.Note ?? "Not yok.")</p>
+                <p>@(h.Note ?? Texts.Get("crm.salesForecastDetail.noNote"))</p>
             }
         </section>
 
         <section class="detail-section" aria-labelledby="sfd-accuracy">
-            <div class="section-header"><h2 id="sfd-accuracy">Tahmin doğruluğu</h2></div>
+            <div class="section-header"><h2 id="sfd-accuracy">@Texts.Get("crm.salesForecastDetail.accuracy")</h2></div>
             @if (d.Accuracy.State == "Ready")
             {
                 var a = d.Accuracy;
                 <p>
-                    Tahmin ufku: kilitten dönem sonuna <strong>@(a.HorizonDays?.ToString() ?? "—") gün</strong> ·
-                    dönem sonunda gerçekleşen <strong>@(a.Actual is { } actual ? CrmLabels.Amount(actual, currency) : "—")</strong>
+                    @Texts.Strong("crm.salesForecastDetail.horizonLine", Texts.Get("crm.sales.days", a.HorizonDays?.ToString() ?? "—"), a.Actual is { } actual ? CrmLabels.Amount(actual, currency) : "—")
                 </p>
                 <table class="table record-table">
-                    <caption class="visually-hidden">Senaryo tahminleri ve gerçekleşen</caption>
+                    <caption class="visually-hidden">@Texts.Get("crm.salesForecastDetail.varianceCaption")</caption>
                     <thead>
-                        <tr><th scope="col">Senaryo</th><th scope="col">Tahmin</th><th scope="col">Gerçekleşen</th><th scope="col">Hata</th><th scope="col">Mutlak hata</th><th scope="col">Hata yüzdesi</th></tr>
+                        <tr><th scope="col">@Texts.Get("crm.salesForecastDetail.col.scenario")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.forecast")</th><th scope="col">@SalesLabels.Label(SalesLabels.Cards, SalesCards.Realized)</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.error")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.absError")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.errorPercent")</th></tr>
                     </thead>
                     <tbody>
-                        @VarianceRow("Taahhüt", a.CommitScenario, currency)
-                        @VarianceRow("Ağırlıklı", a.WeightedScenario, currency)
+                        @VarianceRow(SalesLabels.Category(ForecastCategories.Commit), a.CommitScenario, currency)
+                        @VarianceRow(Texts.Get("crm.salesForecastDetail.weighted"), a.WeightedScenario, currency)
                     </tbody>
                 </table>
-                <p class="small text-muted">Hata = tahmin − gerçekleşen (artı: fazla tahmin, eksi: eksik tahmin). Gerçekleşen sıfırsa yüzde hesaplanmaz.</p>
+                <p class="small text-muted">@Texts.Get("crm.salesForecastDetail.errorNote")</p>
             }
             else if (d.Accuracy.State == "Pending")
             {
-                <p class="text-muted">Dönem sürüyor; dönem bittikten sonra kilitli tahmin gerçekleşenle karşılaştırılır.@(d.Accuracy.HorizonDays is { } horizon ? $" (Kilitten dönem sonuna {horizon} gün.)" : null)</p>
+                <p class="text-muted">@(d.Accuracy.HorizonDays is { } horizon ? Texts.Get("crm.salesForecastDetail.accuracyPendingHorizon", horizon) : Texts.Get("crm.salesForecastDetail.accuracyPending"))</p>
             }
             else
             {
-                <p class="text-muted">Doğruluk yalnızca kilitli tahminler için hesaplanır.</p>
+                <p class="text-muted">@Texts.Get("crm.salesForecastDetail.accuracyLockedOnly")</p>
             }
         </section>
 
         @if (adjusting is not null)
         {
             <form class="record-form" novalidate @onsubmit="AdjustAsync" @onsubmit:preventDefault aria-labelledby="sfd-adjust-title">
-                <h2 id="sfd-adjust-title" tabindex="-1" @ref="adjustHeading">Satırı düzelt: @adjusting.Number · @adjusting.Title</h2>
+                <h2 id="sfd-adjust-title" tabindex="-1" @ref="adjustHeading">@Texts.Get("crm.salesForecastDetail.adjustTitle", adjusting.Number, adjusting.Title)</h2>
                 <ErrorSummary Errors="actionErrors" />
                 <div class="form-grid">
                     <div class="span-3">
-                        <label class="form-label required" for="sfd-adj-kind">Düzeltme türü</label>
+                        <label class="form-label required" for="sfd-adj-kind">@Texts.Get("crm.salesForecastDetail.adjustKind")</label>
                         <select id="sfd-adj-kind" class="form-select" required aria-required="true" @bind="adjusting.Kind" @bind:after="AdjustKindChanged">
                             @foreach (var (key, label) in SalesLabels.AdjustmentKinds) { <option value="@key">@label</option> }
                         </select>
@@ -270,31 +269,31 @@
                     <div class="span-3">
                         @if (adjusting.Kind == ForecastAdjustmentKinds.Category)
                         {
-                            <label class="form-label required" for="sfd-adj-value">Yeni kategori</label>
+                            <label class="form-label required" for="sfd-adj-value">@Texts.Get("crm.salesForecastDetail.newCategory")</label>
                             <select id="sfd-adj-value" class="form-select" required aria-required="true" @bind="adjusting.CategoryValue">
                                 @foreach (var (key, label) in SalesLabels.Categories) { <option value="@key">@label</option> }
                             </select>
                         }
                         else if (adjusting.Kind == ForecastAdjustmentKinds.Amount)
                         {
-                            <label class="form-label" for="sfd-adj-value">Tutar farkı (@currency)</label>
+                            <label class="form-label" for="sfd-adj-value">@Texts.Get("crm.salesForecastDetail.amountDelta", currency)</label>
                             <input id="sfd-adj-value" class="form-control" type="number" step="0.01" inputmode="decimal" aria-describedby="sfd-adj-help" disabled="@(!adjusting.CanAdjustAmount)" @bind="adjusting.AmountValue" />
                             <div id="sfd-adj-help" class="form-text">
                                 @(adjusting.CanAdjustAmount
-                                    ? "Temel tutara eklenecek fark (negatif olabilir); boş bırakmak düzeltmeyi kaldırır."
-                                    : "Tutarı ya da kuru olmayan satırın tutarı düzeltilemez; önce fırsatı tamamlayıp tahmini yenileyin.")
+                                    ? Texts.Get("crm.salesForecastDetail.amountHelp")
+                                    : Texts.Get("crm.salesForecastDetail.amountBlocked"))
                             </div>
                         }
                         else
                         {
-                            <label class="form-label" for="sfd-adj-value">Olasılık (%)</label>
+                            <label class="form-label" for="sfd-adj-value">@Texts.Get("crm.salesForecastDetail.probability")</label>
                             <input id="sfd-adj-value" class="form-control" type="number" min="0" max="100" step="1" inputmode="numeric" aria-describedby="sfd-adj-help" @bind="adjusting.ProbabilityValue" />
-                            <div id="sfd-adj-help" class="form-text">0-100 arası tam sayı; boş bırakmak düzeltmeyi kaldırır ve aşama/fırsat olasılığına döner.</div>
+                            <div id="sfd-adj-help" class="form-text">@Texts.Get("crm.salesForecastDetail.probabilityHelp")</div>
                         }
                         <FieldError Field="value" Errors="actionErrors" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label required" for="sfd-adj-reason">Gerekçe</label>
+                        <label class="form-label required" for="sfd-adj-reason">@Texts.Get("crm.salesForecastDetail.reason")</label>
                         <input id="sfd-adj-reason" class="form-control" maxlength="500" required aria-required="true" @bind="adjusting.Reason" />
                         <FieldError Field="reason" Errors="actionErrors" />
                     </div>
@@ -302,54 +301,54 @@
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary" disabled="@busy">
                         @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
-                        Düzeltmeyi kaydet
+                        @Texts.Get("crm.salesForecastDetail.saveAdjust")
                     </button>
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelAdjust">Vazgeç</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelAdjust">@Texts.Get("common.dismiss")</button>
                 </div>
             </form>
         }
 
         <section class="detail-section" aria-labelledby="sfd-items">
-            <div class="section-header"><h2 id="sfd-items">Fırsat satırları (@d.Items.Count)</h2></div>
+            <div class="section-header"><h2 id="sfd-items">@Texts.Get("crm.salesForecastDetail.items", d.Items.Count)</h2></div>
             @if (!d.ItemsVisible)
             {
-                <p class="text-muted">Fırsat satırlarını görme yetkiniz yok.</p>
+                <p class="text-muted">@Texts.Get("crm.salesForecastDetail.noItemsAccessShort")</p>
             }
             else if (d.Items.Count == 0)
             {
-                <p class="text-muted">Bu tahminde fırsat yok.</p>
+                <p class="text-muted">@Texts.Get("crm.salesForecastDetail.noItems")</p>
             }
             else
             {
                 <div class="table-responsive">
                     <table class="table record-table">
-                        <caption class="visually-hidden">Tahmin satırları</caption>
+                        <caption class="visually-hidden">@Texts.Get("crm.salesForecastDetail.itemsCaption")</caption>
                         <thead>
                             <tr>
-                                <th scope="col">Fırsat</th><th scope="col">Sorumlu</th><th scope="col">Aşama</th><th scope="col">Kaynak tutar</th><th scope="col">Kur</th>
-                                <th scope="col">Temel tutar (@currency)</th><th scope="col">Düzeltme</th><th scope="col">Nihai tutar</th><th scope="col">Olasılık</th>
-                                <th scope="col">Kategori</th><th scope="col">Sorunlar</th>
-                                @if (cap.CanWrite) { <th scope="col"><span class="visually-hidden">İşlemler</span></th> }
+                                <th scope="col">@Texts.Get("crm.opportunity.single")</th><th scope="col">@Texts.Get("common.field.owner")</th><th scope="col">@Texts.Get("crm.opportunities.col.stage")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.sourceAmount")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.rate")</th>
+                                <th scope="col">@Texts.Get("crm.salesForecastDetail.col.baseAmountIn", currency)</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.adjustment")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.finalAmount")</th><th scope="col">@Texts.Get("crm.opportunities.col.probability")</th>
+                                <th scope="col">@Texts.Get("crm.salesForecastDetail.col.category")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.issues")</th>
+                                @if (cap.CanWrite) { <th scope="col"><span class="visually-hidden">@Texts.Get("crm.lead.actions")</span></th> }
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var item in d.Items)
                             {
                                 <tr>
-                                    <td data-label="Fırsat" class="primary"><a href="crm/firsatlar/@item.OpportunityId">@item.OpportunityNumber</a><br /><small>@item.Title</small></td>
-                                    <td data-label="Sorumlu">
-                                        @(item.CurrentOwnerId is null ? "Atanmadı" : Lookups.MemberName(item.CurrentOwnerId))
+                                    <td data-label="@Texts.Get("crm.opportunity.single")" class="primary"><a href="crm/firsatlar/@item.OpportunityId">@item.OpportunityNumber</a><br /><small>@item.Title</small></td>
+                                    <td data-label="@Texts.Get("common.field.owner")">
+                                        @(item.CurrentOwnerId is null ? Texts.Get("crm.leads.unassigned") : Lookups.MemberName(item.CurrentOwnerId))
                                         @if (item.OwnerId != item.CurrentOwnerId)
                                         {
-                                            <br /><small class="text-muted">Tahmin anında: @(item.OwnerId is null ? "Atanmadı" : Lookups.MemberName(item.OwnerId))</small>
+                                            <br /><small class="text-muted">@Texts.Get("crm.salesForecastDetail.ownerAtForecast", item.OwnerId is null ? Texts.Get("crm.leads.unassigned") : Lookups.MemberName(item.OwnerId))</small>
                                         }
                                     </td>
-                                    <td data-label="Aşama">@Lookups.Label(CrmLists.OpportunityStage, item.Stage)</td>
-                                    <td data-label="Kaynak tutar">@(item.SourceAmount is { } source ? CrmLabels.Amount(source, item.SourceCurrency) : "—")</td>
-                                    <td data-label="Kur">
+                                    <td data-label="@Texts.Get("crm.opportunities.col.stage")">@Lookups.Label(CrmLists.OpportunityStage, item.Stage)</td>
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.sourceAmount")">@(item.SourceAmount is { } source ? CrmLabels.Amount(source, item.SourceCurrency) : "—")</td>
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.rate")">
                                         @if (item.RateMissing)
                                         {
-                                            <span class="badge stage-lost">Kur yok</span>
+                                            <span class="badge stage-lost">@SalesLabels.Flag("MissingRate")</span>
                                         }
                                         else if (item.RateUsed is { } rate)
                                         {
@@ -364,21 +363,21 @@
                                             <text>—</text>
                                         }
                                     </td>
-                                    <td data-label="Temel tutar">@(item.BaseAmount is { } baseAmount ? CrmLabels.Amount(baseAmount, currency) : "—")</td>
-                                    <td data-label="Düzeltme">@(item.AdjustmentAmount is { } delta ? $"{(delta > 0 ? "+" : null)}{CrmLabels.Amount(delta, currency)}" : "—")</td>
-                                    <td data-label="Nihai tutar">@(item.FinalAmount is { } final ? CrmLabels.Amount(final, currency) : "—")</td>
-                                    <td data-label="Olasılık">
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.baseAmount")">@(item.BaseAmount is { } baseAmount ? CrmLabels.Amount(baseAmount, currency) : "—")</td>
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.adjustment")">@(item.AdjustmentAmount is { } delta ? $"{(delta > 0 ? "+" : null)}{CrmLabels.Amount(delta, currency)}" : "—")</td>
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.finalAmount")">@(item.FinalAmount is { } final ? CrmLabels.Amount(final, currency) : "—")</td>
+                                    <td data-label="@Texts.Get("crm.opportunities.col.probability")">
                                         @(item.EffectiveProbability is { } probability ? $"%{probability}" : "—")
                                         <br /><small class="text-muted">@SalesLabels.Source(item.ProbabilitySource)</small>
                                     </td>
-                                    <td data-label="Kategori">
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.category")">
                                         <span class="badge stage-@SalesLabels.CategoryBadge(item.Category)">@SalesLabels.Category(item.Category)</span>
                                         @if (item.Category != item.BaseCategory)
                                         {
-                                            <br /><small class="text-muted">Varsayılan: @SalesLabels.Category(item.BaseCategory)</small>
+                                            <br /><small class="text-muted">@Texts.Get("crm.salesForecastDetail.defaultCategory", SalesLabels.Category(item.BaseCategory))</small>
                                         }
                                     </td>
-                                    <td data-label="Sorunlar">
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.issues")">
                                         @if (item.Flags.Count == 0)
                                         {
                                             <text>—</text>
@@ -393,7 +392,7 @@
                                     </td>
                                     @if (cap.CanWrite)
                                     {
-                                        <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" aria-label="@($"{item.OpportunityNumber} satırını düzelt")" @onclick="() => StartAdjust(item)">Düzelt</button></td>
+                                        <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" aria-label="@Texts.Get("crm.salesForecastDetail.adjustAria", item.OpportunityNumber)" @onclick="() => StartAdjust(item)">@Texts.Get("crm.salesForecastDetail.adjust")</button></td>
                                     }
                                 </tr>
                             }
@@ -404,27 +403,27 @@
         </section>
 
         <section class="detail-section" aria-labelledby="sfd-history">
-            <div class="section-header"><h2 id="sfd-history">Düzeltme geçmişi (@d.Adjustments.Count)</h2></div>
+            <div class="section-header"><h2 id="sfd-history">@Texts.Get("crm.salesForecastDetail.history", d.Adjustments.Count)</h2></div>
             @if (d.Adjustments.Count == 0)
             {
-                <p class="text-muted">Bu sürümde düzeltme yapılmadı.</p>
+                <EmptyState Title="@Texts.Get("crm.salesForecastDetail.noHistory")" />
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Düzeltme geçmişi</caption>
-                    <thead><tr><th scope="col">Zaman</th><th scope="col">Kullanıcı</th><th scope="col">Fırsat</th><th scope="col">Tür</th><th scope="col">Önceki</th><th scope="col">Yeni</th><th scope="col">Gerekçe</th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("crm.salesForecastDetail.historyCaption")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("crm.salesForecastDetail.col.time")</th><th scope="col">@Texts.Get("crm.sales-scope.user")</th><th scope="col">@Texts.Get("crm.opportunity.single")</th><th scope="col">@Texts.Get("common.field.kind")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.before")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.after")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.reason")</th></tr></thead>
                     <tbody>
                         @foreach (var adjustment in d.Adjustments)
                         {
                             <tr>
-                                <td data-label="Zaman">@CrmLabels.Time(adjustment.At)</td>
-                                <td data-label="Kullanıcı">@(adjustment.ChangedBy is { } who ? Lookups.MemberName(who) : "—")</td>
-                                <td data-label="Fırsat">@OpportunityText(d, adjustment.OpportunityId)</td>
-                                <td data-label="Tür">@SalesLabels.Label(SalesLabels.AdjustmentKinds, adjustment.Kind)</td>
-                                <td data-label="Önceki">@AdjustmentValue(adjustment.Kind, adjustment.FromValue, currency)</td>
-                                <td data-label="Yeni">@AdjustmentValue(adjustment.Kind, adjustment.ToValue, currency)</td>
-                                <td data-label="Gerekçe">@adjustment.Reason</td>
+                                <td data-label="@Texts.Get("crm.salesForecastDetail.col.time")">@CrmLabels.Time(adjustment.At)</td>
+                                <td data-label="@Texts.Get("crm.sales-scope.user")">@(adjustment.ChangedBy is { } who ? Lookups.MemberName(who) : "—")</td>
+                                <td data-label="@Texts.Get("crm.opportunity.single")">@OpportunityText(d, adjustment.OpportunityId)</td>
+                                <td data-label="@Texts.Get("common.field.kind")">@SalesLabels.Label(SalesLabels.AdjustmentKinds, adjustment.Kind)</td>
+                                <td data-label="@Texts.Get("crm.salesForecastDetail.col.before")">@AdjustmentValue(adjustment.Kind, adjustment.FromValue, currency)</td>
+                                <td data-label="@Texts.Get("crm.salesForecastDetail.col.after")">@AdjustmentValue(adjustment.Kind, adjustment.ToValue, currency)</td>
+                                <td data-label="@Texts.Get("crm.salesForecastDetail.reason")">@adjustment.Reason</td>
                             </tr>
                         }
                     </tbody>
@@ -433,10 +432,10 @@
         </section>
 
         <section class="detail-section" aria-labelledby="sfd-versions">
-            <div class="section-header"><h2 id="sfd-versions">Sürümler ve karşılaştırma</h2></div>
+            <div class="section-header"><h2 id="sfd-versions">@Texts.Get("crm.salesForecastDetail.versions")</h2></div>
             @if (versions is null)
             {
-                <p class="text-muted" role="status">Sürümler yükleniyor…</p>
+                <p class="text-muted" role="status">@Texts.Get("crm.salesForecastDetail.versionsLoading")</p>
             }
             else
             {
@@ -447,11 +446,11 @@
                             <div class="item-main">
                                 @if (version.Id == Id)
                                 {
-                                    <strong aria-current="page">V@(version.VersionNo) (bu sürüm)</strong>
+                                    <strong aria-current="page">@Texts.Get("crm.salesForecastDetail.thisVersion", version.VersionNo)</strong>
                                 }
                                 else
                                 {
-                                    <a href="crm/satis-tahmini/@version.Id">V@(version.VersionNo)</a>
+                                    <a href="crm/satis-tahmini/@version.Id">@Texts.Get("crm.salesForecasts.versionNo", version.VersionNo)</a>
                                 }
                                 <span class="badge stage-@SalesLabels.StatusBadge(version.Status)">@SalesLabels.Status(version.Status)</span>
                                 <span class="text-muted">@(version.ChangedAt is { } changed ? CrmLabels.Time(changed) : null)</span>
@@ -461,121 +460,121 @@
                 </ul>
                 @if (versions.Any(v => v.Id != Id))
                 {
-                    <form class="form-grid" @onsubmit="CompareAsync" @onsubmit:preventDefault aria-label="Sürüm karşılaştırması">
+                    <form class="form-grid" @onsubmit="CompareAsync" @onsubmit:preventDefault aria-label="@Texts.Get("crm.salesForecastDetail.compareAria")">
                         <div class="span-4">
-                            <label class="form-label" for="sfd-against">Bu sürümü şununla karşılaştır</label>
+                            <label class="form-label" for="sfd-against">@Texts.Get("crm.salesForecastDetail.compareWith")</label>
                             <select id="sfd-against" class="form-select" @bind="against">
                                 @foreach (var version in versions.Where(v => v.Id != Id))
                                 {
-                                    <option value="@version.Id">V@(version.VersionNo) · @SalesLabels.Status(version.Status)</option>
+                                    <option value="@version.Id">@Texts.Get("crm.salesForecasts.versionNo", version.VersionNo) · @SalesLabels.Status(version.Status)</option>
                                 }
                             </select>
                         </div>
                         <div class="span-3">
                             <label class="form-label" for="sfd-compare-go">&nbsp;</label>
-                            <button id="sfd-compare-go" type="submit" class="btn btn-outline-secondary" disabled="@comparing">Karşılaştır</button>
+                            <button id="sfd-compare-go" type="submit" class="btn btn-outline-secondary" disabled="@comparing">@Texts.Get("crm.salesForecastDetail.compare")</button>
                         </div>
                     </form>
                 }
                 else
                 {
-                    <p class="text-muted">Karşılaştırılacak başka sürüm yok.</p>
+                    <p class="text-muted">@Texts.Get("crm.salesForecastDetail.noOtherVersion")</p>
                 }
             }
 
             @if (comparing)
             {
-                <p class="text-muted" role="status">Karşılaştırılıyor…</p>
+                <p class="text-muted" role="status">@Texts.Get("crm.salesForecastDetail.comparing")</p>
             }
 
             @if (compareError is not null)
             {
                 <div class="alert alert-danger" role="alert">
                     @compareError
-                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@comparing" @onclick="CompareAsync">Tekrar dene</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@comparing" @onclick="CompareAsync">@Texts.Get("crm.sales.retry")</button>
                 </div>
             }
 
             @if (comparison is { } c)
             {
-                <h3 class="h5 mt-3" id="sfd-compare-title" tabindex="-1" @ref="compareHeading">V@(c.PreviousVersionNo) → V@(c.CurrentVersionNo) değişiklikleri</h3>
-                <p class="small text-muted">Eklenen: @c.Added.Count · çıkan: @c.Removed.Count · tutarı değişen: @c.AmountChanged.Count · kategorisi değişen: @c.CategoryChanged.Count</p>
+                <h3 class="h5 mt-3" id="sfd-compare-title" tabindex="-1" @ref="compareHeading">@Texts.Get("crm.salesForecastDetail.compareTitle", c.PreviousVersionNo, c.CurrentVersionNo)</h3>
+                <p class="small text-muted">@Texts.Get("crm.salesForecastDetail.compareSummary", c.Added.Count, c.Removed.Count, c.AmountChanged.Count, c.CategoryChanged.Count)</p>
 
-                <h4 class="h6">Eklenen fırsatlar (@c.Added.Count)</h4>
-                @if (c.Added.Count == 0) { <p class="text-muted">Yok.</p> }
+                <h4 class="h6">@Texts.Get("crm.salesForecastDetail.added", c.Added.Count)</h4>
+                @if (c.Added.Count == 0) { <p class="text-muted">@Texts.Get("crm.salesForecastDetail.none")</p> }
                 else
                 {
                     <table class="table record-table">
-                        <caption class="visually-hidden">Eklenen fırsatlar</caption>
-                        <thead><tr><th scope="col">Fırsat</th>@if (c.AmountsVisible) { <th scope="col">Tutar</th> }<th scope="col">Kategori</th></tr></thead>
+                        <caption class="visually-hidden">@Texts.Get("crm.salesForecastDetail.addedCaption")</caption>
+                        <thead><tr><th scope="col">@Texts.Get("crm.opportunity.single")</th>@if (c.AmountsVisible) { <th scope="col">@Texts.Get("crm.sales.col.amount")</th> }<th scope="col">@Texts.Get("crm.salesForecastDetail.col.category")</th></tr></thead>
                         <tbody>
                             @foreach (var e in c.Added)
                             {
                                 <tr>
-                                    <td data-label="Fırsat" class="primary"><a href="crm/firsatlar/@e.OpportunityId">@e.OpportunityNumber</a> · @e.Title</td>
-                                    @if (c.AmountsVisible) { <td data-label="Tutar">@AmountOrDash(e.AfterAmount, currency)</td> }
-                                    <td data-label="Kategori">@CategoryOrDash(e.AfterCategory)</td>
+                                    <td data-label="@Texts.Get("crm.opportunity.single")" class="primary"><a href="crm/firsatlar/@e.OpportunityId">@e.OpportunityNumber</a> · @e.Title</td>
+                                    @if (c.AmountsVisible) { <td data-label="@Texts.Get("crm.sales.col.amount")">@AmountOrDash(e.AfterAmount, currency)</td> }
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.category")">@CategoryOrDash(e.AfterCategory)</td>
                                 </tr>
                             }
                         </tbody>
                     </table>
                 }
 
-                <h4 class="h6">Çıkan fırsatlar (@c.Removed.Count)</h4>
-                @if (c.Removed.Count == 0) { <p class="text-muted">Yok.</p> }
+                <h4 class="h6">@Texts.Get("crm.salesForecastDetail.removed", c.Removed.Count)</h4>
+                @if (c.Removed.Count == 0) { <p class="text-muted">@Texts.Get("crm.salesForecastDetail.none")</p> }
                 else
                 {
                     <table class="table record-table">
-                        <caption class="visually-hidden">Çıkan fırsatlar</caption>
-                        <thead><tr><th scope="col">Fırsat</th>@if (c.AmountsVisible) { <th scope="col">Önceki tutar</th> }<th scope="col">Önceki kategori</th><th scope="col">Neden</th></tr></thead>
+                        <caption class="visually-hidden">@Texts.Get("crm.salesForecastDetail.removedCaption")</caption>
+                        <thead><tr><th scope="col">@Texts.Get("crm.opportunity.single")</th>@if (c.AmountsVisible) { <th scope="col">@Texts.Get("crm.salesForecastDetail.col.beforeAmount")</th> }<th scope="col">@Texts.Get("crm.salesForecastDetail.col.beforeCategory")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.reason")</th></tr></thead>
                         <tbody>
                             @foreach (var e in c.Removed)
                             {
                                 <tr>
-                                    <td data-label="Fırsat" class="primary"><a href="crm/firsatlar/@e.OpportunityId">@e.OpportunityNumber</a> · @e.Title</td>
-                                    @if (c.AmountsVisible) { <td data-label="Önceki tutar">@AmountOrDash(e.BeforeAmount, currency)</td> }
-                                    <td data-label="Önceki kategori">@CategoryOrDash(e.BeforeCategory)</td>
-                                    <td data-label="Neden"><span class="badge stage-@OutcomeBadge(e.Outcome)">@SalesLabels.Outcome(e.Outcome)</span></td>
+                                    <td data-label="@Texts.Get("crm.opportunity.single")" class="primary"><a href="crm/firsatlar/@e.OpportunityId">@e.OpportunityNumber</a> · @e.Title</td>
+                                    @if (c.AmountsVisible) { <td data-label="@Texts.Get("crm.salesForecastDetail.col.beforeAmount")">@AmountOrDash(e.BeforeAmount, currency)</td> }
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.beforeCategory")">@CategoryOrDash(e.BeforeCategory)</td>
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.reason")"><span class="badge stage-@OutcomeBadge(e.Outcome)">@SalesLabels.Outcome(e.Outcome)</span></td>
                                 </tr>
                             }
                         </tbody>
                     </table>
                 }
 
-                <h4 class="h6">Tutarı değişenler (@c.AmountChanged.Count)</h4>
-                @if (c.AmountChanged.Count == 0) { <p class="text-muted">Yok.</p> }
+                <h4 class="h6">@Texts.Get("crm.salesForecastDetail.amountChanged", c.AmountChanged.Count)</h4>
+                @if (c.AmountChanged.Count == 0) { <p class="text-muted">@Texts.Get("crm.salesForecastDetail.none")</p> }
                 else
                 {
                     <table class="table record-table">
-                        <caption class="visually-hidden">Tutarı değişen fırsatlar</caption>
-                        <thead><tr><th scope="col">Fırsat</th><th scope="col">Önceki tutar</th><th scope="col">Yeni tutar</th></tr></thead>
+                        <caption class="visually-hidden">@Texts.Get("crm.salesForecastDetail.amountChangedCaption")</caption>
+                        <thead><tr><th scope="col">@Texts.Get("crm.opportunity.single")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.beforeAmount")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.afterAmount")</th></tr></thead>
                         <tbody>
                             @foreach (var e in c.AmountChanged)
                             {
                                 <tr>
-                                    <td data-label="Fırsat" class="primary"><a href="crm/firsatlar/@e.OpportunityId">@e.OpportunityNumber</a> · @e.Title</td>
-                                    <td data-label="Önceki tutar">@(c.AmountsVisible ? AmountOrDash(e.BeforeAmount, currency) : "—")</td>
-                                    <td data-label="Yeni tutar">@(c.AmountsVisible ? AmountOrDash(e.AfterAmount, currency) : "—")</td>
+                                    <td data-label="@Texts.Get("crm.opportunity.single")" class="primary"><a href="crm/firsatlar/@e.OpportunityId">@e.OpportunityNumber</a> · @e.Title</td>
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.beforeAmount")">@(c.AmountsVisible ? AmountOrDash(e.BeforeAmount, currency) : "—")</td>
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.afterAmount")">@(c.AmountsVisible ? AmountOrDash(e.AfterAmount, currency) : "—")</td>
                                 </tr>
                             }
                         </tbody>
                     </table>
                 }
 
-                <h4 class="h6">Kategorisi değişenler (@c.CategoryChanged.Count)</h4>
-                @if (c.CategoryChanged.Count == 0) { <p class="text-muted">Yok.</p> }
+                <h4 class="h6">@Texts.Get("crm.salesForecastDetail.categoryChanged", c.CategoryChanged.Count)</h4>
+                @if (c.CategoryChanged.Count == 0) { <p class="text-muted">@Texts.Get("crm.salesForecastDetail.none")</p> }
                 else
                 {
                     <table class="table record-table">
-                        <caption class="visually-hidden">Kategorisi değişen fırsatlar</caption>
-                        <thead><tr><th scope="col">Fırsat</th><th scope="col">Önceki kategori</th><th scope="col">Yeni kategori</th></tr></thead>
+                        <caption class="visually-hidden">@Texts.Get("crm.salesForecastDetail.categoryChangedCaption")</caption>
+                        <thead><tr><th scope="col">@Texts.Get("crm.opportunity.single")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.col.beforeCategory")</th><th scope="col">@Texts.Get("crm.salesForecastDetail.newCategory")</th></tr></thead>
                         <tbody>
                             @foreach (var e in c.CategoryChanged)
                             {
                                 <tr>
-                                    <td data-label="Fırsat" class="primary"><a href="crm/firsatlar/@e.OpportunityId">@e.OpportunityNumber</a> · @e.Title</td>
-                                    <td data-label="Önceki kategori">@CategoryOrDash(e.BeforeCategory)</td>
-                                    <td data-label="Yeni kategori">@CategoryOrDash(e.AfterCategory)</td>
+                                    <td data-label="@Texts.Get("crm.opportunity.single")" class="primary"><a href="crm/firsatlar/@e.OpportunityId">@e.OpportunityNumber</a> · @e.Title</td>
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.col.beforeCategory")">@CategoryOrDash(e.BeforeCategory)</td>
+                                    <td data-label="@Texts.Get("crm.salesForecastDetail.newCategory")">@CategoryOrDash(e.AfterCategory)</td>
                                 </tr>
                             }
                         </tbody>
@@ -585,7 +584,7 @@
         </section>
 
         <details class="detail-section">
-            <summary><strong>Hesap açıklaması</strong></summary>
+            <summary><strong>@Texts.Get("crm.sales.definitions")</strong></summary>
             <ul class="small text-muted mt-2">
                 @foreach (var definition in d.Definitions)
                 {
@@ -698,7 +697,7 @@
         if (!result.IsSuccess || result.Value is null)
         {
             loadStatus = result.Status;
-            loadError = result.Status == HttpStatusCode.NotFound ? "Tahmin bulunamadı ya da erişiminiz yok." : result.Error;
+            loadError = result.Status == HttpStatusCode.NotFound ? Texts.Get("crm.salesForecastDetail.notFound") : result.Error;
             return;
         }
 
@@ -735,7 +734,7 @@
     private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     private string VersionText(Guid versionId) =>
-        versions?.FirstOrDefault(v => v.Id == versionId) is { } v ? $"V{v.VersionNo}" : "Önceki sürüm";
+        versions?.FirstOrDefault(v => v.Id == versionId) is { } v ? Texts.Get("crm.salesForecasts.versionNo", v.VersionNo) : Texts.Get("crm.salesForecastDetail.previousVersion");
 
     // ---- Eylemler
 
@@ -787,7 +786,7 @@
                 await LoadVersionsAsync();
             }
 
-            actionMessage = $"{result.Error} Tahminin güncel hali yeniden yüklendi; işleminizi gözden geçirip gerekirse tekrar deneyin.";
+            actionMessage = Texts.Get("crm.salesForecastDetail.conflict", result.Error);
             return;
         }
 
@@ -796,13 +795,13 @@
     }
 
     private Task RefreshAsync() =>
-        RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/refresh", new ForecastVersionRequestDto(Version)), "Taslak güncel fırsatlarla yenilendi. Önceki düzeltmeleriniz korundu.");
+        RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/refresh", new ForecastVersionRequestDto(Version)), Texts.Get("crm.salesForecastDetail.refreshed"));
 
     private Task SubmitAsync() =>
-        RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/submit", new ForecastVersionRequestDto(Version)), "Tahmin sunuldu.");
+        RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/submit", new ForecastVersionRequestDto(Version)), Texts.Get("crm.salesForecastDetail.submitted"));
 
     private Task SaveNoteAsync() =>
-        RunAsync(() => Api.PutAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/note", new ForecastNoteRequestDto(string.IsNullOrWhiteSpace(noteText) ? null : noteText.Trim(), Version)), "Not kaydedildi.");
+        RunAsync(() => Api.PutAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/note", new ForecastNoteRequestDto(string.IsNullOrWhiteSpace(noteText) ? null : noteText.Trim(), Version)), Texts.Get("crm.salesForecastDetail.noteSaved"));
 
     private void StartPending(string action)
     {
@@ -822,25 +821,25 @@
 
     private static string PendingTitle(string action) => action switch
     {
-        "return" => "Tahmini taslağa geri çek",
-        "lock" => "Tahmini kilitle",
-        "reopen" => "Kilitli tahmini yeniden aç",
-        _ => "Taslağı sil",
+        "return" => Texts.Get("crm.salesForecastDetail.returnTitle"),
+        "lock" => Texts.Get("crm.salesForecastDetail.lockTitle"),
+        "reopen" => Texts.Get("crm.salesForecastDetail.reopenTitle"),
+        _ => Texts.Get("crm.salesForecastDetail.deleteTitle"),
     };
 
     private static string PendingConfirmText(string action) => action switch
     {
-        "return" => "Taslağa geri çek",
-        "lock" => "Evet, kilitle",
-        "reopen" => "Yeni sürüm olarak aç",
-        _ => "Evet, sil",
+        "return" => Texts.Get("crm.salesForecastDetail.return"),
+        "lock" => Texts.Get("crm.salesForecastDetail.lockYes"),
+        "reopen" => Texts.Get("crm.salesForecastDetail.reopenAsNew"),
+        _ => Texts.Get("common.view.deleteYes"),
     };
 
     private Task ConfirmPendingAsync() => pending switch
     {
-        "return" => RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/return", new ForecastReasonRequestDto(reason.Trim(), Version)), "Tahmin taslağa geri çekildi."),
-        "lock" => RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/lock", new ForecastVersionRequestDto(Version)), "Tahmin kilitlendi."),
-        "reopen" => RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/reopen", new ForecastReasonRequestDto(reason.Trim(), Version)), "Yeni sürüm taslak olarak açıldı."),
+        "return" => RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/return", new ForecastReasonRequestDto(reason.Trim(), Version)), Texts.Get("crm.salesForecastDetail.returned")),
+        "lock" => RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/lock", new ForecastVersionRequestDto(Version)), Texts.Get("crm.salesForecastDetail.locked")),
+        "reopen" => RunAsync(() => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/reopen", new ForecastReasonRequestDto(reason.Trim(), Version)), Texts.Get("crm.salesForecastDetail.reopened")),
         "delete" => DeleteAsync(),
         _ => Task.CompletedTask,
     };
@@ -865,7 +864,7 @@
 
         pending = null;
         actionMessage = result.Status == HttpStatusCode.Conflict
-            ? $"{result.Error} Tahmin silinmedi; güncel hali yeniden yükleniyor."
+            ? Texts.Get("crm.salesForecastDetail.deleteConflict", result.Error)
             : result.Error;
         if (result.Status == HttpStatusCode.Conflict)
         {
@@ -930,7 +929,7 @@
 
         return RunAsync(
             () => Api.PostAsync<ForecastDetailDto>($"{BaseUrl}/{Id}/adjust", new AdjustForecastRequestDto(form.ItemId, form.Kind, value, form.Reason.Trim(), Version)),
-            "Düzeltme kaydedildi.");
+            Texts.Get("crm.salesForecastDetail.adjusted"));
     }
 
     // ---- Karşılaştırma
@@ -974,7 +973,7 @@
     {
         if (string.IsNullOrEmpty(value))
         {
-            return "— (yok)";
+            return Texts.Get("crm.salesForecastDetail.emptyValue");
         }
 
         return kind switch
@@ -994,12 +993,12 @@
 
         var seq = 0;
         builder.OpenElement(seq++, "tr");
-        Cell(builder, ref seq, "Senaryo", label, "primary");
-        Cell(builder, ref seq, "Tahmin", CrmLabels.Amount(variance.Forecast, currency));
-        Cell(builder, ref seq, "Gerçekleşen", CrmLabels.Amount(variance.Actual, currency));
-        Cell(builder, ref seq, "Hata", $"{(variance.Error > 0 ? "+" : null)}{CrmLabels.Amount(variance.Error, currency)}");
-        Cell(builder, ref seq, "Mutlak hata", CrmLabels.Amount(variance.AbsoluteError, currency));
-        Cell(builder, ref seq, "Hata yüzdesi", variance.ErrorPercent is { } percent ? $"{(percent > 0 ? "+" : null)}{SalesLabels.Percent(percent)}" : "Hesaplanmadı");
+        Cell(builder, ref seq, Texts.Get("crm.salesForecastDetail.col.scenario"), label, "primary");
+        Cell(builder, ref seq, Texts.Get("crm.salesForecastDetail.col.forecast"), CrmLabels.Amount(variance.Forecast, currency));
+        Cell(builder, ref seq, SalesLabels.Label(SalesLabels.Cards, SalesCards.Realized), CrmLabels.Amount(variance.Actual, currency));
+        Cell(builder, ref seq, Texts.Get("crm.salesForecastDetail.col.error"), $"{(variance.Error > 0 ? "+" : null)}{CrmLabels.Amount(variance.Error, currency)}");
+        Cell(builder, ref seq, Texts.Get("crm.salesForecastDetail.col.absError"), CrmLabels.Amount(variance.AbsoluteError, currency));
+        Cell(builder, ref seq, Texts.Get("crm.salesForecastDetail.col.errorPercent"), variance.ErrorPercent is { } percent ? $"{(percent > 0 ? "+" : null)}{SalesLabels.Percent(percent)}" : Texts.Get("crm.salesForecastDetail.notCalculated"));
         builder.CloseElement();
     };
 

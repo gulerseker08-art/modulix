@@ -2,25 +2,25 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Fiyat listeleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.priceLists.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.PricesRead">
     <div class="page-header">
-        <h1>Fiyat listeleri</h1>
+        <h1>@Texts.Get("crm.priceLists.title")</h1>
     </div>
 
-    <p class="text-muted">Fiyatlar ürünün temel birimi başınadır; kademe aralığı [alt, üst) temel birim miktarıdır. Yayımlanan liste değişmez, yalnızca arşive alınır; değişiklik için yeni liste açın.</p>
+    <p class="text-muted">@Texts.Get("crm.priceLists.help")</p>
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Fiyat listesi görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("crm.priceLists.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Fiyat listesi ara" placeholder="Ad veya segment ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("crm.priceLists.searchLabel")" placeholder="@Texts.Get("crm.priceLists.searchPlaceholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(CrmAccess.PricesWrite) && form is null)
         {
-            <button type="button" class="btn btn-primary" @onclick="New"><AppIcon Name="plus" Size="16" /> Yeni liste</button>
+            <button type="button" class="btn btn-primary" @onclick="New"><AppIcon Name="plus" Size="16" /> @Texts.Get("crm.priceLists.newButton")</button>
         }
     </div>
 
@@ -35,22 +35,22 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>@(form.Id is null ? "Yeni fiyat listesi" : "Fiyat listesini düzenle")</h2>
-            <TabBar Tabs="FormTabs" State="tabs" Label="Fiyat listesi formu bölümleri" />
+            <h2>@(form.Id is null ? Texts.Get("crm.priceLists.new") : Texts.Get("crm.priceLists.edit"))</h2>
+            <TabBar Tabs="FormTabs" State="tabs" Label="@Texts.Get("crm.priceLists.formSections")" />
             <TabPanel State="tabs" Key="form-genel">
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="name">Ad *</label>
+                    <label class="form-label" for="name">@Texts.Get("common.field.nameRequired")</label>
                     <input id="name" class="form-control" maxlength="150" @bind="form.Name" />
                     <FieldError Field="name" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="currency">Para birimi *</label>
+                    <label class="form-label" for="currency">@Texts.Get("common.field.currencyRequired")</label>
                     <input id="currency" class="form-control" maxlength="3" @bind="form.Currency" />
                     <FieldError Field="currency" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="scope">Kapsam</label>
+                    <label class="form-label" for="scope">@Texts.Get("crm.priceLists.field.scope")</label>
                     <select id="scope" class="form-select" @bind="form.Scope">
                         @foreach (var scope in PricingLabels.Scopes)
                         {
@@ -62,7 +62,7 @@
                 @if (form.Scope == "Customer")
                 {
                     <div>
-                        <label class="form-label" for="company">Firma *</label>
+                        <label class="form-label" for="company">@Texts.Get("crm.priceLists.field.company")</label>
                         <select id="company" class="form-select" @bind="form.CompanyId">
                             <option value="">—</option>
                             @foreach (var company in companies)
@@ -76,7 +76,7 @@
                 @if (form.Scope == "Segment")
                 {
                     <div>
-                        <label class="form-label" for="segment">Segment / kanal *</label>
+                        <label class="form-label" for="segment">@Texts.Get("crm.priceLists.field.segment")</label>
                         <input id="segment" class="form-control" maxlength="100" @bind="form.Segment" />
                         <FieldError Field="segment" Errors="errors" />
                     </div>
@@ -86,7 +86,7 @@
             <TabPanel State="tabs" Key="form-gecerlilik">
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="method">Kademe yöntemi</label>
+                    <label class="form-label" for="method">@Texts.Get("crm.priceLists.field.tierMethod")</label>
                     <select id="method" class="form-select" @bind="form.TierMethod">
                         @foreach (var method in PricingLabels.TierMethods)
                         {
@@ -96,23 +96,23 @@
                     <FieldError Field="tierMethod" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="from">Geçerlilik başı</label>
+                    <label class="form-label" for="from">@Texts.Get("crm.priceLists.field.validFrom")</label>
                     <input id="from" class="form-control" type="datetime-local" @bind="form.ValidFrom" />
                     <FieldError Field="validFrom" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="to">Geçerlilik sonu (hariç)</label>
+                    <label class="form-label" for="to">@Texts.Get("crm.priceLists.field.validTo")</label>
                     <input id="to" class="form-control" type="datetime-local" @bind="form.ValidTo" />
                     <FieldError Field="validTo" Errors="errors" />
                 </div>
             </div>
             </TabPanel>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </form>
@@ -121,31 +121,31 @@
     @if (opened is not null)
     {
         <section class="record-form">
-            <h2>@opened.Name · satırlar <span class="badge status-@PricingLabels.ListBadge(opened.Status)">@PricingLabels.Label(PricingLabels.ListStatuses, opened.Status)</span></h2>
+            <h2>@Texts.Get("crm.priceLists.itemsTitle", opened.Name) <span class="badge status-@PricingLabels.ListBadge(opened.Status)">@PricingLabels.Label(PricingLabels.ListStatuses, opened.Status)</span></h2>
             @if (items is null)
             {
-                <p class="text-muted">Yükleniyor…</p>
+                <LoadingState Kind="LoadingKind.Table" />
             }
             else if (items.Count == 0)
             {
-                <p class="text-muted">Satır yok.</p>
+                <EmptyState Title="@Texts.Get("crm.priceLists.noItems")" />
             }
             else
             {
                 <table class="table record-table">
-                    <thead><tr><th>Ürün</th><th>Alt miktar</th><th>Üst miktar (hariç)</th><th>Birim fiyat</th><th></th></tr></thead>
+                    <thead><tr><th>@Texts.Get("crm.priceLists.col.product")</th><th>@Texts.Get("crm.priceLists.col.min")</th><th>@Texts.Get("crm.priceLists.col.max")</th><th>@Texts.Get("crm.priceLists.col.unitPrice")</th><th></th></tr></thead>
                     <tbody>
                         @foreach (var item in items)
                         {
                             <tr>
-                                <td data-label="Ürün" class="primary">@item.ProductCode — @item.ProductName</td>
-                                <td data-label="Alt miktar">@item.MinQuantity.ToString("0.######")</td>
-                                <td data-label="Üst miktar">@(item.MaxQuantity?.ToString("0.######") ?? "sınırsız")</td>
-                                <td data-label="Birim fiyat">@(item.IsFree ? "Ücretsiz" : $"{item.UnitPrice.ToString("0.00####")} {opened.Currency}")</td>
+                                <td data-label="@Texts.Get("crm.priceLists.col.product")" class="primary">@item.ProductCode — @item.ProductName</td>
+                                <td data-label="@Texts.Get("crm.priceLists.col.min")">@item.MinQuantity.ToString("0.######")</td>
+                                <td data-label="@Texts.Get("crm.priceLists.col.maxShort")">@(item.MaxQuantity?.ToString("0.######") ?? Texts.Get("crm.priceLists.unlimited"))</td>
+                                <td data-label="@Texts.Get("crm.priceLists.col.unitPrice")">@(item.IsFree ? Texts.Get("crm.priceLists.free") : $"{item.UnitPrice.ToString("0.00####")} {opened.Currency}")</td>
                                 <td class="actions">
                                     @if (opened.Status == "Draft" && Session.Can(CrmAccess.PricesWrite))
                                     {
-                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => DeleteItemAsync(item)">Sil</button>
+                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => DeleteItemAsync(item)">@Texts.Get("common.delete")</button>
                                     }
                                 </td>
                             </tr>
@@ -163,7 +163,7 @@
             {
                 <form class="form-grid" novalidate @onsubmit="AddItemAsync" @onsubmit:preventDefault>
                     <div>
-                        <label class="form-label" for="itemProduct">Ürün *</label>
+                        <label class="form-label" for="itemProduct">@Texts.Get("crm.priceLists.item.product")</label>
                         <select id="itemProduct" class="form-select" @bind="itemForm.ProductId">
                             <option value="@Guid.Empty">—</option>
                             @foreach (var product in products)
@@ -174,29 +174,29 @@
                         <FieldError Field="productId" Errors="itemErrors" />
                     </div>
                     <div>
-                        <label class="form-label" for="itemMin">Alt miktar *</label>
+                        <label class="form-label" for="itemMin">@Texts.Get("crm.priceLists.item.min")</label>
                         <input id="itemMin" class="form-control" type="number" step="any" min="0" @bind="itemForm.Min" />
                         <FieldError Field="minQuantity" Errors="itemErrors" />
                     </div>
                     <div>
-                        <label class="form-label" for="itemMax">Üst miktar (hariç)</label>
+                        <label class="form-label" for="itemMax">@Texts.Get("crm.priceLists.col.max")</label>
                         <input id="itemMax" class="form-control" type="number" step="any" min="0" @bind="itemForm.Max" />
                         <FieldError Field="maxQuantity" Errors="itemErrors" />
                     </div>
                     <div>
-                        <label class="form-label" for="itemPrice">Birim fiyat *</label>
+                        <label class="form-label" for="itemPrice">@Texts.Get("crm.priceLists.item.unitPrice")</label>
                         <input id="itemPrice" class="form-control" type="number" step="any" min="0" disabled="@itemForm.IsFree" @bind="itemForm.Price" />
                         <FieldError Field="unitPrice" Errors="itemErrors" />
                     </div>
                     <div>
-                        <label class="form-label" for="itemFree">Ücretsiz satış</label>
+                        <label class="form-label" for="itemFree">@Texts.Get("crm.priceLists.item.free")</label>
                         <select id="itemFree" class="form-select" @bind="itemForm.IsFree">
-                            <option value="False">Hayır</option>
-                            <option value="True">Evet</option>
+                            <option value="False">@Texts.Get("common.no")</option>
+                            <option value="True">@Texts.Get("common.yes")</option>
                         </select>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-outline-primary" disabled="@busy">Satır ekle</button>
+                        <button type="submit" class="btn btn-outline-primary" disabled="@busy">@Texts.Get("crm.priceLists.addItem")</button>
                     </div>
                 </form>
             }
@@ -204,24 +204,24 @@
             <div class="form-actions">
                 @if (opened.Status == "Draft" && Session.Can(CrmAccess.PricesWrite))
                 {
-                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick='() => ChangeStatusAsync(opened, "Published")'>Yayımla</button>
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick='() => ChangeStatusAsync(opened, "Published")'>@Texts.Get("crm.priceLists.publish")</button>
                 }
                 @if (opened.Status != "Archived" && Session.Can(CrmAccess.PricesWrite))
                 {
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick='() => ChangeStatusAsync(opened, "Archived")'>Arşive al</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick='() => ChangeStatusAsync(opened, "Archived")'>@Texts.Get("crm.priceLists.archive")</button>
                 }
-                <button type="button" class="btn btn-outline-secondary" @onclick="CloseItems">Kapat</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="CloseItems">@Texts.Get("common.close")</button>
             </div>
         </section>
     }
 
     @if (page is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Fiyat listesi yok.</p>
+        <EmptyState Title="@Texts.Get("crm.priceLists.none")" />
     }
     else
     {
@@ -232,7 +232,7 @@
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -244,11 +244,11 @@
                             @Cell(column, list)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{list.Name} eylemleri")">
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenItemsAsync(list)"><AppIcon Name="list" Size="16" /> <span>Satırlar</span></button>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", list.Name)">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenItemsAsync(list)"><AppIcon Name="list" Size="16" /> <span>@Texts.Get("crm.priceLists.items")</span></button>
                                 @if (list.Status == "Draft" && Session.Can(CrmAccess.PricesWrite))
                                 {
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Edit(list)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Edit(list)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 }
                             </RowMenu>
                         </td>
@@ -265,14 +265,15 @@
     private const string ItemsUrl = "/api/crm/price-list-items";
 
     // Varsayılan sıra durum + ad ("status"); Kapsam sütunu (ad + segment + firma birleşimi) kapsam türüne göre sıralanır.
-    private static readonly GridColumnDef[] Columns =
+    // Özellik olarak tanımlıdır: başlıklar sınıf yüklenirken değil, sayfa açılırken sözlükten çözülür (ADR-0034).
+    private static GridColumnDef[] Columns =>
     [
-        new("name", "Ad", "type", "name", "-name", Locked: true),
-        new("status", "Durum", "tag", "status", "-status"),
-        new("scope", "Kapsam", "globe", "scope", "-scope"),
-        new("currency", "Para birimi", "coins", "currency", "-currency"),
-        new("period", "Geçerlilik", "calendar", "validFrom", "-validFrom"),
-        new("validTo", "Geçerlilik sonu", "calendar", "validTo", "-validTo", DefaultVisible: false),
+        new("name", Texts.Get("common.field.name"), "type", "name", "-name", Locked: true),
+        new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
+        new("scope", Texts.Get("crm.priceLists.field.scope"), "globe", "scope", "-scope"),
+        new("currency", Texts.Get("crm.priceLists.col.currency"), "coins", "currency", "-currency"),
+        new("period", Texts.Get("crm.priceLists.col.period"), "calendar", "validFrom", "-validFrom"),
+        new("validTo", Texts.Get("crm.priceLists.col.validTo"), "calendar", "validTo", "-validTo", DefaultVisible: false),
     ];
 
     private readonly GridViewState grid = new("crm.price-lists", "status");
@@ -293,8 +294,8 @@
 
     private IReadOnlyList<TabItem> FormTabs =>
     [
-        new("form-genel", "Genel", Errors: ErrorCount("name", "currency", "scope", "companyId", "segment")),
-        new("form-gecerlilik", "Kademe ve geçerlilik", Errors: ErrorCount("tierMethod", "validFrom", "validTo")),
+        new("form-genel", Texts.Get("crm.priceLists.tab.general"), Errors: ErrorCount("name", "currency", "scope", "companyId", "segment")),
+        new("form-gecerlilik", Texts.Get("crm.priceLists.tab.validity"), Errors: ErrorCount("tierMethod", "validFrom", "validTo")),
     ];
     private ItemForm itemForm = new();
     private IReadOnlyDictionary<string, string[]>? errors;
@@ -322,7 +323,7 @@
     // Görünümler yalnızca süzgeçtir (tümü, durum, kişisel); kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllView, "Tüm fiyat listeleri", Icon: "coins"),
+        new(AllView, Texts.Get("crm.priceLists.view.all"), Icon: "coins"),
         .. PricingLabels.ListStatuses.Select(s => new ViewOption(StatusPrefix + s.Key, s.Label, Icon: "tag")),
         .. views.Options,
     ];
@@ -438,7 +439,7 @@
     private string CompanyName(Guid? id) => id is { } value && companies.FirstOrDefault(c => c.Id == value) is { } company ? $" · {company.Name}" : string.Empty;
 
     private static string Period(PriceListDto list) => list.ValidFrom is null && list.ValidTo is null
-        ? "Süresiz"
+        ? Texts.Get("crm.priceLists.noPeriod")
         : $"{list.ValidFrom?.ToLocalTime():yyyy-MM-dd HH:mm} → {(list.ValidTo is { } to ? to.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "…")}";
 
     private async Task New()

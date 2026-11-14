@@ -1,5 +1,5 @@
 using Modulix.Core.Contracts.Customization;
-using Modulix.Core.Contracts.Fleet;
+using Modulix.Modules.Fleet.Contracts;
 using Modulix.Core.Contracts.Persistence;
 
 namespace Modulix.Modules.Logistics.Records;
@@ -8,8 +8,16 @@ namespace Modulix.Modules.Logistics.Records;
 /// Kayıt depolarının ihtiyaç duyduğu servisler. Tenant filtresi ve RLS <see cref="IModuleData"/> üzerinden uygulanır. Araçlar Filo
 /// modülündedir; lojistik araç tablosuna dokunmaz, <see cref="IVehicleDirectory"/> ile okur (ADR-0038 K1).
 /// </summary>
-internal sealed class LogisticsStoreContext(IModuleData data, IChoiceLists choiceLists, IVehicleDirectory vehicles, LogisticsWorkflowGate gate)
+internal sealed class LogisticsStoreContext(
+    IModuleData data, IChoiceLists choiceLists, IVehicleDirectory vehicles, LogisticsWorkflowGate gate, Lifecycle.ILogisticsPolicyProvider? policy = null)
 {
+    /// <summary>Ülke gönderilmediğinde kullanılan ülke: firma ayarı (<c>logistics.default-country</c>), yoksa ya da geçersizse <see cref="Domain.CargoEntity.DefaultCountry"/>.</summary>
+    public async Task<string> DefaultCountryAsync(CancellationToken cancellationToken)
+    {
+        var configured = policy is null ? null : await policy.DefaultCountryAsync(cancellationToken);
+        return configured is not null && Core.Contracts.Records.IsoCountryCodes.IsValid(configured) ? configured : Domain.CargoEntity.DefaultCountry;
+    }
+
     public LogisticsWorkflowGate Gate => gate;
 
     public IModuleData Data => data;

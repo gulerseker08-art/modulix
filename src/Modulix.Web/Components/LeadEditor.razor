@@ -4,6 +4,7 @@
 @inject ApiClient Api
 @inject SessionState Session
 @inject FormLayouts Layouts
+@inject ToastService Toasts
 
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
@@ -83,7 +84,17 @@
                     break;
                 case "industry":
                     <label class="@f.LabelClass()" for="lead-industry">@f.Label</label>
-                    <input id="lead-industry" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Industry" />
+                    <select id="lead-industry" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Industry">
+                        <option value="">@Texts.Get("crm.company.editor.industryPlaceholder")</option>
+                        @foreach (var industry in IndustryChoices)
+                        {
+                            <option value="@industry.Code">@industry.Name</option>
+                        }
+                    </select>
+                    @if (string.IsNullOrEmpty(form.Industry) && !string.IsNullOrWhiteSpace(Lead?.LegacyIndustry))
+                    {
+                        <small class="form-text text-muted">@Texts.Get("crm.company.editor.industryLegacy", Lead!.LegacyIndustry)</small>
+                    }
                     <FieldError Field="industry" Errors="errors" />
                     break;
                 case "firstName":
@@ -224,7 +235,16 @@
     {
         layout = await Layouts.ForAsync(CrmEntityKeys.Lead);
         layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
+
+        // Sektör listesi platform kataloğundan gelir (ADR-0043); yüklenemezse alan boş kalır, form yine kaydedilebilir.
+        industries = (await Api.GetAsync<List<IndustryDto>>("/api/industries")).Value ?? [];
     }
+
+    private IReadOnlyList<IndustryDto> industries = [];
+
+    /// <summary>Etkin sektörler; kayıttaki sektör sonradan pasife alınmışsa o da listede kalır (seçili değer kaybolmaz).</summary>
+    private IEnumerable<IndustryDto> IndustryChoices =>
+        industries.Where(i => i.IsActive || i.Code == Lead?.Industry).OrderBy(i => i.Name, StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("tr-TR"), true));
 
     // Sorumlu yalnızca yeni Lead açarken ve atama izniyle seçilir; sonrası Lead detayındaki atama eylemidir.
     private bool Shows(FormFieldDto field) => field.Key != "ownerId" || (Lead is null && Session.Can(CrmAccess.LeadsAssign));
@@ -324,6 +344,7 @@
         if (result.IsSuccess)
         {
             dirty = false;
+            Toasts.Success(Texts.Get("common.saved"));
             await Saved.InvokeAsync(result.Value);
             return;
         }
@@ -341,6 +362,7 @@
         if (result.IsSuccess)
         {
             dirty = false;
+            Toasts.Success(Texts.Get("common.deleted"));
             await Deleted.InvokeAsync();
             return;
         }

@@ -6,6 +6,7 @@
 @inject ApiClient Api
 @inject FormLayouts Layouts
 @inject SessionState Session
+@inject ToastService Toasts
 
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
@@ -94,6 +95,26 @@
                         <label class="@f.LabelClass()" for="cargo-to">@f.Label</label>
                         <input id="cargo-to" class="form-control" maxlength="100" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.DeliveryCity" />
                         <FieldError Field="deliveryCity" Errors="errors" />
+                        break;
+                    case "pickupCountry":
+                        <label class="@f.LabelClass()" for="cargo-from-country">@f.Label</label>
+                        <select id="cargo-from-country" class="form-select" @bind="form.PickupCountry">
+                            @foreach (var country in CountryCatalog.All)
+                            {
+                                <option value="@country.Code">@country.NameTr (@country.Code)</option>
+                            }
+                        </select>
+                        <FieldError Field="pickupCountry" Errors="errors" />
+                        break;
+                    case "deliveryCountry":
+                        <label class="@f.LabelClass()" for="cargo-to-country">@f.Label</label>
+                        <select id="cargo-to-country" class="form-select" @bind="form.DeliveryCountry">
+                            @foreach (var country in CountryCatalog.All)
+                            {
+                                <option value="@country.Code">@country.NameTr (@country.Code)</option>
+                            }
+                        </select>
+                        <FieldError Field="deliveryCountry" Errors="errors" />
                         break;
                     case "pickupAddress":
                         <label class="@f.LabelClass()" for="cargo-from-address">@f.Label</label>
@@ -255,8 +276,8 @@
             {
                 Id = r.Id, Version = r.Version, CustomerPartyId = WarehouseLabels.Id(r, "customerPartyId"), SenderPartyId = WarehouseLabels.Id(r, "senderPartyId"),
                 ReceiverPartyId = WarehouseLabels.Id(r, "receiverPartyId"), TransportModeKey = WarehouseLabels.Text(r, "transportModeKey"),
-                ExternalRef = r.Values["externalRef"]?.GetValue<string>(), PickupCity = WarehouseLabels.Text(r, "pickupCity"),
-                PickupAddress = r.Values["pickupAddress"]?.GetValue<string>(), DeliveryCity = WarehouseLabels.Text(r, "deliveryCity"),
+                ExternalRef = r.Values["externalRef"]?.GetValue<string>(), PickupCity = WarehouseLabels.Text(r, "pickupCity"), PickupCountry = CountryOrDefault(r, "pickupCountry"),
+                PickupAddress = r.Values["pickupAddress"]?.GetValue<string>(), DeliveryCity = WarehouseLabels.Text(r, "deliveryCity"), DeliveryCountry = CountryOrDefault(r, "deliveryCountry"),
                 DeliveryAddress = r.Values["deliveryAddress"]?.GetValue<string>(), PickupDate = FleetLabels.Day(WarehouseLabels.Text(r, "pickupDate")),
                 DeliveryBy = FleetLabels.Day(WarehouseLabels.Text(r, "deliveryBy")), CargoDescription = WarehouseLabels.Text(r, "cargoDescription"),
                 WeightKg = r.Values["weightKg"]?.GetValue<decimal>(), VolumeM3 = r.Values["volumeM3"]?.GetValue<decimal>(),
@@ -275,6 +296,12 @@
         message = null;
     }
 
+    /// <summary>Kayıttaki ülke kodu; boş ya da kayıtta hiç yoksa varsayılan (eski kayıtlar TR'dir).</summary>
+    private static string CountryOrDefault(RecordResponse record, string field) =>
+        record.Values[field] is { } node && node.GetValueKind() == System.Text.Json.JsonValueKind.String && node.GetValue<string>() is { Length: > 0 } code
+            ? code
+            : CountryCatalog.DefaultCode;
+
     private async Task SaveAsync()
     {
         if (ReadOnly)
@@ -290,8 +317,10 @@
             ["receiverPartyId"] = form.ReceiverPartyId?.ToString(),
             ["transportModeKey"] = form.TransportModeKey,
             ["pickupCity"] = form.PickupCity.Trim(),
+            ["pickupCountry"] = form.PickupCountry,
             ["pickupAddress"] = Blank(form.PickupAddress),
             ["deliveryCity"] = form.DeliveryCity.Trim(),
+            ["deliveryCountry"] = form.DeliveryCountry,
             ["deliveryAddress"] = Blank(form.DeliveryAddress),
             ["pickupDate"] = form.PickupDate?.ToString("yyyy-MM-dd"),
             ["deliveryBy"] = form.DeliveryBy?.ToString("yyyy-MM-dd"),
@@ -326,6 +355,7 @@
         if (result.IsSuccess)
         {
             dirty = false;
+            Toasts.Success(Texts.Get("common.saved"));
             await Saved.InvokeAsync(result.Value!);
             return;
         }
@@ -368,9 +398,13 @@
 
         public string PickupCity { get; set; } = string.Empty;
 
+        public string PickupCountry { get; set; } = CountryCatalog.DefaultCode;
+
         public string? PickupAddress { get; set; }
 
         public string DeliveryCity { get; set; } = string.Empty;
+
+        public string DeliveryCountry { get; set; } = CountryCatalog.DefaultCode;
 
         public string? DeliveryAddress { get; set; }
 

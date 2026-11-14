@@ -8,7 +8,7 @@
 <AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.CampaignsRead">
     @if (campaign is null && loadError is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (campaign is null)
     {
@@ -153,11 +153,11 @@
                     <p class="text-muted">Dahil edilenlerin birleşiminden hariç tutulanlar çıkarılır. Yalnızca etkin (yayımlanmış) segmentler ve @MarketingLabels.Label(MarketingLabels.Targets, campaign.Target).ToLowerInvariant() hedefleri kullanılır.</p>
                     @if (entries is null)
                     {
-                        <p class="text-muted" role="status">Yükleniyor…</p>
+                        <LoadingState Kind="LoadingKind.Table" />
                     }
                     else if (entries.Count == 0)
                     {
-                        <p class="text-muted">Henüz kaynak yok. En az bir dahil edilen segment ya da hedef ekleyin.</p>
+                        <EmptyState Title="Henüz kaynak yok. En az bir dahil edilen segment ya da hedef ekleyin." />
                     }
                     else
                     {
@@ -288,11 +288,11 @@
             <div id="tabpanel-dondurulmus" role="tabpanel" aria-labelledby="tab-dondurulmus" hidden="@tabState.Hidden("dondurulmus")">
                 @if (snapshots is null)
                 {
-                    <p class="text-muted" role="status">Yükleniyor…</p>
+                    <LoadingState Kind="LoadingKind.Table" />
                 }
                 else if (snapshots.Count == 0)
                 {
-                    <p class="text-muted">Henüz dondurulmuş hedef kitle yok. Dondurulan kitle değişmez; sonradan segment ya da izin değişse bile o andaki seçim korunur.</p>
+                    <EmptyState Title="Henüz dondurulmuş hedef kitle yok. Dondurulan kitle değişmez; sonradan segment ya da izin değişse bile o andaki seçim korunur." />
                 }
                 else
                 {

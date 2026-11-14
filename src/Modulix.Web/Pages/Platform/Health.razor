@@ -23,7 +23,7 @@
     {
         @if (message is null)
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <LoadingState />
         }
     }
     else
@@ -90,7 +90,7 @@
             <h3>30 gündür giriş yapılmayan firmalar</h3>
             @if (report.InactiveTenants.Count == 0)
             {
-                <p class="text-muted">Her açık firmada son 30 günde giriş var.</p>
+                <EmptyState Title="Her açık firmada son 30 günde giriş var." />
             }
             else
             {

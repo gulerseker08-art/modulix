@@ -1,0 +1,162 @@
+@* Zimmet listesi (ADR-0042 dilim 4): demirbaş kartında geçmiş, çalışan kartında ve "Zimmetlerim"de çalışanın zimmetleri. Satır açılınca eylemler
+   (teslim aldım, iade al, kayıp) sunucudan gelir ve zimmet tutanağı PDF olarak indirilir. Görünürlük sunucudadır (çalışan yalnızca kendi
+   zimmetlerini görür). *@
+@inject ApiClient Api
+@inject IJSRuntime Js
+
+<section aria-label="@Title">
+    <div class="list-toolbar mt-3">
+        <h3 class="h6 mb-0 me-auto">@Title</h3>
+        @if (AddButton is not null)
+        {
+            @AddButton
+        }
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (items is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (items.Count == 0)
+    {
+        <p class="text-muted" role="status">@EmptyText</p>
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">@Title</caption>
+            <thead>
+                <tr>
+                    @if (ShowAsset)
+                    {
+                        <th scope="col"><AppIcon Name="package" Size="14" /> Demirbaş</th>
+                    }
+                    @if (ShowEmployee)
+                    {
+                        <th scope="col"><AppIcon Name="user" Size="14" /> Çalışan</th>
+                    }
+                    <th scope="col"><AppIcon Name="calendar" Size="14" /> Teslim</th>
+                    <th scope="col"><AppIcon Name="check-circle" Size="14" /> Durum</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in items)
+                {
+                    <tr>
+                        @if (ShowAsset)
+                        {
+                            <td data-label="Demirbaş" class="primary">@WarehouseLabels.Text(item, "assetTag") · @WarehouseLabels.Text(item, "assetName")</td>
+                        }
+                        @if (ShowEmployee)
+                        {
+                            <td data-label="Çalışan" class="@(ShowAsset ? null : "primary")">@WarehouseLabels.Text(item, "employeeName")</td>
+                        }
+                        <td data-label="Teslim">@HrLabels.Date(WarehouseLabels.Text(item, "assignedOn"))@(WarehouseLabels.Text(item, "returnedOn") is { Length: > 0 } back ? $" → {HrLabels.Date(back)}" : "")</td>
+                        <td data-label="Durum">
+                            <span class="badge @HrLabels.AssignmentStatusBadge(WarehouseLabels.Text(item, "status"))">@HrLabels.AssignmentStatus(WarehouseLabels.Text(item, "status"))</span>
+                            @if (WarehouseLabels.Text(item, "status") == "active" && item.Values["acknowledgedAt"] is null)
+                            {
+                                <span class="badge stage-negotiation">Onay bekliyor</span>
+                            }
+                        </td>
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(item, "assetTag")} zimmeti eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => selected = item"><AppIcon Name="eye" Size="16" /> <span>Aç</span></button>
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DownloadAsync(item)"><AppIcon Name="file-text" Size="16" /> <span>Tutanak (PDF)</span></button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (selected is not null)
+    {
+        <div class="summary-card mt-2">
+            <h4 class="summary-heading">@WarehouseLabels.Text(selected, "assetTag") · @WarehouseLabels.Text(selected, "employeeName")</h4>
+            <dl class="summary-facts">
+                <div><dt>Teslim</dt><dd>@HrLabels.Date(WarehouseLabels.Text(selected, "assignedOn"))</dd></div>
+                <div><dt>Beklenen iade</dt><dd>@HrLabels.Date(WarehouseLabels.Text(selected, "expectedReturnOn"))</dd></div>
+                <div><dt>Teslimdeki durum</dt><dd>@(WarehouseLabels.Text(selected, "conditionOut") is { Length: > 0 } outText ? outText : "—")</dd></div>
+                <div><dt>Teslim onayı</dt><dd>@(selected.Values["acknowledgedAt"] is null ? "Onaylanmadı" : "Onaylandı")</dd></div>
+                @if (WarehouseLabels.Text(selected, "conditionIn") is { Length: > 0 } inText)
+                {
+                    <div><dt>İadedeki durum</dt><dd>@inText</dd></div>
+                }
+            </dl>
+            <LeaveActionsBar Record="selected" BaseUrl="/api/hr/asset-assignments" Changed="ChangedAsync" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="() => selected = null">Kapat</button>
+        </div>
+    }
+</section>
+
+@code {
+    private List<RecordResponse>? items;
+    private RecordResponse? selected;
+    private string? message;
+    private string? loadedFor;
+
+    [Parameter] public string Title { get; set; } = "Zimmetler";
+
+    [Parameter] public string EmptyText { get; set; } = "Zimmet yok.";
+
+    /// <summary>Liste süzgeci (ör. <c>assetId=…</c>, <c>employeeId=…&amp;status=active</c>).</summary>
+    [Parameter, EditorRequired] public string Query { get; set; } = string.Empty;
+
+    [Parameter] public bool ShowAsset { get; set; } = true;
+
+    [Parameter] public bool ShowEmployee { get; set; } = true;
+
+    [Parameter] public RenderFragment? AddButton { get; set; }
+
+    /// <summary>Bir zimmet eylemi tamamlanınca (demirbaşın durumu da değişmiş olabilir).</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    /// <summary>Dışarıdan (ör. yeni zimmet açılınca) listeyi yeniler.</summary>
+    public Task ReloadAsync() => LoadAsync();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == Query)
+        {
+            return;
+        }
+
+        loadedFor = Query;
+        selected = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<RecordPageResponse>($"/api/records/{HrAccess.AssetAssignmentEntityKey}?{Query}&pageSize=100");
+        items = result.Value?.Items.ToList() ?? [];
+        message = result.Error;
+    }
+
+    private async Task ChangedAsync(RecordResponse changed)
+    {
+        selected = changed;
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private async Task DownloadAsync(RecordResponse item)
+    {
+        var result = await Api.GetAsync<byte[]>($"/api/hr/asset-assignments/{item.Id}/document");
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        await Js.InvokeVoidAsync("modulixDownload", $"zimmet-{WarehouseLabels.Text(item, "assetTag")}.pdf", "application/pdf", Convert.ToBase64String(result.Value!));
+    }
+}

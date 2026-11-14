@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Credentials;
-using Modulix.Core.Contracts.Fleet;
+using Modulix.Modules.Fleet.Contracts;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Logistics.Domain;
@@ -30,6 +30,9 @@ public interface ILogisticsPolicyProvider
 {
     /// <summary><see cref="LogisticsModule.CredentialCheckModes"/> değerlerinden biri.</summary>
     Task<string> CredentialCheckAsync(CancellationToken cancellationToken);
+
+    /// <summary>Firmanın varsayılan ülkesi (ISO 3166-1 alfa-2; ayar boşsa null). Geçerlilik denetimi çağıran tarafta yapılır.</summary>
+    Task<string?> DefaultCountryAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>
