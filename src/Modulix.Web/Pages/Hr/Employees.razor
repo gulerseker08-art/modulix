@@ -30,6 +30,11 @@
         }
     }
 
+    @if (Session.Can(HrAccess.EmployeesWrite) && !editing)
+    {
+        <DepartmentMappingPanel Applied="() => LoadAsync(1)" />
+    }
+
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
     <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Çalışan görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
 
@@ -48,13 +53,7 @@
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <select class="form-select" aria-label="Departman" @bind="departmentKey" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm departmanlar</option>
-                @foreach (var department in Lookups.ValuesOf(HrAccess.DepartmentList))
-                {
-                    <option value="@department.Key">@department.Label</option>
-                }
-            </select>
+            <HrBusinessUnitSelect AriaLabel="Departman" EmptyLabel="Tüm departmanlar" Value="businessUnitId" ValueChanged="UnitFilterAsync" />
             <select class="form-select" aria-label="Çalışma şekli" @bind="employmentType" @bind:after="() => LoadAsync(1)">
                 <option value="">Tüm çalışma şekilleri</option>
                 @foreach (var (key, label) in HrAccess.EmploymentTypes)
@@ -121,13 +120,14 @@
     private const string OnLeaveView = "onLeave";
     private const string TerminatedView = "terminated";
 
-    // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (EmployeeRecordStore.SortKeys).
+    // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (EmployeeRecordStore.SortKeys). Departman Core'dan gelir
+    // (bölüm 22); adı İK tablosunda olmadığı için sunucuda o sütuna göre sıralanmaz.
     private static readonly GridColumnDef[] BaseColumns =
     [
         new("name", "Ad soyad", "user", "name", "-name", Locked: true),
         new("employeeNumber", "Sicil no", "hash", "employeeNumber", "-employeeNumber"),
         new("jobTitle", "Unvan", "briefcase", "jobTitle", "-jobTitle"),
-        new("department", "Departman", "building", "departmentKey", "-departmentKey"),
+        new("department", "Departman", "building"),
         new("manager", "Yönetici", "user-check"),
         new("email", "E-posta", "mail", DefaultVisible: false),
         new("phone", "Telefon", "phone", DefaultVisible: false),
@@ -148,7 +148,7 @@
     private string view = CurrentView;
     private string? status;
     private bool currentOnly = true;
-    private string? departmentKey;
+    private Guid? businessUnitId;
     private string? employmentType;
 
     protected override async Task OnInitializedAsync()
@@ -166,7 +166,7 @@
 
     private GridViewDto? Active => views.Find(view);
 
-    private int ActiveFilters => (string.IsNullOrEmpty(departmentKey) ? 0 : 1) + (string.IsNullOrEmpty(employmentType) ? 0 : 1);
+    private int ActiveFilters => (businessUnitId is null ? 0 : 1) + (string.IsNullOrEmpty(employmentType) ? 0 : 1);
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
@@ -187,7 +187,7 @@
             var filters = GridFilters.Parse(saved.Filters);
             status = filters.GetValueOrDefault("status");
             currentOnly = filters.GetValueOrDefault("current") == "true";
-            departmentKey = filters.GetValueOrDefault("departmentKey");
+            businessUnitId = Guid.TryParse(filters.GetValueOrDefault("businessUnitId"), out var unit) ? unit : null;
             employmentType = filters.GetValueOrDefault("employmentType");
         }
         else
@@ -197,6 +197,12 @@
             currentOnly = key == CurrentView;
         }
 
+        await LoadAsync(1);
+    }
+
+    private async Task UnitFilterAsync(Guid? unit)
+    {
+        businessUnitId = unit;
         await LoadAsync(1);
     }
 
@@ -211,7 +217,7 @@
     private string? CurrentFilters => GridFilters.Build(
         status is { } s ? ("status", s) : null,
         currentOnly ? ("current", "true") : null,
-        string.IsNullOrEmpty(departmentKey) ? null : ("departmentKey", departmentKey),
+        businessUnitId is { } unit ? ("businessUnitId", unit.ToString()) : null,
         string.IsNullOrEmpty(employmentType) ? null : ("employmentType", employmentType));
 
     private void StartNaming() => views.StartNaming(true);
@@ -260,9 +266,9 @@
             url += "&current=true";
         }
 
-        if (!string.IsNullOrEmpty(departmentKey))
+        if (businessUnitId is { } unit)
         {
-            url += $"&departmentKey={Uri.EscapeDataString(departmentKey)}";
+            url += $"&businessUnitId={unit}";
         }
 
         if (!string.IsNullOrEmpty(employmentType))
@@ -287,7 +293,7 @@
         "name" => @<span class="owner-cell"><span class="avatar avatar-tone-@(Math.Abs(employee.Id.GetHashCode()) % 5)" aria-hidden="true">@HrLabels.Initials(employee)</span>@HrLabels.Name(employee)</span>,
         "employeeNumber" => @<text>@Dash(WarehouseLabels.Text(employee, "employeeNumber"))</text>,
         "jobTitle" => @<text>@Dash(WarehouseLabels.Text(employee, "jobTitle"))</text>,
-        "department" => @<text>@(WarehouseLabels.Text(employee, "departmentKey") is { Length: > 0 } d ? Lookups.Label(HrAccess.DepartmentList, d) : "—")</text>,
+        "department" => @<text>@Dash(WarehouseLabels.Text(employee, "businessUnitName"))</text>,
         "manager" => @<text>@(WarehouseLabels.Id(employee, "managerEmployeeId") is { } manager ? WarehouseLabels.NameOf(managerNames, manager) : "—")</text>,
         "email" => @<text>@Dash(WarehouseLabels.Text(employee, "email"))</text>,
         "phone" => @<text>@Dash(WarehouseLabels.Text(employee, "phone"))</text>,

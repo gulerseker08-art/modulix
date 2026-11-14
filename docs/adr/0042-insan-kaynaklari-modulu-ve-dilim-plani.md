@@ -386,3 +386,30 @@ Bölüm 19'daki karar (a) olarak verildi (kullanıcı kararı, 14 Kasım 2026): 
 | `dotnet test tests/Modulix.Core.Tests` | 996/996 geçti |
 | `dotnet test tests/Modulix.ArchitectureTests` | 91/91 geçti |
 | `HrImportTests` (entegrasyon, +2 test: kişiler sonra kartlar, e-posta ve yönetici bağlantısı, görev geçmişi; bilinmeyen e-posta, aynı kişiye ikinci kart, olası mükerrer kişi uyarısı, kişi içe aktarma izni, başka firmanın kişisi) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+
+## 22. Departmanlar Core'a bağlandı (öncelik 2c, 14 Kasım 2026)
+
+Karar (kullanıcı, 14 Kasım 2026: "Core'a bağla"): İK'nın departmanı ayrı bir seçim listesi (`hr.department`) değil, Core'un departman ağacıdır (ADR-0026). Tek kaynak Yönetim › Departmanlar'dır; İK departman açmaz, adlandırmaz.
+
+- **Core sözleşmesi:** `IBusinessUnitDirectory` (`Core.Contracts.Tenancy`): etkin tenant'ın departmanları (ağaç yolu adı ve kimlikleri, derinlik, etkin mi) ve kullanıcıların departmanı (etkin/pasif üyeliğin bağlı olduğu birim). Uygulaması Infrastructure'da, istek başına önbellekli. İK Core tablolarına doğrudan erişmez; yalnızca bu arayüzü kullanır.
+- **Çalışan kartı:** `businessUnitId` (Core departmanı), okunurken `businessUnitName` (ağaç yolu). Hesabı **bağlı** çalışanın departmanı kullanıcının Core departmanıdır: kart kaydedilirken oradan alınır, farklı bir değer gönderilirse alan hatası (departman değişikliği kayıt görünürlüğünü etkilediği için Core'un "Departmanı değiştir" akışıyla yapılır; ADR-0026 dilim 4). `businessUnitFromAccount` arayüze bunu söyler (seçici kapalı). Hesabı olmayan çalışanda departman ağaçtan seçilir; bulunmayan departman ve yeni seçimde kapalı departman reddedilir. Görev geçmişi (bölüm 20) dönem değişikliğini Core departmanına göre yapar ve `businessUnitName`'i gösterir. Liste süzgeci `businessUnitId`; departman adı İK tablosunda olmadığından o sütuna göre sunucuda sıralanmaz (sütun sıralanamaz).
+- **Duyuru ve anket hedefi:** `audienceBusinessUnitId` (okunurken `audienceName`). Okurun departmanı kullanıcının Core departmanıdır (üyelikte departman yoksa kartındaki); hedef departman okurun departman yolundaysa içerik ona yöneliktir, yani üst departmana hedeflenen içerik alt departmanlardakilere de görünür. Hedef seçimi eski İK hedefini temizler; hedef değiştirilmedikçe editör alanı göndermez (eski hedef korunur).
+- **Geçiş (geriye uyumlu, kesintisiz):** migration `HrCoreDepartments` yalnızca boş kolon ekler (`Employees.BusinessUnitId` + `(TenantId, BusinessUnitId)` indeksi, `EmployeePositions.BusinessUnitId`, `Announcements/Surveys.AudienceBusinessUnitId`); yeni tablo yok. Eski `DepartmentKey` / `AudienceDepartmentKey` kolonları ve `hr.department` listesi durur: eşlenmemiş eski hedef, okurun kartındaki eski departmana göre çalışmaya devam eder. **Eşleme aracı** (Çalışanlar ekranında, `hr.employees.write`): `GET /api/hr/department-mapping` eski değerin adını Core'da aynı adlı (ya da aynı ağaç yollu) tek etkin departmanla eşler ve henüz Core departmanı olmayan çalışan/duyuru/anket sayılarını gösterir; eşleşmeyen ya da belirsiz değer listelenir (Core'da departman açılıp yeniden denenir). `POST` eşleşenleri kayıt boru hattıyla yazar (yetki, denetim kaydı, olay): hesabı olmayan karta eşleşen departman, hesabı bağlı karta kullanıcının departmanı; duyuru/anket hedefleri yalnızca onları yönetme izni olan uygulayınca.
+- **İçe aktarma:** çalışan kartı "Departman" sütunu Core departmanının adı ya da ağaç yoludur (yolun başı yazılmayabilir: "Satış › İstanbul"; ayraç "›", ">" ya da "/"); bulunmayan ya da birden çok departmana uyan ad satır hatasıdır.
+- **Arayüz:** ortak `HrBusinessUnitSelect` seçicisi (seçenek ağaç yolu; kapalı departman yalnızca kayıtta seçiliyse "(kapalı)" ekiyle) çalışan formunda, Çalışanlar ve Rehber süzgecinde, organizasyon şemasında (vurgu alt departmanları kapsar), duyuru ve anket editöründe. Eşleme paneli yalnızca bekleyen kayıt varken görünür (`btn-tonal`, toast). Yeni CSS sınıfı ya da token yok; organizasyon şemasındaki düz boş metin `EmptyState`'e çevrildi.
+
+**Sonraki adımlar (bilerek bu bölümde yapılmadı):**
+
+- **22b:** Core, kullanıcının departmanı değişince bir olay yayınlamıyor (bugün yalnızca denetim kaydı). Hesabı bağlı kart bu yüzden kullanıcı taşındıktan sonra ilk kaydında (ya da eşleme aracıyla) yeni departmanı alır; okurun duyuru/anket hedefi ise her istekte üyelikten okunduğu için hemen doğrudur. Core'a "üyelik departmanı değişti" olayı eklenip İK kartı ve görev geçmişi (değişiklik gününden) onu dinleyecek.
+- **22c:** bütün firmalar eşlemeyi uyguladıktan sonra `DepartmentKey`/`AudienceDepartmentKey` kolonlarının ve `hr.department` listesinin kaldırılması (ayrı, geri alınamaz migration; önce kullanım sayısı ölçülür).
+
+### Test sonuçları (bölüm 22)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 57/57 geçti (+14: departmanı adla bulma: kendi adı, ağaç yolu, yolun sonu, Türkçe harf, belirsiz ad, kapalı departman, üst departman kapsamı) |
+| `dotnet test tests/Modulix.Core.Tests` | 996/996 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 91/91 geçti |
+| `dotnet ef migrations has-pending-model-changes` | Bekleyen model değişikliği yok |
+| `HrDepartmentTests` (entegrasyon, 4 test: seçici, hesabı olmayan/bağlı kart, kullanıcı taşınınca kart ve görev geçmişi, süzgeç; eski değerlerin adla eşlenmesi ve eşlenmemiş eski duyurunun görünmeye devam etmesi; bulunmayan/kapalı/çakışan departman; tenant izolasyonu ve yetki); ayrıca `HrAnnouncementTests` ve `HrSurveyTests` güncellendi (hedef Core departmanı, üst departman kapsamı, bulunmayan ve kapalı departman), `HrImportTests` (departman adı/ağaç yolu, bulunmayan departman) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+| `Modulix.Web` derlemesi | Yeni bileşenler ve ekran değişiklikleri hatasız derleniyor (bilinen 210 hatalık taban dışında hata yok); ekran görüntüsü alınamadı (yerelde uygulama çalışmıyor) |

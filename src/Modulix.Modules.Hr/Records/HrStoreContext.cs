@@ -7,7 +7,8 @@ namespace Modulix.Modules.Hr.Records;
 
 /// <summary>Kayıt depolarının ihtiyaç duyduğu servisler. Tenant filtresi ve RLS <see cref="IModuleData"/> üzerinden uygulanır.</summary>
 internal sealed class HrStoreContext(
-    IModuleData data, IChoiceLists choiceLists, ITenantMembers members, ITenantContextAccessor tenant, ICurrentAccess access, HrWorkflowGate gate)
+    IModuleData data, IChoiceLists choiceLists, ITenantMembers members, ITenantContextAccessor tenant, ICurrentAccess access, HrWorkflowGate gate,
+    IBusinessUnitDirectory businessUnits)
 {
     public HrWorkflowGate Gate => gate;
 
@@ -21,6 +22,9 @@ internal sealed class HrStoreContext(
     public IChoiceLists ChoiceLists => choiceLists;
 
     public ITenantMembers Members => members;
+
+    /// <summary>Core'un departman ağacı ve üyelerin departmanı (ADR-0042 bölüm 22).</summary>
+    public IBusinessUnitDirectory BusinessUnits => businessUnits;
 }
 
 /// <summary>Liste filtresi: değeri okuyup sorguya uygular. Değer geçersizse null döner (doğrulama hatası olur).</summary>

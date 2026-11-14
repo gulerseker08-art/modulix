@@ -19,19 +19,13 @@
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
             <input class="form-control" type="search" aria-label="Rehberde ara" placeholder="Ad, soyad, e-posta, telefon veya unvan ara" @bind="search" />
         </form>
-        <FilterToggle @bind-Open="filtersOpen" Count="@(string.IsNullOrEmpty(departmentKey) ? 0 : 1)" />
+        <FilterToggle @bind-Open="filtersOpen" Count="@(businessUnitId is null ? 0 : 1)" />
     </div>
 
-    @if (filtersOpen || !string.IsNullOrEmpty(departmentKey))
+    @if (filtersOpen || businessUnitId is not null)
     {
         <div class="filters">
-            <select class="form-select" aria-label="Departman" @bind="departmentKey" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm departmanlar</option>
-                @foreach (var department in Lookups.ValuesOf(HrAccess.DepartmentList))
-                {
-                    <option value="@department.Key">@department.Label</option>
-                }
-            </select>
+            <HrBusinessUnitSelect AriaLabel="Departman" EmptyLabel="Tüm departmanlar" Value="businessUnitId" ValueChanged="UnitFilterAsync" />
         </div>
     }
 
@@ -51,13 +45,13 @@
             {
                 var email = WarehouseLabels.Text(employee, "email");
                 var phone = WarehouseLabels.Text(employee, "phone");
-                var department = WarehouseLabels.Text(employee, "departmentKey");
+                var department = WarehouseLabels.Text(employee, "businessUnitName");
                 <li class="profile-card">
                     <span class="owner-cell">
                         <span class="avatar avatar-tone-@(Math.Abs(employee.Id.GetHashCode()) % 5)" aria-hidden="true">@HrLabels.Initials(employee)</span>
                         <strong>@HrLabels.Name(employee)</strong>
                     </span>
-                    <span>@(string.IsNullOrWhiteSpace(WarehouseLabels.Text(employee, "jobTitle")) ? "Unvan girilmedi" : WarehouseLabels.Text(employee, "jobTitle"))@(department.Length > 0 ? $" · {Lookups.Label(HrAccess.DepartmentList, department)}" : "")</span>
+                    <span>@(string.IsNullOrWhiteSpace(WarehouseLabels.Text(employee, "jobTitle")) ? "Unvan girilmedi" : WarehouseLabels.Text(employee, "jobTitle"))@(department.Length > 0 ? $" · {department}" : "")</span>
                     @if (email.Length > 0)
                     {
                         <a href="mailto:@email" class="owner-cell"><AppIcon Name="mail" Size="16" /> @email</a>
@@ -83,7 +77,7 @@
     private RecordPageResponse? page;
     private string? message;
     private string? search;
-    private string? departmentKey;
+    private Guid? businessUnitId;
     private bool filtersOpen;
 
     protected override async Task OnInitializedAsync()
@@ -96,13 +90,19 @@
         }
     }
 
+    private async Task UnitFilterAsync(Guid? unit)
+    {
+        businessUnitId = unit;
+        await LoadAsync(1);
+    }
+
     private async Task LoadAsync(int pageNumber)
     {
         // Rehber yalnızca ayrılmamış çalışanları ada göre gösterir.
         var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&current=true&search={Uri.EscapeDataString(search ?? string.Empty)}";
-        if (!string.IsNullOrEmpty(departmentKey))
+        if (businessUnitId is { } unit)
         {
-            url += $"&departmentKey={Uri.EscapeDataString(departmentKey)}";
+            url += $"&businessUnitId={unit}";
         }
 
         var result = await Api.GetAsync<RecordPageResponse>(url);

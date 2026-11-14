@@ -293,7 +293,7 @@
     private RenderFragment CellContent(string key, RecordResponse record) => key switch
     {
         "title" => @<text>@WarehouseLabels.Text(record, "title")</text>,
-        "audience" => @<text>@(WarehouseLabels.Text(record, "audienceDepartmentKey") is { Length: > 0 } dep ? Lookups.Label(HrAccess.DepartmentList, dep) : "Herkes")</text>,
+        "audience" => @<text>@HrLabels.Audience(record, Lookups)</text>,
         "identity" => @<text>@(WarehouseLabels.Flag(record, "isAnonymous") ? "Gizli" : "Açık")</text>,
         "questionCount" => @<text>@WarehouseLabels.Number(record, "questionCount")</text>,
         "responseCount" => @<text>@WarehouseLabels.Number(record, "responseCount")</text>,

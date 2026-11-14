@@ -218,3 +218,16 @@ public sealed record SurveyQuestionResultDto(
     Guid QuestionId, string Text, string QuestionType, int AnswerCount, decimal? Average, IReadOnlyList<SurveyOptionCountDto> Counts, IReadOnlyList<string> Texts);
 
 public sealed record SurveyOptionCountDto(string Option, int Count);
+
+/// <summary>Core departmanı (ADR-0026) İK seçicileri için: üst departman, ağaç yolu adı ("Merkez › Satış"), derinlik, etkin mi.</summary>
+public sealed record HrBusinessUnitDto(Guid Id, Guid? ParentId, string Name, string PathName, int Depth, bool IsActive);
+
+/// <summary>
+/// Eski İK departman değerinin Core departmanına eşlemesi (ADR-0042 bölüm 22): bulunan departman (yoksa boş: Core'da aynı adla departman yok ya da birden
+/// çok departman uyuyor) ve henüz Core departmanı olmayan çalışan, duyuru, anket sayıları.
+/// </summary>
+public sealed record DepartmentMappingRowDto(
+    string DepartmentKey, string Label, Guid? BusinessUnitId, string? BusinessUnitName, int EmployeeCount, int AnnouncementCount, int SurveyCount);
+
+/// <summary>Eşleme uygulamasının sonucu: güncellenen kayıt sayısı.</summary>
+public sealed record DepartmentMappingResultDto(int Updated);

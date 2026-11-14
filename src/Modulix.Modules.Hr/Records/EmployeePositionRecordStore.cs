@@ -20,17 +20,23 @@ internal sealed class EmployeePositionRecordStore(HrStoreContext context) : HrRe
 
     protected override string? ImmutableMessage => "Görev geçmişi değiştirilmez; çalışan kartını güncelleyin.";
 
-    protected override IReadOnlyList<RecordField<EmployeePosition>> Fields { get; } =
+    private Dictionary<Guid, string> unitNames = [];
+
+    protected override IReadOnlyList<RecordField<EmployeePosition>> Fields => fields ??=
     [
         Field.Computed<EmployeePosition>("employeeId", p => p.EmployeeId.ToString()),
         Field.Computed<EmployeePosition>("startDate", p => p.StartDate.ToString("yyyy-MM-dd")),
         Field.Computed<EmployeePosition>("endDate", p => p.EndDate?.ToString("yyyy-MM-dd")),
         Field.Computed<EmployeePosition>("jobTitle", p => p.JobTitle),
         Field.Computed<EmployeePosition>("departmentKey", p => p.DepartmentKey),
+        Field.Computed<EmployeePosition>("businessUnitId", p => p.BusinessUnitId?.ToString()),
+        Field.Computed<EmployeePosition>("businessUnitName", p => p.BusinessUnitId is { } unit ? unitNames.GetValueOrDefault(unit) : null),
         Field.Computed<EmployeePosition>("managerEmployeeId", p => p.ManagerEmployeeId?.ToString()),
         Field.Computed<EmployeePosition>("employmentType", p => p.EmploymentType),
         Field.Computed<EmployeePosition>("changedByUserId", p => p.ChangedByUserId?.ToString()),
     ];
+
+    private IReadOnlyList<RecordField<EmployeePosition>>? fields;
 
     protected override IReadOnlyDictionary<string, RecordFilter<EmployeePosition>> Filters { get; } = new Dictionary<string, RecordFilter<EmployeePosition>>
     {
@@ -42,6 +48,9 @@ internal sealed class EmployeePositionRecordStore(HrStoreContext context) : HrRe
 
     protected override IQueryable<EmployeePosition> Search(IQueryable<EmployeePosition> source, string term) =>
         source.Where(p => p.JobTitle != null && p.JobTitle.Contains(term));
+
+    protected override async Task PrepareAsync(IReadOnlyCollection<EmployeePosition> entities, CancellationToken cancellationToken) =>
+        unitNames = await BusinessUnitNames.PathsAsync(Context, entities.Select(p => p.BusinessUnitId), cancellationToken);
 }
 
 /// <summary>
@@ -89,6 +98,13 @@ internal static class EmployeePositions
             positions.Add(latest);
         }
 
+        // Eski dönemde Core departmanı yoksa (eşlemeden önce açılmış) açık döneme işlenir.
+        if (latest.BusinessUnitId is null && entity.BusinessUnitId is { } unit)
+        {
+            latest.BusinessUnitId = unit;
+            latest.Touch();
+        }
+
         // Ayrılınca son dönem ayrılış günüyle kapanır; yeniden çalışmaya başlayınca (ayrılış tarihi silinince) yeniden açılır.
         if (entity.Status == Employee.Statuses.Terminated && entity.TerminationDate is { } end && end >= latest.StartDate)
         {
@@ -101,8 +117,16 @@ internal static class EmployeePositions
     }
 
     private static bool Same(EmployeePosition position, Employee employee) =>
-        position.JobTitle == employee.JobTitle && position.DepartmentKey == employee.DepartmentKey
+        position.JobTitle == employee.JobTitle && SameDepartment(position, employee)
         && position.ManagerEmployeeId == employee.ManagerEmployeeId && position.EmploymentType == employee.EmploymentType;
+
+    /// <summary>
+    /// Departman Core'dandır (bölüm 22). Core departmanı henüz yazılmamış eski dönem, aynı eski İK değeriyle aynı departman sayılır: eşleme aracının ilk
+    /// atadığı Core departmanı yeni dönem açmaz, açık döneme işlenir (<see cref="RecordAsync"/>).
+    /// </summary>
+    private static bool SameDepartment(EmployeePosition position, Employee employee) =>
+        position.BusinessUnitId == employee.BusinessUnitId
+        || (position.BusinessUnitId is null && position.DepartmentKey == employee.DepartmentKey);
 
     private static void Close(EmployeePosition position, DateOnly? endDate)
     {
@@ -119,6 +143,7 @@ internal static class EmployeePositions
         StartDate = start,
         JobTitle = employee.JobTitle,
         DepartmentKey = employee.DepartmentKey,
+        BusinessUnitId = employee.BusinessUnitId,
         ManagerEmployeeId = employee.ManagerEmployeeId,
         EmploymentType = employee.EmploymentType,
         ChangedByUserId = changedBy,

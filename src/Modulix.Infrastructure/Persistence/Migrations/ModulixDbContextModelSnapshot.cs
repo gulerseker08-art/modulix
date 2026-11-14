@@ -9300,6 +9300,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("AudienceBusinessUnitId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("AudienceDepartmentKey")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -9835,6 +9838,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("BirthDate")
                         .HasColumnType("date");
 
+                    b.Property<Guid?>("BusinessUnitId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -9922,6 +9928,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(150)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "BusinessUnitId")
+                        .HasDatabaseName("IX_Employees_BusinessUnit");
 
                     b.HasIndex("TenantId", "EmployeeNumber")
                         .IsUnique()
@@ -10036,6 +10045,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Modulix.Modules.Hr.Domain.EmployeePosition", b =>
                 {
                     b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BusinessUnitId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("ChangedByUserId")
@@ -10503,6 +10515,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Modulix.Modules.Hr.Domain.Survey", b =>
                 {
                     b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AudienceBusinessUnitId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("AudienceDepartmentKey")

@@ -34,6 +34,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(e => e.EmployeeNumber).HasMaxLength(Employee.EmployeeNumberMaxLength);
         builder.Property(e => e.JobTitle).HasMaxLength(Employee.JobTitleMaxLength);
         builder.Property(e => e.DepartmentKey).HasMaxLength(100);
+        builder.HasIndex(e => new { e.TenantId, e.BusinessUnitId }).HasDatabaseName("IX_Employees_BusinessUnit");
         builder.Property(e => e.EmploymentType).HasMaxLength(20).IsUnicode(false).IsRequired();
         builder.Property(e => e.WorkLocation).HasMaxLength(Employee.WorkLocationMaxLength);
         builder.Property(e => e.Status).HasMaxLength(20).IsUnicode(false).IsRequired();

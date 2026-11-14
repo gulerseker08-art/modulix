@@ -5,7 +5,8 @@ namespace Modulix.Modules.Hr;
 /// <summary>
 /// İK'nın içe aktarma tanımları (ADR-0033; ADR-0042 bölüm 19 ve 21). Sütunlar elle girilebilen alanlardır; zimmet gibi iş akışı alanları dışarıdadır
 /// (yeni demirbaş depoda başlar). Sıra: önce kişiler (Core, <c>core.people.import</c>), sonra çalışan kartları (kişi e-postayla, yönetici sicil numarasıyla
-/// bağlanır; yöneticiler dosyada astlarından önce gelmelidir), sonra izin hakları (sicil numarasıyla).
+/// bağlanır; yöneticiler dosyada astlarından önce gelmelidir; departman Core departmanının adı ya da ağaç yoludur, bölüm 22), sonra izin hakları
+/// (sicil numarasıyla).
 /// </summary>
 internal static class HrImports
 {
@@ -19,7 +20,7 @@ internal static class HrImports
             new("employeeNumber", "Sicil no"),
             new("hireDate", "İşe giriş tarihi", ImportFieldType.Date, Required: true),
             new("jobTitle", "Unvan"),
-            new("departmentKey", "Departman", ImportFieldType.Choice) { ChoiceListKey = HrModule.Lists.Department },
+            new("businessUnitName", "Departman"),
             new("managerEmployeeId", "Yönetici sicil no", ImportFieldType.Reference) { Reference = EmployeeByNumber },
             new("employmentType", "Çalışma şekli", ImportFieldType.Choice)
             {

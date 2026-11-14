@@ -39,7 +39,7 @@
                             @HrLabels.Date(WarehouseLabels.Text(position, "startDate")) – @(WarehouseLabels.Text(position, "endDate") is { Length: > 0 } end ? HrLabels.Date(end) : "devam ediyor")
                         </td>
                         <td data-label="Unvan">@(WarehouseLabels.Text(position, "jobTitle") is { Length: > 0 } title ? title : "—")</td>
-                        <td data-label="Departman">@(WarehouseLabels.Text(position, "departmentKey") is { Length: > 0 } dep ? Lookups.Label(HrAccess.DepartmentList, dep) : "—")</td>
+                        <td data-label="Departman">@(WarehouseLabels.Text(position, "businessUnitName") is { Length: > 0 } unit ? unit : WarehouseLabels.Text(position, "departmentKey") is { Length: > 0 } dep ? Lookups.Label(HrAccess.DepartmentList, dep) : "—")</td>
                         <td data-label="Yönetici">@(WarehouseLabels.Id(position, "managerEmployeeId") is { } manager && managers.TryGetValue(manager, out var name) ? name : "—")</td>
                         <td data-label="Çalışma şekli">@HrLabels.EmploymentType(WarehouseLabels.Text(position, "employmentType"))</td>
                     </tr>

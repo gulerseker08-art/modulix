@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Modules.Hr.Domain;
 
 namespace Modulix.Modules.Hr.Records;
@@ -22,7 +23,10 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
     private const int MaxChainDepth = 100;
 
     private readonly Dictionary<Guid, PersonInfo> people = [];
+    private Dictionary<Guid, BusinessUnitInfo> units = [];
     private DateOnly? positionEffectiveDate;
+    private string? requestedUnitName;
+    private IReadOnlyDictionary<Guid, Guid> accountUnits = new Dictionary<Guid, Guid>();
 
     public override string EntityKey => HrModule.Entities.Employee;
 
@@ -46,6 +50,13 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
         Field.Member<Employee>("userId", e => e.UserId, (e, v) => e.UserId = v),
         Field.Text<Employee>("jobTitle", Employee.JobTitleMaxLength, e => e.JobTitle, (e, v) => e.JobTitle = v),
         Field.ListChoice<Employee>("departmentKey", HrModule.Lists.Department, e => e.DepartmentKey, (e, v) => e.DepartmentKey = v, required: false),
+
+        // Core departmanı (bölüm 22); hesabı bağlı çalışanda kullanıcının departmanından alınır. Ad okunurken ağaç yoludur; yazılırsa (içe aktarma)
+        // departman adına ya da ağaç yoluna göre bulunur.
+        Field.Id<Employee>("businessUnitId", e => e.BusinessUnitId, (e, v) => e.BusinessUnitId = v),
+        Field.Text<Employee>("businessUnitName", 400,
+            e => e.BusinessUnitId is { } unit && units.TryGetValue(unit, out var info) ? info.PathNames : null, (_, v) => requestedUnitName = v),
+        Field.Computed<Employee>("businessUnitFromAccount", e => JsonValue.Create(e.UserId is { } user && accountUnits.ContainsKey(user))),
         Field.Reference<Employee, Employee>("managerEmployeeId", "Yönetici bulunamadı.", e => e.ManagerEmployeeId, (e, v) => e.ManagerEmployeeId = v),
         Field.Choice<Employee>("employmentType", Employee.EmploymentTypes.All, e => e.EmploymentType, (e, v) => e.EmploymentType = v),
         Field.Text<Employee>("workLocation", Employee.WorkLocationMaxLength, e => e.WorkLocation, (e, v) => e.WorkLocation = v),
@@ -83,6 +94,8 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
         ["userId"] = (q, v) => FilterValue.Id(v) is { } id ? q.Where(e => e.UserId == id) : null,
 
         // Sicil numarası büyük harfle saklanır; içe aktarmada çalışan bağlantısı bununla çözülür.
+        ["businessUnitId"] = (q, v) => FilterValue.Id(v) is { } id ? q.Where(e => e.BusinessUnitId == id) : null,
+
         ["employeeNumber"] = (q, v) => v.Trim().ToUpperInvariant() is { Length: > 0 and <= Employee.EmployeeNumberMaxLength } number
             ? q.Where(e => e.EmployeeNumber == number)
             : null,
@@ -129,6 +142,11 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
 
     protected override async Task PrepareAsync(IReadOnlyCollection<Employee> entities, CancellationToken cancellationToken)
     {
+        await LoadUnitsAsync(entities.Select(e => e.BusinessUnitId), cancellationToken);
+
+        Guid[] users = [.. entities.Select(e => e.UserId).OfType<Guid>().Distinct()];
+        accountUnits = users.Length == 0 ? new Dictionary<Guid, Guid>() : await Context.BusinessUnits.UnitsOfUsersAsync(users, cancellationToken);
+
         Guid[] missing = [.. entities.Select(e => e.PersonId).Where(id => id != Guid.Empty && !people.ContainsKey(id)).Distinct()];
         if (missing.Length == 0)
         {
@@ -210,6 +228,9 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
             }
         }
 
+        await ApplyBusinessUnitAsync(entity, values, isNew, errors, cancellationToken);
+        await LoadUnitsAsync([entity.BusinessUnitId], cancellationToken);
+
         if (errors.Count > 0)
         {
             throw new RecordValidationException(errors);
@@ -219,6 +240,70 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
         var effective = positionEffectiveDate;
         positionEffectiveDate = null;
         await EmployeePositions.RecordAsync(Context, entity, isNew, effective, cancellationToken);
+    }
+
+    /// <summary>
+    /// Departman Core'dandır (bölüm 22). Hesabı bağlı çalışanın departmanı kullanıcının Core departmanıdır: kart ondan alır, farklı bir değer gönderilirse
+    /// reddedilir (departman değişikliği kayıt görünürlüğünü etkilediği için kullanıcı yönetimindeki akışla yapılır). Hesabı olmayan çalışanın departmanı
+    /// ağaçta bulunmalı ve yeni seçimde etkin olmalıdır.
+    /// </summary>
+    private async Task ApplyBusinessUnitAsync(Employee entity, JsonObject values, bool isNew, List<RecordFieldError> errors, CancellationToken cancellationToken)
+    {
+        var requested = values.ContainsKey("businessUnitId");
+        var name = requestedUnitName;
+        requestedUnitName = null;
+        if (!requested && !string.IsNullOrWhiteSpace(name))
+        {
+            var matches = BusinessUnitNames.Find(await Context.BusinessUnits.ListAsync(cancellationToken), name);
+            if (matches.Count != 1)
+            {
+                errors.Add(new RecordFieldError("businessUnitName", matches.Count == 0
+                    ? $"\"{name}\" adlı etkin bir departman yok; departmanı Yönetim › Departmanlar'dan açın."
+                    : $"\"{name}\" birden çok departmana uyuyor; ağaç yoluyla yazın (ör. \"Merkez › Satış\")."));
+                return;
+            }
+
+            entity.BusinessUnitId = matches[0].Id;
+            requested = true;
+        }
+
+        if (entity.UserId is { } user
+            && (await Context.BusinessUnits.UnitsOfUsersAsync([user], cancellationToken)).TryGetValue(user, out var memberUnit))
+        {
+            var sent = requested ? entity.BusinessUnitId : null;
+            if (sent is { } chosen && chosen != memberUnit)
+            {
+                errors.Add(new RecordFieldError("businessUnitId",
+                    "Kullanıcı hesabı bağlı çalışanın departmanı kullanıcının departmanıdır; Yönetim › Kullanıcılar'dan departman değişikliğiyle değiştirilir."));
+                return;
+            }
+
+            entity.BusinessUnitId = memberUnit;
+            return;
+        }
+
+        if (entity.BusinessUnitId is { } unit && (isNew || requested))
+        {
+            var info = (await Context.BusinessUnits.ListAsync(cancellationToken)).FirstOrDefault(u => u.Id == unit);
+            if (info is null)
+            {
+                errors.Add(new RecordFieldError("businessUnitId", "Departman bulunamadı."));
+            }
+            else if (!info.IsActive && (isNew || await Context.Data.Set<Employee>().AsNoTracking()
+                         .Where(e => e.Id == entity.Id).Select(e => e.BusinessUnitId).SingleOrDefaultAsync(cancellationToken) != unit))
+            {
+                errors.Add(new RecordFieldError("businessUnitId", "Kapalı departman seçilemez."));
+            }
+        }
+    }
+
+    /// <summary>Departman adları için ağaç (istek başına önbellekli); yalnızca bilinmeyen bir departman varsa yeniden okunur.</summary>
+    private async Task LoadUnitsAsync(IEnumerable<Guid?> ids, CancellationToken cancellationToken)
+    {
+        if (ids.Any(id => id is { } unit && !units.ContainsKey(unit)))
+        {
+            units = (await Context.BusinessUnits.ListAsync(cancellationToken)).ToDictionary(u => u.Id);
+        }
     }
 
     protected override Task BeforeDeleteAsync(Employee entity, CancellationToken cancellationToken) =>
