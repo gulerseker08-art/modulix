@@ -3,6 +3,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Api.Tenancy;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Infrastructure.Automation;
 using Modulix.Infrastructure.Events;
 using Modulix.Infrastructure.Identity;
@@ -184,12 +186,17 @@ public class HrAutomationTests(CrmAutomationFixture fixture) : IClassFixture<Crm
         Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
     }
 
-    /// <summary>Bekleyen olayları dağıtır (olay tetikleyicili kurallar çalışma açar), sonra kural turu çalışır (taramalar ve bekleyen çalışmalar).</summary>
+    /// <summary>
+    /// Bekleyen olayları dağıtır (olay tetikleyicili kurallar çalışma açar), sonra kural turu çalışır (taramalar ve bekleyen çalışmalar). Dağıtım
+    /// kural çalıştırıcısıyla aynı saatli sunucuda yapılır: çalışmanın "sonraki deneme" anı o saatle yazılır, yoksa çalıştırıcı onu henüz vadesi
+    /// gelmemiş sayar.
+    /// </summary>
     private async Task DeliverAndRunAsync(Guid tenantId)
     {
-        for (var i = 0; i < 20; i++)
+        for (var i = 0; i < 50; i++)
         {
-            using var scope = fixture.Factory.OpenScope(tenantId);
+            using var scope = fixture.Extended.Services.CreateScope();
+            scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current = new TenantContext(tenantId, Guid.NewGuid(), Guid.NewGuid());
             var round = await scope.ServiceProvider.GetRequiredService<EventDispatcher>().RunOnceAsync(CancellationToken.None);
             if (round.Dispatched == 0 && round.Delivered == 0)
             {
