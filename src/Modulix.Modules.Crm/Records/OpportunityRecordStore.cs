@@ -268,7 +268,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
 
         if (stageChanged)
         {
-            entity.StageEnteredAt = DateTimeOffset.UtcNow;
+            entity.StageEnteredAt = Context.Now;
             if (entity.Status == OpportunityStatus.Open)
             {
                 RequireStageFields(entity);
@@ -395,7 +395,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
         {
             OpportunityId = entity.Id,
             Kind = kind,
-            At = DateTimeOffset.UtcNow,
+            At = Context.Now,
             ChangedBy = Context.CurrentUserId,
             Cycle = entity.ClosureCycle,
             FromStage = fromStage,

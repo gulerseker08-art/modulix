@@ -13,13 +13,17 @@ internal sealed class CrmStoreContext(
     IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access,
     ICurrentAccess permissions, IEnumerable<IActivityLinkTarget> linkTargets, LeadWorkflowGate? leadGate = null,
     ActivityWorkflowGate? activityGate = null, IRecordCommandContext? command = null, OpportunityWorkflowGate? opportunityGate = null,
-    IOpportunityPolicyProvider? policy = null, IActivityCodeCatalog? activityCodes = null, IIndustryCatalog? industries = null)
+    IOpportunityPolicyProvider? policy = null, IActivityCodeCatalog? activityCodes = null, IIndustryCatalog? industries = null,
+    TimeProvider? time = null)
 {
     /// <summary>Sektör kataloğunu okuma sınırı (ADR-0043); yoksa (ör. birim testi) sektör kodu denetimi atlanır.</summary>
     public IIndustryCatalog? Industries { get; } = industries;
 
     /// <summary>Faaliyet kataloğunu okuma sınırı (hizmet kapsamı doğrulaması); yoksa (ör. birim testi) katalog denetimi atlanır.</summary>
     public IActivityCodeCatalog? ActivityCodes { get; } = activityCodes;
+
+    /// <summary>Şimdiki an (UTC). İş akışıyla aynı saatten okunur ki tarihçe anı ile kapanış günü birbirini tutsun; sağlayıcı yoksa sistem saati.</summary>
+    public DateTimeOffset Now => (time ?? TimeProvider.System).GetUtcNow();
 
     /// <summary>Fırsat iş akışı kapısı (<see cref="OpportunityWorkflowGate"/>).</summary>
     public OpportunityWorkflowGate OpportunityGate { get; } = opportunityGate ?? new OpportunityWorkflowGate();

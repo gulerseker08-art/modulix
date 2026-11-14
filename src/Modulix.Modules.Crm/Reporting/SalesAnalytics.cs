@@ -208,8 +208,8 @@ internal sealed class SalesAnalytics(
         var history = await planning.HistoryAsync(wonIds, cancellationToken);
         int? Cycle(OpportunityRow row) =>
             wonIds.Contains(row.Id) && row.ActualCloseDate is { } close && history.TryGetValue(row.Id, out var events) && events.FirstOrDefault() is { } first
-                // Kapanış tarihi iş akışında UTC gününe, oluşturulma ise raporun saat dilimine göre hesaplanır; UTC ile yerel gün sınırı arasındaki
-                // saatlerde fark -1 çıkabilir. Süre eksi olamaz: aynı gün kapanan fırsat 0 gündür ve örnekten düşmez.
+                // Kapanış tarihi ve oluşturulma günü firmanın saat dilimindedir. Eski kayıtlarda kapanış UTC gününe göre damgalanmış olabilir
+                // (yerel günden bir gün geride, fark -1): süre eksi olamaz, aynı gün kapanan fırsat 0 gündür ve örnekten düşmez.
                 ? Math.Max(0, close.DayNumber - ReportPeriods.Today(first.At, ctx.Policy.TimeZone).DayNumber)
                 : null;
 
