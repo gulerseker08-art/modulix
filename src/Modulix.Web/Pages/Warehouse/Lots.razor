@@ -5,10 +5,10 @@
 @inject CrmLookups Lookups
 @inject NavigationManager Navigation
 
-<PageTitle>Partiler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.warehouse.lots") · Modulix</PageTitle>
 
 <AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.LotsRead">
-    <PageHeader Title="Partiler" Icon="package" Subtitle="@(page is null ? "Depodaki malların malik ve stok kartına göre partilerini yönetin." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.warehouse.lots")" Icon="package" Subtitle="@(page is null ? Texts.Get("warehouse.lots.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -21,25 +21,25 @@
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Parti görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("warehouse.lots.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Parti ara" placeholder="Parti no veya açıklama ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("warehouse.lots.search")" placeholder="@Texts.Get("warehouse.lots.searchPlaceholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(WarehouseAccess.LotsWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni parti</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("warehouse.lots.new")</button>
         }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <LookupPicker Id="lot-stock-item-filter" LookupKey="@WarehouseAccess.LotStockItemLookup" Value="stockItemId" ValueChanged="ChooseStockItemAsync" Placeholder="Tüm stok kartları" />
-            <LookupPicker Id="lot-owner-filter" LookupKey="@WarehouseAccess.LotOwnerLookup" Value="ownerId" ValueChanged="ChooseOwnerAsync" Placeholder="Tüm malikler" />
+            <LookupPicker Id="lot-stock-item-filter" LookupKey="@WarehouseAccess.LotStockItemLookup" Value="stockItemId" ValueChanged="ChooseStockItemAsync" Placeholder="@Texts.Get("warehouse.stockItems.view.all")" />
+            <LookupPicker Id="lot-owner-filter" LookupKey="@WarehouseAccess.LotOwnerLookup" Value="ownerId" ValueChanged="ChooseOwnerAsync" Placeholder="@Texts.Get("warehouse.allOwners")" />
         </div>
     }
 
@@ -52,20 +52,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu görünüme uyan parti yok.</p>
+        <p class="text-muted" role="status">@Texts.Get("warehouse.lots.empty")</p>
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) parti listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("warehouse.lots.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Parti listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("warehouse.lots.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -79,15 +79,15 @@
                         <td class="row-menu-cell">
                             @if (Session.Can(WarehouseAccess.LotsWrite) || Session.Can(WarehouseAccess.MovementsRead))
                             {
-                            <RowMenu Label="@($"{WarehouseLabels.Text(lot, "lotNo")} eylemleri")">
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", WarehouseLabels.Text(lot, "lotNo"))">
                                 @if (Session.Can(WarehouseAccess.LotsWrite))
                                 {
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(lot)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(lot)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 }
                                 @if (Session.Can(WarehouseAccess.MovementsRead))
                                 {
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="@(() => Navigation.NavigateTo($"depo/bakiyeler?lotId={lot.Id}"))"><AppIcon Name="list" Size="16" /> <span>Bakiyeleri</span></button>
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="@(() => Navigation.NavigateTo($"depo/hareketler?lotId={lot.Id}"))"><AppIcon Name="repeat" Size="16" /> <span>Hareketleri</span></button>
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="@(() => Navigation.NavigateTo($"depo/bakiyeler?lotId={lot.Id}"))"><AppIcon Name="list" Size="16" /> <span>@Texts.Get("warehouse.lots.balances")</span></button>
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="@(() => Navigation.NavigateTo($"depo/hareketler?lotId={lot.Id}"))"><AppIcon Name="repeat" Size="16" /> <span>@Texts.Get("warehouse.lots.movements")</span></button>
                                 }
                             </RowMenu>
                             }
@@ -109,14 +109,14 @@
 
     // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (LotRecordStore.SortKeys).
     // Stok kartı ve firma adları sunucuda sıralanmaz (firma görünürlüğü sıralamayla dolanılmasın).
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("lotNo", "Parti no", "hash", "lotNo", "-lotNo", Locked: true),
-        new("stockItem", "Stok kartı", "package"),
-        new("owner", "Malik", "building"),
-        new("billTo", "Faturalanan", "wallet", DefaultVisible: false),
-        new("description", "Açıklama", "message-square", DefaultVisible: false),
-        new("isActive", "Durum", "tag", "isActive", "-isActive"),
+        new("lotNo", Texts.Get("warehouse.lotNo"), "hash", "lotNo", "-lotNo", Locked: true),
+        new("stockItem", Texts.Get("warehouse.stockItem"), "package"),
+        new("owner", Texts.Get("warehouse.owner"), "building"),
+        new("billTo", Texts.Get("warehouse.billTo"), "wallet", DefaultVisible: false),
+        new("description", Texts.Get("common.field.description"), "message-square", DefaultVisible: false),
+        new("isActive", Texts.Get("common.field.status"), "tag", "isActive", "-isActive"),
     ];
 
     private readonly GridViewState grid = new("warehouse.lots", "lotNo");
@@ -154,9 +154,9 @@
     // Görünümler yalnızca süzgeçtir (Tümü, Etkin, Pasif, kişisel); stok kartı ve malik "Filtrele" ile açılır. Yetki ve kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm partiler", Icon: "package"),
-        new(ActiveView, "Etkin partiler", Icon: "check-circle"),
-        new(InactiveView, "Pasif partiler", Icon: "clock"),
+        new(AllViews, Texts.Get("warehouse.lots.view.all"), Icon: "package"),
+        new(ActiveView, Texts.Get("warehouse.lots.view.active"), Icon: "check-circle"),
+        new(InactiveView, Texts.Get("warehouse.lots.view.inactive"), Icon: "clock"),
         .. views.Options,
     ];
 
@@ -278,9 +278,9 @@
         "lotNo" => @<text>@WarehouseLabels.Text(lot, "lotNo")</text>,
         "stockItem" => @<text>@WarehouseLabels.NameOf(stockItemNames, WarehouseLabels.Id(lot, "stockItemId"))</text>,
         "owner" => @<text>@WarehouseLabels.NameOf(partyNames, WarehouseLabels.Id(lot, "ownerPartyId"))</text>,
-        "billTo" => @<text>@(WarehouseLabels.Id(lot, "billToPartyId") is { } billTo ? WarehouseLabels.NameOf(partyNames, billTo) : "Malikle aynı")</text>,
+        "billTo" => @<text>@(WarehouseLabels.Id(lot, "billToPartyId") is { } billTo ? WarehouseLabels.NameOf(partyNames, billTo) : Texts.Get("warehouse.sameAsOwner"))</text>,
         "description" => @<text>@(WarehouseLabels.Text(lot, "description") is { Length: > 0 } d ? d : "—")</text>,
-        "isActive" => @<span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(lot, "isActive", true))">@(WarehouseLabels.Flag(lot, "isActive", true) ? "Etkin" : "Pasif")</span>,
+        "isActive" => @<span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(lot, "isActive", true))">@WarehouseLabels.ActiveText(WarehouseLabels.Flag(lot, "isActive", true))</span>,
         _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(WarehouseAccess.LotEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
             @<text>@CustomFieldText.Format(field, lot.Values["custom"] as JsonObject)</text>,
         _ => @<text></text>,

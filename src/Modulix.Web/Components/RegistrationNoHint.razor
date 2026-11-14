@@ -10,13 +10,13 @@
         @string.Join(" ", check.Violations)
         @if (check.Enforcement == "Block")
         {
-            <strong>Bu rejimde kayıt engellenir.</strong>
+            <strong>@Texts.Get("warehouse.registrationNoHint.blocked")</strong>
         }
         else
         {
-            <span>Kayıt engellenmez; numarayı kontrol edin.</span>
+            <span>@Texts.Get("warehouse.registrationNoHint.warning")</span>
         }
-        <small class="d-block text-muted">Rejim profili: @check.ProfileName · sürüm @check.VersionNumber@(check.Verified ? null : " · Doğrulanmadı")</small>
+        <small class="d-block text-muted">@Texts.Get("warehouse.registrationNoHint.profile", check.ProfileName, check.VersionNumber)@(check.Verified ? null : " · " + Texts.Get("warehouse.unverified"))</small>
     </div>
 }
 
