@@ -3,43 +3,43 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>Yeni segment · Modulix</PageTitle>
+<PageTitle>@Texts.Get("marketing.segments.new") · Modulix</PageTitle>
 
 <AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.SegmentsWrite">
     <div class="page-header">
         <div>
-            <h1>Yeni segment</h1>
-            <p class="text-muted mb-0">Hedef türü ve tür oluşturulduktan sonra değiştirilemez. Dinamik segmentin koşullarını sonraki adımda tanımlar ve yayımlarsınız; statik segmentte üyeleri kendiniz seçersiniz.</p>
+            <h1>@Texts.Get("marketing.segments.new")</h1>
+            <p class="text-muted mb-0">@Texts.Get("marketing.segmentNew.intro")</p>
         </div>
-        <div class="header-actions"><a class="btn btn-outline-secondary" href="pazarlama/segmentler">Listeye dön</a></div>
+        <div class="header-actions"><a class="btn btn-outline-secondary" href="pazarlama/segmentler">@Texts.Get("crm.quoteDetail.backToList")</a></div>
     </div>
 
     <Notice Text="@message" Failed="true" />
     <ErrorSummary Errors="@errors" />
 
     <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-        <TabBar Tabs="FormTabs" State="tabs" Label="Segment formu bölümleri" />
+        <TabBar Tabs="FormTabs" State="tabs" Label="@Texts.Get("marketing.segmentNew.formSections")" />
         <fieldset disabled="@busy">
             <TabPanel State="tabs" Key="form-genel">
                 <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label" for="s-name">Ad</label>
+                        <label class="form-label" for="s-name">@Texts.Get("common.field.name")</label>
                         <input id="s-name" class="form-control" maxlength="150" @bind="name" />
                         <FieldError Field="name" Errors="errors" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="s-code">Kod</label>
+                        <label class="form-label" for="s-code">@Texts.Get("marketing.code")</label>
                         <input id="s-code" class="form-control" maxlength="40" placeholder="tekstil-marmara" aria-describedby="s-code-help" @bind="code" />
-                        <small id="s-code-help" class="text-muted">Küçük harf, rakam ve tire; sonradan değişmez.</small>
+                        <small id="s-code-help" class="text-muted">@Texts.Get("marketing.codeHelp")</small>
                         <FieldError Field="code" Errors="errors" />
                     </div>
                     <div class="span-12">
-                        <label class="form-label" for="s-purpose">Amaç</label>
-                        <input id="s-purpose" class="form-control" maxlength="200" placeholder="Ör. antrepo hizmeti tanıtımı" @bind="purpose" />
+                        <label class="form-label" for="s-purpose">@Texts.Get("marketing.purpose")</label>
+                        <input id="s-purpose" class="form-control" maxlength="200" placeholder="@Texts.Get("marketing.segmentNew.purposePlaceholder")" @bind="purpose" />
                         <FieldError Field="purpose" Errors="errors" />
                     </div>
                     <div class="span-12">
-                        <label class="form-label" for="s-desc">Açıklama</label>
+                        <label class="form-label" for="s-desc">@Texts.Get("common.field.description")</label>
                         <textarea id="s-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
                         <FieldError Field="description" Errors="errors" />
                     </div>
@@ -48,14 +48,14 @@
             <TabPanel State="tabs" Key="form-hedef">
                 <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label" for="s-target">Hedef türü</label>
+                        <label class="form-label" for="s-target">@Texts.Get("marketing.targetType")</label>
                         <select id="s-target" class="form-select" @bind="target">
                             @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
                         </select>
                         <FieldError Field="target" Errors="errors" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="s-kind">Tür</label>
+                        <label class="form-label" for="s-kind">@Texts.Get("common.field.kind")</label>
                         <select id="s-kind" class="form-select" @bind="kind">
                             @foreach (var k in MarketingLabels.Kinds) { <option value="@k.Key">@k.Label</option> }
                         </select>
@@ -64,7 +64,7 @@
                 </div>
             </TabPanel>
         </fieldset>
-        <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Oluştur</button></div>
+        <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("marketing.create")</button></div>
     </form>
 </AuthGate>
 
@@ -86,8 +86,8 @@
 
     private IReadOnlyList<TabItem> FormTabs =>
     [
-        new("form-genel", "Genel", Errors: ErrorCount("name", "code", "purpose", "description")),
-        new("form-hedef", "Hedef ve tür", Errors: ErrorCount("target", "kind")),
+        new("form-genel", Texts.Get("crm.quoteDetail.tab.general"), Errors: ErrorCount("name", "code", "purpose", "description")),
+        new("form-hedef", Texts.Get("marketing.segmentNew.tab.target"), Errors: ErrorCount("target", "kind")),
     ];
 
     protected override Task OnInitializedAsync() => Session.EnsureLoadedAsync();

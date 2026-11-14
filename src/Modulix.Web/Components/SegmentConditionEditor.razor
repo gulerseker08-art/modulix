@@ -1,15 +1,15 @@
 @* Segment koşul ağacı düzenleyicisi (ADR-0025): grup (VE/VEYA) ve koşul satırları; özyinelemelidir. Yalnızca çağıranın kullanabildiği alanlar
    seçilir; operatörler alanın tipine göredir. Doğrulama sunucudadır. *@
-<div class="cond-group @(Depth > 0 ? "cond-nested" : null)" role="group" aria-label="@(Node.Group == "and" ? "Tümü sağlanmalı" : "Biri sağlanmalı")">
+<div class="cond-group @(Depth > 0 ? "cond-nested" : null)" role="group" aria-label="@(Node.Group == "and" ? Texts.Get("marketing.conditionEditor.allRequired") : Texts.Get("marketing.conditionEditor.anyRequired"))">
     <div class="cond-head">
-        <label class="visually-hidden" for="@GroupId">Grup türü</label>
+        <label class="visually-hidden" for="@GroupId">@Texts.Get("marketing.conditionEditor.groupType")</label>
         <select id="@GroupId" class="form-select form-select-sm filter-select" value="@Node.Group" @onchange="e => SetGroup(e.Value?.ToString())">
-            <option value="and">Tümü sağlanmalı (VE)</option>
-            <option value="or">Biri yeterli (VEYA)</option>
+            <option value="and">@Texts.Get("marketing.conditionEditor.and")</option>
+            <option value="or">@Texts.Get("marketing.conditionEditor.or")</option>
         </select>
         @if (Remove.HasDelegate)
         {
-            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Remove.InvokeAsync()">Grubu sil</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Remove.InvokeAsync()">@Texts.Get("marketing.conditionEditor.removeGroup")</button>
         }
     </div>
 
@@ -25,9 +25,9 @@
         {
             var field = Fields.FirstOrDefault(f => f.Key == item.Field);
             <div class="cond-leaf">
-                <label class="visually-hidden" for="@($"{GroupId}-f{n}")">Alan</label>
+                <label class="visually-hidden" for="@($"{GroupId}-f{n}")">@Texts.Get("marketing.conditionEditor.field")</label>
                 <select id="@($"{GroupId}-f{n}")" class="form-select form-select-sm" value="@item.Field" @onchange="e => SetField(item, e.Value?.ToString())">
-                    <option value="">Alan seçin</option>
+                    <option value="">@Texts.Get("marketing.conditionEditor.chooseField")</option>
                     @foreach (var g in Fields.GroupBy(f => f.Group))
                     {
                         <optgroup label="@g.Key">
@@ -35,9 +35,9 @@
                         </optgroup>
                     }
                 </select>
-                <label class="visually-hidden" for="@($"{GroupId}-o{n}")">Operatör</label>
+                <label class="visually-hidden" for="@($"{GroupId}-o{n}")">@Texts.Get("marketing.conditionEditor.operator")</label>
                 <select id="@($"{GroupId}-o{n}")" class="form-select form-select-sm" value="@item.Operator" disabled="@(field is null)" @onchange="e => SetOperator(item, e.Value?.ToString())">
-                    <option value="">Operatör</option>
+                    <option value="">@Texts.Get("marketing.conditionEditor.operator")</option>
                     @if (field is not null)
                     {
                         @foreach (var o in field.Operators) { <option value="@o">@MarketingLabels.Operator(o)</option> }
@@ -47,7 +47,7 @@
                 {
                     @ValueInputs(item, field, $"{GroupId}-v{n}")
                 }
-                <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Koşulu sil" @onclick="() => RemoveItem(item)">Sil</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="@Texts.Get("marketing.conditionEditor.removeCondition")" @onclick="() => RemoveItem(item)">@Texts.Get("common.delete")</button>
                 @if (field?.Hint is { } hint)
                 {
                     <small class="text-muted cond-hint">@hint</small>
@@ -57,10 +57,10 @@
     }
 
     <div class="cond-actions">
-        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AddLeaf">Koşul ekle</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AddLeaf">@Texts.Get("marketing.conditionEditor.addCondition")</button>
         @if (Depth < MaxDepth - 1)
         {
-            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AddGroup">Grup ekle</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AddGroup">@Texts.Get("marketing.conditionEditor.addGroup")</button>
         }
     </div>
 </div>
@@ -91,7 +91,7 @@
         }
         else if (item.Operator == "in")
         {
-            <input id="@id" class="form-control form-control-sm" placeholder="Virgülle ayırın" aria-label="Değerler" value="@item.ListText"
+            <input id="@id" class="form-control form-control-sm" placeholder="@Texts.Get("marketing.conditionEditor.commaSeparated")" aria-label="@Texts.Get("marketing.conditionEditor.values")" value="@item.ListText"
                    @onchange="e => SetList(item, e.Value?.ToString())" />
         }
         else
@@ -100,20 +100,20 @@
             {
                 var index = i;
                 var current = item.ValueAt(index);
-                var label = max == 2 ? (index == 0 ? "Başlangıç" : "Bitiş") : isDays ? (field.Type == "Relation" ? "Gün penceresi (isteğe bağlı)" : "Gün sayısı") : "Değer";
+                var label = max == 2 ? (index == 0 ? Texts.Get("support.reports.from") : Texts.Get("support.reports.to")) : isDays ? (field.Type == "Relation" ? Texts.Get("marketing.conditionEditor.dayWindow") : Texts.Get("marketing.conditionEditor.days")) : Texts.Get("marketing.conditionEditor.value");
                 @if (choices is not null)
                 {
                     <select id="@(index == 0 ? id : null)" class="form-select form-select-sm" aria-label="@label" value="@current" @onchange="e => SetValue(item, index, e.Value?.ToString())">
-                        <option value="">Seçin</option>
+                        <option value="">@Texts.Get("support.choose")</option>
                         @foreach (var o in choices) { <option value="@o.Key">@o.Value</option> }
                     </select>
                 }
                 else if (field.Type == "Bool")
                 {
                     <select id="@(index == 0 ? id : null)" class="form-select form-select-sm" aria-label="@label" value="@current" @onchange="e => SetValue(item, index, e.Value?.ToString())">
-                        <option value="">Seçin</option>
-                        <option value="true">Evet</option>
-                        <option value="false">Hayır</option>
+                        <option value="">@Texts.Get("support.choose")</option>
+                        <option value="true">@Texts.Get("common.yes")</option>
+                        <option value="false">@Texts.Get("common.no")</option>
                     </select>
                 }
                 else if (isDays)

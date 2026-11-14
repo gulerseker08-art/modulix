@@ -2,52 +2,52 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Kampanyalar · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.marketing.campaigns") · Modulix</PageTitle>
 
 <AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.CampaignsRead">
     <div class="page-header">
         <div>
-            <h1>Kampanyalar</h1>
-            <p class="text-muted mb-0">Kampanya, hedef kitleyi segmentlerden ve seçilen kayıtlardan kurar; gönderimden önce hedef kitle dondurulur. Bu sürümde içerik, onay ve gönderim yoktur: hiçbir ileti gönderilmez.</p>
+            <h1>@Texts.Get("nav.app.marketing.campaigns")</h1>
+            <p class="text-muted mb-0">@Texts.Get("marketing.campaigns.intro")</p>
         </div>
     </div>
 
     @if (message is not null)
     {
-        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">@Texts.Get("crm.sales.retry")</button></div>
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Kampanya görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("marketing.campaigns.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <label class="visually-hidden" for="c-search">Kampanya ara</label>
-            <input id="c-search" class="form-control" type="search" placeholder="Ad veya kod ara" @bind="search" />
+            <label class="visually-hidden" for="c-search">@Texts.Get("marketing.campaigns.search")</label>
+            <input id="c-search" class="form-control" type="search" placeholder="@Texts.Get("marketing.searchPlaceholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(MarketingAccess.CampaignsWrite))
         {
-            <a class="btn btn-primary" href="pazarlama/kampanyalar/yeni"><AppIcon Name="plus" Size="16" /> Yeni kampanya</a>
+            <a class="btn btn-primary" href="pazarlama/kampanyalar/yeni"><AppIcon Name="plus" Size="16" /> @Texts.Get("marketing.campaigns.new")</a>
         }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <label class="visually-hidden" for="c-status">Durum</label>
+            <label class="visually-hidden" for="c-status">@Texts.Get("common.field.status")</label>
             <select id="c-status" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm durumlar</option>
+                <option value="">@Texts.Get("common.allStatuses")</option>
                 @foreach (var s in MarketingLabels.CampaignStatuses) { <option value="@s.Key">@s.Label</option> }
             </select>
-            <label class="visually-hidden" for="c-target">Hedef türü</label>
+            <label class="visually-hidden" for="c-target">@Texts.Get("marketing.targetType")</label>
             <select id="c-target" class="form-select form-select-sm filter-select" @bind="target" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm hedefler</option>
+                <option value="">@Texts.Get("marketing.allTargets")</option>
                 @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
             </select>
-            <label class="visually-hidden" for="c-channel">Kanal</label>
+            <label class="visually-hidden" for="c-channel">@Texts.Get("crm.contactPoint.channel")</label>
             <select id="c-channel" class="form-select form-select-sm filter-select" @bind="channel" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm kanallar</option>
+                <option value="">@Texts.Get("marketing.allChannels")</option>
                 @foreach (var c in MarketingLabels.Channels) { <option value="@c.Key">@c.Label</option> }
             </select>
         </div>
@@ -62,20 +62,20 @@
     }
     else if (list is not null && list.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu süzgece uyan kampanya yok.@(Session.Can(MarketingAccess.CampaignsWrite) ? " Yeni kampanya oluşturabilirsiniz." : null)</p>
+        <p class="text-muted" role="status">@(Session.Can(MarketingAccess.CampaignsWrite) ? Texts.Get("marketing.campaigns.emptyCanCreate") : Texts.Get("marketing.campaigns.empty"))</p>
     }
     else if (list is not null)
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@list.TotalCount kampanya listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("marketing.campaigns.listed", list.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Kampanya listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("marketing.campaigns.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -87,8 +87,8 @@
                             @Cell(column, c)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{c.Name} eylemleri")">
-                                <a class="view-menu-item" role="menuitem" href="pazarlama/kampanyalar/@c.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", c.Name)">
+                                <a class="view-menu-item" role="menuitem" href="pazarlama/kampanyalar/@c.Id"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></a>
                             </RowMenu>
                         </td>
                     </tr>
@@ -104,14 +104,14 @@
     private const string MineView = "mine";
 
     // Başlık tıklamasıyla sıralanan sütunlar sunucudaki sort anahtarlarıdır (CampaignRecordStore.SortKeys). Varsayılan sıra: en yeni önce.
-    private static readonly GridColumnDef[] Columns =
+    private static GridColumnDef[] Columns =>
     [
-        new("name", "Kampanya", "type", "name", "-name", Locked: true),
-        new("target", "Hedef", "target", "target", "-target"),
-        new("channel", "Kanal", "mail", "channel", "-channel"),
-        new("period", "Dönem", "calendar", "startsOn", "-startsOn"),
-        new("status", "Durum", "tag", "status", "-status"),
-        new("budget", "Bütçe", "coins", "budget", "-budget", DefaultVisible: false),
+        new("name", Texts.Get("marketing.campaigns.col.name"), "type", "name", "-name", Locked: true),
+        new("target", Texts.Get("marketing.col.target"), "target", "target", "-target"),
+        new("channel", Texts.Get("crm.contactPoint.channel"), "mail", "channel", "-channel"),
+        new("period", Texts.Get("marketing.campaigns.col.period"), "calendar", "startsOn", "-startsOn"),
+        new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
+        new("budget", Texts.Get("marketing.budget"), "coins", "budget", "-budget", DefaultVisible: false),
     ];
 
     private readonly GridViewState grid = new("marketing.campaigns", "-createdAt");
@@ -146,8 +146,8 @@
     // Görünümler yalnızca süzgeçtir (Benim kampanyalarım, Tümü, kişisel); kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(MineView, "Benim kampanyalarım", Icon: "star"),
-        new(AllViews, "Tüm kampanyalar", Icon: "target"),
+        new(MineView, Texts.Get("marketing.campaigns.view.mine"), Icon: "star"),
+        new(AllViews, Texts.Get("marketing.campaigns.view.all"), Icon: "target"),
         .. views.Options,
     ];
 
