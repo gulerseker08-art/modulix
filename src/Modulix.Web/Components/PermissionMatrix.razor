@@ -12,7 +12,7 @@
                 <label class="form-check">
                     <input class="form-check-input" type="checkbox" checked="@grantable.All(p => Selected.Contains(p.Key))"
                            @onchange="e => SetAll(grantable, e.Value is true)" />
-                    <span class="form-check-label">Tümü</span>
+                    <span class="form-check-label">@Texts.Get("support.all")</span>
                 </label>
             }
         </header>
@@ -20,15 +20,15 @@
         {
             <table class="permission-matrix">
                 <thead>
-                    <tr><th scope="col">Kaynak</th><th scope="col">Görüntüleme</th><th scope="col">Düzenleme</th></tr>
+                    <tr><th scope="col">@Texts.Get("admin.permissions.resource")</th><th scope="col">@Texts.Get("admin.permissions.read")</th><th scope="col">@Texts.Get("admin.permissions.write")</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var row in module.Rows)
                     {
                         <tr>
                             <th scope="row">@row.Name</th>
-                            <td>@if (row.Read is { } read) { @Box(read, $"{row.Name}: görüntüleme") }</td>
-                            <td>@if (row.Write is { } write) { @Box(write, $"{row.Name}: düzenleme") }</td>
+                            <td>@if (row.Read is { } read) { @Box(read, Texts.Get("admin.permissions.readOf", row.Name)) }</td>
+                            <td>@if (row.Write is { } write) { @Box(write, Texts.Get("admin.permissions.writeOf", row.Name)) }</td>
                         </tr>
                     }
                 </tbody>
@@ -87,7 +87,7 @@
             .OrderBy(g => g.Key == CoreAccess.ModuleKey)
             .Select(g => new ModuleGroup(
                 g.Key,
-                g.Key == CoreAccess.ModuleKey ? "Yönetim" : g.First().ModuleName,
+                g.Key == CoreAccess.ModuleKey ? Texts.Get("nav.app.admin") : g.First().ModuleName,
                 g.ToList(),
                 g.GroupBy(p => p.ResourceName)
                     .Select(r => new Row(
@@ -105,7 +105,7 @@
 
     private string Title(PermissionDto permission) =>
         Describe?.Invoke(permission.Key)
-        ?? (CanGrant(permission.Key) || ReadOnly ? permission.DisplayName : "Bu izin sizde olmadığı için veremez veya kaldıramazsınız.");
+        ?? (CanGrant(permission.Key) || ReadOnly ? permission.DisplayName : Texts.Get("admin.permissions.locked"));
 
     /// <summary>Düzenleme görüntülemeyi gerektirir: düzenleme seçilince görüntüleme de seçilir, görüntüleme kalkınca düzenleme de kalkar.</summary>
     private async Task ToggleAsync(PermissionDto permission, bool on)

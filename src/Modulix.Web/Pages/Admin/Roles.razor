@@ -2,20 +2,17 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Roller · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.roles") · Modulix</PageTitle>
 
 <AuthGate Permission="@CoreAccess.ManageRoles">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
     <div class="page-header">
-        <h1>Roller</h1>
-        <a class="btn btn-primary" href="yonetim/roller/yeni">Yeni rol</a>
+        <h1>@Texts.Get("nav.app.admin.roles")</h1>
+        <a class="btn btn-primary" href="yonetim/roller/yeni">@Texts.Get("admin.roles.new")</a>
     </div>
 
-    <p class="text-muted">
-        Rol, kişinin hangi kayıtları görüntüleyip düzenleyebileceğini belirler. Bir kişinin birden fazla rolü olabilir;
-        izinleri birleşir. Değişiklik, rolün üyelerinin bir sonraki işleminde geçerli olur.
-    </p>
+    <p class="text-muted">@Texts.Get("admin.roles.intro")</p>
 
     @if (message is not null)
     {
@@ -33,30 +30,30 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Rol</th><th>İzinler</th><th>Kayıt kapsamı</th><th>Atanabilir düzey</th><th>Üyeler</th><th>Departmanlar</th></tr>
+                <tr><th>@Texts.Get("admin.users.role")</th><th>@Texts.Get("admin.roles.col.permissions")</th><th>@Texts.Get("admin.roles.col.scope")</th><th>@Texts.Get("admin.roles.col.assignLevel")</th><th>@Texts.Get("admin.roles.col.members")</th><th>@Texts.Get("nav.app.admin.business-units")</th></tr>
             </thead>
             <tbody>
                 @foreach (var role in roles)
                 {
                     <tr>
-                        <td data-label="Rol" class="primary">
+                        <td data-label="@Texts.Get("admin.users.role")" class="primary">
                             <a href="yonetim/roller/@role.Id">@role.Name</a>
                             @if (role.IsSystem)
                             {
-                                <span class="badge tag">Sistem rolü</span>
+                                <span class="badge tag">@Texts.Get("admin.roles.system")</span>
                             }
                         </td>
-                        <td data-label="İzinler">@(role.IsSystem ? "Tüm izinler, düzenlenemez" : $"{role.Permissions.Count} izin")</td>
-                        <td data-label="Kayıt kapsamı">
-                            @RecordScopeLabels.Of(role.Scope)
+                        <td data-label="@Texts.Get("admin.roles.col.permissions")">@(role.IsSystem ? Texts.Get("admin.roles.allPermissions") : Texts.Get("admin.roles.permissionCount", role.Permissions.Count))</td>
+                        <td data-label="@Texts.Get("admin.roles.col.scope")">
+                            @AdminLabels.Scope(role.Scope)
                             @if (role.HideOutOfScopeShared)
                             {
-                                <span class="badge tag">Kapsam dışı ortak kayıtlar gizli</span>
+                                <span class="badge tag">@Texts.Get("admin.roles.hideShared")</span>
                             }
                         </td>
-                        <td data-label="Atanabilir düzey">@RoleAssignLevelLabels.Of(role.AssignLevel)</td>
-                        <td data-label="Üyeler">@role.MemberCount</td>
-                        <td data-label="Departmanlar">@role.UnitCount</td>
+                        <td data-label="@Texts.Get("admin.roles.col.assignLevel")">@AdminLabels.AssignLevel(role.AssignLevel)</td>
+                        <td data-label="@Texts.Get("admin.roles.col.members")">@role.MemberCount</td>
+                        <td data-label="@Texts.Get("nav.app.admin.business-units")">@role.UnitCount</td>
                     </tr>
                 }
             </tbody>
@@ -64,8 +61,8 @@
 
         @if (roles.All(r => r.IsSystem) && templates.Count > 0)
         {
-            <h2 class="h5">Hazır rollerle başlayın</h2>
-            <p class="text-muted">Şablon, yeni rol formunu doldurur; oluşturmadan önce izinleri değiştirebilirsiniz.</p>
+            <h2 class="h5">@Texts.Get("admin.roles.templates")</h2>
+            <p class="text-muted">@Texts.Get("admin.roles.templatesHelp")</p>
             <div class="tiles">
                 @foreach (var template in templates)
                 {

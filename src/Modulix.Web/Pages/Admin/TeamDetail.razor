@@ -3,10 +3,10 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>@(team?.Name ?? "Ekip") · Modulix</PageTitle>
+<PageTitle>@(team?.Name ?? Texts.Get("admin.teams.col.team")) · Modulix</PageTitle>
 
 <AuthGate Permission="@CoreAccess.ManageUsers">
-    <a class="back-link" href="yonetim/ekipler">← Ekipler</a>
+    <a class="back-link" href="yonetim/ekipler">← @Texts.Get("nav.app.admin.teams")</a>
 
     @if (notice is not null)
     {
@@ -32,16 +32,16 @@
         </div>
 
         <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>Ekip bilgileri</h2>
-            <FormTabs Title="Ekip bilgileri" Label="Ekip formu bölümleri">
+            <h2>@Texts.Get("admin.teams.section")</h2>
+            <FormTabs Title="@Texts.Get("admin.teams.section")" Label="@Texts.Get("admin.teams.sections")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="teamName">Ekip adı *</label>
+                    <label class="form-label" for="teamName">@Texts.Get("admin.teams.name")</label>
                     <input id="teamName" class="form-control" maxlength="100" @bind="name" @bind:event="oninput" />
                     <FieldError Field="name" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="teamDescription">Açıklama</label>
+                    <label class="form-label" for="teamDescription">@Texts.Get("common.field.description")</label>
                     <input id="teamDescription" class="form-control" maxlength="500" @bind="description" @bind:event="oninput" />
                     <FieldError Field="description" Errors="errors" />
                 </div>
@@ -49,23 +49,23 @@
             </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary"
-                        disabled="@(busy || string.IsNullOrWhiteSpace(name) || (name.Trim() == team.Name && (description ?? "") == (team.Description ?? "")))">Kaydet</button>
+                        disabled="@(busy || string.IsNullOrWhiteSpace(name) || (name.Trim() == team.Name && (description ?? "") == (team.Description ?? "")))">@Texts.Get("common.save")</button>
             </div>
         </form>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Üyeler</h2></div>
+            <div class="section-header"><h2>@Texts.Get("admin.roles.col.members")</h2></div>
             @if (members is null)
             {
                 <LoadingState />
             }
             else if (members.Count == 0)
             {
-                <EmptyState Compact="true" Title="Firmada etkin kullanıcı yok." />
+                <EmptyState Compact="true" Title="@Texts.Get("admin.teamDetail.noUsers")" />
             }
             else
             {
-                <p class="text-muted small">@selected.Count kişi seçili. Değişiklik, kişilerin bir sonraki işleminde geçerli olur.</p>
+                <p class="text-muted small">@Texts.Get("admin.teamDetail.selected", selected.Count)</p>
                 <div class="role-picker">
                     @foreach (var member in members)
                     {
@@ -77,28 +77,28 @@
                     }
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveMembersAsync">Üyeleri kaydet</button>
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveMembersAsync">@Texts.Get("admin.teamDetail.saveMembers")</button>
                 </div>
             }
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Ekibi sil</h2></div>
+            <div class="section-header"><h2>@Texts.Get("admin.teamDetail.delete")</h2></div>
             @if (!deleting)
             {
                 <div class="account-actions">
                     <div>
-                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => deleting = true">Ekibi sil</button>
-                        <small class="text-muted">Üyelerin kayıtlarına dokunulmaz; yalnızca ekip ilişkisi kalkar.</small>
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => deleting = true">@Texts.Get("admin.teamDetail.delete")</button>
+                        <small class="text-muted">@Texts.Get("admin.teamDetail.deleteHint")</small>
                     </div>
                 </div>
             }
             else
             {
                 <div class="alert alert-warning confirm" role="alertdialog">
-                    <p>"@team.Name" ekibi silinsin mi? "Ekibinin kayıtları" kapsamındaki üyeler artık birbirlerinin kayıtlarını görmez.</p>
-                    <button type="button" class="btn btn-danger" disabled="@busy" @onclick="DeleteAsync">Ekibi sil</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => deleting = false">Vazgeç</button>
+                    <p>@Texts.Get("admin.teamDetail.deleteQuestion", team.Name)</p>
+                    <button type="button" class="btn btn-danger" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("admin.teamDetail.delete")</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => deleting = false">@Texts.Get("common.dismiss")</button>
                 </div>
             }
         </section>
@@ -172,7 +172,7 @@
         if (result.Value is { } saved)
         {
             Show(saved);
-            (notice, message) = ("Ekip kaydedildi.", null);
+            (notice, message) = (Texts.Get("admin.teamDetail.saved"), null);
             return;
         }
 
@@ -188,7 +188,7 @@
         if (result.Value is { } saved)
         {
             Show(saved);
-            (notice, message) = ($"Üyeler kaydedildi ({saved.Members.Count} kişi).", null);
+            (notice, message) = (Texts.Get("admin.teamDetail.membersSaved", saved.Members.Count), null);
             return;
         }
 

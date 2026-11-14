@@ -3,21 +3,17 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>Departmanlar · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.business-units") · Modulix</PageTitle>
 
 @* Departman ağacı (ADR-0026). Merkez kök departmandır; bayiler ve diğer yapılar altında yer alır. *@
 <AuthGate Permission="@CoreAccess.ManageUsers">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
     <div class="page-header">
-        <h1>Departmanlar</h1>
+        <h1>@Texts.Get("nav.app.admin.business-units")</h1>
     </div>
 
-    <p class="text-muted">
-        Her kullanıcı tam bir departmandadır. Merkez, ağacın kökündedir; bayiler ve diğer yapılar onun altında yer alır.
-        Bir departmana rol atayabilirsiniz (departmandaki herkes rolün izinlerini alır) ve rollerin kayıt kapsamını
-        "Departmanın kayıtları" ya da "Departmanın ve alt departmanların kayıtları" yapabilirsiniz.
-    </p>
+    <p class="text-muted">@Texts.Get("admin.units.intro")</p>
 
     @if (message is not null)
     {
@@ -27,11 +23,11 @@
     @if (units is not null)
     {
         <form class="record-form settings-group" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
-            <h2>Yeni departman</h2>
-            <FormTabs Title="Departman bilgileri" Label="Departman formu bölümleri">
+            <h2>@Texts.Get("admin.units.new")</h2>
+            <FormTabs Title="@Texts.Get("admin.units.section")" Label="@Texts.Get("admin.units.sections")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="unit-parent">Üst departman *</label>
+                    <label class="form-label" for="unit-parent">@Texts.Get("admin.units.parent")</label>
                     <select id="unit-parent" class="form-select" @bind="parentId">
                         @foreach (var unit in units.Where(u => u.IsActive && u.Depth < MaxParentDepth))
                         {
@@ -41,17 +37,17 @@
                     <FieldError Field="parent" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="unit-name">Departman adı *</label>
-                    <input id="unit-name" class="form-control" maxlength="200" placeholder="ör. Marmara Bayi" @bind="name" @bind:event="oninput" />
+                    <label class="form-label" for="unit-name">@Texts.Get("admin.units.name")</label>
+                    <input id="unit-name" class="form-control" maxlength="200" placeholder="@Texts.Get("admin.units.namePlaceholder")" @bind="name" @bind:event="oninput" />
                     <FieldError Field="name" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="unit-code">Kod</label>
+                    <label class="form-label" for="unit-code">@Texts.Get("crm.products.col.code")</label>
                     <input id="unit-code" class="form-control" maxlength="50" @bind="code" />
                     <FieldError Field="code" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="unit-kind">Tür *</label>
+                    <label class="form-label" for="unit-kind">@Texts.Get("admin.units.kind")</label>
                     <select id="unit-kind" class="form-select" @bind="kind">
                         @foreach (var option in ChildKinds)
                         {
@@ -63,27 +59,27 @@
             </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name) || parentId == Guid.Empty)">Departman ekle</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name) || parentId == Guid.Empty)">@Texts.Get("admin.units.add")</button>
             </div>
         </form>
 
         <table class="table record-table">
             <thead>
-                <tr><th>Departman</th><th>Tür</th><th>Kod</th><th>Kullanıcı</th><th>Durum</th></tr>
+                <tr><th>@Texts.Get("admin.unit")</th><th>@Texts.Get("common.field.kind")</th><th>@Texts.Get("crm.products.col.code")</th><th>@Texts.Get("admin.userDetail.user")</th><th>@Texts.Get("common.field.status")</th></tr>
             </thead>
             <tbody>
                 @foreach (var unit in Ordered())
                 {
                     <tr>
-                        <td data-label="Departman" class="primary">
+                        <td data-label="@Texts.Get("admin.unit")" class="primary">
                             <span style="padding-inline-start: @(unit.Depth * 1.25)rem">
                                 <a href="yonetim/departmanlar/@unit.Id">@unit.Name</a>
                             </span>
                         </td>
-                        <td data-label="Tür">@BusinessUnitKindLabels.Of(unit.Kind)</td>
-                        <td data-label="Kod">@(unit.Code ?? "—")</td>
-                        <td data-label="Kullanıcı">@unit.MemberCount</td>
-                        <td data-label="Durum">@(unit.IsActive ? "Etkin" : "Kapalı")</td>
+                        <td data-label="@Texts.Get("common.field.kind")">@AdminLabels.UnitKind(unit.Kind)</td>
+                        <td data-label="@Texts.Get("crm.products.col.code")">@(unit.Code ?? "—")</td>
+                        <td data-label="@Texts.Get("admin.userDetail.user")">@unit.MemberCount</td>
+                        <td data-label="@Texts.Get("common.field.status")">@(unit.IsActive ? Texts.Get("admin.units.active") : Texts.Get("admin.units.closed"))</td>
                     </tr>
                 }
             </tbody>
@@ -99,10 +95,11 @@
     // Kök dahil dört seviye (0..3): üst departman olabilecek en derin seviye 2'dir.
     private const int MaxParentDepth = 3;
 
-    private static readonly IReadOnlyDictionary<string, string> ChildKinds = new Dictionary<string, string>
+    // Özellik olarak tanımlıdır: metinler her okunuşta etkin dilden çözülür (ADR-0034).
+    private static IReadOnlyDictionary<string, string> ChildKinds => new Dictionary<string, string>
     {
-        [BusinessUnitKindLabels.Dealer] = BusinessUnitKindLabels.Of(BusinessUnitKindLabels.Dealer),
-        [BusinessUnitKindLabels.Other] = BusinessUnitKindLabels.Of(BusinessUnitKindLabels.Other),
+        [BusinessUnitKindLabels.Dealer] = AdminLabels.UnitKind(BusinessUnitKindLabels.Dealer),
+        [BusinessUnitKindLabels.Other] = AdminLabels.UnitKind(BusinessUnitKindLabels.Other),
     };
 
     private IReadOnlyList<BusinessUnitDto>? units;

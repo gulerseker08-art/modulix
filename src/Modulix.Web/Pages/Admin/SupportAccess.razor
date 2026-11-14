@@ -1,21 +1,17 @@
 @page "/yonetim/destek-erisimi"
 @inject ApiClient Api
 
-<PageTitle>Destek erişimi · Modulix</PageTitle>
+<PageTitle>@Texts.Get("admin.supportAccess.title") · Modulix</PageTitle>
 
 @* Destek erişimi (ADR-0028 Dilim 7, Y1.3) firma tarafı: platform ekibinin bu firmada açtığı gerekçeli, süreli ve salt okunur erişimler
    listelenir; firma yöneticisi geçerli bir erişimi süresi dolmadan kapatabilir. Kayıtlar silinmez, geçmişte kalır. *@
 <AuthGate Permission="@CoreAccess.ManageUsers">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
     <div class="page-header">
-        <h1>Destek erişimi</h1>
+        <h1>@Texts.Get("admin.supportAccess.title")</h1>
     </div>
-    <p class="text-muted">
-        Platform ekibi verinize yalnızca gerekçeyle ve süreli bakabilir. Erişim <strong>salt okunurdur</strong>: veri değiştirilemez, dışa aktarılamaz;
-        kullanıcı, rol, denetim ve ayar bölümlerine girilemez. Açıldığında firma yöneticilerine e-posta gider; süresi dolunca kendiliğinden kapanır.
-        Gerek görmüyorsanız geçerli bir erişimi buradan hemen kapatabilirsiniz.
-    </p>
+    <p class="text-muted">@Texts.Strong("admin.supportAccess.intro", Texts.Get("admin.supportAccess.readOnly"))</p>
 
     <Notice Text="@notice" Failed="failed" />
 
@@ -25,29 +21,29 @@
     }
     else if (items.Count == 0)
     {
-        <p class="text-muted">Bu firmada henüz destek erişimi açılmadı.</p>
+        <p class="text-muted">@Texts.Get("admin.supportAccess.empty")</p>
     }
     else
     {
         <div class="card">
             <table class="table record-table">
-                <thead><tr><th>Kişi</th><th>Gerekçe</th><th>Başlangıç</th><th>Bitiş</th><th>Durum</th><th></th></tr></thead>
+                <thead><tr><th>@Texts.Get("admin.supportAccess.col.person")</th><th>@Texts.Get("admin.supportAccess.col.reason")</th><th>@Texts.Get("admin.supportAccess.col.start")</th><th>@Texts.Get("admin.supportAccess.col.end")</th><th>@Texts.Get("common.field.status")</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var item in items)
                     {
                         <tr>
-                            <td data-label="Kişi" class="primary">@item.UserName</td>
-                            <td data-label="Gerekçe">@item.Reason</td>
-                            <td data-label="Başlangıç">@CrmLabels.Time(item.GrantedAt)</td>
-                            <td data-label="Bitiş">@CrmLabels.Time(item.EndedAt ?? item.ExpiresAt)</td>
-                            <td data-label="Durum">
+                            <td data-label="@Texts.Get("admin.supportAccess.col.person")" class="primary">@item.UserName</td>
+                            <td data-label="@Texts.Get("admin.supportAccess.col.reason")">@item.Reason</td>
+                            <td data-label="@Texts.Get("admin.supportAccess.col.start")">@CrmLabels.Time(item.GrantedAt)</td>
+                            <td data-label="@Texts.Get("admin.supportAccess.col.end")">@CrmLabels.Time(item.EndedAt ?? item.ExpiresAt)</td>
+                            <td data-label="@Texts.Get("common.field.status")">
                                 <span class="badge @(item.State == SupportAccessStateDto.Active ? "user-active" : "user-disabled")">@StateText(item.State)</span>
                             </td>
                             <td class="actions">
-                                <button type="button" class="btn btn-ghost btn-sm" @onclick="() => ToggleReadsAsync(item.Id)">İşlemler</button>
+                                <button type="button" class="btn btn-ghost btn-sm" @onclick="() => ToggleReadsAsync(item.Id)">@Texts.Get("admin.supportAccess.reads")</button>
                                 @if (item.State == SupportAccessStateDto.Active)
                                 {
-                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RevokeAsync(item.Id)">Erişimi kapat</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RevokeAsync(item.Id)">@Texts.Get("admin.supportAccess.revoke")</button>
                                 }
                             </td>
                         </tr>
@@ -57,11 +53,11 @@
                                 <td colspan="6">
                                     @if (reads is null)
                                     {
-                                        <span class="text-muted">Yükleniyor…</span>
+                                        <span class="text-muted">@Texts.Get("common.loading")</span>
                                     }
                                     else if (reads.Count == 0)
                                     {
-                                        <span class="text-muted">Bu erişimde henüz istek yapılmadı.</span>
+                                        <span class="text-muted">@Texts.Get("admin.supportAccess.noReads")</span>
                                     }
                                     else
                                     {
@@ -71,7 +67,7 @@
                                                 <li><span class="text-muted">@CrmLabels.Time(read.At)</span> <strong>@read.Method</strong> @read.Path</li>
                                             }
                                         </ul>
-                                        <p class="text-muted">En yeni 200 istek. Yalnızca yöntem ve yol kaydedilir; arama metni ve yanıt içeriği saklanmaz.</p>
+                                        <p class="text-muted">@Texts.Get("admin.supportAccess.readsNote")</p>
                                     }
                                 </td>
                             </tr>
@@ -112,7 +108,7 @@
         busy = true;
         var result = await Api.PostAsync<bool>($"/api/tenant/support-access/{grantId}/revoke", new { });
         busy = false;
-        (notice, failed) = result.IsSuccess ? ("Destek erişimi kapatıldı.", false) : (result.Error, true);
+        (notice, failed) = result.IsSuccess ? (Texts.Get("admin.supportAccess.revoked"), false) : (result.Error, true);
         await LoadAsync();
     }
 
@@ -135,8 +131,8 @@
 
     private static string StateText(SupportAccessStateDto state) => state switch
     {
-        SupportAccessStateDto.Active => "Geçerli",
-        SupportAccessStateDto.Expired => "Süresi doldu",
-        _ => "Kapatıldı",
+        SupportAccessStateDto.Active => Texts.Get("admin.supportAccess.state.active"),
+        SupportAccessStateDto.Expired => Texts.Get("admin.supportAccess.state.expired"),
+        _ => Texts.Get("admin.supportAccess.state.revoked"),
     };
 }
