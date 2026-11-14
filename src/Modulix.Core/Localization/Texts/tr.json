@@ -108,6 +108,12 @@
   "home.noModule": "Kuruluşunuz için açık bir modül yok.",
   "home.funnel.title": "Satış hunisi",
   "home.funnel.chart": "Aşamalardaki fırsat sayıları",
+  "home.announcements.title": "Duyurular",
+  "home.announcements.unread": "{0} okunmamış duyuru",
+  "home.announcements.empty": "Şu an size yönelik duyuru yok.",
+  "home.announcements.all": "Tüm duyurular",
+  "home.announcements.new": "Yeni",
+  "home.announcements.pinned": "Sabitlenmiş",
 
   "nav.app.crm": "CRM",
   "nav.app.crm.activities": "Aktiviteler",

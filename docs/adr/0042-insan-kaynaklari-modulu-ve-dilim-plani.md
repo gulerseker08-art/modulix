@@ -413,3 +413,14 @@ Karar (kullanıcı, 14 Kasım 2026: "Core'a bağla"): İK'nın departmanı ayrı
 | `dotnet ef migrations has-pending-model-changes` | Bekleyen model değişikliği yok |
 | `HrDepartmentTests` (entegrasyon, 4 test: seçici, hesabı olmayan/bağlı kart, kullanıcı taşınınca kart ve görev geçmişi, süzgeç; eski değerlerin adla eşlenmesi ve eşlenmemiş eski duyurunun görünmeye devam etmesi; bulunmayan/kapalı/çakışan departman; tenant izolasyonu ve yetki); ayrıca `HrAnnouncementTests` ve `HrSurveyTests` güncellendi (hedef Core departmanı, üst departman kapsamı, bulunmayan ve kapalı departman), `HrImportTests` (departman adı/ağaç yolu, bulunmayan departman) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web` derlemesi | Yeni bileşenler ve ekran değişiklikleri hatasız derleniyor (bilinen 210 hatalık taban dışında hata yok); ekran görüntüsü alınamadı (yerelde uygulama çalışmıyor) |
+
+## 23. Sonraya kalanlar, öncelik 3: iletişim ek özellikleri (14 Kasım 2026)
+
+Kullanıcı kararı (14 Kasım 2026): dört ek özelliğin hepsi, ayrı ve küçük adımlarla: (a) duyuru kutucuğu ve ekler, (b) ankette çoklu seçim ve sonuçların dışa aktarımı, (c) çoklu hedefleme, (d) yorum ve beğeni.
+
+### 23a. Ana sayfa duyuru kutucuğu ve duyuru ekleri
+
+- **Ekler:** duyuruya görsel ve belge eklenir (ADR-0040 `/api/files`, `entityKey=hr.announcement`). Sunucu değişikliği gerekmedi: dosyanın görünürlüğü duyurunun görünürlüğüdür (hedef departman, yayın aralığı; göremeyene 404), eklemek ve silmek duyuru güncelleme iznini (`hr.announcements.manage`) ister. Duyuru yönetiminde ekler düzenlenir, duyuru akışında açılan duyurunun ekleri listelenir.
+- **Okunmamış süzgeci:** `unread=true` kullanıcının okumadığı duyurular (kullanıcı başına; başka kullanıcının okuması etkilemez).
+- **Ana sayfa kutucuğu** (`AnnouncementsTile`): duyuru okuma izni olan herkese, CRM açık olmasa da; son 5 yayındaki duyuru (sabitlenmişler üstte), "Sabitlenmiş"/"Yeni" rozeti ve okunmamış sayısı; akışa bağlantı. Metinler çeviri sözlüğündedir (`home.announcements.*`, tr/en/az; ADR-0034). Yeni CSS sınıfı yok (aktivite ajandasının `today-panel` sınıfları).
+- **Bilerek yapılmadı:** silinen duyurunun dosyalarının temizliği (öncelik 4, ADR-0040 dilim 3); duyuru metninde satır içi görsel (ekler ayrı listelenir).

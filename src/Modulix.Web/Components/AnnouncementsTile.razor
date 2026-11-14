@@ -1,0 +1,70 @@
+@* Ana sayfadaki "Duyurular" kutucuğu (ADR-0042 bölüm 23a): kullanıcıya yönelik yayındaki son duyurular (sabitlenmişler üstte) ve okunmamış duyuru
+   sayısı. Hangi duyurunun görüneceğine sunucu karar verir (hedef departman, yayın aralığı); duyuru metni burada açılmaz, akışa bağlantı verilir. *@
+@inject ApiClient Api
+
+<section class="today-panel" aria-labelledby="announcements-tile-title">
+    <header class="today-panel-head">
+        <div>
+            <h2 id="announcements-tile-title">@Texts.Get("home.announcements.title")</h2>
+            @if (unread > 0)
+            {
+                <p class="today-panel-date">@Texts.Get("home.announcements.unread", unread)</p>
+            }
+        </div>
+        <a class="btn btn-ghost" href="ik/duyurular">@Texts.Get("home.announcements.all")</a>
+    </header>
+
+    @if (items is null)
+    {
+        <div class="today-panel-state"><LoadingState Rows="3" /></div>
+    }
+    else if (items.Count == 0)
+    {
+        <div class="today-panel-state"><EmptyState Compact="true" Icon="bell" Title="@Texts.Get("home.announcements.empty")" /></div>
+    }
+    else
+    {
+        <ul class="today-list">
+            @foreach (var announcement in items)
+            {
+                @* Simge tonu aktivite ajandasının bilgi tonudur (yeni CSS yok). *@
+                <li class="today-item fam-meeting">
+                    <span class="today-icon" aria-hidden="true"><AppIcon Name="bell" Size="18" /></span>
+                    <a class="today-body" href="ik/duyurular">
+                        <span class="today-time">@HrLabels.Date(WarehouseLabels.Text(announcement, "publishOn"))</span>
+                        <strong class="today-subject">@WarehouseLabels.Text(announcement, "title")</strong>
+                    </a>
+                    @if (WarehouseLabels.Flag(announcement, "isPinned") || !WarehouseLabels.Flag(announcement, "readByMe"))
+                    {
+                        <div class="today-tags">
+                            @if (WarehouseLabels.Flag(announcement, "isPinned"))
+                            {
+                                <span class="badge stage-qualified">@Texts.Get("home.announcements.pinned")</span>
+                            }
+                            @if (!WarehouseLabels.Flag(announcement, "readByMe"))
+                            {
+                                <span class="badge stage-negotiation">@Texts.Get("home.announcements.new")</span>
+                            }
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    private const int Shown = 5;
+    private const string Url = "/api/records/" + HrAccess.AnnouncementEntityKey + "?active=true";
+
+    private IReadOnlyList<RecordResponse>? items;
+    private int unread;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var latest = Api.GetAsync<RecordPageResponse>($"{Url}&pageSize={Shown}");
+        var unreadPage = Api.GetAsync<RecordPageResponse>($"{Url}&unread=true&pageSize=1");
+        items = (await latest).Value?.Items ?? [];
+        unread = (await unreadPage).Value?.TotalCount ?? 0;
+    }
+}

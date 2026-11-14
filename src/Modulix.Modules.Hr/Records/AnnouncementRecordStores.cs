@@ -54,9 +54,19 @@ internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecord
         },
         ["isPublished"] = (q, v) => bool.TryParse(v, out var published) ? q.Where(a => a.IsPublished == published) : null,
         ["expired"] = (q, v) => v == "true" ? q.Where(a => a.ExpiresOn != null && a.ExpiresOn < Today) : null,
+
+        // Kullanıcının henüz okumadığı duyurular (ana sayfa kutucuğundaki okunmamış sayısı).
+        ["unread"] = (q, v) => v == "true" ? Unread(q, context) : null,
         ["audienceBusinessUnitId"] = (q, v) => FilterValue.Id(v) is { } id ? q.Where(a => a.AudienceBusinessUnitId == id) : null,
         ["audienceDepartmentKey"] = (q, v) => v.Length is > 0 and <= 100 ? q.Where(a => a.AudienceDepartmentKey == v) : null,
     };
+
+    private static IQueryable<Announcement> Unread(IQueryable<Announcement> source, HrStoreContext context)
+    {
+        var me = context.CurrentUserId ?? Guid.Empty;
+        var reads = context.Data.Set<AnnouncementRead>().AsNoTracking();
+        return source.Where(a => !reads.Any(r => r.AnnouncementId == a.Id && r.UserId == me));
+    }
 
     protected override IOrderedQueryable<Announcement> Order(IQueryable<Announcement> source) =>
         source.OrderByDescending(a => a.IsPinned).ThenByDescending(a => a.PublishOn).ThenByDescending(a => a.CreatedAt);

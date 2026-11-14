@@ -21,11 +21,12 @@
         <AnnouncementEditor @key="selected?.Id" Announcement="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="() => editing = false" />
         @if (selected is not null)
         {
+            <AttachmentPanel EntityKey="@HrAccess.AnnouncementEntityKey" RecordId="selected.Id" CanWrite="true" Title="Ekler" EmptyText="Bu duyurunun eki yok." />
             <section aria-label="Okuyanlar">
                 <div class="list-toolbar mt-3"><h3 class="h6 mb-0 me-auto">Okuyanlar</h3></div>
                 @if (reads is null || reads.Count == 0)
                 {
-                    <p class="text-muted" role="status">Henüz kimse okumadı.</p>
+                    <EmptyState Compact="true" Icon="eye" Title="Henüz kimse okumadı." />
                 }
                 else
                 {

@@ -108,6 +108,12 @@
   "home.noModule": "No modules are enabled for your organization.",
   "home.funnel.title": "Sales funnel",
   "home.funnel.chart": "Number of opportunities in each stage",
+  "home.announcements.title": "Announcements",
+  "home.announcements.unread": "{0} unread announcements",
+  "home.announcements.empty": "There are no announcements for you right now.",
+  "home.announcements.all": "All announcements",
+  "home.announcements.new": "New",
+  "home.announcements.pinned": "Pinned",
 
   "nav.app.crm": "CRM",
   "nav.app.crm.activities": "Activities",
