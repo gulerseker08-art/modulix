@@ -51,6 +51,11 @@ internal sealed class AutomationRunService(
         var ordered = query.Sort switch
         {
             "createdAt" => runs.OrderBy(r => r.CreatedAt).ThenBy(r => r.Id),
+            // Kural adı kural tablosundan çözülür (aynı tenant; sorgu süzgeci geçerlidir).
+            "rule" => runs.OrderBy(r => db.AutomationRules.Where(x => x.Id == r.RuleId).Select(x => x.Name).FirstOrDefault())
+                .ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
+            "-rule" => runs.OrderByDescending(r => db.AutomationRules.Where(x => x.Id == r.RuleId).Select(x => x.Name).FirstOrDefault())
+                .ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
             "status" => runs.OrderBy(r => r.Status).ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
             "-status" => runs.OrderByDescending(r => r.Status).ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
             "entityKey" => runs.OrderBy(r => r.EntityKey).ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),

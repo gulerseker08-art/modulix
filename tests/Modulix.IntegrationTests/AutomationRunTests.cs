@@ -745,6 +745,23 @@ public class AutomationRunTests(AutomationFixture fixture) : IClassFixture<Autom
         Assert.Equal(HttpStatusCode.Forbidden, (await outsiderClient.GetAsync("/api/automation/runs?sort=createdAt")).StatusCode);
     }
 
+    [Fact]
+    public async Task Run_history_sorts_by_rule_name_in_both_directions()
+    {
+        var setup = await SetUpAsync();
+        var ruleOne = await PublishRuleAsync(setup, ClosedDefinition());
+        var ruleTwo = await PublishRuleAsync(setup, ClosedDefinition());
+        await DeliverAsync(setup.Tenant.Id, AutomationRecords.Add(setup.Tenant.Id, Item, status: "closed", title: "Kayıt"), "closed");
+
+        var ascending = (await setup.Client.GetFromJsonAsync<AutomationRunPageDto>("/api/automation/runs?sort=rule"))!;
+        var descending = (await setup.Client.GetFromJsonAsync<AutomationRunPageDto>("/api/automation/runs?sort=-rule"))!;
+
+        // Aynı olay iki kuralı da çalıştırır; kural adları rastgele onaltılık soneklidir (sıralaması harf duyarsız ve yalındır).
+        string[] expected = [.. new[] { ruleOne.Rule.Name, ruleTwo.Rule.Name }.Order(StringComparer.OrdinalIgnoreCase)];
+        Assert.Equal(expected, ascending.Items.Select(r => r.RuleName));
+        Assert.Equal(expected.Reverse(), descending.Items.Select(r => r.RuleName));
+    }
+
     private static async Task<List<Guid>> RunIdsAsync(HttpClient client, string? sort)
     {
         var page = await client.GetFromJsonAsync<AutomationRunPageDto>(

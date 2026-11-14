@@ -104,8 +104,10 @@ internal sealed class AuditLog(
 
     // Kayıtlar tenant verisidir: sorgu filtresi ve RLS yalnızca aktif tenant'ınkileri döndürür.
     // Anahtarlar AuditQuery.SortKeys'tedir; bilinmeyen anahtar uç noktada reddedilir, burada varsayılan sıraya düşer.
-    private static IOrderedQueryable<AuditLogEntry> Order(IQueryable<AuditLogEntry> entries, string? sort) => sort switch
+    private IQueryable<AuditLogEntry> Order(IQueryable<AuditLogEntry> entries, string? sort) => sort switch
     {
+        "user" => OrderByUser(entries, descending: false),
+        "-user" => OrderByUser(entries, descending: true),
         "occurredAt" => entries.OrderBy(a => a.OccurredAt).ThenBy(a => a.Id),
         "entityKey" => entries.OrderBy(a => a.EntityKey).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
         "-entityKey" => entries.OrderByDescending(a => a.EntityKey).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
@@ -115,6 +117,28 @@ internal sealed class AuditLog(
         "-source" => entries.OrderByDescending(a => a.Source).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
         _ => entries.OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
     };
+
+    /// <summary>
+    /// Kullanıcı adına göre sıralama: ad platform kullanıcı tablosundan çözülür. Adı ekranda gösterilmeyenler (sistem, firma
+    /// üyesi olmayan platform yöneticisi) gerçek adlarıyla sıralanmaz; her iki yönde de sonda kalır.
+    /// </summary>
+    private IQueryable<AuditLogEntry> OrderByUser(IQueryable<AuditLogEntry> entries, bool descending)
+    {
+        var tenantId = RequireTenant().TenantId;
+        var named = entries.Select(a => new
+        {
+            Entry = a,
+            Name = db.Users
+                .Where(u => u.Id == a.UserId
+                    && (!u.IsPlatformAdministrator || db.Memberships.Any(m => m.TenantId == tenantId && m.UserId == u.Id)))
+                .Select(u => u.DisplayName)
+                .FirstOrDefault(),
+        });
+        var ordered = descending
+            ? named.OrderBy(x => x.Name == null).ThenByDescending(x => x.Name)
+            : named.OrderBy(x => x.Name == null).ThenBy(x => x.Name);
+        return ordered.ThenByDescending(x => x.Entry.OccurredAt).ThenByDescending(x => x.Entry.Id).Select(x => x.Entry);
+    }
 
     private IQueryable<AuditLogEntry> Filter(AuditQuery query)
     {

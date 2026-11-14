@@ -45,7 +45,7 @@
             <caption class="visually-hidden">Otomasyon çalışmaları</caption>
             <thead>
                 <tr>
-                    <th scope="col">Kural</th>
+                    <th scope="col"><SortHeader Label="Kural" ColumnIcon="zap" Asc="rule" Desc="-rule" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
                     <th scope="col"><SortHeader Label="Kayıt türü" ColumnIcon="layers" Asc="entityKey" Desc="-entityKey" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
                     <th scope="col">Kaynak</th>
                     <th scope="col"><SortHeader Label="Durum" ColumnIcon="tag" Asc="status" Desc="-status" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>

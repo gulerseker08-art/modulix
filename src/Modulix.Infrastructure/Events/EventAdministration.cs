@@ -58,6 +58,8 @@ internal sealed class EventAdministration(
         var ordered = query.Sort switch
         {
             "createdAt" => rows.OrderBy(r => r.Delivery.CreatedAt).ThenBy(r => r.Delivery.Id),
+            "tenant" => rows.OrderBy(r => r.TenantName).ThenByDescending(r => r.Delivery.CreatedAt).ThenByDescending(r => r.Delivery.Id),
+            "-tenant" => rows.OrderByDescending(r => r.TenantName).ThenByDescending(r => r.Delivery.CreatedAt).ThenByDescending(r => r.Delivery.Id),
             "subscription" => rows.OrderBy(r => r.Delivery.Subscription).ThenByDescending(r => r.Delivery.CreatedAt).ThenByDescending(r => r.Delivery.Id),
             "-subscription" => rows.OrderByDescending(r => r.Delivery.Subscription).ThenByDescending(r => r.Delivery.CreatedAt).ThenByDescending(r => r.Delivery.Id),
             "attemptCount" => rows.OrderBy(r => r.Delivery.AttemptCount).ThenByDescending(r => r.Delivery.CreatedAt).ThenByDescending(r => r.Delivery.Id),

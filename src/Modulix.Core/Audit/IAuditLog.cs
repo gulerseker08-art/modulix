@@ -20,7 +20,7 @@ public sealed record AuditQuery(
 {
     /// <summary>Başlığa göre sıralama anahtarları (ADR-0036); boşsa en yeni önce. Eşit kayıtlar en yeni önce sıralanır.</summary>
     public static readonly IReadOnlyCollection<string> SortKeys =
-        ["occurredAt", "-occurredAt", "entityKey", "-entityKey", "action", "-action", "source", "-source"];
+        ["occurredAt", "-occurredAt", "user", "-user", "entityKey", "-entityKey", "action", "-action", "source", "-source"];
 }
 
 /// <summary>

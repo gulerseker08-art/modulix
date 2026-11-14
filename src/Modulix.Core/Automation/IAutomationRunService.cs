@@ -6,7 +6,7 @@ public sealed record AutomationRunQuery(
     public const int MaxPageSize = 200;
 
     /// <summary>Başlığa göre sıralama anahtarları (ADR-0036); boşsa en yeni önce.</summary>
-    public static readonly IReadOnlyCollection<string> SortKeys = ["createdAt", "-createdAt", "status", "-status", "entityKey", "-entityKey"];
+    public static readonly IReadOnlyCollection<string> SortKeys = ["createdAt", "-createdAt", "rule", "-rule", "status", "-status", "entityKey", "-entityKey"];
 }
 
 public sealed record AutomationRunSummary(

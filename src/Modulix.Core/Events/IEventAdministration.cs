@@ -27,7 +27,7 @@ public sealed record EventDeliveryQuery(
 {
     /// <summary>Başlığa göre sıralama anahtarları (ADR-0036); boşsa en yeni önce.</summary>
     public static readonly IReadOnlyCollection<string> SortKeys =
-        ["createdAt", "-createdAt", "subscription", "-subscription", "attemptCount", "-attemptCount"];
+        ["createdAt", "-createdAt", "tenant", "-tenant", "subscription", "-subscription", "attemptCount", "-attemptCount"];
 }
 
 /// <summary>

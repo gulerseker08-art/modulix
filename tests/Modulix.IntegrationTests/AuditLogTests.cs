@@ -8,6 +8,7 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Shared.Account;
 using Modulix.Shared.Audit;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Crm;
@@ -213,6 +214,28 @@ public class AuditLogTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         using var client = await LoginAsync(outsider);
 
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/audit?sort=occurredAt")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Sorting_by_user_orders_by_display_name_in_both_directions()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var zeki = await factory.CreateUserAsync(tenant);
+        var ayla = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [CompaniesRead, CompaniesWrite, ReadAudit], zeki, ayla);
+        using var zekiClient = await LoginAsync(zeki);
+        using var aylaClient = await LoginAsync(ayla);
+        Assert.Equal(HttpStatusCode.OK, (await zekiClient.PutAsJsonAsync("/api/account/profile", new UpdateProfileRequest("Zeki Demir"))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await aylaClient.PutAsJsonAsync("/api/account/profile", new UpdateProfileRequest("Ayla Kaya"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await zekiClient.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Zeki'nin Firması"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await aylaClient.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Ayla'nın Firması"))).StatusCode);
+
+        var ascending = await aylaClient.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company&sort=user");
+        var descending = await aylaClient.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company&sort=-user");
+
+        Assert.Equal(["Ayla Kaya", "Zeki Demir"], ascending!.Items.Select(e => e.UserName));
+        Assert.Equal(["Zeki Demir", "Ayla Kaya"], descending!.Items.Select(e => e.UserName));
     }
 
     private static async Task<List<AuditOperation>> ActionsAsync(HttpClient client, string? sort, string extra = "")

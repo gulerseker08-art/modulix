@@ -685,9 +685,36 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         Assert.All(byAttempts.Items, d => Assert.Equal(actor.TenantId, d.TenantId));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await client.GetAsync($"{url}&sort=password")).StatusCode);
 
+        // Firma adına göre: iki firmanın teslimleri ad sırasıyla gelir (test firma adları "Test <onaltılık>" biçimindedir).
+        string[] names = [.. new[] { actor.Tenant.Name, other.Tenant.Name }.Order(StringComparer.OrdinalIgnoreCase)];
+        Assert.Equal(names, await TenantOrderAsync(client, "tenant", names));
+        Assert.Equal(names.Reverse(), await TenantOrderAsync(client, "-tenant", names));
+
         var member = await MemberAsync(actor, CoreModule.Permissions.ManageUsers);
         using var memberClient = await LoginAsync(member.Email);
         Assert.Equal(HttpStatusCode.Forbidden, (await memberClient.GetAsync("/api/platform/events/deliveries?sort=createdAt")).StatusCode);
+    }
+
+    /// <summary>Verilen firmaların, sıralı teslim listesinde ilk göründükleri sıra (liste bütün firmaları kapsar; sayfalar gezilir).</summary>
+    private static async Task<List<string>> TenantOrderAsync(HttpClient client, string sort, string[] names)
+    {
+        List<string> seen = [];
+        for (int page = 1; page <= 50 && seen.Count < names.Length; page++)
+        {
+            var result = (await client.GetFromJsonAsync<EventDeliveryPageResponse>(
+                $"/api/platform/events/deliveries?subscription={EventTestModule.Recorder}&sort={Uri.EscapeDataString(sort)}&page={page}&pageSize=200"))!;
+            foreach (var item in result.Items.Where(d => names.Contains(d.TenantName) && !seen.Contains(d.TenantName)))
+            {
+                seen.Add(item.TenantName);
+            }
+
+            if (result.Items.Count == 0)
+            {
+                break;
+            }
+        }
+
+        return seen;
     }
 
     private async Task SetPlatformAdministratorAsync(Guid userId)
