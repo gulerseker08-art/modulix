@@ -1,5 +1,5 @@
 using Modulix.Core.Contracts.Communication;
-using Modulix.Core.Contracts.Marketing;
+using Modulix.Modules.Marketing.Contracts;
 
 namespace Modulix.Modules.Marketing.Runs;
 

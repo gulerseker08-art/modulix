@@ -1,4 +1,4 @@
-using Modulix.Core.Contracts.Marketing;
+using Modulix.Modules.Marketing.Contracts;
 using Modulix.Modules.Crm.Records;
 
 namespace Modulix.Modules.Crm.Tests;

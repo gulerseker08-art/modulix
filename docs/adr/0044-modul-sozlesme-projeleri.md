@@ -1,6 +1,6 @@
 # ADR-0044: Modül sözleşme projeleri (modüller arası sözleşmeler Core'dan çıkar)
 
-- **Durum:** Uygulanıyor, 13 Kasım 2026. Dilim 1 (Fleet) ve Dilim 2 (Crm: `Sales`, `Activities`) teslim edildi; açık sorular 1-4 hâlâ karar bekliyor ve ilgili dilimlerden (4, 5) önce yanıtlanmalı.
+- **Durum:** Uygulanıyor, 13 Kasım 2026. Dilim 1 (Fleet), Dilim 2 (Crm: `Sales`, `Activities`), Dilim 3 (Marketing) ve Dilim 6 (ad alanı izin listesi testi) teslim edildi; `Customs` ve `Pricing` testte geçici istisna olarak durur. Açık sorular 1-4 hâlâ karar bekliyor ve ilgili dilimlerden (4, 5) önce yanıtlanmalı.
 - **Karar (öneri):** Bir modülün başka modüllere açtığı arayüzler ve veri tipleri `Modulix.Core.Contracts` yerine o modülün kendi sözleşme projesinde (`Modulix.Modules.<Ad>.Contracts`) durur. Bir modül başka bir modülün yalnızca sözleşme projesine başvurabilir; bu bağımlılık mimari test tablosunda açıkça yazılır. `Modulix.Core.Contracts` yalnızca bütün modüllerin ortak kullandığı çekirdek sözleşmeleri tutar ve içine modüle özel alan adı eklenmesi testle engellenir.
 
 > Numara notu: 0043 numarası açık dallarda iki ayrı ADR tarafından kullanılıyor (`0043-firma-sektor-katalogu`, `0043-sevkiyatta-ulke-ve-uluslararasi-tasima`). Bu taslak 0044 aldı; birleştirmeden önce numara yeniden kontrol edilmeli.
@@ -52,7 +52,7 @@ Sonuçları:
 ### Sözleşme hangi modülde durur
 
 - **Sağlanan hizmet:** kavramın sahibi olan modülde. `IVehicleDirectory` Fleet'te, `IAcceptedQuoteSource` ve `IFollowUpActivities` Crm'de.
-- **Genişleme noktası:** bir modülün "bana şunu sağlayan olursa kullanırım" dediği arayüz, onu tanımlayan modülde. Marketing'in alıcı çözümleme ve segment alanı arayüzleri Marketing'de kalır; Crm bunları uygulamak için `Modulix.Modules.Marketing.Contracts`'a başvurur. (Hangi arayüzü kimin uyguladığı taşıma diliminde tek tek doğrulanacak.)
+- **Genişleme noktası:** bir modülün "bana şunu sağlayan olursa kullanırım" dediği arayüz, onu tanımlayan modülde. Marketing'in alıcı çözümleme ve segment alanı arayüzleri Marketing'de kalır; Crm bunları uygulamak için `Modulix.Modules.Marketing.Contracts`'a başvurur. (Dilim 3'te doğrulandı: `ISegmentFieldSource`, `IRecipientResolver`, `IAddressLookup` ve `ICampaignLeads` arayüzlerini Crm uygular; `IMessageProvider` şimdilik Marketing içindeki sahte sağlayıcıyla uygulanır.)
 
 ### Modül yokken davranış
 
@@ -78,7 +78,7 @@ Her dilim yalnızca taşıma yapar, davranış değiştirmez; ayrı PR'dır.
 3. **Marketing.** `Marketing` alanı → `Modulix.Modules.Marketing.Contracts`.
 4. **Sözleşme modülünün adı** (açık soru 1) ve **Pricing ayrımı** (açık soru 2).
 5. **Customs** (açık soru 3 karara bağlandıktan sonra).
-6. **Kapanış.** `Core.Contracts` ad alanı izin listesi testi; `CLAUDE.md` ve README'deki "modüller yalnızca `Core.Contracts`'a başvurur" cümlesinin güncellenmesi.
+6. **Kapanış.** `Core.Contracts` ad alanı izin listesi testi (`CoreContractsNamespaceRulesTests`; Dilim 4 ve 5 beklenmeden eklendi, taşınmamış alanlar `PendingMoves` listesinde); `CLAUDE.md` ve README'deki "modüller yalnızca `Core.Contracts`'a başvurur" cümlesinin güncellenmesi.
 
 ## Kabul ölçütleri
 

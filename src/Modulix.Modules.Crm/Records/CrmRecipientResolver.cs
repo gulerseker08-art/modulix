@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Communication;
-using Modulix.Core.Contracts.Marketing;
+using Modulix.Modules.Marketing.Contracts;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Modules.Crm.Domain;
 

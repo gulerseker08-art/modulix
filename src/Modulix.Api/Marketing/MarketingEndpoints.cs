@@ -1,6 +1,6 @@
 using Modulix.Api.Access;
 using Modulix.Api.Records;
-using Modulix.Core.Contracts.Marketing;
+using Modulix.Modules.Marketing.Contracts;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Marketing;
 using Modulix.Modules.Marketing.Segments;
