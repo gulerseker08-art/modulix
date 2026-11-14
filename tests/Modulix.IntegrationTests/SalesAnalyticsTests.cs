@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Authorization;
 using Modulix.Core.Platform;
@@ -123,7 +124,9 @@ public class SalesAnalyticsTests(ModulixApiFactory factory) : IClassFixture<Modu
     [Fact]
     public async Task Team_performance_groups_by_current_owner_with_cycle_sample_and_hides_amounts_without_permission()
     {
-        var s = await SetUpAsync();
+        // Saat sabittir (bugün UTC 12:00 = İstanbul 15:00): sonuç testin çalıştığı saate bağlı değildir. Gece yarısı sınırı OpportunityCycleTimeZoneTests'te sınanır.
+        using var host = factory.WithClock(new MutableTimeProvider(new DateTimeOffset(DateTime.UtcNow.Date.AddHours(12), TimeSpan.Zero)));
+        var s = await SetUpAsync(host);
         var won = await OpenAsync(s.Admin, s.CompanyId, "Kazanılan", 5_000m);
         var winResult = await ReadAsync<OpportunityActionResultDto>(await s.Admin.PostAsJsonAsync($"/api/crm/opportunities/{won.Id}/win", new WinOpportunityRequestDto(won.Version)));
         var anchor = winResult.Opportunity.ActualCloseDate!.Value;
@@ -137,7 +140,7 @@ public class SalesAnalyticsTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.Equal((1, 1, 50m, 1), (row.Performance.WonCount, row.Performance.LostCount, row.Performance.WinRatePercent, row.Performance.OpenCount));
         Assert.Equal(5_000m, row.Performance.Realized.Amount);
         Assert.Equal(1, row.Performance.CycleSample);   // tarihçesi olan kazanılmış fırsat
-        Assert.NotNull(row.Performance.MedianCycleDays);
+        Assert.Equal((0m, 0m), (row.Performance.AverageCycleDays, row.Performance.MedianCycleDays));   // aynı gün açılıp kazanıldı
 
         // Hedef: kullanıcı hedefi tanımlıysa gerçekleşme hesaplanır.
         var start = new DateOnly(anchor.Year, anchor.Month, 1);
@@ -240,12 +243,12 @@ public class SalesAnalyticsTests(ModulixApiFactory factory) : IClassFixture<Modu
 
     // ---- Yardımcılar
 
-    private record Setup(HttpClient Admin, Tenant Tenant, Guid CompanyId)
+    private record Setup(HttpClient Admin, Tenant Tenant, Guid CompanyId, WebApplicationFactory<Program>? Host = null)
     {
         public Guid TenantId => Tenant.Id;
     }
 
-    private async Task<Setup> SetUpAsync()
+    private async Task<Setup> SetUpAsync(WebApplicationFactory<Program>? host = null)
     {
         var tenant = await factory.CreateTenantAsync();
         await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
@@ -257,16 +260,16 @@ public class SalesAnalyticsTests(ModulixApiFactory factory) : IClassFixture<Modu
             Assert.True(await roles.SetMembershipRolesAsync(await factory.GetMembershipIdAsync(admin.Id, tenant.Id), [system.Id], CancellationToken.None));
         }
 
-        var client = await LoginAsync(admin);
+        var client = host is null ? await LoginAsync(admin) : await host.LoginAsync(admin);
         var company = await PostAsync<CompanyDto>(client, "/api/crm/companies", new SaveCompanyRequest("Anka Ltd."));
-        return new Setup(client, tenant, company.Id);
+        return new Setup(client, tenant, company.Id, host);
     }
 
     private async Task<HttpClient> UserAsync(Setup s, IReadOnlyCollection<string> permissions, Scope scope)
     {
         var user = await factory.CreateUserAsync(s.Tenant);
         await factory.CreateRoleAsync(s.TenantId, permissions, scope, user);
-        return await LoginAsync(user);
+        return s.Host is null ? await LoginAsync(user) : await s.Host.LoginAsync(user);
     }
 
     private async Task<HttpClient> LoginAsync(ModulixUser user)

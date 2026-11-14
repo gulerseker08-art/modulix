@@ -483,7 +483,7 @@
                                 </div>
                                 @if (Session.Can(CrmAccess.OpportunitiesWrite))
                                 {
-                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveAsync(ContactsPath, link.Id, link.Version)">@Texts.Get("crm.opp.remove")</button>
+                                    <ConfirmAction Disabled="@busy" OnConfirm="() => RemoveAsync(ContactsPath, link.Id, link.Version)">@Texts.Get("crm.opp.remove")</ConfirmAction>
                                 }
                             </li>
                         }
@@ -550,7 +550,7 @@
                                 </div>
                                 @if (Session.Can(CrmAccess.OpportunitiesWrite))
                                 {
-                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveAsync(CompetitorsPath, c.Id, c.Version)">@Texts.Get("crm.opp.remove")</button>
+                                    <ConfirmAction Disabled="@busy" OnConfirm="() => RemoveAsync(CompetitorsPath, c.Id, c.Version)">@Texts.Get("crm.opp.remove")</ConfirmAction>
                                 }
                             </li>
                         }

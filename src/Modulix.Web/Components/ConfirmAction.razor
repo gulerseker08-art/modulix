@@ -1,0 +1,78 @@
+@* Onaylı yıkıcı düğme (docs/design-system/component-catalog.md → ConfirmAction): düğme ilk tıklamada eylemi çalıştırmaz,
+   yerinde küçük bir onay satırına dönüşür ("Emin misiniz?" + kırmızı onay + "Vazgeç"). Tablo hücresi, liste satırı ya da
+   satır içi her yerde kullanılır; geniş soru metni gerekiyorsa ConfirmBox kullanılır. Odak "Vazgeç"e gelir, Escape kapatır. *@
+@if (asking)
+{
+    <span class="confirm-inline" role="alertdialog" aria-label="@(AriaLabel ?? QuestionText)" @onkeydown="OnKeyDown">
+        <span class="confirm-inline-text">@QuestionText</span>
+        <button type="button" class="btn btn-danger btn-sm" disabled="@(Disabled || running)" aria-busy="@(running ? "true" : "false")" @onclick="ConfirmAsync">@ChildContent</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@running" @ref="cancel" @onclick="Cancel">@Texts.Get("common.confirm.cancel")</button>
+    </span>
+}
+else
+{
+    <button type="button" class="@Class" disabled="@Disabled" aria-label="@AriaLabel" @onclick="Ask">@ChildContent</button>
+}
+
+@code {
+    private ElementReference cancel;
+    private bool asking;
+    private bool running;
+    private bool focusPending;
+
+    /// <summary>Düğmenin içeriği (metin ya da ikon + metin); onay düğmesinde de aynısı görünür.</summary>
+    [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = default!;
+
+    /// <summary>İlk düğmenin sınıfı (ör. <c>btn btn-outline-danger btn-sm</c>).</summary>
+    [Parameter] public string Class { get; set; } = "btn btn-outline-danger btn-sm";
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public string? AriaLabel { get; set; }
+
+    /// <summary>Soru metni; verilmezse "Emin misiniz?".</summary>
+    [Parameter] public string? Question { get; set; }
+
+    [Parameter] public EventCallback OnConfirm { get; set; }
+
+    private string QuestionText => Question ?? Texts.Get("common.confirm.sure");
+
+    private void Ask()
+    {
+        asking = true;
+        focusPending = true;
+    }
+
+    private void Cancel() => asking = false;
+
+    private async Task ConfirmAsync()
+    {
+        running = true;
+        try
+        {
+            await OnConfirm.InvokeAsync();
+        }
+        finally
+        {
+            running = false;
+            asking = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusPending && asking)
+        {
+            focusPending = false;
+            await cancel.FocusAsync();
+        }
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape" && !running)
+        {
+            asking = false;
+        }
+    }
+}

@@ -11,6 +11,7 @@ using Modulix.Core.Records;
 using Modulix.Core.Settings;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Opportunities;
+using Modulix.Modules.Crm.Reporting;
 using Modulix.Shared.Crm;
 
 namespace Modulix.Api.Crm;
@@ -98,10 +99,11 @@ internal static class OpportunityEndpoints
     private static async Task<IResult> SettingsAsync(IOpportunityPolicyProvider policy, CancellationToken ct) =>
         Results.Ok(new OpportunitySettingsDto((await policy.GetAsync(ct)).StaleDays));
 
-    private static async Task<IResult> ReportAsync(DateOnly? from, DateOnly? to, Guid? ownerId, IOpportunityReport report, TimeProvider time, CancellationToken ct)
+    private static async Task<IResult> ReportAsync(
+        DateOnly? from, DateOnly? to, Guid? ownerId, IOpportunityReport report, TimeProvider time, ISalesReportingPolicyProvider policy, CancellationToken ct)
     {
-        // Varsayılan dönem: içinde bulunulan ayın başından bugüne.
-        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        // Varsayılan dönem: içinde bulunulan ayın başından bugüne (firmanın saat diliminde).
+        var today = ReportPeriods.Today(time.GetUtcNow(), (await policy.GetAsync(ct)).TimeZone);
         var result = await report.BuildAsync(new OpportunityReportQuery(from ?? new DateOnly(today.Year, today.Month, 1), to ?? today, ownerId), ct);
         return result.IsSuccess
             ? Results.Ok(JsonSerializer.Deserialize<OpportunityReportDto>(JsonSerializer.Serialize(result.Value, Json), Json))

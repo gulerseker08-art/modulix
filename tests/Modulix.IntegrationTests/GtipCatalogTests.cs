@@ -56,6 +56,17 @@ public class GtipCatalogTests(ModulixApiFactory factory) : IClassFixture<Modulix
             Assert.Equal(["18050000"], byText.Items.Select(e => e.Code));
             Assert.Equal(3, (await platform.GetFromJsonAsync<GtipEntryPageDto>($"/api/platform/gtip/versions/{v1.Id}/entries?pageSize=2"))!.TotalCount);
 
+            // Başlığa göre sıralama: iki yön, aramayla birlikte, yalnızca seçilen sürümün satırları, geçersiz anahtar reddi.
+            string entriesOfV1 = $"/api/platform/gtip/versions/{v1.Id}/entries";
+            Assert.Equal(["09023000", "090230001100", "18050000"], (await platform.GetFromJsonAsync<GtipEntryPageDto>($"{entriesOfV1}?sort=code"))!.Items.Select(e => e.Code));
+            Assert.Equal(["18050000", "090230001100", "09023000"], (await platform.GetFromJsonAsync<GtipEntryPageDto>($"{entriesOfV1}?sort=-code"))!.Items.Select(e => e.Code));
+            Assert.Equal(["090230001100", "09023000"], (await platform.GetFromJsonAsync<GtipEntryPageDto>($"{entriesOfV1}?sort=-code&search=0902"))!.Items.Select(e => e.Code));
+            var byDescription = (await platform.GetFromJsonAsync<GtipEntryPageDto>($"{entriesOfV1}?sort=description"))!.Items;
+            var byDescriptionDescending = (await platform.GetFromJsonAsync<GtipEntryPageDto>($"{entriesOfV1}?sort=-description"))!.Items;
+            Assert.Equal(byDescription.Select(e => e.Code).Reverse(), byDescriptionDescending.Select(e => e.Code));
+            Assert.DoesNotContain(byDescription, e => e.Code == "85171300");
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, (await platform.GetAsync($"{entriesOfV1}?sort=password")).StatusCode);
+
             using var tenant = await LoginAsync(s.Reader);
 
             // Aynen var, ayraçlı giriş de normalleşir; baştaki sıfır korunur.
@@ -189,6 +200,7 @@ public class GtipCatalogTests(ModulixApiFactory factory) : IClassFixture<Modulix
             using var facilityOnly = await LoginAsync(s.FacilityOnly);
             Assert.Equal(HttpStatusCode.Forbidden, (await facilityOnly.GetAsync($"/api/gtip/check?code=09023000&date={day:yyyy-MM-dd}")).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await readerA.GetAsync("/api/platform/gtip/versions")).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await readerA.GetAsync($"/api/platform/gtip/versions/{Guid.NewGuid()}/entries?sort=code")).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await readerA.GetAsync($"/api/platform/gtip/versions/{version.Id}/entries")).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await readerA.DeleteAsync($"/api/platform/gtip/versions/{version.Id}")).StatusCode);
 

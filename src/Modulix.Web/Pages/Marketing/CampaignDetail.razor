@@ -173,7 +173,7 @@
                                         <td data-label="@Texts.Get("crm.quoteApprovals.reasonLabel")">@(e.Reason ?? "—")</td>
                                         @if (CanEntries)
                                         {
-                                            <td data-label="@Texts.Get("crm.quoteApprovals.col.action")"><button type="button" class="btn btn-sm btn-outline-secondary" disabled="@busy" @onclick="() => RemoveEntryAsync(e)">@Texts.Get("marketing.remove")</button></td>
+                                            <td data-label="@Texts.Get("crm.quoteApprovals.col.action")"><ConfirmAction Class="btn btn-sm btn-outline-secondary" Disabled="@busy" OnConfirm="() => RemoveEntryAsync(e)">@Texts.Get("marketing.remove")</ConfirmAction></td>
                                         }
                                     </tr>
                                 }
@@ -280,6 +280,13 @@
         {
             <div id="tabpanel-yanitlar" role="tabpanel" aria-labelledby="tab-yanitlar" hidden="@tabState.Hidden("yanitlar")">
                 <CampaignResponsesPanel Campaign="campaign" />
+            </div>
+        }
+
+        @if (tabState.Rendered("bagli"))
+        {
+            <div id="tabpanel-bagli" role="tabpanel" aria-labelledby="tab-bagli" hidden="@tabState.Hidden("bagli")">
+                <CampaignLinkedRecordsPanel CampaignId="campaign.Id" />
             </div>
         }
 
@@ -417,6 +424,7 @@
         new("genel", Texts.Get("crm.quoteDetail.tab.general")), new("kitle", Texts.Get("marketing.campaignDetail.tab.audience")),
         new("dondurulmus", Texts.Get("marketing.campaignDetail.tab.snapshots")), new("calistirmalar", Texts.Get("marketing.campaignDetail.tab.runs")),
         .. (Session.Can(MarketingAccess.ResponsesRead) ? new[] { new TabItem("yanitlar", Texts.Get("marketing.campaignDetail.tab.responses")) } : []),
+        .. (CampaignLinkedRecordsPanel.Visible(Session) ? new[] { new TabItem("bagli", Texts.Get("marketing.campaignDetail.tab.linked")) } : []),
     ];
 
     protected override async Task OnInitializedAsync()

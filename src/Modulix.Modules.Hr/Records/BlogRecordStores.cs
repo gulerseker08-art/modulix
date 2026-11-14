@@ -7,17 +7,20 @@ namespace Modulix.Modules.Hr.Records;
 
 /// <summary>
 /// Blog yazıları (ADR-0042 dilim 8). "Blog yönetimi" izni olan bütün yazıları (taslak dahil) görür ve yazar; diğer okur yalnızca yayındaki yazıları
-/// görür, görmediği yazı "bulunamadı"dır (yazıya bağlı dosyalar da). İlk yayında yayın anı yazılır.
+/// görür, görmediği yazı "bulunamadı"dır (yazıya bağlı dosyalar, yorumlar ve beğeniler de). İlk yayında yayın anı yazılır. Silinen yazının yorum ve
+/// beğenileri de silinir (bölüm 23d).
 /// </summary>
 internal sealed class BlogPostRecordStore(HrStoreContext context) : HrRecordStore<BlogPost>(context)
 {
+    private readonly ContentStats stats = new(context);
+
     public override string EntityKey => HrModule.Entities.BlogPost;
 
     protected override string ReadPermission => HrModule.Permissions.BlogRead;
 
     protected override string WritePermission => HrModule.Permissions.BlogManage;
 
-    protected override IReadOnlyList<RecordField<BlogPost>> Fields { get; } =
+    protected override IReadOnlyList<RecordField<BlogPost>> Fields => fields ??=
     [
         Field.Text<BlogPost>("title", BlogPost.TitleMaxLength, p => p.Title, (p, v) => p.Title = v!, required: true),
         Field.Text<BlogPost>("summary", BlogPost.SummaryMaxLength, p => p.Summary, (p, v) => p.Summary = v),
@@ -25,7 +28,10 @@ internal sealed class BlogPostRecordStore(HrStoreContext context) : HrRecordStor
         Field.Flag<BlogPost>("isPublished", p => p.IsPublished, (p, v) => p.IsPublished = v),
         Field.Computed<BlogPost>("publishedAt", p => p.PublishedAt?.ToString("O")),
         Field.Computed<BlogPost>("authorUserId", p => p.AuthorUserId?.ToString()),
+        .. stats.Fields<BlogPost>(),
     ];
+
+    private IReadOnlyList<RecordField<BlogPost>>? fields;
 
     protected override IReadOnlyDictionary<string, RecordFilter<BlogPost>> Filters { get; } = new Dictionary<string, RecordFilter<BlogPost>>
     {
@@ -48,8 +54,18 @@ internal sealed class BlogPostRecordStore(HrStoreContext context) : HrRecordStor
     protected override IQueryable<BlogPost> Search(IQueryable<BlogPost> source, string term) =>
         source.Where(p => p.Title.Contains(term) || (p.Summary != null && p.Summary.Contains(term)) || p.Body.Contains(term));
 
-    protected override async Task<IQueryable<BlogPost>> RestrictAsync(IQueryable<BlogPost> source, CancellationToken cancellationToken) =>
-        await Context.Access.HasPermissionAsync(HrModule.Permissions.BlogManage, cancellationToken) ? source : source.Where(p => p.IsPublished);
+    protected override Task<IQueryable<BlogPost>> RestrictAsync(IQueryable<BlogPost> source, CancellationToken cancellationToken) =>
+        ForReaderAsync(Context, source, cancellationToken);
+
+    /// <summary>Kullanıcının görebildiği yazılar (yorum ve beğeni de bu kuralı kullanır; bölüm 23d).</summary>
+    internal static async Task<IQueryable<BlogPost>> ForReaderAsync(HrStoreContext context, IQueryable<BlogPost> source, CancellationToken cancellationToken) =>
+        await context.Access.HasPermissionAsync(HrModule.Permissions.BlogManage, cancellationToken) ? source : source.Where(p => p.IsPublished);
+
+    protected override Task PrepareAsync(IReadOnlyCollection<BlogPost> entities, CancellationToken cancellationToken) =>
+        stats.LoadAsync(entities.Select(p => p.Id), cancellationToken);
+
+    protected override Task BeforeDeleteAsync(BlogPost entity, CancellationToken cancellationToken) =>
+        ContentStats.RemoveAsync(Context, entity.Id, cancellationToken);
 
     protected override Task AppliedAsync(BlogPost entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {

@@ -64,7 +64,7 @@
                                 <td class="row-menu-cell">
                                     <RowMenu Label="@($"{WarehouseLabels.Text(item, "title")} eylemleri")">
                                         <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenItem(item)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
-                                        <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteItemAsync(item)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                        <RowMenuDelete OnConfirm="() => DeleteItemAsync(item)" />
                                     </RowMenu>
                                 </td>
                             </tr>
@@ -124,7 +124,7 @@
                         <td class="row-menu-cell">
                             <RowMenu Label="@($"{WarehouseLabels.Text(template, "name")} eylemleri")">
                                 <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(template)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle ve adımlar</span></button>
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteAsync(template)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                <RowMenuDelete OnConfirm="() => DeleteAsync(template)" />
                             </RowMenu>
                         </td>
                     </tr>

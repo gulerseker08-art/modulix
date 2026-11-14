@@ -311,3 +311,29 @@
     .stat-card .stat-trend .dash-delta.is-flat {
         color: var(--mx-tone-neutral-fg);
     }
+
+/* ---- Satır içi onay (docs/design-system/component-catalog.md → ConfirmAction) ---- */
+/* Düğmenin yerinde açılır: soru + kırmızı onay + Vazgeç tek satırda; dar yerde alt satıra kayar. */
+.confirm-inline {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-2);
+    padding: var(--mx-space-1) var(--mx-space-2);
+    border-radius: var(--mx-radius-button);
+    background: var(--mx-tone-warning-bg);
+    color: var(--mx-tone-warning-fg);
+    font-size: var(--mx-fs-label);
+    font-weight: 600;
+}
+
+/* Satır menüsünün yerinde açılan onay kutusu: menü kabuğu içinde, kendi kenarlığı olmadan. */
+.row-menu-confirm {
+    min-width: 16rem;
+    padding: 0;
+}
+
+    .row-menu-confirm .confirm {
+        margin: 0;
+        white-space: normal;
+    }

@@ -112,8 +112,11 @@ public interface IGtipCatalogAdmin
 
     Task DeleteVersionAsync(Guid actingUserId, Guid versionId, CancellationToken cancellationToken);
 
-    /// <summary>Sürümdeki satırlar; <paramref name="search"/> kod ön eki ya da tanım içinde arar.</summary>
-    Task<GtipCatalogEntryPage> SearchEntriesAsync(Guid versionId, string? search, int page, int pageSize, CancellationToken cancellationToken);
+    /// <summary>
+    /// Sürümdeki satırlar; <paramref name="search"/> kod ön eki ya da tanım içinde arar. <paramref name="sort"/>
+    /// <see cref="GtipEntrySort.Keys"/> içinden bir anahtardır; boşsa koda göre artan sıralanır.
+    /// </summary>
+    Task<GtipCatalogEntryPage> SearchEntriesAsync(Guid versionId, string? search, int page, int pageSize, CancellationToken cancellationToken, string? sort = null);
 }
 
 /// <summary>Katalog sürümü ve satırları için saf kurallar (veritabanı gerekmez).</summary>
@@ -186,4 +189,10 @@ public static class GtipCatalogRules
 
         return null;
     }
+}
+
+/// <summary>GTİP satır listesinin başlığa göre sıralama anahtarları (ADR-0036).</summary>
+public static class GtipEntrySort
+{
+    public static readonly IReadOnlyCollection<string> Keys = ["code", "-code", "description", "-description", "unit", "-unit"];
 }

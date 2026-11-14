@@ -221,8 +221,7 @@
                                     <td data-label="Özellik" class="primary">@feature.Group</td>
                                     <td data-label="Değer">@feature.Value</td>
                                     <td class="actions">
-                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="@($"{feature.Group}: {feature.Value} özelliğini kaldır")"
-                                                @onclick="() => RemoveFeatureAsync(feature)">Kaldır</button>
+                                        <ConfirmAction Disabled="@busy" AriaLabel="@($"{feature.Group}: {feature.Value} özelliğini kaldır")" OnConfirm="() => RemoveFeatureAsync(feature)">Kaldır</ConfirmAction>
                                     </td>
                                 </tr>
                             }
@@ -287,7 +286,7 @@
                                         @if (option.AppliedAt is null)
                                         {
                                             <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => EditOption(option)">Düzenle</button>
-                                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveOptionAsync(option)">Kaldır</button>
+                                            <ConfirmAction Disabled="@busy" OnConfirm="() => RemoveOptionAsync(option)">Kaldır</ConfirmAction>
                                         }
                                     </td>
                                 </tr>
@@ -422,7 +421,7 @@
                                         {
                                             <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="@($"{rule.Name} kuralını düzenle")" @onclick="() => EditRule(rule)">Düzenle</button>
                                         }
-                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="@($"{rule.Name} kuralını kaldır")" @onclick="() => RemoveRuleAsync(rule)">Kaldır</button>
+                                        <ConfirmAction Disabled="@busy" AriaLabel="@($"{rule.Name} kuralını kaldır")" OnConfirm="() => RemoveRuleAsync(rule)">Kaldır</ConfirmAction>
                                     </td>
                                 </tr>
                             }
