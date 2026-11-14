@@ -10,18 +10,18 @@
 <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>Yeni stok hareketi</h2>
-            <p>Kaydedilen hareket değiştirilemez; hata düzeltmesi ters kayıtla yapılır.</p>
+            <h2>@Texts.Get("warehouse.stockMovementEditor.title")</h2>
+            <p>@Texts.Get("warehouse.stockMovementEditor.note")</p>
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -31,12 +31,12 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <FormTabs Title="Hareket" Label="Stok hareketi formu bölümleri">
+    <FormTabs Title="@Texts.Get("warehouse.stockMovementEditor.tab")" Label="@Texts.Get("warehouse.stockMovementEditor.tabs")">
         <div class="form-grid">
             <div>
-                <label class="form-label required" for="movement-type">Hareket türü</label>
+                <label class="form-label required" for="movement-type">@Texts.Get("warehouse.movementType")</label>
                 <select id="movement-type" class="form-select" required aria-required="true" @bind="form.TypeKey">
-                    <option value="">Seçin…</option>
+                    <option value="">@Texts.Get("common.choose")</option>
                     @foreach (var type in DirectTypes)
                     {
                         <option value="@type.Key">@type.Label</option>
@@ -45,34 +45,34 @@
                 <FieldError Field="typeKey" Errors="errors" />
             </div>
             <div>
-                <label class="form-label required" for="movement-lot">Parti</label>
-                <LookupPicker Id="movement-lot" LookupKey="@WarehouseAccess.MovementLotLookup" @bind-Value="form.LotId" Required="true" Placeholder="Parti seçin…" Invalid="@(errors?.ContainsKey("lotId") == true)" />
+                <label class="form-label required" for="movement-lot">@Texts.Get("warehouse.lot")</label>
+                <LookupPicker Id="movement-lot" LookupKey="@WarehouseAccess.MovementLotLookup" @bind-Value="form.LotId" Required="true" Placeholder="@Texts.Get("warehouse.chooseLot")" Invalid="@(errors?.ContainsKey("lotId") == true)" />
                 <FieldError Field="lotId" Errors="errors" />
             </div>
             @if (Category is WarehouseAccess.MovementOutbound or WarehouseAccess.MovementTransfer)
             {
                 <div>
-                    <label class="form-label required" for="movement-from">Kaynak lokasyon</label>
-                    <LookupPicker Id="movement-from" LookupKey="@WarehouseAccess.MovementFromLocationLookup" @bind-Value="form.FromLocationId" Required="true" Placeholder="Kaynak lokasyon seçin…" Invalid="@(errors?.ContainsKey("fromLocationId") == true)" />
+                    <label class="form-label required" for="movement-from">@Texts.Get("warehouse.fromLocation")</label>
+                    <LookupPicker Id="movement-from" LookupKey="@WarehouseAccess.MovementFromLocationLookup" @bind-Value="form.FromLocationId" Required="true" Placeholder="@Texts.Get("warehouse.stockMovementEditor.chooseFrom")" Invalid="@(errors?.ContainsKey("fromLocationId") == true)" />
                     <FieldError Field="fromLocationId" Errors="errors" />
                 </div>
             }
             @if (Category is WarehouseAccess.MovementInbound or WarehouseAccess.MovementTransfer)
             {
                 <div>
-                    <label class="form-label required" for="movement-to">Hedef lokasyon</label>
-                    <LookupPicker Id="movement-to" LookupKey="@WarehouseAccess.MovementToLocationLookup" @bind-Value="form.ToLocationId" Required="true" Placeholder="Hedef lokasyon seçin…" Invalid="@(errors?.ContainsKey("toLocationId") == true)" />
+                    <label class="form-label required" for="movement-to">@Texts.Get("warehouse.toLocation")</label>
+                    <LookupPicker Id="movement-to" LookupKey="@WarehouseAccess.MovementToLocationLookup" @bind-Value="form.ToLocationId" Required="true" Placeholder="@Texts.Get("warehouse.stockMovementEditor.chooseTo")" Invalid="@(errors?.ContainsKey("toLocationId") == true)" />
                     <FieldError Field="toLocationId" Errors="errors" />
                 </div>
             }
             <div>
-                <label class="form-label required" for="movement-quantity">Miktar</label>
-                <input id="movement-quantity" class="form-control" inputmode="decimal" required aria-required="true" placeholder="ör. 12,5" @bind="form.Quantity" />
+                <label class="form-label required" for="movement-quantity">@Texts.Get("warehouse.quantity")</label>
+                <input id="movement-quantity" class="form-control" inputmode="decimal" required aria-required="true" placeholder="@Texts.Get("warehouse.quantityPlaceholder")" @bind="form.Quantity" />
                 <FieldError Field="quantity" Errors="errors" />
-                <small class="text-muted">Sıfırdan büyük; en çok 3 ondalık hane.</small>
+                <small class="text-muted">@Texts.Get("warehouse.quantityHelp")</small>
             </div>
             <div>
-                <label class="form-label" for="movement-reason">Neden</label>
+                <label class="form-label" for="movement-reason">@Texts.Get("warehouse.reason")</label>
                 <select id="movement-reason" class="form-select" @bind="form.ReasonKey">
                     <option value="">—</option>
                     @foreach (var reason in Lookups.ValuesOf(WarehouseAccess.MovementReasonList).Where(v => v.Active))
@@ -83,8 +83,8 @@
                 <FieldError Field="reasonKey" Errors="errors" />
             </div>
             <div>
-                <label class="form-label" for="movement-document">Belge referansı</label>
-                <input id="movement-document" class="form-control" maxlength="200" placeholder="İrsaliye, beyanname ya da iş emri no" @bind="form.DocumentReference" />
+                <label class="form-label" for="movement-document">@Texts.Get("warehouse.documentReference")</label>
+                <input id="movement-document" class="form-control" maxlength="200" placeholder="@Texts.Get("warehouse.stockMovementEditor.documentPlaceholder")" @bind="form.DocumentReference" />
                 <FieldError Field="documentReference" Errors="errors" />
             </div>
         </div>
@@ -123,7 +123,7 @@
         message = null;
         if (!TryParseQuantity(form.Quantity, out var quantity))
         {
-            errors = new Dictionary<string, string[]> { ["quantity"] = ["Miktarı sayı olarak girin (ör. 12,5)."] };
+            errors = new Dictionary<string, string[]> { ["quantity"] = [Texts.Get("warehouse.quantityInvalid")] };
             return;
         }
 

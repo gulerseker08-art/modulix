@@ -5,13 +5,13 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Rejim profilleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.warehouse.regime-bindings") · Modulix</PageTitle>
 
 @* Rejim–profil bağlaması (ADR-0032 K16). Platformun yayınladığı bir rejim profili, firmanın kendi rejim listesindeki bir değere bağlanır; o rejimdeki
    beyannamelerde tescil numarası profilin kuralına göre denetlenir. Firma kuralı yalnızca sıkılaştırabilir (uyarıyı engele çevirir), gevşetemez.
    Profil platformca yönetilir; "Doğrulanmadı" etiketli profilin kuralı uzman teyidi beklemektedir. Ayar ekranıdır (form sekmeleri kuralının dışında). *@
 <AuthGate Module="@WarehouseAccess.ModuleKey" Permission="@WarehouseAccess.RegimesRead">
-    <PageHeader Title="Rejim profilleri" Icon="shield" Subtitle="Rejimlerinizi platformun yayınladığı kural paketlerine bağlayın." />
+    <PageHeader Title="@Texts.Get("nav.app.warehouse.regime-bindings")" Icon="shield" Subtitle="@Texts.Get("warehouse.regimeBindings.intro")" />
 
     <Notice Text="@notice" Failed="@failed" />
 
@@ -22,9 +22,9 @@
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Rejim profil bağlamaları</caption>
+            <caption class="visually-hidden">@Texts.Get("warehouse.regimeBindings.caption")</caption>
             <thead>
-                <tr><th scope="col">Rejim</th><th scope="col">Bağlı profil</th><th scope="col">Tescil no kuralı</th><th scope="col">İhlalde</th><th scope="col"></th></tr>
+                <tr><th scope="col">@Texts.Get("warehouse.regime")</th><th scope="col">@Texts.Get("warehouse.regimeBindings.profile")</th><th scope="col">@Texts.Get("warehouse.regimeBindings.rule")</th><th scope="col">@Texts.Get("warehouse.regimeBindings.onViolation")</th><th scope="col"></th></tr>
             </thead>
             <tbody>
                 @foreach (var regime in regimes)
@@ -32,28 +32,28 @@
                     var binding = bindings.GetValueOrDefault(regime.Key);
                     var profile = binding is null ? null : profiles.FirstOrDefault(p => p.ProfileId == WarehouseLabels.Id(binding, "profileId"));
                     <tr>
-                        <td data-label="Rejim" class="primary">@regime.Label</td>
-                        <td data-label="Bağlı profil">
+                        <td data-label="@Texts.Get("warehouse.regime")" class="primary">@regime.Label</td>
+                        <td data-label="@Texts.Get("warehouse.regimeBindings.profile")">
                             @if (binding is null)
                             {
-                                <span class="text-muted">Bağlı değil</span>
+                                <span class="text-muted">@Texts.Get("warehouse.regimeBindings.notBound")</span>
                             }
                             else if (profile is null)
                             {
-                                <span class="text-muted">Profil yayında değil (kural uygulanmaz)</span>
+                                <span class="text-muted">@Texts.Get("warehouse.regimeBindings.notPublished")</span>
                             }
                             else
                             {
-                                <span>@profile.Name · sürüm @profile.VersionNumber</span>
-                                <span class="badge @(profile.IsVerified ? "status-customer" : "stage-qualified")">@(profile.IsVerified ? "Doğrulandı" : "Doğrulanmadı")</span>
+                                <span>@Texts.Get("warehouse.regimeBindings.profileVersion", profile.Name, profile.VersionNumber)</span>
+                                <span class="badge @(profile.IsVerified ? "status-customer" : "stage-qualified")">@(profile.IsVerified ? Texts.Get("warehouse.verified") : Texts.Get("warehouse.unverified"))</span>
                             }
                         </td>
-                        <td data-label="Tescil no kuralı">@(profile is null ? "—" : RuleText(profile.RegistrationNo))</td>
-                        <td data-label="İhlalde">@(binding is null || profile is null ? "—" : LevelText(profile, WarehouseLabels.Text(binding, "enforcement")))</td>
+                        <td data-label="@Texts.Get("warehouse.regimeBindings.rule")">@(profile is null ? "—" : RuleText(profile.RegistrationNo))</td>
+                        <td data-label="@Texts.Get("warehouse.regimeBindings.onViolation")">@(binding is null || profile is null ? "—" : LevelText(profile, WarehouseLabels.Text(binding, "enforcement")))</td>
                         <td class="actions">
                             @if (Session.Can(WarehouseAccess.RegimesWrite))
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(regime.Key)">@(binding is null ? "Bağla" : "Düzenle")</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(regime.Key)">@(binding is null ? Texts.Get("warehouse.regimeBindings.bind") : Texts.Get("common.edit"))</button>
                             }
                         </td>
                     </tr>
@@ -62,42 +62,42 @@
         </table>
         @if (profiles.Count == 0)
         {
-            <p class="text-muted" role="status">Platform henüz yayında bir rejim profili sunmuyor; profil yayınlanınca burada seçilebilir.</p>
+            <p class="text-muted" role="status">@Texts.Get("warehouse.regimeBindings.noProfiles")</p>
         }
     }
 
     @if (editingKey is { } key)
     {
         <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>@Lookups.Label(WarehouseAccess.CustomsRegimeList, key) · profil bağlaması</h2>
+            <h2>@Texts.Get("warehouse.regimeBindings.formTitle", Lookups.Label(WarehouseAccess.CustomsRegimeList, key))</h2>
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="binding-profile">Rejim profili *</label>
+                    <label class="form-label" for="binding-profile">@Texts.Get("warehouse.regimeBindings.profileRequired")</label>
                     <select id="binding-profile" class="form-select" @bind="profileId">
-                        <option value="">Seçin…</option>
+                        <option value="">@Texts.Get("common.choose")</option>
                         @foreach (var p in profiles)
                         {
-                            <option value="@p.ProfileId">@p.Name · sürüm @p.VersionNumber@(p.IsVerified ? null : " · Doğrulanmadı")</option>
+                            <option value="@p.ProfileId">@Texts.Get("warehouse.regimeBindings.profileVersion", p.Name, p.VersionNumber)@(p.IsVerified ? null : " · " + Texts.Get("warehouse.unverified"))</option>
                         }
                     </select>
                     <FieldError Field="profileId" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="binding-level">İhlalde</label>
+                    <label class="form-label" for="binding-level">@Texts.Get("warehouse.regimeBindings.onViolation")</label>
                     <select id="binding-level" class="form-select" @bind="level">
-                        <option value="Inherit">Profilin düzeyi</option>
-                        <option value="Block">Engel (sıkılaştır: kaydı reddet)</option>
+                        <option value="Inherit">@Texts.Get("warehouse.regimeBindings.inherit")</option>
+                        <option value="Block">@Texts.Get("warehouse.regimeBindings.block")</option>
                     </select>
                     <FieldError Field="enforcement" Errors="errors" />
-                    <div class="form-text">Profil uyarı veriyorsa burada engele çevirebilirsiniz; profilin engelini gevşetemezsiniz.</div>
+                    <div class="form-text">@Texts.Get("warehouse.regimeBindings.levelHelp")</div>
                 </div>
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(profileId))">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Close">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(profileId))">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Close">@Texts.Get("common.cancel")</button>
                 @if (editingBinding is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="RemoveAsync">Bağlamayı kaldır</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="RemoveAsync">@Texts.Get("warehouse.regimeBindings.remove")</button>
                 }
             </div>
         </form>
@@ -179,7 +179,7 @@
             return;
         }
 
-        notice = "Rejim profili bağlaması kaydedildi.";
+        notice = Texts.Get("warehouse.regimeBindings.saved");
         failed = false;
         editingKey = null;
         await LoadAsync();
@@ -201,7 +201,7 @@
             return;
         }
 
-        notice = "Bağlama kaldırıldı; bu rejimde tescil numarası artık profile göre denetlenmez.";
+        notice = Texts.Get("warehouse.regimeBindings.removed");
         failed = false;
         editingKey = null;
         await LoadAsync();
@@ -211,30 +211,30 @@
     {
         if (rule is null)
         {
-            return "Kural yok";
+            return Texts.Get("warehouse.regimeBindings.noRule");
         }
 
         var parts = new List<string>();
         if (rule.MinLength is not null || rule.MaxLength is not null)
         {
-            parts.Add($"{rule.MinLength?.ToString() ?? "—"}–{rule.MaxLength?.ToString() ?? "—"} karakter");
+            parts.Add(Texts.Get("warehouse.regimeBindings.length", rule.MinLength?.ToString() ?? "—", rule.MaxLength?.ToString() ?? "—"));
         }
 
         if (!string.IsNullOrEmpty(rule.Pattern))
         {
-            parts.Add($"desen {rule.Pattern}");
+            parts.Add(Texts.Get("warehouse.regimeBindings.pattern", rule.Pattern));
         }
 
-        return parts.Count == 0 ? "Kural yok" : string.Join(" · ", parts);
+        return parts.Count == 0 ? Texts.Get("warehouse.regimeBindings.noRule") : string.Join(" · ", parts);
     }
 
     // Etkin düzey: profil engelse engel (gevşetilemez); aksi halde firma engel seçtiyse engel, yoksa uyarı.
     private static string LevelText(PublishedRegimeProfileDto profile, string tenantLevel) =>
-        profile.RegistrationNo?.Enforcement == "Block" || tenantLevel == "Block" ? "Engel" : "Uyarı";
+        profile.RegistrationNo?.Enforcement == "Block" || tenantLevel == "Block" ? Texts.Get("warehouse.regimeBindings.levelBlock") : Texts.Get("warehouse.regimeBindings.levelWarn");
 
     private void Fail(string? message)
     {
-        notice = message ?? "İşlem tamamlanamadı.";
+        notice = message ?? Texts.Get("warehouse.regimeBindings.failed");
         failed = true;
     }
 }
