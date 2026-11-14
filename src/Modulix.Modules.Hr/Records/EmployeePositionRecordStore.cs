@@ -121,12 +121,14 @@ internal static class EmployeePositions
         && position.ManagerEmployeeId == employee.ManagerEmployeeId && position.EmploymentType == employee.EmploymentType;
 
     /// <summary>
-    /// Departman Core'dandır (bölüm 22). Core departmanı henüz yazılmamış eski dönem, aynı eski İK değeriyle aynı departman sayılır: eşleme aracının ilk
-    /// atadığı Core departmanı yeni dönem açmaz, açık döneme işlenir (<see cref="RecordAsync"/>).
+    /// Departman Core'dandır (bölüm 22). Core departmanı olmayan (henüz eşlenmemiş) kartta eski İK değeri karşılaştırılır. Core departmanı henüz
+    /// yazılmamış eski dönem, aynı eski İK değeriyle aynı departman sayılır: eşleme aracının ilk atadığı Core departmanı yeni dönem açmaz, açık döneme
+    /// işlenir (<see cref="RecordAsync"/>).
     /// </summary>
     private static bool SameDepartment(EmployeePosition position, Employee employee) =>
-        position.BusinessUnitId == employee.BusinessUnitId
-        || (position.BusinessUnitId is null && position.DepartmentKey == employee.DepartmentKey);
+        employee.BusinessUnitId is null
+            ? position.BusinessUnitId is null && position.DepartmentKey == employee.DepartmentKey
+            : position.BusinessUnitId == employee.BusinessUnitId || (position.BusinessUnitId is null && position.DepartmentKey == employee.DepartmentKey);
 
     private static void Close(EmployeePosition position, DateOnly? endDate)
     {
