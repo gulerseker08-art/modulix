@@ -4,8 +4,8 @@
 @using System.Globalization
 @inject ApiClient Api
 
-<section class="settings-group" aria-label="Uygunluk denetimi">
-    <h2>Uygunluk denetimi</h2>
+<section class="settings-group" aria-label="@Texts.Get("logistics.trip-check.title")">
+    <h2>@Texts.Get("logistics.trip-check.title")</h2>
 
     @if (message is not null)
     {
@@ -13,28 +13,28 @@
     }
     else if (check is null)
     {
-        <p class="text-muted" role="status">Denetleniyor…</p>
+        <p class="text-muted" role="status">@Texts.Get("logistics.trip-check.checking")</p>
     }
     else
     {
         <div class="kpi-grid">
-            <SalesKpiCard Label="Sevkiyat / durak" Value="@($"{check.Load.ShipmentCount} / {check.Load.StopCount}")" Icon="package" Tone="@(check.Load.ShipmentCount == 0 ? "danger" : "brand")" />
-            @Measure("Ağırlık", "hash", check.Load.WeightKg, check.Load.PayloadKg, "kg")
-            @Measure("Palet", "layers", check.Load.Pallets, check.Load.PalletCapacity, "palet")
-            @Measure("Yükleme metresi", "columns", check.Load.LoadingMeters, check.Load.LoadingMetersCapacity, "LDM")
-            @Measure("Hacim", "package", check.Load.VolumeM3, check.Load.VolumeCapacity, "m³")
+            <SalesKpiCard Label="@Texts.Get("logistics.trip-check.shipment-stop")" Value="@($"{check.Load.ShipmentCount} / {check.Load.StopCount}")" Icon="package" Tone="@(check.Load.ShipmentCount == 0 ? "danger" : "brand")" />
+            @Measure(Texts.Get("logistics.trip-check.weight"), "hash", check.Load.WeightKg, check.Load.PayloadKg, "kg")
+            @Measure(Texts.Get("logistics.trip-check.pallets"), "layers", check.Load.Pallets, check.Load.PalletCapacity, Texts.Get("logistics.trip-check.unit-pallet"))
+            @Measure(Texts.Get("logistics.trip-check.loading-meters"), "columns", check.Load.LoadingMeters, check.Load.LoadingMetersCapacity, "LDM")
+            @Measure(Texts.Get("logistics.trip-check.volume"), "package", check.Load.VolumeM3, check.Load.VolumeCapacity, "m³")
         </div>
 
         @if (check.Issues.Count == 0)
         {
-            <div class="alert alert-success" role="status"><AppIcon Name="check-circle" Size="16" /> Sefer hazır: araç, sürücü, kapasite ve belgeler uygun.</div>
+            <div class="alert alert-success" role="status"><AppIcon Name="check-circle" Size="16" /> @Texts.Get("logistics.trip-check.ready")</div>
         }
         else
         {
             @if (check.Issues.Where(i => i.Blocking).ToList() is { Count: > 0 } blocking)
             {
                 <div class="alert alert-danger" role="status">
-                    <strong>Plan onaylanmadan önce düzeltin:</strong>
+                    <strong>@Texts.Get("logistics.trip-check.blocking")</strong>
                     <ul class="mb-0">
                         @foreach (var issue in blocking)
                         {
@@ -46,7 +46,7 @@
             @if (check.Issues.Where(i => !i.Blocking).ToList() is { Count: > 0 } warnings)
             {
                 <div class="alert alert-warning" role="status">
-                    <strong>Uyarılar</strong> (onayı engellemez, seferde saklanır):
+                    <strong>@Texts.Get("logistics.trip-check.warnings")</strong> @Texts.Get("logistics.trip-check.warnings-note")
                     <ul class="mb-0">
                         @foreach (var issue in warnings)
                         {
@@ -96,8 +96,8 @@
         };
         var detail = capacity switch
         {
-            null => "Araç kapasitesi girilmemiş",
-            { } cap when cap > 0 => $"%{Math.Round(used * 100 / cap).ToString(Tr)} dolu",
+            null => Texts.Get("logistics.trip-check.no-capacity"),
+            { } cap when cap > 0 => Texts.Get("logistics.trip-check.filled", Math.Round(used * 100 / cap).ToString(Tr)),
             _ => null,
         };
         return @<SalesKpiCard Label="@label" Value="@value" Icon="@icon" Tone="@tone" Detail="@detail" />;
