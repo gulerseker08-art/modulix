@@ -466,110 +466,7 @@ public sealed class HrModule : IModule
     IReadOnlyList<FormDefinition> IModule.Forms => HrForms.All;
 
     /// <summary>Kural altyapısı yetenekleri (ADR-0027): çalışan eklendi/güncellendi olayları; durum, çalışma şekli ve tarihler (ör. işe girişe N gün kala).</summary>
-    AutomationCapabilities IModule.Automation { get; } = new()
-    {
-        Entities =
-        [
-            new(Entities.Employee, "Çalışan", Permissions.EmployeesRead) { LabelField = "fullName" },
-            new(Entities.LeaveRequest, "İzin talebi", Permissions.LeavesRead) { LabelField = "employeeName" },
-            new(Entities.ExpenseClaim, "Masraf beyanı", Permissions.ExpensesRead) { LabelField = "title" },
-            new(Entities.AssetAssignment, "Zimmet", Permissions.AssetsRead) { LabelField = "assetTag" },
-            new(Entities.ChecklistTask, "Süreç görevi", Permissions.ChecklistsRead) { LabelField = "title" },
-            new(Entities.Announcement, "Duyuru", Permissions.AnnouncementsManage) { LabelField = "title" },
-            new(Entities.Survey, "Anket", Permissions.SurveysManage) { LabelField = "title" },
-            new(Entities.BlogPost, "Blog yazısı", Permissions.BlogManage) { LabelField = "title" },
-            new(Entities.PhotoAlbum, "Fotoğraf albümü", Permissions.GalleryManage) { LabelField = "title" },
-        ],
-        Events =
-        [
-            new("hr.employee.created", Entities.Employee, DomainEventTypes.RecordCreated, "Çalışan eklendi"),
-            new("hr.employee.updated", Entities.Employee, DomainEventTypes.RecordUpdated, "Çalışan güncellendi"),
-            new("hr.leave-request.created", Entities.LeaveRequest, DomainEventTypes.RecordCreated, "İzin talebi açıldı"),
-            new("hr.leave-request.updated", Entities.LeaveRequest, DomainEventTypes.RecordUpdated, "İzin talebinin durumu değişti"),
-            new("hr.expense-claim.created", Entities.ExpenseClaim, DomainEventTypes.RecordCreated, "Masraf beyanı açıldı"),
-            new("hr.expense-claim.updated", Entities.ExpenseClaim, DomainEventTypes.RecordUpdated, "Masraf beyanı güncellendi"),
-            new("hr.asset-assignment.created", Entities.AssetAssignment, DomainEventTypes.RecordCreated, "Demirbaş zimmetlendi"),
-            new("hr.asset-assignment.updated", Entities.AssetAssignment, DomainEventTypes.RecordUpdated, "Zimmet onaylandı ya da kapandı"),
-            new("hr.checklist-task.created", Entities.ChecklistTask, DomainEventTypes.RecordCreated, "Süreç görevi açıldı"),
-            new("hr.checklist-task.updated", Entities.ChecklistTask, DomainEventTypes.RecordUpdated, "Süreç görevi tamamlandı ya da değişti"),
-            new("hr.announcement.created", Entities.Announcement, DomainEventTypes.RecordCreated, "Duyuru yazıldı"),
-            new("hr.announcement.updated", Entities.Announcement, DomainEventTypes.RecordUpdated, "Duyuru güncellendi ya da yayınlandı"),
-            new("hr.survey.created", Entities.Survey, DomainEventTypes.RecordCreated, "Anket hazırlandı"),
-            new("hr.survey.updated", Entities.Survey, DomainEventTypes.RecordUpdated, "Anket güncellendi, yanıta açıldı ya da kapandı"),
-            new("hr.blog-post.created", Entities.BlogPost, DomainEventTypes.RecordCreated, "Blog yazısı yazıldı"),
-            new("hr.blog-post.updated", Entities.BlogPost, DomainEventTypes.RecordUpdated, "Blog yazısı güncellendi ya da yayınlandı"),
-            new("hr.photo-album.created", Entities.PhotoAlbum, DomainEventTypes.RecordCreated, "Fotoğraf albümü açıldı"),
-            new("hr.photo-album.updated", Entities.PhotoAlbum, DomainEventTypes.RecordUpdated, "Fotoğraf albümü güncellendi ya da yayınlandı"),
-        ],
-        Fields =
-        [
-            new(Entities.Employee, "status", "Durum", AutomationFieldType.Choice)
-            {
-                Options = [new(Employee.Statuses.Active, "Çalışıyor"), new(Employee.Statuses.OnLeave, "İzinde"), new(Employee.Statuses.Terminated, "Ayrıldı")],
-            },
-            new(Entities.Employee, "employmentType", "Çalışma şekli", AutomationFieldType.Choice)
-            {
-                Options =
-                [
-                    new(Employee.EmploymentTypes.FullTime, "Tam zamanlı"), new(Employee.EmploymentTypes.PartTime, "Yarı zamanlı"),
-                    new(Employee.EmploymentTypes.FixedTerm, "Belirli süreli"), new(Employee.EmploymentTypes.Intern, "Stajyer"),
-                ],
-            },
-            new(Entities.Employee, "fullName", "Ad soyad", AutomationFieldType.Text),
-            new(Entities.Employee, "jobTitle", "Unvan", AutomationFieldType.Text),
-            new(Entities.Employee, "hireDate", "İşe giriş tarihi", AutomationFieldType.Date),
-            new(Entities.Employee, "terminationDate", "Ayrılış tarihi", AutomationFieldType.Date),
-            new(Entities.LeaveRequest, "employeeName", "Çalışan", AutomationFieldType.Text),
-            new(Entities.LeaveRequest, "status", "Durum", AutomationFieldType.Choice)
-            {
-                Options =
-                [
-                    new(Domain.LeaveRequest.Statuses.Pending, "Onay bekliyor"), new(Domain.LeaveRequest.Statuses.Approved, "Onaylandı"),
-                    new(Domain.LeaveRequest.Statuses.Rejected, "Reddedildi"), new(Domain.LeaveRequest.Statuses.Cancelled, "İptal edildi"),
-                ],
-            },
-            new(Entities.LeaveRequest, "startDate", "Başlangıç", AutomationFieldType.Date),
-            new(Entities.LeaveRequest, "days", "Gün", AutomationFieldType.Number),
-            new(Entities.ExpenseClaim, "title", "Başlık", AutomationFieldType.Text),
-            new(Entities.ExpenseClaim, "status", "Durum", AutomationFieldType.Choice)
-            {
-                Options =
-                [
-                    new(Domain.ExpenseClaim.Statuses.Draft, "Taslak"), new(Domain.ExpenseClaim.Statuses.Submitted, "Onay bekliyor"),
-                    new(Domain.ExpenseClaim.Statuses.Approved, "Onaylandı"), new(Domain.ExpenseClaim.Statuses.Paid, "Ödendi"),
-                    new(Domain.ExpenseClaim.Statuses.Rejected, "Reddedildi"), new(Domain.ExpenseClaim.Statuses.Cancelled, "İptal edildi"),
-                ],
-            },
-            new(Entities.ExpenseClaim, "totalAmount", "Toplam", AutomationFieldType.Number),
-            new(Entities.AssetAssignment, "assetTag", "Envanter numarası", AutomationFieldType.Text),
-            new(Entities.AssetAssignment, "status", "Durum", AutomationFieldType.Choice)
-            {
-                Options =
-                [
-                    new(Domain.AssetAssignment.Statuses.Active, "Zimmette"), new(Domain.AssetAssignment.Statuses.Returned, "İade alındı"),
-                    new(Domain.AssetAssignment.Statuses.Lost, "Kayıp"),
-                ],
-            },
-            new(Entities.AssetAssignment, "expectedReturnOn", "Beklenen iade", AutomationFieldType.Date),
-            new(Entities.ChecklistTask, "title", "Başlık", AutomationFieldType.Text),
-            new(Entities.ChecklistTask, "status", "Durum", AutomationFieldType.Choice)
-            {
-                Options = [new(Domain.ChecklistTask.Statuses.Open, "Açık"), new(Domain.ChecklistTask.Statuses.Done, "Tamamlandı"), new(Domain.ChecklistTask.Statuses.Skipped, "Atlandı")],
-            },
-            new(Entities.ChecklistTask, "dueDate", "Son tarih", AutomationFieldType.Date),
-            new(Entities.Announcement, "title", "Başlık", AutomationFieldType.Text),
-            new(Entities.Announcement, "isPublished", "Yayında", AutomationFieldType.Boolean),
-            new(Entities.Survey, "title", "Başlık", AutomationFieldType.Text),
-            new(Entities.Survey, "status", "Durum", AutomationFieldType.Choice)
-            {
-                Options = [new(Domain.Survey.Statuses.Draft, "Taslak"), new(Domain.Survey.Statuses.Open, "Yanıta açık"), new(Domain.Survey.Statuses.Closed, "Kapalı")],
-            },
-            new(Entities.BlogPost, "title", "Başlık", AutomationFieldType.Text),
-            new(Entities.BlogPost, "isPublished", "Yayında", AutomationFieldType.Boolean),
-            new(Entities.PhotoAlbum, "title", "Başlık", AutomationFieldType.Text),
-            new(Entities.PhotoAlbum, "isPublished", "Yayında", AutomationFieldType.Boolean),
-        ],
-    };
+    AutomationCapabilities IModule.Automation => Automation.HrAutomation.Capabilities;
 
     IReadOnlyList<RoleTemplate> IModule.RoleTemplates { get; } =
     [
@@ -648,5 +545,7 @@ public sealed class HrModule : IModule
         services.AddScoped<ISurveyService, SurveyService>();
         services.AddScoped<IRecordStore, BlogPostRecordStore>();
         services.AddScoped<IRecordStore, PhotoAlbumRecordStore>();
+        services.AddScoped<HrAutomationRecordSource>();
+        services.AddScoped<Automation.StartChecklistAction>();
     }
 }

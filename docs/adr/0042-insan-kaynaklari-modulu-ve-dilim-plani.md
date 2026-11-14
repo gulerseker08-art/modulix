@@ -307,3 +307,23 @@ Bölüm 5'teki masraf akışı izin dilimindeki kalıpla (iş akışı kapısı,
 ## 17. Liste şablonu borcu kapatıldı (13 Kasım 2026)
 
 Dilim 5–8'de grid şablonunun bir kısmıyla açılan altı İK listesi tam şablona taşındı: İşe giriş ve çıkış, Süreç şablonları, Duyuru yönetimi, Anket yönetimi, Blog yönetimi, Galeri yönetimi. Hepsinde artık `ViewTabs` + "+ Görünüm" ile kişisel görünüm (`PersonalViewBar`, sütunlar, sıralama ve görünüm süzgeci birlikte saklanır), `GridHeader` ile sunucu `sort` anahtarlarına bağlı sıralanabilir başlıklar, `GridColumnPicker` (özel alanlar da sütun olarak seçilebilir), `RowMenu` ve `Pager` (sayfa boyutu seçimiyle) vardır. İşe giriş ve çıkış listesine tür süzgeci (`FilterToggle`) eklendi; Süreç şablonları arama, sayfalama ve "Pasif" görünümü kazandı. Sunucu ve API değişmedi; yeni CSS sınıfı yok. Okur ekranları (Duyurular, Anketler, Blog, Galeri, Görevlerim) liste değil akış/kart ekranıdır ve şablonun dışındadır.
+
+## 18. Sonraya kalanlar, öncelik 1: otomasyon ve bildirim (14 Kasım 2026)
+
+Dilimlerin "bilerek yapılmadı" listelerinden kalanlar öncelik sırasına konuldu: (1) otomasyon ve bildirim, (2) çalışan kartı genişletmeleri (içe aktarma, görev geçmişi, iş birimi eşlemesi), (3) iletişim ek özellikleri, (4) Core kararı gerektirenler (tam anonim yazma, kayıt düzeyinde dosya yetkisi, silinen kaydın dosya temizliği). Bu bölüm (1)'dir; yeni tablo ve migration yoktur, her şey ADR-0027 kural altyapısının mevcut sözleşmesiyle yapıldı.
+
+- **Beyan taşındı:** İK'nın kural yeteneği `HrModule` içinden `Automation/HrAutomation.cs`'ye alındı (CRM kalıbı). Tarih sütunlarının tek kaynağı bu sınıftır.
+- **Tarama kaynağı** `HrAutomationRecordSource`: çalışan (işe giriş, ayrılış), izin talebi (başlangıç), zimmet (beklenen iade), süreç görevi (son tarih) için tarihe bağlı tetikleyiciler artık çalışır; zamanlanmış tarama yalnızca açık kayıtları kapsar. Önceden tarih alanları beyan ediliyor ama taranamıyordu.
+- **Bildirime bağlanabilir kullanıcı alanları:** çalışanın hesabı, izin ve masrafta talep eden ve onaylayan, zimmetli, görevin sorumlusu ve çalışanı Core'un bildirim alıcısı lookup'ıyla beyan edildi. Böylece Core'un "Bildirim gönder" aksiyonunun "Kime"si bu alanlara bağlanır; alıcı kaydı kendi yetkisiyle göremiyorsa bildirim gitmez (Core kuralı).
+- **Aksiyon `hr.checklist.start`** ("İşe giriş/çıkış süreci başlat", izin `hr.checklists.manage`): hedef çalışana süreç başlatır; elle başlatmayla aynı servis ve kurallar (`IChecklistWorkflow`). Şablon verilmezse türün ada göre ilk etkin şablonu; başlangıç günü işe giriş/ayrılış tarihine bağlanabilir, boşsa tenant'ın bugünü. Aynı türde açık süreç varsa adım atlanır (kural yeniden tetiklense de tek süreç). Dry-run desteklenir.
+- **Yedi başlangıç şablonu** (kullanılınca taslak kural; yayın firmanın kararı): görev atanınca sorumluya bildir, görevin son gününe 1 gün kala hatırlat, izin talebi açılınca onaylayana bildir, masraf beyanı onaya gönderilince onaylayana bildir, zimmet iade tarihi geçince zimmetliye bildir, çalışan eklenince işe giriş süreci başlat, çalışan ayrılınca işten çıkış süreci başlat.
+
+**Bilerek yapılmadı:** duyuru ve anket için toplu bildirim/e-posta (Core'un "Bildirim gönder"i tek alıcılıdır; hedef kitleye toplu gönderim Core'da yeni bir aksiyon ister), kullanıcı hesabının çıkışta otomatik kapatılması (Core üyelik işlemi; bilinçli olarak elle), e-posta kanalı (bildirim kutusu yeterli görüldü; e-posta aksiyonu Core kararıdır).
+
+### Test sonuçları (bölüm 18)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 37/37 geçti (gerçek katalogla beyan, tarih alanı ↔ tarama kaynağı uyumu, bildirim alanları, aksiyon izni, şablon bağlamaları) |
+| `dotnet test tests/Modulix.ArchitectureTests` | 78/78 geçti |
+| `HrAutomationTests` (entegrasyon, 4 test: bütün şablonlar gerçek yayın doğrulamasından geçer; görev bildirimi + son gün hatırlatması + tenant izolasyonu; ayrılınca tek işten çıkış süreci; izinsiz kural yöneticisi şablonu kullanamaz) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
