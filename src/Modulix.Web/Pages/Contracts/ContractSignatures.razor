@@ -3,47 +3,45 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Sözleşme imzaları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.contracts.signatures.menu") · Modulix</PageTitle>
 
 <AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsRead">
     <div class="page-header">
-        <h1>Sözleşme imzaları</h1>
+        <h1>@Texts.Get("nav.app.contracts.signatures.menu")</h1>
     </div>
-    <p class="text-muted">
-        İmza sürecindeki sözleşmeler. İmza isteği başlatmak, manuel imzayı doğrulamak ve süreci yönetmek için sözleşmeyi açın (İmza sekmesi). Simülasyon sağlayıcısıyla alınan imzaların hukuki değeri yoktur.
-    </p>
+    <p class="text-muted">@Texts.Get("contracts.signatures.intro")</p>
 
     <Notice Text="@notice" Failed="true" />
 
     <div class="filters">
-        <label class="form-label" for="sig-filter">Durum</label>
+        <label class="form-label" for="sig-filter">@Texts.Get("common.field.status")</label>
         <select id="sig-filter" class="form-select" value="@status" @onchange="FilterAsync">
-            @foreach (var s in statuses) { <option value="@s.Key">@s.Label</option> }
+            @foreach (var s in Statuses) { <option value="@s.Key">@s.Label</option> }
         </select>
     </div>
 
     @if (items is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
     }
     else if (items.Count == 0)
     {
-        <p class="text-muted">Bu durumda sözleşme yok.</p>
+        <p class="text-muted">@Texts.Get("contracts.signatures.empty")</p>
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">İmza durumuna göre sözleşmeler</caption>
-            <thead><tr><th scope="col">Sözleşme</th><th scope="col">Müşteri</th><th scope="col">İmza</th><th scope="col">Yürürlük</th><th scope="col">Başlangıç / Bitiş</th></tr></thead>
+            <caption class="visually-hidden">@Texts.Get("contracts.signatures.caption")</caption>
+            <thead><tr><th scope="col">@Texts.Get("contracts.list.col.contract")</th><th scope="col">@Texts.Get("contracts.list.col.customer")</th><th scope="col">@Texts.Get("contracts.signatures.col.signature")</th><th scope="col">@Texts.Get("contracts.signatures.col.effective")</th><th scope="col">@Texts.Get("contracts.list.col.dates")</th></tr></thead>
             <tbody>
                 @foreach (var c in items)
                 {
                     <tr>
-                        <td data-label="Sözleşme" class="primary"><a href="sozlesmeler/@c.Id">@c.Title</a> <small class="text-muted">@c.Number · V@(c.CurrentVersionNo)</small></td>
-                        <td data-label="Müşteri">@PartyName(c.PartyId)</td>
-                        <td data-label="İmza"><span class="badge stage-@ContractLabels.SignatureBadge(c.SignatureStatus)">@ContractLabels.Label(ContractLabels.Signatures, c.SignatureStatus)</span></td>
-                        <td data-label="Yürürlük"><span class="badge stage-@ContractLabels.EffectiveBadge(c.EffectiveStatus)">@ContractLabels.Label(ContractLabels.Effectives, c.EffectiveStatus)</span></td>
-                        <td data-label="Başlangıç / Bitiş">@ContractLabels.Date(c.StartDate) – @(c.IsIndefinite ? "Belirsiz süreli" : ContractLabels.Date(c.EndDate))</td>
+                        <td data-label="@Texts.Get("contracts.list.col.contract")" class="primary"><a href="sozlesmeler/@c.Id">@c.Title</a> <small class="text-muted">@c.Number · @Texts.Get("contracts.versionNo", c.CurrentVersionNo)</small></td>
+                        <td data-label="@Texts.Get("contracts.list.col.customer")">@PartyName(c.PartyId)</td>
+                        <td data-label="@Texts.Get("contracts.signatures.col.signature")"><span class="badge stage-@ContractLabels.SignatureBadge(c.SignatureStatus)">@ContractLabels.Label(ContractLabels.Signatures, c.SignatureStatus)</span></td>
+                        <td data-label="@Texts.Get("contracts.signatures.col.effective")"><span class="badge stage-@ContractLabels.EffectiveBadge(c.EffectiveStatus)">@ContractLabels.Label(ContractLabels.Effectives, c.EffectiveStatus)</span></td>
+                        <td data-label="@Texts.Get("contracts.list.col.dates")">@ContractLabels.Date(c.StartDate) – @(c.IsIndefinite ? Texts.Get("contracts.indefinite") : ContractLabels.Date(c.EndDate))</td>
                     </tr>
                 }
             </tbody>
@@ -52,10 +50,8 @@
 </AuthGate>
 
 @code {
-    private readonly IReadOnlyList<(string Key, string Label)> statuses =
-    [
-        ("Pending", "İmza bekliyor"), ("PartiallySigned", "Kısmen imzalandı"), ("Completed", "İmzalandı"), ("Rejected", "İmza reddedildi"), ("Expired", "İmza süresi doldu"), ("Cancelled", "İmza iptal edildi"),
-    ];
+    // Süzgeç, imzaya gönderilmiş sözleşmelerin imza durumlarıdır; adlar ortak imza durumu tablosundan gelir (ADR-0034).
+    private static IEnumerable<(string Key, string Label)> Statuses => ContractLabels.Signatures.Where(s => s.Key != "NotSent");
 
     private readonly Dictionary<Guid, string> partyNames = [];
     private List<ContractDto>? items;
