@@ -343,6 +343,13 @@
                                                         }
                                                     </select>
                                                 }
+                                                else if (p.Type == "Lookup" && p.LookupKey is { } lookupKey)
+                                                {
+                                                    @* Kayıt seçimi (ör. bildirimin alıcısı): ortak lookup ile seçilir (ADR-0016); kimlik elle yazılmaz. *@
+                                                    <LookupPicker Id="@($"param-{step.Id}-{p.Name}")" LookupKey="@lookupKey" Required="p.Required"
+                                                                  Value="@(Guid.TryParse(step.ValueText(p.Name), out var chosen) ? chosen : null)"
+                                                                  ValueChanged="id => step.SetValue(p.Name, p.Type, id?.ToString())" />
+                                                }
                                                 else if (p.Type == "Boolean")
                                                 {
                                                     <select class="form-select" aria-label="@p.Label" value="@step.ValueText(p.Name).ToLowerInvariant()" @onchange="e => step.SetValue(p.Name, p.Type, e.Value?.ToString())">
