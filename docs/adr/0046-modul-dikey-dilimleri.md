@@ -126,11 +126,11 @@ Api'deki modül klasörlerinin kendi modülü, `Core.Contracts`, `Shared`, modü
 |---|---|---|---|
 | `Hr` | 3 | yok | hazır |
 | `Warehouse` | 1 | yok | hazır |
-| `Logistics` | 1 | `Core.Settings` | 1 (`ITenantSettings`, tam adla iki yerde) |
-| `Orders` | 2 | `Core.Events`, `Core.Modules`, `Core.Platform`, `Core.Settings`, `Infrastructure` | 2 (biri iş) |
-| `Marketing` | 7 | `Core.Events`, `Core.Modules`, `Core.Platform`, `Core.Settings`, `Infrastructure` | 2 (biri iş) |
-| `Support` | 3 | `Api.Crm`, `Core.Events`, `Core.Modules`, `Core.Platform`, `Core.Records`, `Core.Settings`, `Infrastructure` | 3 (biri iş) |
-| `Contracts` | 8 | `Api.Crm`, `Core.Events`, `Core.Lookups`, `Core.Modules`, `Core.Platform`, `Core.Records`, `Core.Settings`, `Infrastructure` | 5 (biri iş) |
+| `Logistics` | 1 | yok | hazır (ayar okuma `ITenantSettingReader`'a alındı) |
+| `Orders` | 2 | `Core.Events`, `Core.Modules`, `Core.Platform`, `Infrastructure` | 1 (iş) |
+| `Marketing` | 7 | `Core.Events`, `Core.Modules`, `Core.Platform`, `Infrastructure` | 1 (iş) |
+| `Support` | 3 | `Api.Crm`, `Core.Events`, `Core.Modules`, `Core.Platform`, `Core.Records`, `Infrastructure` | 2 (biri iş) |
+| `Contracts` | 8 | `Api.Crm`, `Core.Events`, `Core.Lookups`, `Core.Modules`, `Core.Platform`, `Core.Records`, `Infrastructure` | 5 (biri iş) |
 | `Crm` | 17 | `Api.Users`, `Core.Events`, `Core.Modules`, `Core.Platform`, `Core.Records`, `Core.Reporting`, `Core.Settings`, `Infrastructure` | 10 (biri iş) |
 | `Customs` | 3 | `Api.Imports`, `Api.Platform`, `Api.Users`, `Core.Customs` | 2 |
 
@@ -138,11 +138,11 @@ Okuması:
 
 - **Başka modülün ana projesine başvuran modül klasörü yok.** Taslaktaki `Api/Contracts` → `Modulix.Modules.Crm` başvurusu ADR-0044 Dilim 2 ile sözleşme projesine (`Modulix.Modules.Crm.Contracts.Activities`) dönmüş. Kural istisnasız yazıldı.
 - **Beş iş dosyası aynı dört başvuruyu taşıyor** (`Core.Events`, `Core.Modules`, `Core.Platform`, `Infrastructure`): `ContractJobsWorker`, `QuoteExpiryWorker`, `MarketingSendWorker`, `OrderJobsWorker`, `SupportJobsWorker`. Tek zamanlayıcı (Dilim 3-4) bunları kendiliğinden kaldırır; Sipariş ve Marketing'de geriye yalnızca `Core.Settings` kalır.
-- **`Core.Settings` altı klasörde.** En yaygın engel `ITenantSettings`; `Core.Contracts`'a arayüz olarak açılması Dilim 1'in ön koşuludur (Lojistik pilotu dahil dört küçük/orta modülü açar).
+- **`Core.Settings` altı klasördeydi; beşinde kapandı.** En yaygın engel `ITenantSettings` idi. Dilim 1 ön koşulu olarak `Core.Contracts`'a salt okunur `ITenantSettingReader` (`Modulix.Core.Contracts.Settings`) açıldı ve modül klasörleri ona çevrildi; ayar listeleme ve yazma `ITenantSettings`'te (Core) kaldı. Crm'de `Core.Settings` başvurusu sürüyor: `SalesPlanningEndpoints` saat dilimi için `RegionalTime` kullanıyor.
 - **Uç nokta dosyalarında `ModulixDbContext` kullanan dört dosya var:** `ContractSignatureEndpoints`, `LeadIntakeEndpoints`, `QuoteSharingEndpoints`, `SupportChannelEndpoints` (hepsi oturumsuz/dış kanal uçları) ve yardımcı `QuoteDelivery`. Bölüm 4'teki temizliğin asıl işi bunlardır.
 - **`Api.Crm` başvurusu tek yardımcıdan ibaret (açık soru 6):** `Api/Support` ve `Api/Contracts` yalnızca `LeadEndpoints.Csv(...)` (CSV hücre kaçışı) kullanıyor. Crm davranışı değil; `Core.Hosting`'e ortak yardımcı olarak taşınır.
 - **`Api.Users` başvuruları da ortak yardımcı:** Crm `PublicUrl.Resolve`, Customs `UserEndpoints.ToProblem` kullanıyor; ikisi `Core.Hosting`'e gider. Customs'ın `Api.Platform` (`PlatformEndpoints.UserId`) ve `Api.Imports` başvuruları Dilim 7'de ele alınır.
-- Antrepo ve İK bugün taşınabilir. Bölüm 4'teki "Lojistik neredeyse hazır" değerlendirmesi `ITenantSettings` kaydıyla geçerlidir.
+- Antrepo, İK ve Lojistik bugün taşınabilir. Sipariş ve Marketing'de iş dosyası dışında host içi başvuru kalmadı.
 
 Sınır: denetim metin üzerindedir; üst ad alanı üzerinden kısaltılmış başvuru (`Modulix.Api.Crm` içinden `Users.Tip`) yakalanmaz. Yorum içinde geçen ad da başvuru sayılır (yanlış alarm yönünde güvenli).
 

@@ -9,7 +9,7 @@ using Modulix.Api.Access;
 using Modulix.Api.Records;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Contracts.Sales;
-using Modulix.Core.Settings;
+using Modulix.Core.Contracts.Settings;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Quotes;
 using Modulix.Shared.Crm;
@@ -240,7 +240,7 @@ internal sealed class QuotePolicyProvider(IServiceProvider services) : IQuotePol
 {
     public async Task<QuotePolicySettings> GetAsync(CancellationToken cancellationToken)
     {
-        var settings = services.GetRequiredService<ITenantSettings>();
+        var settings = services.GetRequiredService<ITenantSettingReader>();
         decimal? Decimal(string? text) =>
             decimal.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var v) && v >= 0 ? v : null;
 

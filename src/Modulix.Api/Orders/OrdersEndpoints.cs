@@ -301,7 +301,7 @@ internal sealed class OrderPolicyProvider(IServiceProvider services) : IOrderPol
 {
     public async Task<OrderPolicySettings> GetAsync(CancellationToken cancellationToken)
     {
-        var settings = services.GetRequiredService<Modulix.Core.Settings.ITenantSettings>();
+        var settings = services.GetRequiredService<Modulix.Core.Contracts.Settings.ITenantSettingReader>();
         return new OrderPolicySettings(
             string.Equals(await settings.GetValueAsync(OrdersModule.SettingKeys.AllowSelfApproval, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
             int.TryParse(await settings.GetValueAsync(OrdersModule.SettingKeys.HandoverAcceptDueDays, cancellationToken), out var dueDays) ? Math.Clamp(dueDays, 1, 30) : 2,

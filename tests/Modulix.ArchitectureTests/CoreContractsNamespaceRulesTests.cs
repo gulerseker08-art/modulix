@@ -31,6 +31,7 @@ public partial class CoreContractsNamespaceRulesTests
         "Modulix.Core.Contracts.Records",
         "Modulix.Core.Contracts.Reporting",
         "Modulix.Core.Contracts.Sectors",
+        "Modulix.Core.Contracts.Settings", // ayar okuma (ITenantSettingReader, ADR-0046)
         "Modulix.Core.Contracts.SharedRecords",
         "Modulix.Core.Contracts.Tenancy",
     ];
