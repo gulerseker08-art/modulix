@@ -1,4 +1,4 @@
-namespace Modulix.Core.Pricing;
+namespace Modulix.Core.Contracts.Pricing;
 
 /// <summary>Teklif satırının toplama katılma biçimi.</summary>
 public enum QuoteLineRole

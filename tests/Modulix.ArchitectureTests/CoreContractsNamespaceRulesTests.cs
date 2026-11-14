@@ -27,6 +27,7 @@ public partial class CoreContractsNamespaceRulesTests
         "Modulix.Core.Contracts.Modules",
         "Modulix.Core.Contracts.Notifications",
         "Modulix.Core.Contracts.Persistence",
+        "Modulix.Core.Contracts.Pricing", // ortak hesap çekirdeği: para, birim, indirim, teklif toplamı (ADR-0044 karar 2)
         "Modulix.Core.Contracts.Records",
         "Modulix.Core.Contracts.Reporting",
         "Modulix.Core.Contracts.Sectors",
@@ -35,13 +36,13 @@ public partial class CoreContractsNamespaceRulesTests
     ];
 
     /// <summary>
-    /// Modüle özel olduğu hâlde henüz taşınmamış ad alanları (ADR-0044 açık soru 2 ve 3). Kendi dilimlerinde taşınınca
-    /// buradan silinir; bu listeye yeni ad alanı eklenmez.
+    /// Modüle özel olduğu hâlde henüz taşınmamış ad alanları. Taşınınca buradan silinir; bu listeye yeni ad alanı eklenmez.
     /// </summary>
     private static readonly string[] PendingMoves =
     [
-        "Modulix.Core.Contracts.Customs", // Dilim 5: gümrük (GTİP, rejim profili)
-        "Modulix.Core.Pricing", // Dilim 4: genel tipler Core'da kalır, teklif hesabı Crm sözleşmesine gider
+        // Gümrük (GTİP, rejim profili): uygulaması platform tablolarında olduğu için sözleşmeyle birlikte, uç noktaların ve
+        // platform tablolarının modüle taşınmasını ele alacak ADR'de taşınır (ADR-0044 karar 3).
+        "Modulix.Core.Contracts.Customs",
     ];
 
     [Fact]
