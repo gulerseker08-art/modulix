@@ -11,7 +11,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Record is null ? "Yeni sefer" : $"Sefer {WarehouseLabels.Text(Record, "number")}")</h2>
+            <h2>@(Record is null ? Texts.Get("logistics.trip-form.new") : Texts.Get("logistics.trip-form.title", WarehouseLabels.Text(Record, "number")))</h2>
             @if (Record is not null)
             {
                 <p><span class="badge @LogisticsLabels.TripStatusBadge(Status)">@LogisticsLabels.TripStatus(Status)</span></p>
@@ -19,13 +19,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">Kapat</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.close")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null || ReadOnly)" aria-busy="@(busy ? "true" : null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -54,7 +54,7 @@
     }
 
     <fieldset disabled="@ReadOnly">
-        <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Sefer formu bölümleri">
+        <LayoutForm Layout="layout" Shows="Shows" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("logistics.trip-form.tabs")">
             <Field Context="f">
                 @switch (f.Key)
                 {
@@ -67,16 +67,16 @@
                         <label class="@f.LabelClass()" for="trip-end">@f.Label</label>
                         <input id="trip-end" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PlannedEnd" />
                         <FieldError Field="plannedEnd" Errors="errors" />
-                        <small class="text-muted">Boşsa tek günlük sefer sayılır; belge ve çakışma denetimi bu tarihe göre yapılır.</small>
+                        <small class="text-muted">@Texts.Get("logistics.trip-form.end-hint")</small>
                         break;
                     case "vehicleId":
                         <label class="@f.LabelClass()" for="trip-vehicle">@f.Label</label>
-                        <LookupPicker Id="trip-vehicle" LookupKey="@LogisticsAccess.TripVehicleLookup" @bind-Value="form.VehicleId" Required="f.Required" Placeholder="Plaka ile arayın…" Invalid="@(errors?.ContainsKey("vehicleId") == true)" />
+                        <LookupPicker Id="trip-vehicle" LookupKey="@LogisticsAccess.TripVehicleLookup" @bind-Value="form.VehicleId" Required="f.Required" Placeholder="@Texts.Get("logistics.trip-form.vehicle-placeholder")" Invalid="@(errors?.ContainsKey("vehicleId") == true)" />
                         <FieldError Field="vehicleId" Errors="errors" />
                         break;
                     case "trailerId":
                         <label class="@f.LabelClass()" for="trip-trailer">@f.Label</label>
-                        <LookupPicker Id="trip-trailer" LookupKey="@LogisticsAccess.TripTrailerLookup" @bind-Value="form.TrailerId" Required="f.Required" Placeholder="Dorse ya da römork…" Invalid="@(errors?.ContainsKey("trailerId") == true)" />
+                        <LookupPicker Id="trip-trailer" LookupKey="@LogisticsAccess.TripTrailerLookup" @bind-Value="form.TrailerId" Required="f.Required" Placeholder="@Texts.Get("logistics.trip-form.trailer-placeholder")" Invalid="@(errors?.ContainsKey("trailerId") == true)" />
                         <FieldError Field="trailerId" Errors="errors" />
                         break;
                     case "driverId":
@@ -88,13 +88,13 @@
                         <label class="@f.LabelClass()" for="trip-codriver">@f.Label</label>
                         @DriverSelect("trip-codriver", form.CoDriverId, v => form.CoDriverId = v, f.Required)
                         <FieldError Field="coDriverId" Errors="errors" />
-                        <small class="text-muted">Uzun yolda çift sürücü; aktarma için yeni sefer açın.</small>
+                        <small class="text-muted">@Texts.Get("logistics.trip-form.codriver-hint")</small>
                         break;
                     case "carrierPartyId":
                         <label class="@f.LabelClass()" for="trip-carrier">@f.Label</label>
-                        <LookupPicker Id="trip-carrier" LookupKey="@LogisticsAccess.TripCarrierLookup" @bind-Value="form.CarrierPartyId" Required="f.Required" Placeholder="Taşeron seferde taşıyıcı firma…" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
+                        <LookupPicker Id="trip-carrier" LookupKey="@LogisticsAccess.TripCarrierLookup" @bind-Value="form.CarrierPartyId" Required="f.Required" Placeholder="@Texts.Get("logistics.trip-form.carrier-placeholder")" Invalid="@(errors?.ContainsKey("carrierPartyId") == true)" />
                         <FieldError Field="carrierPartyId" Errors="errors" />
-                        <small class="text-muted">Taşeron seferde araç ve sürücü isteğe bağlıdır; firma "Taşıyıcı" ilişki rolünde olmalıdır.</small>
+                        <small class="text-muted">@Texts.Get("logistics.trip-form.carrier-hint")</small>
                         break;
                     case "settlementAmount":
                         <label class="@f.LabelClass()" for="trip-settlement">@f.Label</label>
@@ -118,8 +118,8 @@
     </fieldset>
 
     <div class="form-actions">
-        <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">Kapat</button>
-        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null || ReadOnly)">Kaydet</button>
+        <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">@Texts.Get("common.close")</button>
+        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null || ReadOnly)">@Texts.Get("common.save")</button>
     </div>
 </form>
 
@@ -168,15 +168,15 @@
     private bool ReadOnly => Record is not null && Status != "planning";
 
     private string LockedText => Status == "ready"
-        ? "Planı onaylanan sefer değiştirilemez; değişiklik için \"Planlamaya geri al\" eylemini kullanın."
-        : "Yoldaki ya da kapanan seferin planı değiştirilemez; yoldaki seferde duraklara varış saatini aşağıdan girin.";
+        ? Texts.Get("logistics.trip-form.locked-ready")
+        : Texts.Get("logistics.trip-form.locked-other");
 
     private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(LogisticsAccess.TripEntityKey)];
 
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(LogisticsAccess.TripEntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir kayıt verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
@@ -208,10 +208,10 @@
     private RenderFragment DriverSelect(string id, Guid? value, Action<Guid?> set, bool required) =>
         @<select id="@id" class="form-select" required="@required" aria-required="@(required ? "true" : null)"
                  value="@(value?.ToString() ?? string.Empty)" @onchange="e => { set(Guid.TryParse(e.Value?.ToString(), out var g) ? g : null); dirty = true; }">
-            <option value="">Seçilmedi</option>
+            <option value="">@Texts.Get("logistics.trip-form.driver-none")</option>
             @foreach (var driver in Drivers.Where(d => d.Status != "passive" || d.Id == value))
             {
-                <option value="@driver.Id">@driver.Name@(driver.Status == "onLeave" ? " (izinde)" : driver.Status == "passive" ? " (pasif)" : "")</option>
+                <option value="@driver.Id">@driver.Name@(driver.Status == "onLeave" ? $" ({Texts.Get("logistics.trip-form.driver-on-leave")})" : driver.Status == "passive" ? $" ({Texts.Get("common.inactiveLower")})" : "")</option>
             }
         </select>;
 

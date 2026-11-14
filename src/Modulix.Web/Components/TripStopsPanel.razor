@@ -4,8 +4,8 @@
    tamamlanabilir. Kurallar sunucudadır; sayfa içi küçük eylem formu olduğu için sekmesizdir. *@
 @inject ApiClient Api
 
-<section class="settings-group" aria-label="Duraklar ve sevkiyatlar">
-    <h2>Duraklar ve sevkiyatlar</h2>
+<section class="settings-group" aria-label="@Texts.Get("logistics.trip-stops.title")">
+    <h2>@Texts.Get("logistics.trip-stops.title")</h2>
 
     @if (message is not null)
     {
@@ -14,36 +14,36 @@
 
     @if (Planning && CanWrite)
     {
-        <div class="list-toolbar" aria-label="Sevkiyat ekle">
-            <label class="visually-hidden" for="trip-add-shipment">Planlama bekleyen sevkiyat</label>
+        <div class="list-toolbar" aria-label="@Texts.Get("logistics.trip-stops.add-shipment-group")">
+            <label class="visually-hidden" for="trip-add-shipment">@Texts.Get("logistics.trip-stops.pending-label")</label>
             <select id="trip-add-shipment" class="form-select" @bind="pickShipment">
-                <option value="">@(pending.Count == 0 ? "Planlama bekleyen sevkiyat yok" : "Planlama bekleyen sevkiyat seçin…")</option>
+                <option value="">@(pending.Count == 0 ? Texts.Get("logistics.trip-stops.pending-none") : Texts.Get("logistics.trip-stops.pending-pick"))</option>
                 @foreach (var shipment in pending)
                 {
                     <option value="@shipment.Id">@ShipmentLabel(shipment)</option>
                 }
             </select>
             <button type="button" class="btn btn-tonal" disabled="@(busy || pickShipment is null)" aria-busy="@(busy ? "true" : null)" @onclick="AssignAsync">
-                <AppIcon Name="plus" Size="16" /> Sevkiyatı ekle
+                <AppIcon Name="plus" Size="16" /> @Texts.Get("logistics.trip-stops.add-shipment")
             </button>
         </div>
 
-        <form class="list-toolbar" aria-label="Ara durak ekle" @onsubmit="AddStopAsync" @onsubmit:preventDefault>
-            <label class="visually-hidden" for="stop-type">Durak türü</label>
+        <form class="list-toolbar" aria-label="@Texts.Get("logistics.trip-stops.add-stop-group")" @onsubmit="AddStopAsync" @onsubmit:preventDefault>
+            <label class="visually-hidden" for="stop-type">@Texts.Get("logistics.trip-stops.stop-type")</label>
             <select id="stop-type" class="form-select" @bind="newStop.Type">
-                @foreach (var (key, label) in LogisticsAccess.StopTypes)
+                @foreach (var (key, label) in LogisticsLabels.StopTypes)
                 {
                     <option value="@key">@label</option>
                 }
             </select>
-            <label class="visually-hidden" for="stop-city">Şehir</label>
-            <input id="stop-city" class="form-control" maxlength="100" placeholder="Şehir" required @bind="newStop.City" />
-            <label class="visually-hidden" for="stop-at">Planlanan varış</label>
-            <input id="stop-at" class="form-control" type="datetime-local" title="Planlanan varış" @bind="newStop.PlannedAt" />
-            <label class="visually-hidden" for="stop-seq">Sıra</label>
-            <input id="stop-seq" class="form-control" type="number" min="1" max="9999" placeholder="Sıra (boşsa sona)" @bind="newStop.Sequence" />
+            <label class="visually-hidden" for="stop-city">@Texts.Get("logistics.trip-stops.city")</label>
+            <input id="stop-city" class="form-control" maxlength="100" placeholder="@Texts.Get("logistics.trip-stops.city")" required @bind="newStop.City" />
+            <label class="visually-hidden" for="stop-at">@Texts.Get("logistics.trip-stops.planned-arrival")</label>
+            <input id="stop-at" class="form-control" type="datetime-local" title="@Texts.Get("logistics.trip-stops.planned-arrival")" @bind="newStop.PlannedAt" />
+            <label class="visually-hidden" for="stop-seq">@Texts.Get("logistics.trip-stops.col.order")</label>
+            <input id="stop-seq" class="form-control" type="number" min="1" max="9999" placeholder="@Texts.Get("logistics.trip-stops.sequence-placeholder")" @bind="newStop.Sequence" />
             <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(newStop.City))">
-                <AppIcon Name="map-pin" Size="16" /> Durak ekle
+                <AppIcon Name="map-pin" Size="16" /> @Texts.Get("logistics.trip-stops.add-stop")
             </button>
         </form>
         <FieldError Field="sequence" Errors="errors" />
@@ -56,22 +56,22 @@
     }
     else if (stops.Count == 0)
     {
-        <EmptyState Compact="true" Title="Henüz durak yok." Text="Sevkiyat ekleyin; yükleme ve boşaltma durakları sevkiyatın güzergâhından açılır." />
+        <EmptyState Compact="true" Title="@Texts.Get("logistics.trip-stops.empty-title")" Text="@Texts.Get("logistics.trip-stops.empty-text")" />
     }
     else
     {
         <p class="text-muted" role="status" aria-live="polite">@Summary</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Sefer durakları</caption>
+            <caption class="visually-hidden">@Texts.Get("logistics.trip-stops.caption")</caption>
             <thead>
                 <tr>
-                    <th scope="col"><AppIcon Name="hash" Size="14" /> Sıra</th>
-                    <th scope="col"><AppIcon Name="tag" Size="14" /> Tür</th>
-                    <th scope="col"><AppIcon Name="map-pin" Size="14" /> Yer</th>
-                    <th scope="col"><AppIcon Name="calendar" Size="14" /> Planlanan</th>
-                    <th scope="col"><AppIcon Name="clock" Size="14" /> Varış</th>
-                    <th scope="col"><AppIcon Name="package" Size="14" /> Sevkiyat</th>
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col"><AppIcon Name="hash" Size="14" /> @Texts.Get("logistics.trip-stops.col.order")</th>
+                    <th scope="col"><AppIcon Name="tag" Size="14" /> @Texts.Get("common.field.kind")</th>
+                    <th scope="col"><AppIcon Name="map-pin" Size="14" /> @Texts.Get("logistics.trip-stops.col.place")</th>
+                    <th scope="col"><AppIcon Name="calendar" Size="14" /> @Texts.Get("logistics.trip-stops.col.planned")</th>
+                    <th scope="col"><AppIcon Name="clock" Size="14" /> @Texts.Get("logistics.trip-stops.col.arrival")</th>
+                    <th scope="col"><AppIcon Name="package" Size="14" /> @Texts.Get("logistics.trip-stops.col.shipment")</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -81,11 +81,11 @@
                     var shipment = shipmentId is { } sid ? shipments.FirstOrDefault(s => s.Id == sid) : null;
                     var arrived = Moment(WarehouseLabels.Text(stop, "arrivedAt"));
                     <tr>
-                        <td data-label="Sıra">@(stop.Values["sequence"]?.GetValue<int>())</td>
-                        <td data-label="Tür" class="primary"><AppIcon Name="@LogisticsLabels.StopIcon(WarehouseLabels.Text(stop, "stopType"))" Size="16" /> @LogisticsLabels.StopType(WarehouseLabels.Text(stop, "stopType"))</td>
-                        <td data-label="Yer">@WarehouseLabels.Text(stop, "city")@(WarehouseLabels.Text(stop, "address") is { Length: > 0 } a ? $" — {a}" : "")</td>
-                        <td data-label="Planlanan">@(Moment(WarehouseLabels.Text(stop, "plannedAt")) ?? "—")</td>
-                        <td data-label="Varış">
+                        <td data-label="@Texts.Get("logistics.trip-stops.col.order")">@(stop.Values["sequence"]?.GetValue<int>())</td>
+                        <td data-label="@Texts.Get("common.field.kind")" class="primary"><AppIcon Name="@LogisticsLabels.StopIcon(WarehouseLabels.Text(stop, "stopType"))" Size="16" /> @LogisticsLabels.StopType(WarehouseLabels.Text(stop, "stopType"))</td>
+                        <td data-label="@Texts.Get("logistics.trip-stops.col.place")">@WarehouseLabels.Text(stop, "city")@(WarehouseLabels.Text(stop, "address") is { Length: > 0 } a ? $" — {a}" : "")</td>
+                        <td data-label="@Texts.Get("logistics.trip-stops.col.planned")">@(Moment(WarehouseLabels.Text(stop, "plannedAt")) ?? "—")</td>
+                        <td data-label="@Texts.Get("logistics.trip-stops.col.arrival")">
                             @if (arrived is not null)
                             {
                                 <span class="badge status-customer">@arrived</span>
@@ -95,7 +95,7 @@
                                 <span>—</span>
                             }
                         </td>
-                        <td data-label="Sevkiyat">
+                        <td data-label="@Texts.Get("logistics.trip-stops.col.shipment")">
                             @if (shipment is not null)
                             {
                                 <span>@LogisticsLabels.Route(shipment)</span>
@@ -103,21 +103,21 @@
                             }
                             else
                             {
-                                <span class="text-muted">Ara durak</span>
+                                <span class="text-muted">@Texts.Get("logistics.trip-stops.intermediate")</span>
                             }
                         </td>
                         <td class="row-menu-cell actions">
                             @if (CanWrite && Planning && shipmentId is { } assigned)
                             {
-                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => UnassignAsync(assigned)">Seferden çıkar</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => UnassignAsync(assigned)">@Texts.Get("logistics.trip-stops.unassign")</button>
                             }
                             else if (CanWrite && Planning)
                             {
-                                <ConfirmAction Disabled="@busy" OnConfirm="() => RemoveStopAsync(stop)">Kaldır</ConfirmAction>
+                                <ConfirmAction Disabled="@busy" OnConfirm="() => RemoveStopAsync(stop)">@Texts.Get("logistics.trip-stops.remove")</ConfirmAction>
                             }
                             else if (CanWrite && InProgress && arrived is null)
                             {
-                                <button type="button" class="btn btn-tonal btn-sm" disabled="@busy" @onclick="() => ArriveAsync(stop)"><AppIcon Name="check" Size="16" /> Vardı</button>
+                                <button type="button" class="btn btn-tonal btn-sm" disabled="@busy" @onclick="() => ArriveAsync(stop)"><AppIcon Name="check" Size="16" /> @Texts.Get("logistics.trip-stops.arrived")</button>
                             }
                         </td>
                     </tr>
@@ -157,8 +157,8 @@
         {
             var arrived = stops!.Count(s => s.Values["arrivedAt"] is not null);
             return InProgress || Status == "completed"
-                ? $"{stops!.Count} durak, {arrived} durağa varıldı · {shipments.Count} sevkiyat"
-                : $"{stops!.Count} durak · {shipments.Count} sevkiyat";
+                ? Texts.Get("logistics.trip-stops.summary-progress", stops!.Count, arrived, shipments.Count)
+                : Texts.Get("logistics.trip-stops.summary", stops!.Count, shipments.Count);
         }
     }
 

@@ -6,10 +6,10 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Seferler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.logistics.trips") · Modulix</PageTitle>
 
 <AuthGate Module="@LogisticsAccess.ModuleKey" Permission="@LogisticsAccess.TripsRead">
-    <PageHeader Title="Seferler" Icon="map-pin" Subtitle="@(page is null ? "Araç ve sürücü atayın, sevkiyatları duraklara bağlayın, seferi yola çıkarın." : $"{page.TotalCount} sefer")" />
+    <PageHeader Title="@Texts.Get("nav.app.logistics.trips")" Icon="map-pin" Subtitle="@(page is null ? Texts.Get("logistics.trips.intro") : Texts.Get("logistics.trips.count", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -21,16 +21,16 @@
         <TripEditor Record="selected" Lookups="Lookups" Drivers="drivers" Saved="SavedAsync" Cancelled="Close" />
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Sefer görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("logistics.trips.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Seferlerde ara" placeholder="Sefer no ya da durak şehri ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("logistics.trips.search-label")" placeholder="@Texts.Get("logistics.trips.search-placeholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(LogisticsAccess.TripsWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni sefer</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("logistics.trips.new")</button>
         }
     </div>
 
@@ -43,20 +43,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan sefer yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("logistics.trips.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) sefer listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("logistics.trips.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Seferler</caption>
+            <caption class="visually-hidden">@Texts.Get("nav.app.logistics.trips")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -68,8 +68,8 @@
                             @Cell(column, record)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{WarehouseLabels.Text(record, "number")} eylemleri")">
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(record)"><AppIcon Name="pencil" Size="16" /> <span>Aç</span></button>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", WarehouseLabels.Text(record, "number"))">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(record)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.open")</span></button>
                             </RowMenu>
                         </td>
                     </tr>
@@ -84,14 +84,14 @@
     private const string Url = "/api/records/" + LogisticsAccess.TripEntityKey;
 
     /// <summary>Görünüm → durum süzgeci (virgülle birden çok durum).</summary>
-    private static readonly IReadOnlyList<(string Key, string Label, string Icon, string? Status)> Views =
+    private static IReadOnlyList<(string Key, string Label, string Icon, string? Status)> Views =>
     [
-        ("open", "Açık seferler", "map-pin", "planning,ready,inProgress"),
-        ("planning", "Planlanan", "hourglass", "planning"),
-        ("ready", "Hazır", "check", "ready"),
-        ("road", "Yolda", "truck", "inProgress"),
-        ("closed", "Kapanan", "check-circle", "completed,cancelled"),
-        ("all", "Tüm seferler", "list", null),
+        ("open", Texts.Get("logistics.trips.view.open"), "map-pin", "planning,ready,inProgress"),
+        ("planning", Texts.Get("logistics.trips.view.planning"), "hourglass", "planning"),
+        ("ready", Texts.Get("logistics.trips.view.ready"), "check", "ready"),
+        ("road", Texts.Get("logistics.trips.view.road"), "truck", "inProgress"),
+        ("closed", Texts.Get("logistics.trips.view.closed"), "check-circle", "completed,cancelled"),
+        ("all", Texts.Get("logistics.trips.view.all"), "list", null),
     ];
 
     private readonly Dictionary<Guid, string> plates = [];
@@ -123,12 +123,12 @@
         await Lookups.LoadAsync();
         grid.Define(
         [
-            new("number", "Sefer no", "hash", "number", "-number", Locked: true),
-            new("plannedStart", "Başlangıç", "calendar", "plannedStart", "-plannedStart"),
-            new("vehicle", "Araç", "truck"),
-            new("driver", "Sürücü", "user"),
-            new("carrier", "Taşıyıcı", "building", DefaultVisible: false),
-            new("status", "Durum", "tag", "status", "-status"),
+            new("number", Texts.Get("logistics.trips.col.number"), "hash", "number", "-number", Locked: true),
+            new("plannedStart", Texts.Get("logistics.trips.col.start"), "calendar", "plannedStart", "-plannedStart"),
+            new("vehicle", Texts.Get("logistics.trips.col.vehicle"), "truck"),
+            new("driver", Texts.Get("logistics.trips.col.driver"), "user"),
+            new("carrier", Texts.Get("logistics.trips.col.carrier"), "building", DefaultVisible: false),
+            new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
             .. Lookups.FieldsOf(LogisticsAccess.TripEntityKey).Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList)),
         ]);
         drivers = Session.Can(LogisticsAccess.DriversRead) ? await LogisticsDrivers.LoadAsync(Api) : [];
