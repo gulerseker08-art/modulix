@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Modulix.Core.Automation;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Customization;
 using Modulix.Core.FieldRules;
 using Modulix.Core.Modules;
 using Modulix.Core.Records;
@@ -24,7 +25,7 @@ internal sealed class TenantFieldRulesService(
     ModuleCatalog modules,
     IAutomationCatalog catalog,
     IAuditWriter audit,
-    ILogger<TenantFieldRulesService> logger) : ITenantFieldRules
+    ILogger<TenantFieldRulesService> logger) : ITenantFieldRules, ITenantRuleSimulation
 {
     public async Task<RuleMergeResult> GetEffectiveAsync(CancellationToken cancellationToken)
     {
@@ -118,7 +119,8 @@ internal sealed class TenantFieldRulesService(
         return new TenantRuleAdaptationView([.. rules], [.. disabledRuleKeys], row.Revision);
     }
 
-    private async Task<List<RuleLayer>> BuildLayersAsync(IReadOnlyList<FieldRule> adaptationRules, IReadOnlyList<string> disabled, CancellationToken cancellationToken)
+    private async Task<List<RuleLayer>> BuildLayersAsync(
+        IReadOnlyList<FieldRule> adaptationRules, IReadOnlyList<string> disabled, CancellationToken cancellationToken, IReadOnlyList<FieldRule>? subProfileRules = null)
     {
         var selected = await db.ActivitySelections.AsNoTracking().Select(s => s.NodeId).ToListAsync(cancellationToken);
         var nodes = await db.ActivityNodes.AsNoTracking()
@@ -142,8 +144,28 @@ internal sealed class TenantFieldRulesService(
         [
             new RuleLayer(RuleLayerKind.ProductStandard, Of(RuleLayerKind.ProductStandard, _ => true)),
             new RuleLayer(RuleLayerKind.SectorPackage, Of(RuleLayerKind.SectorPackage, id => id is { } node && applicable.Contains(node))),
+            new RuleLayer(RuleLayerKind.SubProfile, subProfileRules ?? await LoadSubProfileRulesAsync(cancellationToken)),
             new RuleLayer(RuleLayerKind.TenantAdaptation, adaptationRules, disabled),
         ];
+    }
+
+    public async Task<RuleMergeResult> GetEffectiveWithSubProfileRulesAsync(IReadOnlyList<FieldRule> subProfileRules, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(subProfileRules);
+        _ = RequireTenant();
+        var adaptation = await LoadAdaptationAsync(cancellationToken);
+        return RuleLayerMerger.Merge(await BuildLayersAsync(adaptation.Rules, adaptation.Disabled, cancellationToken, subProfileRules));
+    }
+
+    // Yalnızca etkin alt profillerin kuralları (ADR-0041 K4); pasife alınan ya da taslak alt profilin kuralı katmana girmez. Sıra belirleyicidir.
+    private async Task<List<FieldRule>> LoadSubProfileRulesAsync(CancellationToken cancellationToken)
+    {
+        var rows = await (from r in db.SubProfileRules.AsNoTracking()
+                          join p in db.SubProfiles.AsNoTracking() on r.SubProfileId equals p.Id
+                          where p.Status == SubProfileStatus.Active
+                          orderby p.Code, r.SortOrder
+                          select new { p.Code, Rule = r }).ToListAsync(cancellationToken);
+        return [.. rows.Select(x => x.Rule.ToRule(x.Code))];
     }
 
     private async Task<(IReadOnlyList<FieldRule> Rules, IReadOnlyList<string> Disabled, long Revision)> LoadAdaptationAsync(CancellationToken cancellationToken)
