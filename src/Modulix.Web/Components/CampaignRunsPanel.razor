@@ -17,7 +17,7 @@
     }
     else if (contents.Count == 0)
     {
-        <p class="text-muted">Henüz içerik yok. İçerik düz metindir; bağlantılar yalnızca http/https olabilir. Yayımlanan sürüm değişmez, değişiklik yeni sürümdür.</p>
+        <EmptyState Compact="true" Title="Henüz içerik yok." Text="İçerik düz metindir; bağlantılar yalnızca http/https olabilir. Yayımlanan sürüm değişmez, değişiklik yeni sürümdür." />
     }
     else
     {
@@ -73,7 +73,7 @@
     }
     else if (runs.Count == 0)
     {
-        <p class="text-muted">Henüz çalıştırma yok. Çalıştırma, dondurulmuş bir hedef kitleyi bir içerik sürümüyle gönderir.</p>
+        <EmptyState Compact="true" Title="Henüz çalıştırma yok." Text="Çalıştırma, dondurulmuş bir hedef kitleyi bir içerik sürümüyle gönderir." />
     }
     else
     {

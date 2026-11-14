@@ -56,7 +56,7 @@
         <h2 id="rules-title">Yönlendirme kuralları</h2>
         <p class="small text-muted">Etkin kurallardan sırası küçük olan, eşit sırada daha çok kısıtı olan <strong>ilk eşleşen</strong> uygulanır; yalnızca talep açılırken bir kez değerlendirilir. Yetkiyle açıkça kuyruk/sorumlu verilen talepte kural uygulanmaz. Hiçbiri uymazsa kategori, sonra varsayılan kuyruk kullanılır.</p>
         @if (rules is null) { <LoadingState Kind="LoadingKind.Table" /> }
-        else if (rules.Count == 0) { <p class="text-muted">Kural yok.</p> }
+        else if (rules.Count == 0) { <EmptyState Compact="true" Title="Kural yok." /> }
         else
         {
             <table class="table record-table">

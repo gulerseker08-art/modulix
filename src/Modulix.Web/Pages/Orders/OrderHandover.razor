@@ -28,7 +28,7 @@
     }
     else if (detail is null)
     {
-        <p class="text-muted">@Texts.Get("orders.handover-page.none")</p>
+        <EmptyState Compact="true" Title="@Texts.Get("orders.handover-page.none")" />
         @if (Session.Can(OrderHandoverAccess.HandoversWrite))
         {
             <button type="button" class="btn btn-primary" disabled="@busy" @onclick="CreateAsync">@Texts.Get("orders.handover-page.create")</button>

@@ -72,7 +72,7 @@
                         <div class="dash-card-head"><h2 id="wh-movements">Stok hareketleri</h2><span class="small text-muted">Son @d.Days gün · hareket sayısı</span></div>
                         @if (m.Daily.All(x => x.Inbound == 0 && x.Outbound == 0 && x.Transfer == 0 && x.Adjustment == 0))
                         {
-                            <p class="text-muted mb-0">Bu dönemde stok hareketi yok.</p>
+                            <EmptyState Compact="true" Title="Bu dönemde stok hareketi yok." />
                         }
                         else
                         {
@@ -126,7 +126,7 @@
                         <div class="dash-card-head"><h2 id="wh-recent">Son hareketler</h2></div>
                         @if (recent.Recent.Count == 0)
                         {
-                            <p class="text-muted mb-0">Henüz stok hareketi yok.</p>
+                            <EmptyState Compact="true" Title="Henüz stok hareketi yok." />
                         }
                         else
                         {
@@ -159,7 +159,7 @@
                         </div>
                         @if (total == 0)
                         {
-                            <p class="text-muted mb-0">Henüz beyanname yok.</p>
+                            <EmptyState Compact="true" Title="Henüz beyanname yok." />
                         }
                         else
                         {
@@ -187,7 +187,7 @@
                     <div class="dash-card-head"><h2 id="wh-attention" class="dash-card-title"><AppIcon Name="alert-circle" Size="18" /> Dikkat gerektirenler</h2></div>
                     @if (Attention(d).Count == 0)
                     {
-                        <p class="text-muted mb-0">Şu an dikkat gerektiren kayıt yok.</p>
+                        <EmptyState Compact="true" Title="Şu an dikkat gerektiren kayıt yok." />
                     }
                     else
                     {

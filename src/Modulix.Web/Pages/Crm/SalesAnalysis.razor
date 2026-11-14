@@ -82,7 +82,7 @@
 
                     @if (q.Families == 0)
                     {
-                        <p class="text-muted">@Texts.Get("crm.salesAnalysis.q.empty")</p>
+                        <EmptyState Compact="true" Title="@Texts.Get("crm.salesAnalysis.q.empty")" />
                     }
                     else
                     {
@@ -191,7 +191,7 @@
 
                     @if (l.Leads == 0)
                     {
-                        <p class="text-muted">@Texts.Get("crm.salesAnalysis.l.empty")</p>
+                        <EmptyState Compact="true" Title="@Texts.Get("crm.salesAnalysis.l.empty")" />
                     }
                     else
                     {

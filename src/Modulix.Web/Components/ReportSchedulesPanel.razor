@@ -119,7 +119,7 @@
                         }
                         @if (!FilteredMembers().Any())
                         {
-                            <p class="text-muted mb-0">Kullanıcı bulunamadı.</p>
+                            <EmptyState Compact="true" Title="Kullanıcı bulunamadı." />
                         }
                     </div>
                     <p class="small text-muted mt-1" role="status">@recipientIds.Count alıcı seçili.</p>

@@ -501,7 +501,7 @@
                 <p class="small text-muted">@Texts.Get("crm.salesForecastDetail.compareSummary", c.Added.Count, c.Removed.Count, c.AmountChanged.Count, c.CategoryChanged.Count)</p>
 
                 <h4 class="h6">@Texts.Get("crm.salesForecastDetail.added", c.Added.Count)</h4>
-                @if (c.Added.Count == 0) { <p class="text-muted">@Texts.Get("crm.salesForecastDetail.none")</p> }
+                @if (c.Added.Count == 0) { <EmptyState Compact="true" Title="@Texts.Get("crm.salesForecastDetail.none")" /> }
                 else
                 {
                     <table class="table record-table">
@@ -521,7 +521,7 @@
                 }
 
                 <h4 class="h6">@Texts.Get("crm.salesForecastDetail.removed", c.Removed.Count)</h4>
-                @if (c.Removed.Count == 0) { <p class="text-muted">@Texts.Get("crm.salesForecastDetail.none")</p> }
+                @if (c.Removed.Count == 0) { <EmptyState Compact="true" Title="@Texts.Get("crm.salesForecastDetail.none")" /> }
                 else
                 {
                     <table class="table record-table">
@@ -542,7 +542,7 @@
                 }
 
                 <h4 class="h6">@Texts.Get("crm.salesForecastDetail.amountChanged", c.AmountChanged.Count)</h4>
-                @if (c.AmountChanged.Count == 0) { <p class="text-muted">@Texts.Get("crm.salesForecastDetail.none")</p> }
+                @if (c.AmountChanged.Count == 0) { <EmptyState Compact="true" Title="@Texts.Get("crm.salesForecastDetail.none")" /> }
                 else
                 {
                     <table class="table record-table">
@@ -562,7 +562,7 @@
                 }
 
                 <h4 class="h6">@Texts.Get("crm.salesForecastDetail.categoryChanged", c.CategoryChanged.Count)</h4>
-                @if (c.CategoryChanged.Count == 0) { <p class="text-muted">@Texts.Get("crm.salesForecastDetail.none")</p> }
+                @if (c.CategoryChanged.Count == 0) { <EmptyState Compact="true" Title="@Texts.Get("crm.salesForecastDetail.none")" /> }
                 else
                 {
                     <table class="table record-table">

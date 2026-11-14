@@ -36,7 +36,7 @@
     {
         @if (ModuleKey is not null && !settings.Any(InScope))
         {
-            <p class="text-muted">Bu modülün ayarı yok.</p>
+            <EmptyState Compact="true" Title="Bu modülün ayarı yok." />
         }
 
         <section class="record-form settings-group" hidden="@(ModuleKey is not null)">

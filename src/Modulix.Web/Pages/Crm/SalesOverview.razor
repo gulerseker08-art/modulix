@@ -115,7 +115,7 @@
 
         @if (IsEmpty(r))
         {
-            <p class="text-muted">@Texts.Get("crm.salesOverview.empty")</p>
+            <EmptyState Compact="true" Title="@Texts.Get("crm.salesOverview.empty")" />
         }
 
         <div class="kpi-grid" role="group" aria-label="@Texts.Get("crm.salesOverview.summary")">
