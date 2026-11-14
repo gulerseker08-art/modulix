@@ -1,0 +1,78 @@
+@* Duyuru ve anketin hedef kitlesi (ADR-0042 bölüm 23c): birden çok Core departmanı (alt departmanları dahil) ya da birden çok kişi. Seçilenler
+   listelenir ve tek tek kaldırılır; hiçbiri seçilmezse içerik herkese yöneliktir. Departmanlar Yönetim › Departmanlar ağacından, kişiler kuruluşun
+   etkin üyelerinden gelir; kalan doğrulama (kapalı departman, etkin üye) sunucudadır. *@
+
+@if (Kind == AudienceKind.Units)
+{
+    <HrBusinessUnitSelect @key="reset" Id="@Id" EmptyLabel="Departman ekle…" Value="null" ValueChanged="Add" Loaded="u => units = u" Invalid="Invalid" />
+}
+else
+{
+    <select @key="reset" id="@Id" class="form-select@(Invalid ? " is-invalid" : "")" @onchange="AddMember">
+        <option value="" selected>Kişi ekle…</option>
+        @foreach (var member in Lookups.Members.Where(m => !Selected.Contains(m.UserId)).OrderBy(m => m.DisplayName, StringComparer.CurrentCulture))
+        {
+            <option value="@member.UserId">@member.DisplayName</option>
+        }
+    </select>
+}
+
+@if (Selected.Count > 0)
+{
+    <ul class="list-unstyled mt-2 mb-0" aria-label="@(Kind == AudienceKind.Units ? "Seçilen departmanlar" : "Seçilen kişiler")">
+        @foreach (var id in Selected)
+        {
+            var name = NameOf(id);
+            <li class="list-toolbar mb-1">
+                <span class="me-auto">@name</span>
+                <button type="button" class="btn btn-ghost" aria-label="@($"{name} kaldır")" @onclick="() => Remove(id)"><AppIcon Name="x" Size="16" /> Kaldır</button>
+            </li>
+        }
+    </ul>
+}
+else
+{
+    <small class="text-muted d-block mt-1">@(Kind == AudienceKind.Units ? "Departman seçilmezse departman hedefi yoktur." : "Kişi seçilmezse kişi hedefi yoktur.")</small>
+}
+
+@code {
+    private IReadOnlyList<HrBusinessUnitDto> units = [];
+
+    // Seçim eklendikten sonra seçici yeniden çizilir ("… ekle" durumuna döner).
+    private int reset;
+
+    public enum AudienceKind
+    {
+        Units,
+        Users,
+    }
+
+    [Parameter, EditorRequired] public AudienceKind Kind { get; set; }
+
+    [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    [Parameter] public IReadOnlyList<Guid> Selected { get; set; } = [];
+
+    [Parameter] public EventCallback<IReadOnlyList<Guid>> SelectedChanged { get; set; }
+
+    [Parameter] public bool Invalid { get; set; }
+
+    private string NameOf(Guid id) => Kind == AudienceKind.Units
+        ? units.FirstOrDefault(u => u.Id == id)?.PathName ?? "Departman"
+        : Lookups.MemberName(id);
+
+    private async Task Add(Guid? id)
+    {
+        reset++;
+        if (id is { } value && !Selected.Contains(value))
+        {
+            await SelectedChanged.InvokeAsync([.. Selected, value]);
+        }
+    }
+
+    private Task AddMember(ChangeEventArgs e) => Add(Guid.TryParse(e.Value?.ToString(), out var id) ? id : null);
+
+    private Task Remove(Guid id) => SelectedChanged.InvokeAsync([.. Selected.Where(s => s != id)]);
+}

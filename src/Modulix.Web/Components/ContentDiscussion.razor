@@ -1,0 +1,179 @@
+@* Duyuru ve blog yazısında beğeni ve yorumlar (ADR-0042 bölüm 23d). İçeriği görebilen beğenir ve yorum yazar; kendi yorumunu siler. İçeriği yöneten
+   yorumu gizler (metni okura gösterilmez), yeniden gösterir ya da siler. Yetki ve görünürlük sunucuda denetlenir; burada yalnızca uygun düğmeler
+   gösterilir. Yorum metni düz metindir (HTML yorumlanmaz). *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject ToastService Toasts
+
+<section class="mt-3" aria-label="Beğeni ve yorumlar">
+    <div class="list-toolbar mb-2">
+        <button type="button" class="btn btn-tonal" aria-pressed="@(likedByMe ? "true" : "false")" disabled="@liking" aria-busy="@(liking ? "true" : null)" @onclick="ToggleLikeAsync">
+            <AppIcon Name="star" Size="16" /> @(likedByMe ? "Beğendiniz" : "Beğen") · @likeCount
+        </button>
+        <span class="text-muted me-auto">@CommentCount yorum</span>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (comments is null)
+    {
+        <LoadingState Rows="2" />
+    }
+    else if (comments.Count == 0)
+    {
+        <EmptyState Compact="true" Icon="message-square" Title="Henüz yorum yok." Text="İlk yorumu siz yazın." />
+    }
+    else
+    {
+        <ul class="list-unstyled" aria-label="Yorumlar">
+            @foreach (var comment in comments)
+            {
+                var hidden = WarehouseLabels.Flag(comment, "isHidden");
+                var mine = WarehouseLabels.Id(comment, "authorUserId") == Session.User?.UserId;
+                <li class="summary-card mb-2">
+                    <div class="list-toolbar mb-1">
+                        <strong class="me-auto">@Lookups.MemberName(WarehouseLabels.Id(comment, "authorUserId"))</strong>
+                        <small class="text-muted">@(DateTimeOffset.TryParse(WarehouseLabels.Text(comment, "createdAt"), out var at) ? at.LocalDateTime.ToString("dd.MM.yyyy HH:mm") : "")</small>
+                        @if (hidden)
+                        {
+                            <span class="badge status-inactive">Gizlendi</span>
+                        }
+                    </div>
+                    @if (WarehouseLabels.Text(comment, "body") is { Length: > 0 } body)
+                    {
+                        <p class="preline mb-1">@body</p>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-1">Bu yorum gizlendi.</p>
+                    }
+                    @if (CanModerate || mine)
+                    {
+                        <div class="list-toolbar">
+                            @if (CanModerate)
+                            {
+                                <button type="button" class="btn btn-ghost" @onclick='() => ActAsync(comment, hidden ? "show" : "hide")'>@(hidden ? "Göster" : "Gizle")</button>
+                            }
+                            <button type="button" class="btn btn-outline-danger" @onclick='() => ActAsync(comment, "delete")'>Sil</button>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+
+    <form class="mt-2" novalidate @onsubmit="CommentAsync" @onsubmit:preventDefault>
+        <label class="form-label" for="@($"comment-{Content.Id}")">Yorumunuz</label>
+        <textarea id="@($"comment-{Content.Id}")" class="form-control@(errors?.ContainsKey("body") == true ? " is-invalid" : "")" rows="2" maxlength="2000" @bind="draft"></textarea>
+        <FieldError Field="body" Errors="errors" />
+        <div class="list-toolbar mt-2">
+            <button type="submit" class="btn btn-tonal ms-auto" disabled="@(busy || string.IsNullOrWhiteSpace(draft))" aria-busy="@(busy ? "true" : null)">Yorum yap</button>
+        </div>
+    </form>
+</section>
+
+@code {
+    private List<RecordResponse>? comments;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private string? draft;
+    private bool busy;
+    private bool liking;
+
+    /// <summary>Duyuru (<c>announcements</c>) ya da blog yazısı (<c>blog-posts</c>) uç noktası.</summary>
+    [Parameter, EditorRequired] public string Route { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public string CommentEntityKey { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public RecordResponse Content { get; set; } = default!;
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    /// <summary>İçeriği yönetme izni (yorumu gizler ve siler).</summary>
+    [Parameter] public bool CanModerate { get; set; }
+
+    /// <summary>Beğeni ya da yorum sayısı değişince içeriğin güncel hali.</summary>
+    [Parameter] public EventCallback<RecordResponse> ContentChanged { get; set; }
+
+    private int likeCount;
+    private bool likedByMe;
+    private int commentDelta;
+
+    private int CommentCount => (Content.Values["commentCount"]?.GetValue<int>() ?? 0) + commentDelta;
+
+    protected override async Task OnInitializedAsync()
+    {
+        likeCount = Content.Values["likeCount"]?.GetValue<int>() ?? 0;
+        likedByMe = WarehouseLabels.Flag(Content, "likedByMe");
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<RecordPageResponse>($"/api/records/{CommentEntityKey}?contentId={Content.Id}&pageSize=200");
+        comments = result.Value?.Items.ToList() ?? [];
+        message = result.Error;
+    }
+
+    private async Task ToggleLikeAsync()
+    {
+        liking = true;
+        var result = await Api.PostAsync<RecordResponse>($"/api/hr/{Route}/{Content.Id}/like", new { });
+        liking = false;
+        if (result.Value is { } fresh)
+        {
+            likeCount = fresh.Values["likeCount"]?.GetValue<int>() ?? likeCount;
+            likedByMe = WarehouseLabels.Flag(fresh, "likedByMe");
+            await ContentChanged.InvokeAsync(fresh);
+            return;
+        }
+
+        message = result.Error;
+    }
+
+    private async Task CommentAsync()
+    {
+        busy = true;
+        errors = null;
+        message = null;
+        var result = await Api.PostAsync<RecordResponse>($"/api/hr/{Route}/{Content.Id}/comments", new WriteCommentRequest(draft?.Trim()));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            draft = null;
+            commentDelta++;
+            Toasts.Success("Yorumunuz eklendi.");
+            await LoadAsync();
+            return;
+        }
+
+        errors = result.FieldErrors;
+        message = result.FieldErrors is { Count: > 0 } ? null : result.Error;
+    }
+
+    private async Task ActAsync(RecordResponse comment, string action)
+    {
+        message = null;
+        var result = await Api.PostAsync<RecordResponse?>($"/api/hr/{CommentEntityKey["hr.".Length..]}s/{comment.Id}/actions",
+            new RunHrActionRequest(action, comment.Version, null));
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        var wasVisible = !WarehouseLabels.Flag(comment, "isHidden");
+        commentDelta += action switch
+        {
+            "delete" when wasVisible => -1,
+            "hide" => -1,
+            "show" => 1,
+            _ => 0,
+        };
+        Toasts.Success(action switch { "delete" => "Yorum silindi.", "hide" => "Yorum gizlendi.", _ => "Yorum yeniden gösteriliyor." });
+        await LoadAsync();
+    }
+}

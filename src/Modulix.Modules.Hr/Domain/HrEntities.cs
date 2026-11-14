@@ -31,6 +31,17 @@ public abstract class HrEntity : ITenantEntity, ICompanyShared
     /// <summary>Firmanın tanımladığı özel alanların değerleri (Y9a), JSON nesnesi; boşsa null.</summary>
     public string? CustomFields { get; internal set; }
 
+    /// <summary>
+    /// Tam anonim kayıt (ADR-0042 bölüm 24: kimliği gizli anketin cevabı): sıralı kimlik ve saniyeli zaman yazma anını belli ederdi; kimlik
+    /// rastgele, zaman verilen gündür (anketin açıldığı gün).
+    /// </summary>
+    internal void Anonymize(DateTimeOffset day)
+    {
+        Id = Guid.NewGuid();
+        CreatedAt = new DateTimeOffset(day.UtcDateTime.Date, TimeSpan.Zero);
+        UpdatedAt = CreatedAt;
+    }
+
     internal void Touch()
     {
         UpdatedAt = DateTimeOffset.UtcNow;
@@ -645,7 +656,7 @@ public sealed class ChecklistTask : HrEntity
 /// herkes, doluysa yalnızca o departmandaki çalışanlar (kullanıcının çalışan kartından). Sabitlenmiş duyuru listenin başındadır. Metin düz metindir;
 /// ekranda HTML olarak yorumlanmaz. Okundu bilgisi ayrı kayıtta tutulur (<see cref="AnnouncementRead"/>).
 /// </summary>
-public sealed class Announcement : HrEntity
+public sealed class Announcement : HrEntity, IAudienceContent
 {
     public const int TitleMaxLength = 200;
     public const int BodyMaxLength = 8000;
@@ -676,6 +687,65 @@ public sealed class Announcement : HrEntity
     public Guid? AuthorUserId { get; internal set; }
 }
 
+/// <summary>
+/// Hedef kitlesi olan içerik (duyuru, anket; ADR-0042 bölüm 23c). Hedefler <see cref="AudienceTarget"/> satırlarıdır; tek departman kolonu ve eski İK
+/// departmanı geçiş için okunur (bölüm 22), yeni seçim onları temizler.
+/// </summary>
+public interface IAudienceContent
+{
+    Guid Id { get; }
+
+    Guid? AudienceBusinessUnitId { get; }
+
+    string? AudienceDepartmentKey { get; }
+}
+
+/// <summary>
+/// Duyuru ya da anketin bir hedefi (ADR-0042 bölüm 23c): bir Core departmanı (alt departmanları dahil) ya da bir kullanıcı; satırda ikisinden yalnızca
+/// biri doludur. İçeriğin hiç hedefi yoksa içerik herkese yöneliktir; varsa hedeflerden birine uyan okur görür. Satırları içeriğin kayıt deposu,
+/// içerikle aynı işlemde yazar.
+/// </summary>
+public sealed class AudienceTarget : HrEntity
+{
+    public const int MaxUnits = 50;
+    public const int MaxUsers = 200;
+
+    /// <summary>Duyurunun ya da anketin kimliği.</summary>
+    public Guid ContentId { get; internal set; }
+
+    public Guid? BusinessUnitId { get; internal set; }
+
+    public Guid? UserId { get; internal set; }
+}
+
+/// <summary>
+/// Duyuruya ya da blog yazısına yorum (ADR-0042 bölüm 23d). İçeriği görebilen okur yazar; yazar kendi yorumunu siler; içeriği yönetme izni olan
+/// yorumu gizler (gizli yorumun metni okura gösterilmez) ya da siler. Metin düz metindir. Yalnızca yorum servisi yazar.
+/// </summary>
+public sealed class ContentComment : HrEntity
+{
+    public const int BodyMaxLength = 2000;
+
+    /// <summary>Duyuru ya da blog yazısının kimliği.</summary>
+    public Guid ContentId { get; internal set; }
+
+    public Guid AuthorUserId { get; internal set; }
+
+    public string Body { get; internal set; } = string.Empty;
+
+    public bool IsHidden { get; internal set; }
+
+    public Guid? HiddenByUserId { get; internal set; }
+}
+
+/// <summary>Duyuru ya da blog yazısının bir kullanıcı tarafından beğenilmesi (içerik başına kullanıcı tekil; ADR-0042 bölüm 23d).</summary>
+public sealed class ContentLike : HrEntity
+{
+    public Guid ContentId { get; internal set; }
+
+    public Guid UserId { get; internal set; }
+}
+
 /// <summary>Duyurunun bir kullanıcı tarafından okunduğu an (duyuru başına kullanıcı tekil). Okur duyuruyu açınca yazılır; değişmez.</summary>
 public sealed class AnnouncementRead : HrEntity
 {
@@ -690,7 +760,7 @@ public sealed class AnnouncementRead : HrEntity
 /// Çalışan anketi (ADR-0042 dilim 7, K8). Taslakken soruları düzenlenir; "yanıta aç" ile hedef kitleye görünür, "kapat" ile yanıt almaz. Kimliği gizli
 /// ankette sonuçlar ve kayıt uçları yanıtlayanı göstermez (denetim kaydı yazanı tutar; bkz. ADR). Durum yalnızca komutla değişir.
 /// </summary>
-public sealed class Survey : HrEntity
+public sealed class Survey : HrEntity, IAudienceContent
 {
     public const int TitleMaxLength = 200;
     public const int DescriptionMaxLength = 2000;
@@ -746,9 +816,14 @@ public sealed class SurveyQuestion : HrEntity
     {
         public const string Rating = "rating";
         public const string Choice = "choice";
+
+        /// <summary>Çoklu seçim (ADR-0042 bölüm 23b): seçilen her seçenek ayrı bir cevap satırıdır.</summary>
+        public const string MultiChoice = "multiChoice";
         public const string Text = "text";
 
-        public static IReadOnlyList<string> All { get; } = [Rating, Choice, Text];
+        public static IReadOnlyList<string> All { get; } = [Rating, Choice, MultiChoice, Text];
+
+        public static bool HasOptions(string type) => type is Choice or MultiChoice;
     }
 
     public Guid SurveyId { get; internal set; }
@@ -759,7 +834,7 @@ public sealed class SurveyQuestion : HrEntity
 
     public string QuestionType { get; internal set; } = Types.Rating;
 
-    /// <summary>Tek seçim sorusunun seçenekleri, satır başına bir tane; diğer türlerde boş.</summary>
+    /// <summary>Tek ya da çoklu seçim sorusunun seçenekleri, satır başına bir tane; diğer türlerde boş.</summary>
     public string? Options { get; internal set; }
 
     public bool IsRequired { get; internal set; } = true;
@@ -784,7 +859,17 @@ public sealed class SurveyAnswer : HrEntity
 {
     public const int TextMaxLength = 2000;
 
-    public Guid ResponseId { get; internal set; }
+    /// <summary>
+    /// Katılım satırı; kimliği gizli ankette (bölüm 24) boştur: cevap katılıma, dolayısıyla kişiye bağlanmaz. Katılım ayrı tutulur (tekrar yanıtı
+    /// engellemek için).
+    /// </summary>
+    public Guid? ResponseId { get; internal set; }
+
+    /// <summary>
+    /// Bir yanıt formunun cevaplarını bir arada tutan pusula kimliği (cevaplayan sayısı buna göre sayılır). Kimliği açık ankette katılımın kimliği,
+    /// kimliği gizli ankette rastgeledir ve başka hiçbir yerde saklanmaz.
+    /// </summary>
+    public Guid BallotId { get; internal set; }
 
     public Guid SurveyId { get; internal set; }
 

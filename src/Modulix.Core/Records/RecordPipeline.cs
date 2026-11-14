@@ -162,6 +162,11 @@ public sealed class RecordPipeline(
             return Invalid<RecordData>(errors);
         }
 
+        if (command.Anonymous && !store.AllowsAnonymousWrites)
+        {
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Bu kayıt türü anonim yazılamaz.");
+        }
+
         using var reason = commandContext?.Enter(command.Reason);
         try
         {
@@ -171,7 +176,19 @@ public sealed class RecordPipeline(
                 return OwnerOutOfScope<RecordData>(store);
             }
 
-            Record(tenant!, command.Source, created.EntityKey, created.Id, AuditAction.Created, DomainEventTypes.RecordCreated, before: null, after: created.Values, created.Version, command.Reason, CompanyIdOf(store, created.Values));
+            if (command.Anonymous)
+            {
+                // Anonim yazma (ADR-0042 bölüm 24): yazmanın olduğu denetlenir; kim, hangi kayıt ve ne yazıldığı hiçbir yere düşmez, olay yok.
+                audit.Add(new AuditEntry(tenant!.TenantId, Guid.Empty, created.EntityKey, Guid.Empty, AuditAction.Created, [], command.Source, CorrelationId: null)
+                {
+                    Anonymous = true,
+                });
+            }
+            else
+            {
+                Record(tenant!, command.Source, created.EntityKey, created.Id, AuditAction.Created, DomainEventTypes.RecordCreated, before: null, after: created.Values, created.Version, command.Reason, CompanyIdOf(store, created.Values));
+            }
+
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return RecordResult<RecordData>.Ok(Present(created, hidden, custom));
         }

@@ -4,10 +4,10 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Araçlar · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.fleet.vehicles") · Modulix</PageTitle>
 
 <AuthGate Module="@FleetAccess.ModuleKey" Permission="@FleetAccess.VehiclesRead">
-    <PageHeader Title="Araçlar" Icon="truck" Subtitle="@(page is null ? "Çekici, kamyon, panelvan, dorse ve römorkları yönetin." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.fleet.vehicles")" Icon="truck" Subtitle="@(page is null ? Texts.Get("fleet.vehicles.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -20,39 +20,39 @@
         @if (selected is not null)
         {
             <CredentialsPanel OwnerEntityKey="@FleetAccess.VehicleEntityKey" OwnerId="selected.Id" Category="@CredentialAccess.Vehicle" Lookups="Lookups"
-                              CanWrite="@Session.Can(FleetAccess.VehiclesWrite)" Title="Araç belgeleri"
-                              EmptyText="Bu araca henüz belge eklenmedi (muayene, trafik sigortası, kasko…)." />
+                              CanWrite="@Session.Can(FleetAccess.VehiclesWrite)" Title="@Texts.Get("fleet.vehicles.credentials-title")"
+                              EmptyText="@Texts.Get("fleet.vehicles.credentials-empty")" />
         }
     }
 
     @* Görünümler sunucuda süzgeç olarak uygulanır; sayfalama ve toplam doğru kalır. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Araç görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("fleet.vehicles.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Araç ara" placeholder="Plaka, marka, model veya şasi ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("fleet.vehicles.search-label")" placeholder="@Texts.Get("fleet.vehicles.search-placeholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(FleetAccess.VehiclesWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni araç</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("fleet.vehicles.new")</button>
         }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <select class="form-select" aria-label="Araç türü" @bind="kindKey" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm türler</option>
+            <select class="form-select" aria-label="@Texts.Get("fleet.vehicles.kind-filter")" @bind="kindKey" @bind:after="() => LoadAsync(1)">
+                <option value="">@Texts.Get("fleet.all-kinds")</option>
                 @foreach (var kind in Lookups.ValuesOf(FleetAccess.VehicleKindList))
                 {
                     <option value="@kind.Key">@kind.Label</option>
                 }
             </select>
-            <select class="form-select" aria-label="Mülkiyet" @bind="ownership" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm mülkiyetler</option>
-                @foreach (var (key, label) in FleetAccess.Ownerships)
+            <select class="form-select" aria-label="@Texts.Get("fleet.vehicles.ownership-filter")" @bind="ownership" @bind:after="() => LoadAsync(1)">
+                <option value="">@Texts.Get("fleet.vehicles.all-ownerships")</option>
+                @foreach (var (key, label) in FleetLabels.Ownerships)
                 {
                     <option value="@key">@label</option>
                 }
@@ -69,20 +69,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan araç yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("fleet.vehicles.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) araç listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("fleet.vehicles.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Araç listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("fleet.vehicles.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -96,8 +96,8 @@
                         <td class="row-menu-cell">
                             @if (Session.Can(FleetAccess.VehiclesWrite))
                             {
-                                <RowMenu Label="@($"{WarehouseLabels.Text(vehicle, "plate")} eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(vehicle)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <RowMenu Label="@Texts.Get("common.rowActionsOf", WarehouseLabels.Text(vehicle, "plate"))">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(vehicle)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 </RowMenu>
                             }
                         </td>
@@ -120,17 +120,17 @@
     private const string MaintenanceDueView = "maintenance-due";
 
     // Sütunların sırası varsayılan sıradır; sıralama anahtarları kayıt deposunun beyanıdır (VehicleRecordStore.SortKeys).
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("plate", "Plaka", "hash", "plate", "-plate", Locked: true),
-        new("kindKey", "Tür", "truck", "kindKey", "-kindKey"),
-        new("ownership", "Mülkiyet", "building", "ownership", "-ownership"),
-        new("carrier", "Taşıyıcı", "briefcase"),
-        new("brand", "Marka / model", "type", "brand", "-brand"),
-        new("modelYear", "Model yılı", "calendar", "modelYear", "-modelYear", DefaultVisible: false),
-        new("payloadKg", "Kapasite", "package", "payloadKg", "-payloadKg"),
-        new("nextMaintenanceDate", "Sonraki bakım", "wrench", "nextMaintenanceDate", "-nextMaintenanceDate"),
-        new("status", "Durum", "tag", "status", "-status"),
+        new("plate", Texts.Get("fleet.vehicles.col.plate"), "hash", "plate", "-plate", Locked: true),
+        new("kindKey", Texts.Get("common.field.kind"), "truck", "kindKey", "-kindKey"),
+        new("ownership", Texts.Get("fleet.vehicles.col.ownership"), "building", "ownership", "-ownership"),
+        new("carrier", Texts.Get("fleet.vehicles.col.carrier"), "briefcase"),
+        new("brand", Texts.Get("fleet.vehicles.col.brand"), "type", "brand", "-brand"),
+        new("modelYear", Texts.Get("fleet.vehicles.col.year"), "calendar", "modelYear", "-modelYear", DefaultVisible: false),
+        new("payloadKg", Texts.Get("fleet.vehicles.col.payload"), "package", "payloadKg", "-payloadKg"),
+        new("nextMaintenanceDate", Texts.Get("fleet.vehicles.col.next-maintenance"), "wrench", "nextMaintenanceDate", "-nextMaintenanceDate"),
+        new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
     ];
 
     private readonly GridViewState grid = new("fleet.vehicles", "plate");
@@ -169,12 +169,12 @@
     // Görünümler yalnızca süzgeçtir (Tümü, Etkin, Bakımda, Pasif, Taşeron, kişisel); yetkiyi ve kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm araçlar", Icon: "truck"),
-        new(ActiveView, "Etkin araçlar", Icon: "check-circle"),
-        new(MaintenanceDueView, "Bakımı yaklaşan", Icon: "alert-circle"),
-        new(MaintenanceView, "Bakımda", Icon: "wrench"),
-        new(PassiveView, "Pasif araçlar", Icon: "clock"),
-        new(SubcontractedView, "Taşeron araçlar", Icon: "briefcase"),
+        new(AllViews, Texts.Get("fleet.vehicles.view.all"), Icon: "truck"),
+        new(ActiveView, Texts.Get("fleet.vehicles.view.active"), Icon: "check-circle"),
+        new(MaintenanceDueView, Texts.Get("fleet.vehicles.view.maintenance-due"), Icon: "alert-circle"),
+        new(MaintenanceView, Texts.Get("fleet.vehicles.view.maintenance"), Icon: "wrench"),
+        new(PassiveView, Texts.Get("fleet.vehicles.view.passive"), Icon: "clock"),
+        new(SubcontractedView, Texts.Get("fleet.vehicles.view.subcontracted"), Icon: "briefcase"),
         .. views.Options,
     ];
 

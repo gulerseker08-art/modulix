@@ -145,7 +145,7 @@
                                 <td class="actions">
                                     @if (opened.Status == "Draft" && Session.Can(CrmAccess.PricesWrite))
                                     {
-                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => DeleteItemAsync(item)">@Texts.Get("common.delete")</button>
+                                        <ConfirmAction OnConfirm="() => DeleteItemAsync(item)">@Texts.Get("common.delete")</ConfirmAction>
                                     }
                                 </td>
                             </tr>

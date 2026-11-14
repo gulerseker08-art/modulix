@@ -267,6 +267,37 @@ internal sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Annou
     }
 }
 
+internal sealed class AudienceTargetConfiguration : IEntityTypeConfiguration<AudienceTarget>
+{
+    public void Configure(EntityTypeBuilder<AudienceTarget> builder)
+    {
+        HrTables.ConfigureCommon(builder, "AudienceTargets");
+        builder.HasIndex(t => new { t.TenantId, t.ContentId }).HasDatabaseName("IX_AudienceTargets_Content");
+        builder.HasIndex(t => new { t.TenantId, t.UserId }).HasDatabaseName("IX_AudienceTargets_User");
+        builder.ToTable(t => t.HasCheckConstraint("CK_AudienceTargets_OneKind",
+            "([BusinessUnitId] IS NULL AND [UserId] IS NOT NULL) OR ([BusinessUnitId] IS NOT NULL AND [UserId] IS NULL)"));
+    }
+}
+
+internal sealed class ContentCommentConfiguration : IEntityTypeConfiguration<ContentComment>
+{
+    public void Configure(EntityTypeBuilder<ContentComment> builder)
+    {
+        HrTables.ConfigureCommon(builder, "ContentComments");
+        builder.Property(c => c.Body).HasMaxLength(ContentComment.BodyMaxLength).IsRequired();
+        builder.HasIndex(c => new { c.TenantId, c.ContentId, c.CreatedAt }).HasDatabaseName("IX_ContentComments_Content");
+    }
+}
+
+internal sealed class ContentLikeConfiguration : IEntityTypeConfiguration<ContentLike>
+{
+    public void Configure(EntityTypeBuilder<ContentLike> builder)
+    {
+        HrTables.ConfigureCommon(builder, "ContentLikes");
+        builder.HasIndex(l => new { l.TenantId, l.ContentId, l.UserId }).IsUnique().HasDatabaseName("UX_ContentLikes_User");
+    }
+}
+
 internal sealed class AnnouncementReadConfiguration : IEntityTypeConfiguration<AnnouncementRead>
 {
     public void Configure(EntityTypeBuilder<AnnouncementRead> builder)

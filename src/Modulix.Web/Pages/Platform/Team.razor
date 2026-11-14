@@ -87,7 +87,7 @@
                             <td class="actions">
                                 @if (!member.Roles.Contains(PlatformRoleNames.Owner) && member.UserId != Session.User?.UserId)
                                 {
-                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveAsync(member)">Erişimi kapat</button>
+                                    <ConfirmAction Disabled="@busy" OnConfirm="() => RemoveAsync(member)">Erişimi kapat</ConfirmAction>
                                 }
                             </td>
                         </tr>

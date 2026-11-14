@@ -267,7 +267,7 @@ Bölüm 5'teki masraf akışı izin dilimindeki kalıpla (iş akışı kapısı,
 - **Durum komutla değişir:** `POST /api/hr/surveys/{id}/actions` (`open`: sorusu olmalı, kapanış günü geçmemiş olmalı; `close`: yalnızca açık anket; kapalı anket yeniden açılabilir). Soru yalnızca taslakta eklenir, değişir, silinir (yanıt toplanırken soru değişirse sonuç karşılaştırılamaz). Yanıtı olan anket silinmez, kapatılır; taslak anket sorularıyla silinir.
 - **Yanıt:** `POST /api/hr/surveys/{id}/responses` anket yanıta açıksa, kapanış günü geçmemişse ve kullanıcı hedef kitledeyse (departmanı boş ya da çalışan kartındaki departmanı) kabul edilir. Zorunlu soru, puan 1–5, seçeneğin listede olması ve metin uzunluğu denetlenir (alan adı `answers.{soruId}`, 422); tekrar yanıt 409. Katılım ve cevaplar kayıt boru hattından **tek işlemde** yazılır. Okur (yönetim izni yok) yalnızca yanıt verebileceği anketleri ve sorularını görür; diğerleri 404. Yönetici bütün anketleri görür ama yanıt için o da hedef kitlede olmalıdır.
 - **Sonuç:** `GET /api/hr/surveys/{id}/results` (yalnızca yönetim izni): soru başına cevap sayısı, puan ortalaması ve 1–5 dağılımı, seçenek dağılımı, metin cevapları (yanıtlayan bilgisi olmadan, alfabetik).
-- **Kimliği gizli anket (sınırıyla birlikte):** seçim yalnızca oluştururken yapılır. Sonuçlarda ve kayıt uçlarında yanıtlayan gösterilmez (katılım listesinde `respondentUserId` boş), cevaplar tek tek listelenmez (`hr.surveys.answers` izniyle de), sonuç en az **3 yanıt** gelince gösterilir. **Sınır:** platform kuralı gereği her yazma denetim kaydına yazan kullanıcıyla düşer (Y5: her önemli yazma denetim kaydına yazılır); bu yüzden cevap kaydı ile kullanıcı denetim kaydında ilişkilidir. Cevap değerleri denetim kaydında yalnızca `hr.surveys.answers` izniyle görünür, ama tenant'ın sistem yöneticisi rolü bütün izinlere sahiptir. Yani "kimliği gizli", İK yöneticisinden ve sonuç ekranından gizlidir; tenant yöneticisinden ve veritabanından tam anonimlik **değildir**. Arayüz metni de buna göre yazıldı ("sonuçlarda kimin ne yanıtladığı gösterilmez"; "anonim" denmez). Tam anonimlik (yazanı kaydetmeyen yazma) Core'da kayıt boru hattının sistem kimliğiyle yazabilmesini gerektirir; ayrı bir karar konusudur.
+- **Kimliği gizli anket (sınırıyla birlikte):** seçim yalnızca oluştururken yapılır. Sonuçlarda ve kayıt uçlarında yanıtlayan gösterilmez (katılım listesinde `respondentUserId` boş), cevaplar tek tek listelenmez (`hr.surveys.answers` izniyle de), sonuç en az **3 yanıt** gelince gösterilir. **Sınır:** platform kuralı gereği her yazma denetim kaydına yazan kullanıcıyla düşer (Y5: her önemli yazma denetim kaydına yazılır); bu yüzden cevap kaydı ile kullanıcı denetim kaydında ilişkilidir. Cevap değerleri denetim kaydında yalnızca `hr.surveys.answers` izniyle görünür, ama tenant'ın sistem yöneticisi rolü bütün izinlere sahiptir. Yani "kimliği gizli", İK yöneticisinden ve sonuç ekranından gizlidir; tenant yöneticisinden ve veritabanından tam anonimlik **değildir**. Arayüz metni de buna göre yazıldı ("sonuçlarda kimin ne yanıtladığı gösterilmez"; "anonim" denmez). Tam anonimlik (yazanı kaydetmeyen yazma) Core'da kayıt boru hattının sistem kimliğiyle yazabilmesini gerektirir; ayrı bir karar konusudur. **Güncelleme (bölüm 24):** tam anonimlik eklendi; arayüz artık "anonim" der.
 - **Arayüz:** Anketler (`/ik/anketler`: açık anketler, "Yanıt bekliyor/Yanıtlandı", yanıt formu) ve Anket yönetimi (`/ik/anket-yonetimi`: Taslak / Yanıta açık / Kapalı / Tümü görünümleri, sıralanabilir başlıklar, sekmeli anket ve soru formları, yanıta aç/kapat eylemleri, sonuç özeti). Yeni CSS sınıfı yok.
 - Migration `HrSurveys`: dört tablo + `TenantIsolationSql.AddTable`. `Field.Flag` yardımcısına `createOnly` eklendi.
 
@@ -413,3 +413,84 @@ Karar (kullanıcı, 14 Kasım 2026: "Core'a bağla"): İK'nın departmanı ayrı
 | `dotnet ef migrations has-pending-model-changes` | Bekleyen model değişikliği yok |
 | `HrDepartmentTests` (entegrasyon, 4 test: seçici, hesabı olmayan/bağlı kart, kullanıcı taşınınca kart ve görev geçmişi, süzgeç; eski değerlerin adla eşlenmesi ve eşlenmemiş eski duyurunun görünmeye devam etmesi; bulunmayan/kapalı/çakışan departman; tenant izolasyonu ve yetki); ayrıca `HrAnnouncementTests` ve `HrSurveyTests` güncellendi (hedef Core departmanı, üst departman kapsamı, bulunmayan ve kapalı departman), `HrImportTests` (departman adı/ağaç yolu, bulunmayan departman) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web` derlemesi | Yeni bileşenler ve ekran değişiklikleri hatasız derleniyor (bilinen 210 hatalık taban dışında hata yok); ekran görüntüsü alınamadı (yerelde uygulama çalışmıyor) |
+
+## 23. Sonraya kalanlar, öncelik 3: iletişim ek özellikleri (14 Kasım 2026)
+
+Kullanıcı kararı (14 Kasım 2026): dört ek özelliğin hepsi, ayrı ve küçük adımlarla: (a) duyuru kutucuğu ve ekler, (b) ankette çoklu seçim ve sonuçların dışa aktarımı, (c) çoklu hedefleme, (d) yorum ve beğeni.
+
+### 23a. Ana sayfa duyuru kutucuğu ve duyuru ekleri
+
+- **Ekler:** duyuruya görsel ve belge eklenir (ADR-0040 `/api/files`, `entityKey=hr.announcement`). Sunucu değişikliği gerekmedi: dosyanın görünürlüğü duyurunun görünürlüğüdür (hedef departman, yayın aralığı; göremeyene 404), eklemek ve silmek duyuru güncelleme iznini (`hr.announcements.manage`) ister. Duyuru yönetiminde ekler düzenlenir, duyuru akışında açılan duyurunun ekleri listelenir.
+- **Okunmamış süzgeci:** `unread=true` kullanıcının okumadığı duyurular (kullanıcı başına; başka kullanıcının okuması etkilemez).
+- **Ana sayfa kutucuğu** (`AnnouncementsTile`): duyuru okuma izni olan herkese, CRM açık olmasa da; son 5 yayındaki duyuru (sabitlenmişler üstte), "Sabitlenmiş"/"Yeni" rozeti ve okunmamış sayısı; akışa bağlantı. Metinler çeviri sözlüğündedir (`home.announcements.*`, tr/en/az; ADR-0034). Yeni CSS sınıfı yok (aktivite ajandasının `today-panel` sınıfları).
+- **Bilerek yapılmadı:** silinen duyurunun dosyalarının temizliği (öncelik 4, ADR-0040 dilim 3); duyuru metninde satır içi görsel (ekler ayrı listelenir).
+
+### 23b. Ankette çoklu seçim ve sonuçların dışa aktarımı
+
+- **Çoklu seçim** (`multiChoice`): seçenekler tek seçimle aynı kuralla girilir (2–20 farklı seçenek). Yanıtta `choices` listesi gönderilir; seçenekler soruda olmalı, bir seçenek bir kez seçilir, zorunlu soruda en az biri seçilir. Seçilen her seçenek **ayrı bir cevap satırıdır** (`SurveyAnswer.Choice`): kolon genişlemedi, migration yok, sonuçta seçenek başına sayım doğal olarak çalışır. Sorunun "cevaplayan" sayısı artık yanıt (kişi) sayısıdır; oran, cevaplayanların o seçeneği işaretleyen payıdır (çoklu seçimde toplamı %100'ü geçebilir).
+- **Dışa aktarma:** `GET /api/hr/surveys/{id}/results/export` sonuç ekranıyla **aynı özeti** CSV verir (soru, tür, cevaplayan, ortalama, seçenek/puan dağılımı, metin cevapları). İzin ve kimliği gizli ankette eşik sonuçla aynıdır (eşik altında 409). Yanıtlayan bilgisi ve ham yanıt satırı **yoktur**: ham satırlar kimliği gizli ankette cevap kombinasyonuyla kişiyi açığa çıkarabilirdi. Excel'in Türkçe ayarına göre UTF-8 BOM, ";" ayraç, virgüllü ondalık; "=", "+", "-", "@" ile başlayan hücre kesme işaretiyle başlar (formül enjeksiyonu; denetim kaydı dışa aktarımıyla aynı kural).
+- **Bilerek yapılmadı:** departman kırılımı (kimliği gizli ankette küçük grupları açığa çıkarır; eşik kuralıyla ayrıca tasarlanmalı), matris ve koşullu soru, Excel (.xlsx) biçimi.
+
+### 23c. Birden çok departmana ve kişiye hedefleme
+
+- **Model:** yeni tenant tablosu `hr.AudienceTargets` (içerik kimliği; ya Core departmanı ya kullanıcı, CHECK kısıtıyla yalnızca biri; RLS `TenantIsolationSql.AddTable`, migration `HrAudienceTargets`). Satırları duyuru ve anket kayıt depoları içerikle aynı işlemde yazar (görev geçmişi kalıbı); içerik silinince hedefleri de silinir. Duyuru ve anket aynı kodu kullanır (`IAudienceContent`, `AudienceFields<T>`, `HrAudience.Visible`).
+- **Kural (birleşim):** hedefi olmayan içerik herkese yöneliktir; hedefi olan içeriği, hedeflerden birine uyan okur görür: departman hedefi okurun departmanı ya da üst departmanıysa (alt departmanlar dahil), kişi hedefi okurun kendisiyse. Bölüm 22'den kalan tek departman kolonu ve eşlenmemiş eski İK departmanı birer hedef sayılmaya devam eder.
+- **Alanlar:** `audienceBusinessUnitIds` (en çok 50) ve `audienceUserIds` (en çok 200) kimlik listesidir; gönderilen tür tamamen değiştirilir, gönderilmeyen tür kalır. Yeni seçilen departman ağaçta olmalı ve etkin olmalı (kapalı departmanda kalan eski hedef korunur), yeni seçilen kişi kuruluşun etkin üyesi olmalı (başka firmanın kullanıcısı reddedilir); tekrar ve biçimsiz değer alan hatasıdır. Tek departman `audienceBusinessUnitId` uyumluluk için tek elemanlı liste gibi yazılır; okunurken yalnızca hedef tam olarak tek departmansa doludur. Departmanlar seçilince eski İK departmanı ve tek departman kolonu temizlenir (kolondaki hedef satıra taşınır).
+- **Arayüz:** duyuru ve anket formunda "Hedef departmanlar" ve "Hedef kişiler" alanları (`HrAudiencePicker`: seçilenler listelenir, tek tek kaldırılır). Yeni CSS sınıfı yok.
+- **Bilerek yapılmadı:** çalışma yerine göre hedefleme (çalışma yeri serbest metindir), hedef kitle önizlemesi (kaç kişiye ulaşır), hariç tutma ("şu departman hariç").
+
+### 23d. Duyuru ve blog yazısına yorum ve beğeni
+
+- **Model:** iki yeni tenant tablosu: `hr.ContentComments` (içerik, yazar, metin ≤ 2000, gizli mi, gizleyen) ve `hr.ContentLikes` (içerik, kullanıcı; içerik başına kullanıcı tekil). RLS `TenantIsolationSql.AddTable`, migration `HrContentComments`.
+- **Kayıt türleri:** kayıt boru hattı işlem başına tek izin denetlediği için içerik türü başına ayrı kayıt türü vardır: `hr.announcement-comment` / `hr.announcement-like` (duyuru okuma izni) ve `hr.blog-comment` / `hr.blog-like` (blog okuma izni). Tablolar ve depo kodu ortaktır (`ContentCommentRecordStore<T>`, `ContentLikeRecordStore<T>`).
+- **Görünürlük:** yorum ve beğeni, içeriğin görünürlüğünü izler. İçerik deposunun okur kuralı kullanılır (`ForReaderAsync`: duyuruda yayın aralığı ve hedef kitle, blogda yayın). Görülmeyen içeriğe yorum ve beğeni 404'tür, yorumları da listede yoktur.
+- **Yazma:** yalnızca `IContentInteractions` ile ve kayıt boru hattından yapılır (yetki, denetim kaydı, olay); genel uçtan yazma, değiştirme ve silme 409'dur.
+  - Yorumu ve beğeniyi içeriği görebilen kullanıcı yazar.
+  - Yorumunu yazarı siler.
+  - İçeriği yöneten (`hr.announcements.manage` / `hr.blog.manage`) yorumu gizler, yeniden gösterir ya da siler. Gizli yorumun metni okura gönderilmez ve gizli yorum sayılmaz.
+  - Yorum metni değiştirilmez.
+  - İçerik silinince yorumları ve beğenileri de silinir.
+- **Arayüz:** duyuru akışında ve blogda açılan içerikte `ContentDiscussion` bileşeni yer alır: beğen düğmesi (`btn-tonal`, `aria-pressed`) ve sayı, yorum listesi (`LoadingState`/`EmptyState`), yorum formu, yazar ve yönetici eylemleri, toast. Yeni CSS sınıfı yoktur.
+- **Bilerek yapılmadı:**
+  - yoruma yanıt (iç içe yorum)
+  - yorumu düzenleme
+  - yorum ve beğeni bildirimi (yazara)
+  - beğenenlerin adlarının listesi (arayüzde)
+  - galeri albümüne yorum
+  - içeriğin yorumlara kapatılması
+
+## 24. Tam anonim anket (öncelik 4a, 14 Kasım 2026)
+
+Karar (kullanıcı, 14 Kasım 2026: "kullanıcısız oy pusulası"): kimliği gizli ankette cevap, yanıtlayana sistemin hiçbir yerinde bağlanmaz. Bu, "her önemli yazma denetim kaydına yazılır" kuralının (Y5) **bilinçli ve tek istisnasıdır**: yazmanın olduğu denetlenir, kimin ve neyin yazdığı denetlenmez.
+
+Bölüm 15'teki sınır üç bağdan geliyordu; üçü de koparıldı:
+
+1. **Katılım satırı:** cevap katılım satırına (`SurveyResponse`, kullanıcıyı tutar) bağlıydı. Artık kimliği gizli ankette cevapta `ResponseId` boştur. Bir yanıt formunun cevapları, başka hiçbir yerde saklanmayan rastgele bir pusula kimliğiyle (`BallotId`) bir arada durur; cevaplayan sayısı buna göre sayılır. Kimliği açık ankette pusula = katılım. Katılım (kim yanıtladı) tutulmaya devam eder, çünkü tekrar yanıt böyle engellenir.
+2. **Denetim kaydı:** her cevap yazımı kullanıcı, değer ve istek iz kimliğiyle denetime düşüyordu. Core'a **anonim yazma** eklendi:
+   - `RecordCommand.Anonymous` yalnızca `IRecordStore.AllowsAnonymousWrites` diyen depoda kabul edilir; diğerlerinde 409. Bugün yalnızca `hr.survey-answer` bunu der.
+   - Depo kuralı anonim cevabı yalnızca kimliği gizli ankete izin verir; kimliği açık anketin cevabı katılıma bağlanmak zorundadır.
+   - Yetki ve doğrulama her zamanki gibi işler.
+   - Denetim satırı kullanıcısız (ekranda "Sistem"), kayıt kimliksiz, değersiz (`{}`) ve iz kimliksizdir.
+   - Olay yayımlanmaz.
+3. **Zaman ve sıralı kimlik:** satır kimlikleri zamana göre sıralı (v7) ve zaman damgaları saniyeliydi; yazma anı katılımla eşleştirilebiliyordu.
+   - Anonim cevap satırının kimliği rastgeledir (v4), zamanı anketin açıldığı gündür.
+   - Anonim denetim satırının kimliği rastgele, zamanı yalnızca gündür.
+   - Böylece "o gün tek kişi yanıtladı" durumunda bile denetim satırından cevaba gidilemez: satır kayıt kimliği taşımaz, cevabın zamanı da yanıt gününü değil anketin açıldığı günü gösterir.
+
+**Mevcut veri:** migration `HrAnonymousSurveyAnswers` kimliği gizli anketlerin önceki cevaplarını katılımdan koparır (yanıt başına yeni rastgele pusula). Ancak bölüm 24'ten önce yazılmış denetim satırları (kullanıcı ve değer) **değişmez**, çünkü denetim kaydı değiştirilmez. Bu yüzden eski cevaplar tam anonim **değildir**. Tam anonimlik bu sürümden sonra verilen cevaplar içindir.
+
+**Kalan sınırlar (bilerek):**
+- Katılım ve anonim cevap aynı veritabanı işleminde yazılır. SQL Server işlem günlüğüne doğrudan erişen bir veritabanı yöneticisi satırları işlem sırasıyla ilişkilendirebilir.
+- Aynı gün kaç anonim cevap satırı yazıldığı, o günün denetim satırı sayısından görülebilir. Bu yalnızca sayıdır: değer de kayıt kimliği de yoktur.
+- Kimliği gizli ankette sonuç eşiği (en az 3 yanıt), ham satır dışa aktarılmaması ve departman kırılımı olmaması korunur. Az yanıtta cevap birleşiminden kişi tahmini bu kurallarla önlenir.
+
+**Arayüz:** form ve yanıt ekranı artık "anonim" der ("cevaplarınız kimliğinizle hiçbir yerde ilişkilendirilmez; yalnızca anketi yanıtladığınız kaydedilir").
+
+### Test sonuçları (bölüm 24)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Core.Tests` (boru hattı) | 1018/1018 geçti. +2 test: anonim oluşturmada denetim satırı kişisiz, kayıtsız, değersiz, iz kimliksiz ve olay yok; izin vermeyen depoda 409; anonim yazmada da yetki ve doğrulama işler. |
+| `dotnet test tests/Modulix.ArchitectureTests`, `tests/Modulix.Modules.Hr.Tests` | 91/91 ve 57/57 geçti |
+| `dotnet ef migrations has-pending-model-changes` | Değişiklik yok |
+| `HrSurveyTests` (+1 entegrasyon testi) | Veritabanında cevapta katılım yok, pusula başka yerde yok, kimlik v4, zaman açılış günü. Cevabın denetim satırı anonim; cevap kimliği, pusula ve metin denetim kaydının hiçbir yerinde yok; olay yok. Katılım tutulur, tekrar yanıt 409. Kimliği açık ankette bağ ve kişisel denetim sürer. Derleniyor; yerelde SQL Server olmadığı için **CI çalıştırır**. |

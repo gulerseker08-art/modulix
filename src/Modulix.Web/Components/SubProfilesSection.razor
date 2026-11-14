@@ -219,8 +219,7 @@
                                     <td data-label="@Texts.Get("admin.subProfiles.featureGroup")" class="primary">@feature.Group</td>
                                     <td data-label="@Texts.Get("admin.subProfiles.value")">@feature.Value</td>
                                     <td class="actions">
-                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="@Texts.Get("admin.subProfiles.removeFeature", feature.Group, feature.Value)"
-                                                @onclick="() => RemoveFeatureAsync(feature)">@Texts.Get("admin.subProfiles.remove")</button>
+                                        <ConfirmAction Disabled="@busy" AriaLabel="@Texts.Get("admin.subProfiles.removeFeature", feature.Group, feature.Value)" OnConfirm="() => RemoveFeatureAsync(feature)">@Texts.Get("admin.subProfiles.remove")</ConfirmAction>
                                     </td>
                                 </tr>
                             }
@@ -285,7 +284,7 @@
                                         @if (option.AppliedAt is null)
                                         {
                                             <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => EditOption(option)">@Texts.Get("common.edit")</button>
-                                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => RemoveOptionAsync(option)">@Texts.Get("admin.subProfiles.remove")</button>
+                                            <ConfirmAction Disabled="@busy" OnConfirm="() => RemoveOptionAsync(option)">@Texts.Get("admin.subProfiles.remove")</ConfirmAction>
                                         }
                                     </td>
                                 </tr>
@@ -419,7 +418,7 @@
                                         {
                                             <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="@Texts.Get("admin.subProfiles.editRule", rule.Name)" @onclick="() => EditRule(rule)">@Texts.Get("common.edit")</button>
                                         }
-                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="@Texts.Get("admin.subProfiles.removeRule", rule.Name)" @onclick="() => RemoveRuleAsync(rule)">@Texts.Get("admin.subProfiles.remove")</button>
+                                        <ConfirmAction Disabled="@busy" AriaLabel="@Texts.Get("admin.subProfiles.removeRule", rule.Name)" OnConfirm="() => RemoveRuleAsync(rule)">@Texts.Get("admin.subProfiles.remove")</ConfirmAction>
                                     </td>
                                 </tr>
                             }

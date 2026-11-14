@@ -86,7 +86,38 @@ public partial class EndpointProtectionTests(ModulixApiFactory factory) : IClass
         "GET /api/notifications/",      // bildirim kutusu (ADR-0027 Dilim 4b): yalnızca kişinin kendi bildirimleri
         "GET /api/notifications/unread-count", // aynı gerekçe
         "POST /api/notifications/read-all",    // kişinin kendi bildirimlerini okundu yapar; firma kaydı değişmez
+        "POST /api/notifications/{id:guid}/read", // aynı gerekçe; başkasının bildirimi bulunamadı (404) döner
+        "GET /api/settings/logo",       // firmanın logosu: ekran başlığında her üyeye gösterilir (ayarlar okuması gibi)
     ];
+
+    /// <summary>
+    /// Rolsüz üyeye 403 yerine başka bir hata dönen, ama yetkiyi parametreye göre denetleyen uçlar. Bunlar için yalnızca
+    /// başarılı (2xx) yanıt hata sayılır. Yeni bir uç buraya ancak gerekçesiyle girer; listede olmayan her uç 403 dönmelidir.
+    /// </summary>
+    private static readonly Dictionary<string, string> ParameterDependent = new()
+    {
+        // Zorunlu sorgu parametresi eksik: ASP.NET bağlama hatasını (400) izin filtresinden önce verir; uçta RequirePermission vardır.
+        ["GET /api/crm/quotes/{id:guid}/compare"] = "with parametresi zorunlu; crm.quotes.read",
+        ["DELETE /api/customization/form-layouts/{entityKey}"] = "version parametresi zorunlu; form tasarımı yönetimi izni",
+        ["GET /api/marketing/segment-fields"] = "target parametresi zorunlu; pazarlama izni",
+        ["GET /api/users/{membershipId:guid}/business-unit/change-preview"] = "businessUnitId parametresi zorunlu; kullanıcı yönetimi izni",
+
+        // İzin hedef kaydın türünden gelir (genel uçlar): önce hedef çözülür, sonra o türün izni denetlenir.
+        ["GET /api/files/"] = "entityKey ve recordId zorunlu; hedef kaydın okuma izni",
+        ["POST /api/files/"] = "çok parçalı gövde zorunlu (415); hedef kaydın yazma izni",
+        ["DELETE /api/files/{id:guid}"] = "version zorunlu; dosyanın bağlı olduğu kaydın yazma izni",
+        ["GET /api/files/{id:guid}/content"] = "dosyanın bağlı olduğu kaydın okuma izni; yoksa 404",
+        ["GET /api/lookups/{key}/search"] = "lookup tanımı anahtardan çözülür; hedef türün okuma izni; bilinmeyen anahtar 404",
+        ["POST /api/lookups/{key}/resolve"] = "aynı gerekçe",
+        ["PUT /api/records/{entityKey}/{id:guid}"] = "If-Match zorunlu (428), kayıt boru hattı türün yazma iznini denetler",
+        ["DELETE /api/records/{entityKey}/{id:guid}"] = "aynı gerekçe",
+
+        // Kişisel liste görünümleri (ADR-0036): kişinin kendi görünümleridir; listenin kayıt türü parametreyle gelir.
+        ["GET /api/grid-views/"] = "screen zorunlu; kişinin kendi görünümleri",
+        ["POST /api/grid-views/"] = "kişinin kendi görünümü; doğrulama 422",
+        ["PUT /api/grid-views/{id:guid}"] = "gövdede version zorunlu (428); kişinin kendi görünümü",
+        ["DELETE /api/grid-views/{id:guid}"] = "version zorunlu; kişinin kendi görünümü",
+    };
 
     [Fact]
     public async Task Every_api_endpoint_requires_a_session_unless_listed()
@@ -117,14 +148,21 @@ public partial class EndpointProtectionTests(ModulixApiFactory factory) : IClass
         var allowed = new List<string>();
         foreach (var endpoint in Endpoints().Where(e => !Anonymous.Contains(e.Name) && !SignedIn.Contains(e.Name) && !e.Route.StartsWith(OwnAccountPrefix, StringComparison.Ordinal)))
         {
+            // Yetki denetimi doğrulamadan ve kayıt aramadan önce yapılmalıdır: rolsüz üye 403 almalıdır. 404/400/422 dönen bir uç
+            // izin denetimini unutmuş olabilir (örnek kimlik ve boş gövde yalnızca o yüzden başarısız olur); bu yüzden 403 dışındaki
+            // her yanıt korumasız sayılır.
             var status = await CallAsync(client, endpoint);
-            if ((int)status is >= 200 and < 300 && !AnyMember.Contains(endpoint.Name))
+            var unprotected = ParameterDependent.ContainsKey(endpoint.Name)
+                ? (int)status is >= 200 and < 300
+                : status != HttpStatusCode.Forbidden;
+            if (unprotected && !AnyMember.Contains(endpoint.Name))
             {
                 allowed.Add($"{endpoint.Name} → {(int)status}");
             }
         }
 
-        Assert.True(allowed.Count == 0, "Rolü olmayan üyenin başarıyla çağırabildiği, listede olmayan uç nokta:\n" + string.Join("\n", allowed));
+        Assert.True(allowed.Count == 0, "Rolü olmayan üyeye 403 dönmeyen, listede olmayan uç nokta:\n" + string.Join("\n", allowed));
+        AssertListed(ParameterDependent.Keys);
         AssertListed(SignedIn);
         AssertListed(AnyMember);
     }

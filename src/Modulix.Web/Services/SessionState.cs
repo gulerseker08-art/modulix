@@ -11,11 +11,23 @@ namespace Modulix.Web.Services;
 /// Oturumdaki kullanıcı, aktif tenant ve erişimi. Menü ve ekranlar buna göre gösterilir; asıl denetim
 /// her istekte sunucudadır. Giriş, çıkış ve tenant değişiminde yeniden yüklenir.
 /// </summary>
-public sealed class SessionState(ApiClient api, IJSRuntime? js = null)
+public sealed class SessionState
 {
+    private readonly ApiClient api;
+    private readonly IJSRuntime? js;
     private Task? loading;
     private bool languageDetected;
     private string? detectedLanguage;
+
+    public SessionState(ApiClient api, IJSRuntime? js = null, SessionExpiry? expiry = null)
+    {
+        this.api = api;
+        this.js = js;
+        if (expiry is not null)
+        {
+            expiry.Expired += OnExpired;
+        }
+    }
 
     public event Action? Changed;
 
@@ -171,6 +183,25 @@ public sealed class SessionState(ApiClient api, IJSRuntime? js = null)
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// Sunucu 401 döndü: oturum süresi dolmuş ya da kapatılmış. Oturum bilgisi temizlenir; <c>AuthGate</c> dönüş adresiyle
+    /// girişe yönlendirir. Zaten oturumsuzken (ör. hatalı şifre) hiçbir şey yapmaz.
+    /// </summary>
+    private void OnExpired()
+    {
+        if (User is null)
+        {
+            return;
+        }
+
+        User = null;
+        Access = null;
+        Logo = null;
+        TwoFactorPending = false;
+        loading = Task.CompletedTask;
+        Changed?.Invoke();
+    }
+
     private async Task ReloadAsync()
     {
         var me = await api.GetAsync<MeResponse>("/api/auth/me");
@@ -180,11 +211,14 @@ public sealed class SessionState(ApiClient api, IJSRuntime? js = null)
 
         if (User?.ActiveTenantId is not null && !TwoFactorRequired)
         {
-            var access = await api.GetAsync<MyAccessResponse>("/api/tenant/access");
+            // Erişim ile bölgesel ayarlar birbirinden bağımsızdır; birlikte istenir.
+            var accessTask = api.GetAsync<MyAccessResponse>("/api/tenant/access");
+            var settingsTask = api.GetAsync<SettingsResponse>("/api/settings");
+            var access = await accessTask;
             Access = access.IsSuccess ? access.Value : null;
 
             // Bölgesel ayarlar ve logo: ekranlar saatleri, biçimleri ve para birimini buradan alır.
-            var settings = await api.GetAsync<SettingsResponse>("/api/settings");
+            var settings = await settingsTask;
             Regional.Apply(settings.Value?.Settings);
             UiLanguage.Apply(User.PreferredLanguage, settings.Value?.Settings, fallbackLanguage);
             Logo = settings.Value?.Logo;

@@ -56,7 +56,16 @@
             </div>
         }
     }
-    else
+
+    @* İK duyuruları (ADR-0042 bölüm 23a): duyuru okuma izni olan herkese, CRM açık olmasa da. *@
+    @if (ShowAnnouncements)
+    {
+        <div class="chart-grid">
+            <AnnouncementsTile />
+        </div>
+    }
+
+    @if (!Session.IsModuleEnabled(CrmAccess.ModuleKey) && !ShowAnnouncements)
     {
         <p>@Texts.Get("home.noModule")</p>
     }
@@ -80,6 +89,8 @@
         ? Texts.Get("home.greeting", name)
         : Texts.Get("home.title");
 
+
+    private bool ShowAnnouncements => Session.IsModuleEnabled(HrAccess.ModuleKey) && Session.Can(HrAccess.AnnouncementsRead);
 
     private void OpenActivities(ActivityDto activity) => Navigation.NavigateTo("crm/aktiviteler");
 

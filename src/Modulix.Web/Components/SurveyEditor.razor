@@ -49,21 +49,27 @@
                         <input id="survey-anonymous" class="form-check-input" type="checkbox" disabled="@(form.Id is not null)" @bind="form.IsAnonymous" />
                         <label class="form-check-label" for="survey-anonymous">@f.Label</label>
                     </div>
-                    <small class="text-muted">Sonuçlarda kimin ne yanıtladığı gösterilmez; en az @MinAnonymousResponses yanıt gelince özet görünür. Kaydettikten sonra değişmez.</small>
+                    <small class="text-muted">Tam anonim: cevaplar yanıtlayana hiçbir yerde (sonuç, denetim kaydı, veritabanı) bağlanmaz; yalnızca kimin katıldığı tutulur. En az @MinAnonymousResponses yanıt gelince özet görünür. Kaydettikten sonra değişmez.</small>
                     break;
-                case "audienceBusinessUnitId":
-                    <label class="@f.LabelClass()" for="survey-audience">@f.Label</label>
-                    <HrBusinessUnitSelect Id="survey-audience" EmptyLabel="Bütün çalışanlar" Value="form.AudienceBusinessUnitId" ValueChanged="AudienceChanged"
-                                          Invalid="@(errors?.ContainsKey("audienceBusinessUnitId") == true)" />
-                    <FieldError Field="audienceBusinessUnitId" Errors="errors" />
-                    @if (!form.AudienceTouched && form.AudienceBusinessUnitId is null && form.LegacyAudience is { Length: > 0 } legacy)
+                case "audienceBusinessUnitIds":
+                    <label class="@f.LabelClass()" for="survey-audience-units">@f.Label</label>
+                    <HrAudiencePicker Kind="HrAudiencePicker.AudienceKind.Units" Id="survey-audience-units" Lookups="Lookups" Selected="form.AudienceUnits"
+                                      SelectedChanged="UnitsChanged" Invalid="@(errors?.ContainsKey("audienceBusinessUnitIds") == true)" />
+                    <FieldError Field="audienceBusinessUnitIds" Errors="errors" />
+                    @if (!form.UnitsTouched && form.AudienceUnits.Count == 0 && form.LegacyAudience is { Length: > 0 } legacy)
                     {
                         <small class="text-muted">Eski İK departmanına hedefli: @Lookups.Label(HrAccess.DepartmentList, legacy). Departman seçilince Core departmanına geçer.</small>
                     }
                     else
                     {
-                        <small class="text-muted">Alt departmanlardakiler de dahildir.</small>
+                        <small class="text-muted">Alt departmanlardakiler de dahildir. Departman ve kişi seçilmezse bütün çalışanlara yöneliktir.</small>
                     }
+                    break;
+                case "audienceUserIds":
+                    <label class="@f.LabelClass()" for="survey-audience-users">@f.Label</label>
+                    <HrAudiencePicker Kind="HrAudiencePicker.AudienceKind.Users" Id="survey-audience-users" Lookups="Lookups" Selected="form.AudienceUsers"
+                                      SelectedChanged="UsersChanged" Invalid="@(errors?.ContainsKey("audienceUserIds") == true)" />
+                    <FieldError Field="audienceUserIds" Errors="errors" />
                     break;
                 case "closesOn":
                     <label class="@f.LabelClass()" for="survey-closes">@f.Label</label>
@@ -104,7 +110,7 @@
             ? new SurveyForm
             {
                 Id = s.Id, Version = s.Version, Title = WarehouseLabels.Text(s, "title"), Description = WarehouseLabels.Text(s, "description"),
-                IsAnonymous = WarehouseLabels.Flag(s, "isAnonymous"), AudienceBusinessUnitId = WarehouseLabels.Id(s, "audienceBusinessUnitId"),
+                IsAnonymous = WarehouseLabels.Flag(s, "isAnonymous"), AudienceUnits = HrLabels.Ids(s, "audienceBusinessUnitIds"), AudienceUsers = HrLabels.Ids(s, "audienceUserIds"),
                 LegacyAudience = WarehouseLabels.Text(s, "audienceDepartmentKey"),
                 ClosesOn = FleetLabels.Day(WarehouseLabels.Text(s, "closesOn")), Custom = s.Values["custom"]?.DeepClone().AsObject() ?? [],
             }
@@ -113,19 +119,28 @@
         layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
     }
 
-    // Hedef Core departmanıdır (bölüm 22). Eski İK departman hedefi olan kayıtta hedef değiştirilmedikçe alan gönderilmez (sunucu eski hedefi korur).
+    // Hedef birden çok Core departmanı ve/veya kişidir (bölüm 23c). Eski İK departman hedefi olan kayıtta departmanlar değiştirilmedikçe gönderilmez
+    // (sunucu eski hedefi korur).
     private void AddAudience(JsonObject values)
     {
-        if (form.AudienceTouched || string.IsNullOrEmpty(form.LegacyAudience))
+        if (form.UnitsTouched || string.IsNullOrEmpty(form.LegacyAudience))
         {
-            values["audienceBusinessUnitId"] = form.AudienceBusinessUnitId?.ToString();
+            values["audienceBusinessUnitIds"] = HrLabels.IdArray(form.AudienceUnits);
         }
+
+        values["audienceUserIds"] = HrLabels.IdArray(form.AudienceUsers);
     }
 
-    private void AudienceChanged(Guid? unit)
+    private void UnitsChanged(IReadOnlyList<Guid> units)
     {
-        form.AudienceBusinessUnitId = unit;
-        form.AudienceTouched = true;
+        form.AudienceUnits = units;
+        form.UnitsTouched = true;
+        dirty = true;
+    }
+
+    private void UsersChanged(IReadOnlyList<Guid> users)
+    {
+        form.AudienceUsers = users;
         dirty = true;
     }
 
@@ -177,12 +192,14 @@
 
         public bool IsAnonymous { get; set; }
 
-        public Guid? AudienceBusinessUnitId { get; set; }
+        public IReadOnlyList<Guid> AudienceUnits { get; set; } = [];
+
+        public IReadOnlyList<Guid> AudienceUsers { get; set; } = [];
 
         /// <summary>Eski İK departman hedefi (Core'a eşlenmemiş kayıtta); hedef değiştirilmedikçe korunur.</summary>
         public string? LegacyAudience { get; init; }
 
-        public bool AudienceTouched { get; set; }
+        public bool UnitsTouched { get; set; }
 
         public DateOnly? ClosesOn { get; set; }
     }

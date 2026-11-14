@@ -155,6 +155,13 @@ internal static class Field
     public static RecordField<T> Id<T>(string name, Func<T, Guid?> get, Action<T, Guid?> set) =>
         new(name, required: false, nullable: true, ParseId, e => get(e) is { } value ? value.ToString() : null, (e, v) => set(e, (Guid?)v));
 
+    /// <summary>
+    /// Kimlik listesi (ör. hedef departmanlar, kişiler): JSON dizisi, her öğe GUID, tekrar yok, en çok <paramref name="max"/> öğe; boş (null) boş liste
+    /// demektir. Varlığı kayıt deposu denetler.
+    /// </summary>
+    public static RecordField<T> IdList<T>(string name, int max, Func<T, JsonNode?> read, Action<T, IReadOnlyList<Guid>> set) =>
+        new(name, required: false, nullable: true, node => ParseIdList(node, max), read, (e, v) => set(e, v as IReadOnlyList<Guid> ?? []));
+
     /// <summary>Kullanıcı hesabına bağ: aktif tenant'ın etkin üyesi olan bir kullanıcı (destek erişimi etkin üye sayılmaz).</summary>
     public static RecordField<T> Member<T>(string name, Func<T, Guid?> get, Action<T, Guid?> set) =>
         new(name, required: false, nullable: true, ParseId, e => get(e) is { } value ? value.ToString() : null, (e, v) => set(e, (Guid?)v))
@@ -237,6 +244,32 @@ internal static class Field
                     : ParsedValue.Fail("Tarih ve saat ISO 8601 biçiminde olmalıdır (ör. 2026-11-12T08:30:00+03:00)."),
             e => get(e) is { } value ? value.ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture) : null,
             (e, v) => set(e, (DateTimeOffset?)v));
+
+    private static ParsedValue ParseIdList(JsonNode node, int max)
+    {
+        if (node is not JsonArray array)
+        {
+            return ParsedValue.Fail("Kimlik listesi olmalıdır.");
+        }
+
+        var ids = new List<Guid>();
+        foreach (var item in array)
+        {
+            if (item is null || item.GetValueKind() != JsonValueKind.String || !Guid.TryParse(item.GetValue<string>(), out var id) || id == Guid.Empty)
+            {
+                return ParsedValue.Fail("Geçerli kayıt kimlikleri olmalıdır.");
+            }
+
+            if (ids.Contains(id))
+            {
+                return ParsedValue.Fail("Aynı kayıt bir kez seçilir.");
+            }
+
+            ids.Add(id);
+        }
+
+        return ids.Count > max ? ParsedValue.Fail($"En çok {max} kayıt seçilir.") : ParsedValue.Of(ids);
+    }
 
     private static ParsedValue ParseId(JsonNode node) =>
         node.GetValueKind() == JsonValueKind.String && Guid.TryParse(node.GetValue<string>(), out var id) && id != Guid.Empty

@@ -74,7 +74,7 @@ public class AppNavigationTests
 
         var menu = nav.Context("crm/teklifler")!;
         Assert.Equal(AppCatalog.Crm, menu.Root.Id);
-        Assert.Equal(["Müşteri adayları", "Fırsatlar", "Teklifler", "Satış sözleşmeleri", "Satış siparişleri"], EntryNames(menu, AppCatalog.CrmSalesGroup));
+        Assert.Equal(["Müşteri adayları", "Fırsatlar", "Teklifler", "Satış sözleşmeleri", "Sözleşme şablonları", "Satış siparişleri"], EntryNames(menu, AppCatalog.CrmSalesGroup));
         Assert.Contains("Kampanyalar", EntryNames(menu, AppCatalog.CrmMarketingGroup));
     }
 
@@ -147,7 +147,8 @@ public class AppNavigationTests
     public void Crm_settings_section_is_pinned_and_lists_only_what_the_user_can_open()
     {
         var plain = Nav(AllModules, SalesUser).Context("crm/teklifler")!;
-        Assert.Equal(["Sözleşme şablonları"], EntryNames(plain, AppCatalog.CrmSettingsGroup));
+        // Satış kullanıcısının günlük ekranları (ör. sözleşme şablonları) ayarlarda değildir; yönetici izni yoksa bölüm hiç çıkmaz.
+        Assert.DoesNotContain(plain.Sections, s => s.Group?.Id == AppCatalog.CrmSettingsGroup);
 
         var noContracts = Nav([CrmAccess.ModuleKey], [CrmAccess.QuotesRead]).Context("crm/teklifler")!;
         Assert.DoesNotContain(noContracts.Sections, s => s.Group?.Id == AppCatalog.CrmSettingsGroup);
@@ -197,6 +198,21 @@ public class AppNavigationTests
             new[] { CrmAccess.ModuleKey, ContractsAccess.ModuleKey, OrdersAccess.ModuleKey, SupportAccess.ModuleKey, MarketingAccess.ModuleKey }.Order(),
             screens.Select(s => s.ModuleKey!).Order());
         Assert.All(screens, s => Assert.Equal(AppCatalog.ModuleSettingsRoute(s.ModuleKey!), s.Route));
+    }
+
+    [Fact]
+    public void Data_quality_is_a_sales_report_and_contract_templates_sit_with_sales_screens()
+    {
+        var nav = Nav(AllModules, [.. SalesUser, SalesAccess.ReportsRead]);
+
+        var menu = nav.Context("crm/veri-kalitesi")!;
+        Assert.Equal((AppCatalog.Crm, "crm.sales-data-quality"), (menu.Root.Id, menu.Active.Id));
+        Assert.Contains("Veri kalitesi", EntryNames(menu, AppCatalog.CrmReportsGroup));
+        Assert.DoesNotContain(menu.Sections, s => s.Group?.Id == AppCatalog.CrmSettingsGroup);
+
+        var templates = nav.Context("sozlesmeler/sablonlar")!;
+        Assert.Equal((AppCatalog.Crm, "contracts.templates"), (templates.Root.Id, templates.Active.Id));
+        Assert.Contains("Sözleşme şablonları", EntryNames(templates, AppCatalog.CrmSalesGroup));
     }
 
     [Fact]

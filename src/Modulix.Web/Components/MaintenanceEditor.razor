@@ -9,7 +9,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Record is null ? "Yeni bakım kaydı" : "Bakım kaydı")</h2>
+            <h2>@(Record is null ? Texts.Get("fleet.maintenance-form.new") : Texts.Get("fleet.maintenance-form.record"))</h2>
             @if (Record is not null)
             {
                 <p>@Lookups.Label(FleetAccess.MaintenanceKindList, form.KindKey) · @(form.PerformedOn is { } d ? FleetLabels.Date(d) : "")</p>
@@ -17,13 +17,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -38,34 +38,34 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Bakım özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("fleet.maintenance-form.summary-label")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true"><AppIcon Name="wrench" Size="24" /></span>
-                    <strong class="summary-name">@(string.IsNullOrEmpty(form.KindKey) ? "Bakım türü" : Lookups.Label(FleetAccess.MaintenanceKindList, form.KindKey))</strong>
-                    <span class="summary-sub">@(form.PerformedOn is { } day ? FleetLabels.Date(day) : "Bakım tarihi")</span>
+                    <strong class="summary-name">@(string.IsNullOrEmpty(form.KindKey) ? Texts.Get("fleet.maintenance-form.kind-placeholder") : Lookups.Label(FleetAccess.MaintenanceKindList, form.KindKey))</strong>
+                    <span class="summary-sub">@(form.PerformedOn is { } day ? FleetLabels.Date(day) : Texts.Get("fleet.maintenance-form.date-placeholder"))</span>
                 </div>
-                <h3 class="summary-heading">Bakım özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("fleet.maintenance-form.summary-label")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Kilometre</dt><dd>@FleetLabels.Km(form.OdometerKm)</dd></div>
-                    <div><dt>Tutar</dt><dd>@FleetLabels.Money(form.Cost, form.Currency)</dd></div>
-                    <div><dt>Sonraki bakım</dt><dd>@(form.NextDueDate is { } next ? FleetLabels.Date(next) : "—")</dd></div>
+                    <div><dt>@Texts.Get("fleet.maintenance-form.odometer")</dt><dd>@FleetLabels.Km(form.OdometerKm)</dd></div>
+                    <div><dt>@Texts.Get("fleet.maintenance-form.amount")</dt><dd>@FleetLabels.Money(form.Cost, form.Currency)</dd></div>
+                    <div><dt>@Texts.Get("fleet.maintenance-form.next")</dt><dd>@(form.NextDueDate is { } next ? FleetLabels.Date(next) : "—")</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Bakım formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("fleet.maintenance-form.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
                         case "vehicleId":
                             <label class="@f.LabelClass()" for="maintenance-vehicle">@f.Label</label>
-                            <LookupPicker Id="maintenance-vehicle" LookupKey="@FleetAccess.MaintenanceVehicleLookup" @bind-Value="form.VehicleId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="Plaka ile araç seçin…" Invalid="@(errors?.ContainsKey("vehicleId") == true)" />
+                            <LookupPicker Id="maintenance-vehicle" LookupKey="@FleetAccess.MaintenanceVehicleLookup" @bind-Value="form.VehicleId" Required="f.Required" Disabled="@(form.Id is not null)" Placeholder="@Texts.Get("fleet.maintenance-form.vehicle-placeholder")" Invalid="@(errors?.ContainsKey("vehicleId") == true)" />
                             <FieldError Field="vehicleId" Errors="errors" />
                             @if (form.Id is not null)
                             {
-                                <small class="text-muted">Bakımın aracı oluşturulduktan sonra değiştirilemez.</small>
+                                <small class="text-muted">@Texts.Get("fleet.maintenance-form.vehicle-locked")</small>
                             }
                             break;
                         case "kindKey":
@@ -90,9 +90,9 @@
                             break;
                         case "supplierPartyId":
                             <label class="@f.LabelClass()" for="maintenance-supplier">@f.Label</label>
-                            <LookupPicker Id="maintenance-supplier" LookupKey="@FleetAccess.MaintenanceSupplierLookup" @bind-Value="form.SupplierPartyId" Required="f.Required" Placeholder="Servis firması seçin…" Invalid="@(errors?.ContainsKey("supplierPartyId") == true)" />
+                            <LookupPicker Id="maintenance-supplier" LookupKey="@FleetAccess.MaintenanceSupplierLookup" @bind-Value="form.SupplierPartyId" Required="f.Required" Placeholder="@Texts.Get("fleet.maintenance-form.supplier-placeholder")" Invalid="@(errors?.ContainsKey("supplierPartyId") == true)" />
                             <FieldError Field="supplierPartyId" Errors="errors" />
-                            <small class="text-muted">Kendi atölyenizde yapıldıysa boş bırakın.</small>
+                            <small class="text-muted">@Texts.Get("fleet.maintenance-form.supplier-hint")</small>
                             break;
                         case "cost":
                             <label class="@f.LabelClass()" for="maintenance-cost">@f.Label</label>
@@ -108,7 +108,7 @@
                             <label class="@f.LabelClass()" for="maintenance-next-date">@f.Label</label>
                             <input id="maintenance-next-date" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.NextDueDate" />
                             <FieldError Field="nextDueDate" Errors="errors" />
-                            <small class="text-muted">Aracın "sonraki bakım" tarihi olur; hatırlatma kuralları bu tarihe bakar.</small>
+                            <small class="text-muted">@Texts.Get("fleet.maintenance-form.next-hint")</small>
                             break;
                         case "nextDueKm":
                             <label class="@f.LabelClass()" for="maintenance-next-km">@f.Label</label>
@@ -127,10 +127,10 @@
             <div class="form-actions">
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
-                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
             </div>
         </div>
     </div>
@@ -166,7 +166,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir kayıt verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>

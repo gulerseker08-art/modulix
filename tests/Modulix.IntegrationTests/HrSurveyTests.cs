@@ -1,10 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Authorization;
 using Modulix.Infrastructure.Identity;
+using Modulix.Infrastructure.Persistence;
+using Modulix.Modules.Hr.Domain;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Hr;
 using Modulix.Shared.Records;
@@ -163,6 +167,71 @@ public class HrSurveyTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         Assert.Empty(await ListAsync(hr, Answers, $"questionId={rating.Id}"));
     }
 
+    /// <summary>
+    /// Bölüm 24: tam anonim anket. Kimliği gizli ankette cevap ne katılım satırına ne yazma anına bağlıdır: cevapta katılım kimliği yok, pusula
+    /// kimliği rastgele ve başka yerde yok, satır kimliği rastgele (v4), zamanı anketin açıldığı gün; cevabın denetim satırı kişisiz, kayıtsız,
+    /// değersiz ve iz kimliksiz; olay yok; cevap metni denetim kaydının hiçbir yerinde yok. Katılım (kim yanıtladı) tutulur ve tekrar yanıt
+    /// engellenir. Kimliği açık ankette cevap katılıma bağlı ve denetim kaydı kişiseldir.
+    /// </summary>
+    [Fact]
+    public async Task Anonymous_answers_are_linked_to_no_one_in_the_database_audit_log_or_events()
+    {
+        var s = await SetUpAsync();
+        using var hr = await LoginAsync(s.Hr);
+        using var staff = await LoginAsync(s.Staff);
+
+        var anonymous = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "Gizli nabız", ["isAnonymous"] = true });
+        var rating = await QuestionAsync(hr, anonymous.Id, "Puanınız", "rating", null, required: true);
+        var comment = await QuestionAsync(hr, anonymous.Id, "Görüşünüz", "text", null, required: false);
+        await ActAsync(hr, anonymous.Id, "open");
+        await SubmitAsync(staff, anonymous.Id, new SurveyAnswerItem(rating.Id, 5, null, null), new SurveyAnswerItem(comment.Id, null, null, "cok gizli dusunce 7f3a"));
+        Assert.Equal(HttpStatusCode.Conflict, (await PostResponseAsync(staff, anonymous.Id, new SurveyAnswerItem(rating.Id, 1, null, null))).StatusCode);
+
+        var open = await GetAsync(hr, $"{Surveys}/{anonymous.Id}");
+        var named = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "Açık anket" });
+        var namedQuestion = await QuestionAsync(hr, named.Id, "Puan", "rating", null, required: true);
+        await ActAsync(hr, named.Id, "open");
+        await SubmitAsync(staff, named.Id, new SurveyAnswerItem(namedQuestion.Id, 3, null, null));
+
+        using var scope = factory.OpenScope(s.TenantId);
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        var participation = await db.Set<SurveyResponse>().AsNoTracking().SingleAsync(r => r.SurveyId == anonymous.Id);
+        Assert.Equal(s.Staff.Id, participation.RespondentUserId);
+
+        var answers = await db.Set<SurveyAnswer>().AsNoTracking().Where(a => a.SurveyId == anonymous.Id).ToListAsync();
+        Assert.Equal(2, answers.Count);
+        Assert.All(answers, a => Assert.Null(a.ResponseId));
+        Assert.Single(answers.Select(a => a.BallotId).Distinct());
+        var ballot = answers[0].BallotId;
+        Assert.NotEqual(participation.Id, ballot);
+        Assert.False(await db.Set<SurveyResponse>().AsNoTracking().AnyAsync(r => r.Id == ballot));
+        Assert.All(answers, a => Assert.Equal(4, a.Id.Version));
+        var openedDay = DateTimeOffset.Parse(Text(open, "openedAt")!).UtcDateTime.Date;
+        Assert.All(answers, a => Assert.Equal(openedDay, a.CreatedAt.UtcDateTime));
+
+        // Denetim kaydı: anonim cevabın satırı kişisiz, kayıtsız, değersiz, iz kimliksiz ve gün hassasiyetinde; cevap ve metni hiçbir satırda yok.
+        var answerAudit = await db.AuditLog.AsNoTracking().Where(a => a.EntityKey == "hr.survey-answer").ToListAsync();
+        var anonymousAudit = answerAudit.Where(a => a.UserId == Guid.Empty).ToList();
+        Assert.Equal(2, anonymousAudit.Count);
+        Assert.All(anonymousAudit, a => Assert.Equal((Guid.Empty, "{}", (string?)null, TimeSpan.Zero),
+            (a.RecordId, a.Changes, a.CorrelationId, a.OccurredAt.UtcDateTime.TimeOfDay)));
+        Guid[] answerIds = [.. answers.Select(a => a.Id)];
+        Assert.False(await db.AuditLog.AsNoTracking().AnyAsync(a => answerIds.Contains(a.RecordId) || a.RecordId == ballot));
+        Assert.False(await db.AuditLog.AsNoTracking().AnyAsync(a => a.Changes.Contains("cok gizli dusunce 7f3a")));
+        Assert.False(await db.OutboxMessages.AsNoTracking().AnyAsync(o => o.TenantId == s.TenantId && o.EntityKey == "hr.survey-answer"
+            && (answerIds.Contains(o.RecordId) || o.RecordId == Guid.Empty)));
+
+        // Kimliği açık ankette cevap katılıma bağlıdır ve denetim satırı kişiseldir.
+        var namedAnswer = await db.Set<SurveyAnswer>().AsNoTracking().SingleAsync(a => a.SurveyId == named.Id);
+        var namedParticipation = await db.Set<SurveyResponse>().AsNoTracking().SingleAsync(r => r.SurveyId == named.Id);
+        Assert.Equal((namedParticipation.Id, namedParticipation.Id), (namedAnswer.ResponseId, namedAnswer.BallotId));
+        Assert.Contains(answerAudit, a => a.RecordId == namedAnswer.Id && a.UserId == s.Staff.Id);
+
+        // Sonuç sayımı pusulaya göre: kimliği gizli ankette yanıt az olduğu için sonuç gizli, açık ankette bir cevaplayan.
+        var namedResults = (await hr.GetFromJsonAsync<SurveyResultsDto>($"/api/hr/surveys/{named.Id}/results"))!;
+        Assert.Equal(1, Assert.Single(namedResults.Questions).AnswerCount);
+    }
+
     [Fact]
     public async Task Audience_permissions_and_tenants_are_enforced()
     {
@@ -209,6 +278,113 @@ public class HrSurveyTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         Assert.Equal(HttpStatusCode.NotFound, (await hrB.GetAsync($"/api/hr/surveys/{finance.Id}/results")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await PostResponseAsync(hrB, finance.Id, new SurveyAnswerItem(financeQuestion.Id, 3, null, null))).StatusCode);
         Assert.Equal(1, Number(await GetAsync(hrA, $"{Surveys}/{finance.Id}"), "responseCount"));
+    }
+
+    /// <summary>Bölüm 23b: çoklu seçim sorusu seçenek başına sayılır; sonuç CSV olarak (formül enjeksiyonuna karşı korumalı) indirilir.</summary>
+    [Fact]
+    public async Task Multi_choice_answers_are_counted_per_option_and_results_export_as_csv()
+    {
+        var s = await SetUpAsync();
+        using var hr = await LoginAsync(s.Hr);
+        using var staff = await LoginAsync(s.Staff);
+        using var colleague = await LoginAsync(s.Colleague);
+
+        var survey = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "İkram" });
+        var drinks = await QuestionAsync(hr, survey.Id, "Hangi içecekler olsun?", "multiChoice", "Kahve\nÇay\nSu", required: true);
+        var note = await QuestionAsync(hr, survey.Id, "Notunuz", "text", null, required: false);
+        await ActAsync(hr, survey.Id, "open");
+
+        await SubmitAsync(staff, survey.Id, new SurveyAnswerItem(drinks.Id, null, null, null, ["Kahve", "Çay"]));
+        await SubmitAsync(colleague, survey.Id,
+            new SurveyAnswerItem(drinks.Id, null, null, null, ["Çay"]), new SurveyAnswerItem(note.Id, null, null, "=1+1 çay demli olsun"));
+
+        var results = (await hr.GetFromJsonAsync<SurveyResultsDto>($"/api/hr/surveys/{survey.Id}/results"))!;
+        var counted = Assert.Single(results.Questions, q => q.QuestionId == drinks.Id);
+        Assert.Equal(2, counted.AnswerCount);
+        Assert.Equal([("Kahve", 1), ("Çay", 2), ("Su", 0)], counted.Counts.Select(c => (c.Option, c.Count)));
+
+        var export = await hr.GetAsync($"/api/hr/surveys/{survey.Id}/results/export");
+        Assert.Equal(HttpStatusCode.OK, export.StatusCode);
+        Assert.Equal("text/csv", export.Content.Headers.ContentType!.MediaType);
+        var bytes = await export.Content.ReadAsByteArrayAsync();
+        Assert.Equal(Encoding.UTF8.GetPreamble(), bytes[..3]);
+        var csv = Encoding.UTF8.GetString(bytes[3..]);
+        Assert.StartsWith("Sıra;Soru;Tür;Cevaplayan;Ortalama;Seçenek / puan;Sayı;Metin cevabı", csv);
+        Assert.Contains("1;Hangi içecekler olsun?;Çoklu seçim;2;;Çay;2;", csv);
+        Assert.Contains(";'=1+1 çay demli olsun", csv);
+        Assert.DoesNotContain(s.Staff.Email!, csv);
+    }
+
+    [Fact]
+    public async Task Multi_choice_answers_and_questions_are_validated()
+    {
+        var s = await SetUpAsync();
+        using var hr = await LoginAsync(s.Hr);
+        using var staff = await LoginAsync(s.Staff);
+
+        var survey = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "Doğrulama" });
+        var oneOption = await hr.PostAsJsonAsync(Questions, new RecordWriteRequest(Question(survey.Id, "Tek seçenek", "multiChoice", "Yalnız", required: true)));
+        Assert.True((await ValidationProblemAsync(oneOption)).Errors.ContainsKey("options"));
+        var question = await QuestionAsync(hr, survey.Id, "Hangileri?", "multiChoice", "A\nB\nC", required: true);
+        await ActAsync(hr, survey.Id, "open");
+
+        foreach (string[] choices in new[] { new[] { "A", "Z" }, ["A", "A"], [] })
+        {
+            var rejected = await PostResponseAsync(staff, survey.Id, new SurveyAnswerItem(question.Id, null, null, null, choices));
+            Assert.True((await ValidationProblemAsync(rejected)).Errors.ContainsKey($"answers.{question.Id}"));
+        }
+
+        Assert.Equal(0, Number(await GetAsync(hr, $"{Surveys}/{survey.Id}"), "responseCount"));
+    }
+
+    [Fact]
+    public async Task Result_export_needs_survey_management_stays_in_the_tenant_and_respects_the_anonymous_threshold()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var hr = await LoginAsync(a.Hr);
+        using var hrB = await LoginAsync(b.Hr);
+        using var staff = await LoginAsync(a.Staff);
+        using var colleague = await LoginAsync(a.Colleague);
+        using var outsider = await LoginAsync(a.Outsider);
+
+        var survey = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "Gizli nabız", ["isAnonymous"] = true });
+        var question = await QuestionAsync(hr, survey.Id, "Puanınız", "rating", null, required: true);
+        await ActAsync(hr, survey.Id, "open");
+        await SubmitAsync(staff, survey.Id, new SurveyAnswerItem(question.Id, 4, null, null));
+        await SubmitAsync(colleague, survey.Id, new SurveyAnswerItem(question.Id, 2, null, null));
+
+        var url = $"/api/hr/surveys/{survey.Id}/results/export";
+        Assert.Equal(HttpStatusCode.Conflict, (await hr.GetAsync(url)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(url)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await outsider.GetAsync(url)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await hrB.GetAsync(url)).StatusCode);
+    }
+
+    /// <summary>Bölüm 23c: kişiye hedeflenmiş anketi yalnızca o kişi görür ve yanıtlar; departman hedefiyle birlikte birleşim kuralı geçerlidir.</summary>
+    [Fact]
+    public async Task Surveys_targeted_at_people_are_only_available_to_them()
+    {
+        var s = await SetUpAsync();
+        using var hr = await LoginAsync(s.Hr);
+        using var staff = await LoginAsync(s.Staff);
+        using var colleague = await LoginAsync(s.Colleague);
+
+        var survey = await PostAsync(hr, Surveys, new JsonObject
+        {
+            ["title"] = "Yalnız Selin ve yönetim",
+            ["audienceBusinessUnitIds"] = new JsonArray(JsonValue.Create(s.Management.ToString())),
+            ["audienceUserIds"] = new JsonArray(JsonValue.Create(s.Colleague.Id.ToString())),
+        });
+        var question = await QuestionAsync(hr, survey.Id, "Puan", "rating", null, required: true);
+        await ActAsync(hr, survey.Id, "open");
+
+        Assert.Empty(await ListAsync(staff, Surveys, null));
+        Assert.Empty(await ListAsync(staff, Questions, $"surveyId={survey.Id}"));
+        Assert.Equal(HttpStatusCode.NotFound, (await PostResponseAsync(staff, survey.Id, new SurveyAnswerItem(question.Id, 3, null, null))).StatusCode);
+        Assert.Equal([survey.Id], (await ListAsync(colleague, Surveys, null)).Select(x => x.Id));
+        await SubmitAsync(colleague, survey.Id, new SurveyAnswerItem(question.Id, 3, null, null));
+        Assert.Equal(1, Number(await GetAsync(hr, $"{Surveys}/{survey.Id}"), "responseCount"));
     }
 
     // --- yardımcılar ---

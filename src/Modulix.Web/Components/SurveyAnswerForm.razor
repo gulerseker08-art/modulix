@@ -1,5 +1,5 @@
-@* Anket yanıt formu (ADR-0042 dilim 7). Sorular sunucudan gelir (yalnızca yanıt verilebilecek anketlerin soruları görünür); puan 1–5, tek seçim ya da
-   serbest metin. Zorunlu sorular, seçeneklerin geçerliliği ve tekrar yanıt sunucuda denetlenir; hatalı soru kendi altında gösterilir. Kimliği gizli
+@* Anket yanıt formu (ADR-0042 dilim 7). Sorular sunucudan gelir (yalnızca yanıt verilebilecek anketlerin soruları görünür); puan 1–5, tek seçim, çoklu seçim
+   (bölüm 23b) ya da serbest metin. Zorunlu sorular, seçeneklerin geçerliliği ve tekrar yanıt sunucuda denetlenir; hatalı soru kendi altında gösterilir. Kimliği gizli
    ankette okura sonuçlarda kimliğinin gösterilmeyeceği söylenir. *@
 @inject ApiClient Api
 
@@ -9,7 +9,7 @@
             <h2>@WarehouseLabels.Text(Survey, "title")</h2>
             @if (WarehouseLabels.Flag(Survey, "isAnonymous"))
             {
-                <p>Kimliği gizli anket: sonuçlarda kimin ne yanıtladığı gösterilmez.</p>
+                <p>Anonim anket: cevaplarınız kimliğinizle hiçbir yerde ilişkilendirilmez. Yalnızca anketi yanıtladığınız kaydedilir (ikinci kez yanıtlanmasın diye).</p>
             }
         </div>
         <div class="form-toolbar-actions">
@@ -70,6 +70,19 @@
                                         </div>
                                     }
                                     break;
+                                case "multiChoice":
+                                    var multiIndex = 0;
+                                    @foreach (var option in (WarehouseLabels.Text(question, "options") ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                                    {
+                                        var key = $"q-{id}-m{multiIndex++}";
+                                        <div class="form-check">
+                                            <input id="@key" class="form-check-input" type="checkbox" checked="@answers[id].Choices.Contains(option)"
+                                                   @onchange="e => Toggle(answers[id], option, e.Value is true)" />
+                                            <label class="form-check-label" for="@key">@option</label>
+                                        </div>
+                                    }
+                                    <small class="text-muted d-block">Birden çok seçenek işaretleyebilirsiniz.</small>
+                                    break;
                                 default:
                                     <label class="visually-hidden" for="@($"q-{id}-text")">Cevabınız</label>
                                     <textarea id="@($"q-{id}-text")" class="form-control" rows="3" maxlength="2000" @bind="answers[id].Text"></textarea>
@@ -114,8 +127,9 @@
         message = null;
         errors = null;
         var request = new SubmitSurveyRequest([.. answers
-            .Where(a => a.Value.Rating is not null || !string.IsNullOrWhiteSpace(a.Value.Choice) || !string.IsNullOrWhiteSpace(a.Value.Text))
-            .Select(a => new SurveyAnswerItem(a.Key, a.Value.Rating, a.Value.Choice, string.IsNullOrWhiteSpace(a.Value.Text) ? null : a.Value.Text.Trim()))]);
+            .Where(a => a.Value.Rating is not null || !string.IsNullOrWhiteSpace(a.Value.Choice) || !string.IsNullOrWhiteSpace(a.Value.Text) || a.Value.Choices.Count > 0)
+            .Select(a => new SurveyAnswerItem(a.Key, a.Value.Rating, a.Value.Choice, string.IsNullOrWhiteSpace(a.Value.Text) ? null : a.Value.Text.Trim(),
+                a.Value.Choices.Count > 0 ? [.. a.Value.Choices] : null))]);
         var result = await Api.PostAsync<RecordResponse>($"/api/hr/surveys/{Survey.Id}/responses", request);
         busy = false;
         if (result.IsSuccess)
@@ -128,8 +142,20 @@
         message = result.Error;
     }
 
+    private static void Toggle(Answer answer, string option, bool selected)
+    {
+        answer.Choices.Remove(option);
+        if (selected)
+        {
+            answer.Choices.Add(option);
+        }
+    }
+
     private sealed class Answer
     {
+        /// <summary>Çoklu seçim sorusunda işaretlenen seçenekler (işaretlenme sırasıyla).</summary>
+        public List<string> Choices { get; } = [];
+
         public int? Rating { get; set; }
 
         public string? Choice { get; set; }

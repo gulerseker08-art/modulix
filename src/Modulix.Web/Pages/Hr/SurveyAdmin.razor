@@ -74,7 +74,7 @@
                                         {
                                             <RowMenu Label="@($"{WarehouseLabels.Text(q, "text")} eylemleri")">
                                                 <button type="button" class="view-menu-item" role="menuitem" @onclick="() => { question = q; addingQuestion = false; }"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
-                                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteQuestionAsync(q)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                                <RowMenuDelete OnConfirm="() => DeleteQuestionAsync(q)" />
                                             </RowMenu>
                                         }
                                     </td>
@@ -143,7 +143,7 @@
                                 <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenAsync(survey)"><AppIcon Name="pencil" Size="16" /> <span>Aç</span></button>
                                 @if (WarehouseLabels.Number(survey, "responseCount") == 0)
                                 {
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteAsync(survey)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                                    <RowMenuDelete OnConfirm="() => DeleteAsync(survey)" />
                                 }
                             </RowMenu>
                         </td>
