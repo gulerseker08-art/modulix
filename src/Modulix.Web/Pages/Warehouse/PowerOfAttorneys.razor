@@ -52,7 +52,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">@Texts.Get("warehouse.powerOfAttorneys.empty")</p>
+        <EmptyState Compact="true" Title="@Texts.Get("warehouse.powerOfAttorneys.empty")" />
     }
     else
     {

@@ -99,7 +99,7 @@
                 </div>
                 @if (day.ClosingThisMonth.Count == 0)
                 {
-                    <p class="text-muted mb-0">Beklenen kapanışı bu ay olan açık fırsatınız yok.</p>
+                    <EmptyState Compact="true" Title="Beklenen kapanışı bu ay olan açık fırsatınız yok." />
                 }
                 else
                 {

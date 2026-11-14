@@ -36,7 +36,7 @@
             </div>
             @if (items is null || items.Count == 0)
             {
-                <p class="text-muted" role="status">Henüz adım yok. Süreç başlatmak için en az bir adım ekleyin.</p>
+                <EmptyState Compact="true" Title="Henüz adım yok." Text="Süreç başlatmak için en az bir adım ekleyin." />
             }
             else
             {
@@ -97,7 +97,7 @@
     }
     else if (templates.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu görünüme uyan şablon yok.</p>
+        <EmptyState Compact="true" Title="Bu görünüme uyan şablon yok." />
     }
     else
     {

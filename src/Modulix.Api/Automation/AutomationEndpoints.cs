@@ -110,8 +110,15 @@ public static class AutomationEndpoints
     private static void MapRunEndpoints(RouteGroupBuilder group)
     {
         group.MapGet("/runs", async (
-            Guid? ruleId, string? status, Guid? recordId, int? page, int? pageSize, IAutomationRunService service, CancellationToken ct) =>
+            Guid? ruleId, string? status, Guid? recordId, int? page, int? pageSize, string? sort, IAutomationRunService service, CancellationToken ct) =>
         {
+            // Başlığa göre sıralama (ADR-0036): yalnızca bilinen anahtarlar kabul edilir.
+            if (!string.IsNullOrEmpty(sort) && !AutomationRunQuery.SortKeys.Contains(sort))
+            {
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]> { ["sort"] = ["Geçersiz sıralama."] }, statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+
             AutomationRunStatus? parsed = null;
             if (!string.IsNullOrWhiteSpace(status))
             {
@@ -125,7 +132,7 @@ public static class AutomationEndpoints
                 parsed = value;
             }
 
-            var result = await service.ListAsync(new AutomationRunQuery(ruleId, parsed, recordId, page ?? 1, pageSize ?? 50), ct);
+            var result = await service.ListAsync(new AutomationRunQuery(ruleId, parsed, recordId, page ?? 1, pageSize ?? 50, string.IsNullOrEmpty(sort) ? null : sort), ct);
             return Results.Ok(new AutomationRunPageDto([.. result.Items.Select(ToDto)], result.Page, result.PageSize, result.TotalCount));
         }).RequirePermission(CoreModule.Permissions.ReadAutomationLogs);
 

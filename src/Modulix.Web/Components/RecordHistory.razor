@@ -16,7 +16,7 @@
     }
     else if (entries.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("common.history.none")</p>
+        <EmptyState Compact="true" Title="@Texts.Get("common.history.none")" />
     }
     else
     {

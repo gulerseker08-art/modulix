@@ -22,7 +22,13 @@ public sealed record EventDeliveryQuery(
     DateTimeOffset? From = null,
     DateTimeOffset? To = null,
     int Page = 1,
-    int PageSize = 50);
+    int PageSize = 50,
+    string? Sort = null)
+{
+    /// <summary>Başlığa göre sıralama anahtarları (ADR-0036); boşsa en yeni önce.</summary>
+    public static readonly IReadOnlyCollection<string> SortKeys =
+        ["createdAt", "-createdAt", "tenant", "-tenant", "subscription", "-subscription", "attemptCount", "-attemptCount"];
+}
 
 /// <summary>
 /// Bir teslim; payload ve alan değeri içermez. <see cref="HoldingBack"/>: başarısız sıralı teslimin beklettiği (aynı

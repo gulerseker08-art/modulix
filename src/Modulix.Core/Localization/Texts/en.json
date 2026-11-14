@@ -2,6 +2,8 @@
   "common.save": "Save",
   "common.saved": "Saved.",
   "common.deleted": "Deleted.",
+  "common.confirm.deleteOf": "Delete \"{0}\"?",
+  "common.confirm.cancel": "Keep",
   "common.email": "Email",
   "common.password": "Password",
   "common.loading": "Loading…",
@@ -101,6 +103,8 @@
 
   "home.title": "Welcome",
   "home.greeting": "Welcome, {0}",
+  "home.trend.label": "new in the last 30 days",
+  "home.trend.detail": "{0} new records in the last 30 days; {1} in the 30 days before.",
   "home.noModule": "No modules are enabled for your organization.",
   "home.funnel.title": "Sales funnel",
   "home.funnel.chart": "Number of opportunities in each stage",

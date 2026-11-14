@@ -1,0 +1,1248 @@
+/* Breadcrumb (konum izi): "CRM / Satış / Teklifler"; ayırıcı CSS ile eklenir, ekran okuyucuya listeyi bozmaz. */
+.page-breadcrumb {
+    margin-bottom: var(--mx-space-3);
+    font-size: var(--mx-fs-body);
+}
+
+    .page-breadcrumb ol {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--mx-space-1) var(--mx-space-2);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        color: var(--mx-text-secondary);
+    }
+
+    .page-breadcrumb li + li::before {
+        content: "/";
+        margin-right: var(--mx-space-2);
+        color: var(--mx-text-secondary);
+    }
+
+    .page-breadcrumb a {
+        color: var(--mx-text-secondary);
+        text-decoration: none;
+    }
+
+        .page-breadcrumb a:hover {
+            color: var(--mx-text-primary);
+            text-decoration: underline;
+        }
+
+    .page-breadcrumb [aria-current="page"] {
+        color: var(--mx-text-primary);
+        font-weight: 600;
+    }
+
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mx-space-3) var(--mx-space-4);
+    margin-bottom: var(--mx-space-5);
+}
+
+    .page-header h1 {
+        margin: 0;
+    }
+
+    /* Standart PageHeader düzeni: [ikon] başlık + açıklama | aksiyonlar */
+    .page-header .page-heading {
+        display: flex;
+        align-items: center;
+        gap: var(--mx-space-4);
+        min-width: 0;
+    }
+
+    /* Sayfa ikonu (12.11.2026 görsel kararı): daha büyük, yumuşak marka→turkuaz zeminli yuvarlak kutu. */
+    .page-header .page-icon {
+        display: inline-grid;
+        place-items: center;
+        flex: none;
+        width: 3.5rem;
+        height: 3.5rem;
+        border-radius: var(--mx-radius-card);
+        background: linear-gradient(135deg, var(--mx-tone-brand-bg), var(--mx-tone-teal-bg));
+        color: var(--mx-brand-primary);
+    }
+
+    .page-header .page-subtitle {
+        margin: var(--mx-space-1) 0 0;
+        color: var(--mx-text-secondary);
+        font-size: var(--mx-fs-body);
+    }
+
+    .page-header .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--mx-space-2);
+    }
+
+/* Breadcrumb */
+.breadcrumb-trail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-2);
+    margin: 0 0 var(--mx-space-2);
+    padding: 0;
+    list-style: none;
+    font-size: var(--mx-fs-label);
+    color: var(--mx-text-secondary);
+}
+
+    .breadcrumb-trail li + li::before {
+        content: "›";
+        margin-right: var(--mx-space-2);
+        color: var(--mx-border-strong);
+    }
+
+    .breadcrumb-trail a {
+        color: var(--mx-text-secondary);
+        text-decoration: none;
+    }
+
+        .breadcrumb-trail a:hover {
+            color: var(--mx-brand-primary);
+        }
+
+.record-form {
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    padding: var(--mx-space-6);
+    margin-bottom: 1.5rem;
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+}
+
+    .record-form h2 {
+        font-size: 1.15rem;
+        margin-bottom: 1rem;
+    }
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem 1rem;
+}
+
+.form-check-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+}
+
+.form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.search {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+    /* Arama kutusuna büyüteç simgesi */
+    .search .form-control {
+        padding-left: 2.5rem;
+        background: var(--mx-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 0.9rem center;
+        border-radius: 999px;
+    }
+
+.pager {
+    margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.nav-section {
+    color: var(--mx-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding-top: 1rem;
+}
+
+.session-info {
+    margin-right: auto;
+    max-width: 60%;
+}
+
+.tiles {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1.25rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+    .tile strong {
+        font-size: 1.1rem;
+    }
+
+    .tile span {
+        color: var(--bs-secondary-color);
+        font-size: 0.875rem;
+    }
+
+    /* Kartın altındaki ok düğmesi */
+    .tile::after {
+        content: "→";
+        display: grid;
+        place-items: center;
+        width: 3rem;
+        height: 2rem;
+        margin-top: auto;
+        border-radius: 999px;
+        background: var(--mx-lilac);
+        color: var(--mx-indigo);
+        font-weight: 700;
+    }
+
+    .tile:nth-child(even)::after {
+        background: var(--mx-tone-success-bg);
+        color: var(--mx-teal);
+    }
+
+    .tile:hover {
+        border-color: rgba(var(--mx-indigo-rgb), 0.4);
+        transform: translateY(-2px);
+        box-shadow: var(--mx-shadow-raised);
+    }
+
+    /* Henüz yapılmamış ekranın kartı: tıklanmaz, "Yakında" etiketi taşır. */
+    .tile.is-soon {
+        cursor: default;
+        opacity: 0.7;
+    }
+
+        .tile.is-soon::after {
+            content: "Yakında";
+            width: auto;
+            padding: 0 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        .tile.is-soon:hover {
+            border-color: var(--mx-border);
+            transform: none;
+            box-shadow: none;
+        }
+
+.table {
+    --bs-table-bg: var(--mx-surface);
+}
+
+.list-group-item.active {
+    background-color: var(--mx-indigo);
+    border-color: var(--mx-indigo);
+}
+
+.badge {
+    background: var(--mx-tone-brand-bg);
+    color: var(--mx-tone-brand-fg);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+    line-height: 1.2;
+    border-radius: var(--mx-radius-badge);
+    padding: 0.35em 0.65em;
+}
+
+    /* Fırsat aşamaları: soğuk adaylardan kazanılana doğru */
+    .badge.stage-lead {
+        background: var(--mx-tone-neutral-bg);
+        color: var(--mx-tone-neutral-fg);
+    }
+
+    .badge.stage-qualified {
+        background: var(--mx-tone-brand-bg);
+        color: var(--mx-tone-brand-fg);
+    }
+
+    .badge.stage-proposal {
+        background: var(--mx-tone-info-bg);
+        color: var(--mx-tone-info-fg);
+    }
+
+    .badge.stage-negotiation {
+        background: var(--mx-tone-warning-bg);
+        color: var(--mx-tone-warning-fg);
+    }
+
+    .badge.stage-won {
+        background: var(--mx-tone-success-bg);
+        color: var(--mx-tone-success-fg);
+    }
+
+    .badge.stage-lost {
+        background: var(--mx-tone-danger-bg);
+        color: var(--mx-tone-danger-fg);
+    }
+
+    /* Fırsat durumları (ADR-0017): beklemede ve iptal edildi kapanış aşaması değildir */
+    .badge.stage-onhold {
+        background: var(--mx-tone-warning-bg);
+        color: var(--mx-tone-warning-fg);
+    }
+
+    .badge.stage-cancelled {
+        background: var(--mx-tone-neutral-bg);
+        color: var(--mx-tone-neutral-fg);
+        text-decoration: line-through;
+    }
+
+    .badge.stage-open {
+        background: var(--mx-tone-brand-bg);
+        color: var(--mx-tone-brand-fg);
+    }
+
+tr.done td.primary {
+    text-decoration: line-through;
+    color: var(--bs-secondary-color);
+}
+
+/* Telefonda tablo kart listesine döner; her hücre etiketini data-label'dan alır. */
+@media (max-width: 767.98px) {
+    .record-table thead {
+        display: none;
+    }
+
+    .record-table, .record-table tbody, .record-table tr, .record-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .record-table tr {
+        border: 1px solid var(--bs-border-color);
+        border-radius: var(--mx-radius);
+        background: var(--mx-surface);
+        margin-bottom: 0.75rem;
+        padding: 0.5rem 0.75rem;
+    }
+
+    .record-table td {
+        border: 0;
+        padding: 0.25rem 0;
+        text-align: left !important;
+    }
+
+        .record-table td[data-label]:not(.primary):not(:empty)::before {
+            content: attr(data-label) ": ";
+            color: var(--bs-secondary-color);
+        }
+
+        .record-table td[data-label]:empty {
+            display: none;
+        }
+
+        .record-table td.primary {
+            font-weight: 600;
+        }
+
+        .record-table td.actions:not(:empty) {
+            padding-top: 0.5rem;
+        }
+
+        .record-table .row-menu-cell {
+            border-left: 0;
+        }
+}
+
+@media (min-width: 768px) {
+    /* 12 kolonlu form ızgarası: alanlar span-3/4/6/8/12 ile genişlik alır; sınıfsız alan tablette 2, masaüstünde 3 kolona böler. */
+    .form-grid {
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+        .form-grid > *,
+        .form-grid > .span-3,
+        .form-grid > .span-4,
+        .form-grid > .span-6 {
+            grid-column: span 6;
+        }
+
+        .form-grid > .span-8,
+        .form-grid > .span-12,
+        .form-grid .span-all {
+            grid-column: 1 / -1;
+        }
+
+    .tiles {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .record-table {
+        background: var(--mx-surface);
+        border: 1px solid var(--mx-border);
+        border-collapse: separate;
+        border-spacing: 0;
+        border-radius: var(--mx-radius-card);
+        box-shadow: var(--mx-shadow);
+    }
+
+        /* Köşeler hücrelerde yuvarlanır (overflow:hidden yok): satır menüsü ("⋯") tablonun dışına taşabilir. */
+        .record-table > thead > tr:first-child > :first-child { border-top-left-radius: calc(var(--mx-radius-card) - 1px); }
+        .record-table > thead > tr:first-child > :last-child { border-top-right-radius: calc(var(--mx-radius-card) - 1px); }
+        .record-table > tbody > tr:last-child > :first-child { border-bottom-left-radius: calc(var(--mx-radius-card) - 1px); }
+        .record-table > tbody > tr:last-child > :last-child { border-bottom-right-radius: calc(var(--mx-radius-card) - 1px); }
+
+        .record-table > :not(caption) > * > * {
+            padding: var(--mx-space-2) var(--mx-space-4);
+            vertical-align: middle;
+        }
+
+        .record-table tbody tr:hover > * {
+            background: var(--mx-surface-hover);
+        }
+
+        .record-table tbody tr:last-child > * {
+            border-bottom: 0;
+        }
+
+        /* Başlık: dolgulu ince bant, cümle yazımı, kalın, ikincil renk; sütun türü ikonu SortHeader'ın ColumnIcon'uyla gelir. */
+        .record-table thead th {
+            background: var(--mx-surface-hover);
+            color: var(--mx-text-secondary);
+            font-size: var(--mx-fs-helper);
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .record-table thead th .sort-button .app-icon:first-child,
+        .record-table thead th .th-label .app-icon:first-child {
+            color: var(--mx-text-secondary);
+            opacity: 1;
+        }
+
+        .record-table thead th .sort-button.active .app-icon:first-child {
+            color: inherit;
+        }
+
+        .th-label {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--mx-space-1);
+        }
+
+        /* Satır menüsü ("⋯") sütunu: dar, solunda ayırıcı çizgi (RowMenu). */
+        .record-table .row-menu-cell {
+            width: 3.25rem;
+            padding-left: 0;
+            padding-right: 0;
+            border-left: 1px solid var(--mx-border);
+            text-align: center;
+        }
+
+        /* Satır 44 px: yüksekliği düğmeler değil bu kural belirler; düğmeli hücrelerde dikey dolgu azalır. */
+        .record-table td {
+            height: 2.75rem;
+            font-size: var(--mx-fs-table);
+        }
+
+        .record-table > tbody > tr > td.actions,
+        .record-table > tbody > tr > td.row-menu-cell {
+            padding-top: var(--mx-space-1);
+            padding-bottom: var(--mx-space-1);
+        }
+
+        .record-table .avatar {
+            width: 1.5rem;
+            height: 1.5rem;
+            font-size: 0.625rem;
+        }
+
+        .record-table .badge {
+            padding: 0.2em 0.6em;
+        }
+
+        /* Kayıt bağlantısı: alt çizgisiz, yarı kalın; çizgi üzerine gelince görünür. */
+        .record-table td.primary a {
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+            .record-table td.primary a:hover {
+                text-decoration: underline;
+            }
+
+    .record-table td.actions {
+        text-align: right;
+        white-space: nowrap;
+    }
+}
+
+/* Fareyle kullanımda "⋯" düğmesi satırı büyütmez; dokunmatikte 44 px hedef korunur. */
+@media (min-width: 768px) and (not (pointer: coarse)) {
+    .record-table .row-menu-button {
+        min-height: 2rem;
+    }
+}
+
+@media (min-width: 1200px) {
+    .form-grid > * {
+        grid-column: span 4;
+    }
+
+    .form-grid > .span-3 { grid-column: span 3; }
+    .form-grid > .span-4 { grid-column: span 4; }
+    .form-grid > .span-6 { grid-column: span 6; }
+    .form-grid > .span-8 { grid-column: span 8; }
+    .form-grid > .span-12, .form-grid .span-all { grid-column: 1 / -1; }
+
+    .tiles {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767.98px) {
+    .pager .pager-info {
+        order: -1;
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* ---- CRM: filtreler, firma detayı, satış hunisi ---- */
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+    /* Süzgeç satırındaki alanlar yan yana durur (Bootstrap'ın tam genişliği yerine); dar ekranda alt satıra kayar. */
+    .filters > .form-control,
+    .filters > .form-select {
+        flex: 1 1 11rem;
+        width: auto;
+        max-width: 18rem;
+    }
+
+    .filters > input[type="search"].form-control {
+        flex-basis: 14rem;
+        max-width: 22rem;
+    }
+
+@media (max-width: 575.98px) {
+    .filters > .form-control,
+    .filters > .form-select {
+        max-width: none;
+    }
+}
+
+.segmented {
+    display: inline-flex;
+    gap: 0.25rem;
+    padding: 0.2rem;
+    border-radius: var(--mx-radius-button);
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-border);
+}
+
+    .segmented .chip {
+        border: 0;
+    }
+
+.chip {
+    min-height: 36px;
+    padding: 0.35rem 0.9rem;
+    border: 1px solid var(--mx-border);
+    border-radius: 999px;
+    background: var(--mx-surface);
+    color: var(--mx-ink);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+    .chip:hover {
+        background: var(--mx-surface-muted);
+        border-color: var(--mx-border-strong);
+    }
+
+    .chip.active {
+        background: var(--mx-gradient-brand);
+        border-color: transparent;
+        color: var(--mx-text-on-brand);
+    }
+
+/* ---- Liste araç çubuğu ve görünüm seçici (ViewSelector): solda "Görünüm: … ▾", sağda arama + eylemler ---- */
+.list-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-2);
+    margin: var(--mx-space-4) 0 var(--mx-space-3);
+}
+
+    /* Arama kutusu seçicinin sağına yaslanır; sonraki eylemler (Filtrele, Sütunlar, birincil) onu izler. */
+    .list-toolbar > .search {
+        flex: 0 1 22rem;
+        margin: 0 0 0 auto;
+    }
+
+    .list-toolbar > .search .form-control {
+        min-width: 0;
+    }
+
+/* Görünümler sekmelerdeyse (ViewTabs) araç çubuğu aramayla başlar: arama soldan genişler, eylemler sağda kalır. */
+.list-toolbar > .search:first-child {
+    flex: 1 1 22rem;
+    margin-left: 0;
+}
+
+.list-toolbar-spacer {
+    flex: 1 1 auto;
+}
+
+/* Araç çubuğu düğmeleri (Filtrele, Sütunlar; 12.11.2026 görsel kararı): beyaz yüzey, ince çerçeve, sonunda açılır ok. */
+.list-toolbar .btn-ghost {
+    --bs-btn-bg: var(--mx-surface);
+    --bs-btn-border-color: var(--mx-border);
+    --bs-btn-hover-bg: var(--mx-surface-hover);
+    --bs-btn-hover-border-color: var(--mx-border-strong);
+    --bs-btn-active-bg: var(--mx-surface-hover);
+    --bs-btn-active-border-color: var(--mx-border-strong);
+    box-shadow: var(--mx-shadow-control);
+}
+
+    .list-toolbar .btn-ghost .toolbar-chevron {
+        margin-left: var(--mx-space-1);
+        color: var(--mx-text-secondary);
+    }
+
+.view-selector,
+.row-menu {
+    position: relative;
+}
+
+.row-menu {
+    display: inline-block;
+}
+
+.row-menu-button {
+    padding: 0.25rem 0.5rem;
+}
+
+/* Satır menüsü sağa yaslanır (tablonun sağ kenarında taşmaz). */
+.view-menu.row-menu-list {
+    left: auto;
+    right: 0;
+    width: max-content;
+    min-width: 11rem;
+    text-align: left;
+}
+
+.row-menu-list .view-menu-item {
+    justify-content: flex-start;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.view-selector-button {
+    gap: var(--mx-space-2);
+}
+
+.view-selector-prefix {
+    color: var(--mx-text-secondary);
+    font-weight: 600;
+}
+
+/* Menü dışına tıklama: görünmez tam ekran katman menüyü kapatır. */
+.view-selector-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+}
+
+.view-menu {
+    position: absolute;
+    z-index: 1050;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 16rem;
+    max-width: min(24rem, 90vw);
+    padding: var(--mx-space-2);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow-popover);
+}
+
+.view-menu-group {
+    padding: var(--mx-space-2) var(--mx-space-3) var(--mx-space-1);
+    color: var(--mx-text-secondary);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.view-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mx-space-2);
+    width: 100%;
+    min-height: 2.5rem;
+    padding: var(--mx-space-2) var(--mx-space-3);
+    border: 0;
+    border-radius: var(--mx-radius-input);
+    background: transparent;
+    color: var(--mx-text-primary);
+    font-weight: 500;
+    text-align: left;
+}
+
+    .view-menu-item:hover {
+        background: var(--mx-surface-hover);
+    }
+
+    /* Seçili görünüm: renk + kalın yazı + onay işareti (yalnızca renkle anlatılmaz). */
+    .view-menu-item.selected {
+        background: var(--mx-nav-active-bg);
+        color: var(--mx-tone-brand-fg);
+        font-weight: 700;
+    }
+
+    /* Yıkıcı menü öğesi (Sil): renk + çöp ikonu; menünün son öğesidir. */
+    .view-menu-item.is-danger {
+        color: var(--mx-danger-text);
+    }
+
+        .view-menu-item.is-danger:hover {
+            background: var(--mx-tone-danger-bg);
+        }
+
+    .view-menu-item:disabled {
+        opacity: 0.55;
+    }
+
+    .view-menu-item.view-menu-new {
+        justify-content: flex-start;
+        font-weight: 600;
+    }
+
+.view-menu-divider {
+    height: 1px;
+    margin: var(--mx-space-2) var(--mx-space-1);
+    background: var(--mx-border);
+}
+
+/* Sayfalama: "1–8 / 24 kayıt" solda, sayfa numaraları sağda */
+.pager-pages {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-1);
+}
+
+.pager-btn {
+    display: inline-grid;
+    place-items: center;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    padding: 0 var(--mx-space-2);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-surface);
+    color: var(--mx-text-primary);
+    font-weight: 600;
+}
+
+    .pager-btn:hover:not(:disabled) {
+        background: var(--mx-surface-muted);
+    }
+
+    .pager-btn:disabled {
+        color: var(--mx-text-secondary);
+        opacity: 0.55;
+    }
+
+    /* Geçerli sayfa: degrade + beyaz ("disabled" olsa da tam opaklıkla okunur). */
+    .pager-btn.active {
+        border-color: transparent;
+        background: var(--mx-gradient-brand);
+        color: var(--mx-text-on-brand);
+        opacity: 1;
+    }
+
+.pager-gap {
+    padding: 0 var(--mx-space-1);
+    color: var(--mx-text-secondary);
+}
+
+/* Sütunlar menüsü (GridColumnPicker) ve etkin süzgeç sayısı rozeti */
+.column-menu {
+    min-width: 14rem;
+}
+
+.column-item {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-3);
+    padding: var(--mx-space-2) var(--mx-space-3);
+    border-radius: var(--mx-radius-input);
+    font-weight: 500;
+}
+
+    .column-item:hover {
+        background: var(--mx-surface-hover);
+    }
+
+/* Sütun menüsü satırı (GridColumnPicker): onay kutusu + ikon + ad, sağda yukarı/aşağı taşıma. */
+.view-menu.column-menu {
+    right: 0;
+    left: auto;
+    min-width: 18rem;
+}
+
+.column-row {
+    padding-right: var(--mx-space-1);
+}
+
+.column-check {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--mx-space-2);
+    margin: 0;
+    cursor: pointer;
+}
+
+    .column-check .app-icon {
+        color: var(--mx-text-secondary);
+    }
+
+.column-row .btn-sm {
+    padding: 0.15rem 0.35rem;
+}
+
+/* Kişisel görünüm şeridi (PersonalViewBar): kaydedilmemiş değişiklik uyarısı, ad girişi, kişisel görünüm notu. */
+.view-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-2);
+    margin: 0 0 var(--mx-space-3);
+    padding: var(--mx-space-2) var(--mx-space-3);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-tone-warning-bg);
+    color: var(--mx-tone-warning-fg);
+}
+
+.view-bar-note {
+    padding-left: 0;
+    padding-right: 0;
+    background: transparent;
+    color: var(--mx-text-secondary);
+}
+
+.view-bar-text {
+    font-size: var(--mx-fs-helper);
+    font-weight: 600;
+}
+
+.view-bar-input {
+    width: 14rem;
+}
+
+.view-bar-error {
+    padding: 0 var(--mx-space-2);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-tone-danger-bg);
+    color: var(--mx-tone-danger-fg);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+}
+
+.filter-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--mx-gradient-brand);
+    color: var(--mx-text-on-brand);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+}
+
+/* Sıralanabilir başlık (SortHeader): başlık metni + yön oku; etkin sütun koyu ve renkli. */
+.sort-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-1);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    text-align: left;
+}
+
+    .sort-button .app-icon {
+        opacity: 0.55;
+    }
+
+    .sort-button:hover,
+    .sort-button.active {
+        color: var(--mx-tone-brand-fg);
+    }
+
+        .sort-button:hover .app-icon,
+        .sort-button.active .app-icon {
+            opacity: 1;
+        }
+
+/* Sayfa boyutu seçici ve sorumlu avatarı (OwnerCell) */
+.pager-size {
+    width: auto;
+    min-height: 2.25rem;
+    margin-left: auto;
+}
+
+.owner-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-2);
+}
+
+.avatar {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    font-size: 0.6875rem;
+    font-weight: 700;
+}
+
+.avatar-tone-0 { background: var(--mx-tone-brand-bg); color: var(--mx-tone-brand-fg); }
+.avatar-tone-1 { background: var(--mx-tone-teal-bg); color: var(--mx-tone-teal-fg); }
+.avatar-tone-2 { background: var(--mx-tone-violet-bg); color: var(--mx-tone-violet-fg); }
+.avatar-tone-3 { background: var(--mx-tone-warning-bg); color: var(--mx-tone-warning-fg); }
+.avatar-tone-4 { background: var(--mx-tone-success-bg); color: var(--mx-tone-success-fg); }
+
+/* Satır eylemleri: ikincil (beyaz çerçeveli) düğme tabloda yumuşak görünür; birincil/yıkıcı zaten global yumuşaktır. */
+.record-table td.actions .btn-outline-secondary {
+    --bs-btn-color: var(--mx-tone-brand-fg);
+    --bs-btn-bg: var(--mx-tone-brand-bg);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-tone-brand-fg);
+    --bs-btn-hover-bg: var(--mx-tone-info-bg);
+    --bs-btn-hover-border-color: transparent;
+    box-shadow: none;
+}
+
+@media (max-width: 575.98px) {
+    .list-toolbar > .search {
+        flex: 1 1 100%;
+        margin-left: 0;
+    }
+}
+
+.badge.status-prospect {
+    background: var(--mx-tone-warning-bg);
+    color: var(--mx-tone-warning-fg);
+}
+
+.badge.status-customer {
+    background: var(--mx-tone-success-bg);
+    color: var(--mx-tone-success-fg);
+}
+
+.badge.status-inactive {
+    background: var(--mx-tone-neutral-bg);
+    color: var(--mx-tone-neutral-fg);
+}
+
+.badge.tag {
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-border);
+    font-weight: 500;
+}
+
+.back-link {
+    display: inline-block;
+    margin-bottom: 0.75rem;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.header-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.4rem;
+}
+
+.summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.summary-item {
+    display: flex;
+    flex-direction: column;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+}
+
+    .summary-item span {
+        color: var(--mx-muted);
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .summary-item strong {
+        font-size: var(--mx-fs-kpi);
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+
+    .summary-item small {
+        color: var(--mx-muted);
+        min-height: 1.2em;
+    }
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem 1rem;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+}
+
+    .detail-grid dt {
+        color: var(--mx-muted);
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .detail-grid dd {
+        margin: 0;
+        min-height: 1.5em;
+        overflow-wrap: anywhere;
+    }
+
+    .detail-grid .notes {
+        white-space: pre-line;
+    }
+
+.detail-section {
+    margin-bottom: 1.5rem;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+    .section-header h2 {
+        font-size: 1.15rem;
+        margin: 0;
+    }
+
+.item-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+}
+
+    .item-list li {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.65rem 1rem;
+        border-bottom: 1px solid var(--mx-border);
+    }
+
+        .item-list li:last-child {
+            border-bottom: 0;
+        }
+
+.item-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+    .item-main span {
+        color: var(--mx-muted);
+        font-size: 0.875rem;
+    }
+
+.btn.check {
+    width: 36px;
+    padding: 0;
+    border-radius: 999px;
+    flex: none;
+}
+
+li.done .item-main strong {
+    text-decoration: line-through;
+    color: var(--mx-muted);
+}
+
+li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
+    color: var(--mx-danger-text);
+    font-weight: 600;
+}
+
+.board-hint {
+    margin-bottom: 0.5rem;
+}
+
+/* Telefonda sütunlar yan yana kaydırılır; masaüstünde altı aşama tek satıra sığar. */
+.board {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(16rem, 85vw);
+    gap: 0.75rem;
+    overflow-x: auto;
+    padding-bottom: 0.75rem;
+    scroll-snap-type: x mandatory;
+}
+
+.board-column {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface-muted);
+    scroll-snap-align: start;
+    min-height: 10rem;
+}
+
+    .board-column.drop {
+        outline: 2px dashed var(--mx-indigo);
+    }
+
+    .board-column header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+        .board-column header .count {
+            font-weight: 700;
+        }
+
+        .board-column header small {
+            width: 100%;
+            color: var(--mx-muted);
+        }
+
+.board-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.75rem;
+    border: 1px solid var(--mx-border);
+    border-radius: 0.625rem;
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+    cursor: grab;
+}
+
+    .board-card span, .board-card a {
+        font-size: 0.875rem;
+    }
+
+    .board-card .owner {
+        color: var(--mx-muted);
+    }
+
+.card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.35rem;
+}
+
+    .card-actions .form-select {
+        flex: 1;
+        min-width: 0;
+        min-height: 36px;
+    }
+
+.check-cell {
+    width: 3rem;
+}
+
+@media (max-width: 767.98px) {
+    .record-table td.check-cell:empty {
+        display: none;
+    }
+}
+
+@media (min-width: 768px) {
+    .detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+        .detail-grid .span-all {
+            grid-column: 1 / -1;
+        }
+
+    .board {
+        grid-auto-columns: minmax(15rem, 1fr);
+    }
+}
+
+@media (min-width: 1200px) {
+    .detail-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .board {
+        grid-auto-columns: minmax(12rem, 1fr);
+    }
+}
