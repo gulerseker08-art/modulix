@@ -70,7 +70,7 @@ public partial class HrAutomationTests
     {
         var definition = Catalog.FindAutomationAction(HrAutomation.StartChecklist)!.Value.Action.Definition;
 
-        Assert.Equal([HrModule.Permissions.ChecklistsManage], definition.RequiredPermissions);
+        Assert.Equal([HrModule.Permissions.ChecklistsRead, HrModule.Permissions.ChecklistsManage], definition.RequiredPermissions);
         Assert.Equal([HrModule.ModuleKey], definition.RequiredModules);
         Assert.Equal(AutomationSideEffect.Write, definition.SideEffect);
         Assert.True(definition.SupportsDryRun);

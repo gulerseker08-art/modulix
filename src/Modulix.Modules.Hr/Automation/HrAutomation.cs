@@ -203,7 +203,8 @@ public static class HrAutomation
                         Description = "Görev son tarihleri buna göre hesaplanır. Çalışanın işe giriş ya da ayrılış tarihine bağlanabilir; boşsa bugün.",
                     },
                 ],
-                [HrModule.Permissions.ChecklistsManage],
+                // Kural kimliği yalnızca beyan edilen izinleri taşır: şablonu ve açık süreci okumak için okuma izni de gerekir.
+                [HrModule.Permissions.ChecklistsRead, HrModule.Permissions.ChecklistsManage],
                 [HrModule.ModuleKey],
                 AutomationSideEffect.Write,
                 SupportsDryRun: true)),
