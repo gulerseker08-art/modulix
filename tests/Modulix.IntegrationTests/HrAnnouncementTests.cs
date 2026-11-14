@@ -194,7 +194,7 @@ public class HrAnnouncementTests(ModulixApiFactory factory) : IClassFixture<Modu
             Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsync(Files, form)).StatusCode);
         }
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await staff.DeleteAsync($"{Files}/{plan.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.DeleteAsync($"{Files}/{plan.Id}?version={plan.Version}")).StatusCode);
         Assert.NotEqual(HttpStatusCode.OK, (await outsider.GetAsync($"{Files}/{plan.Id}/content")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await hrB.GetAsync($"{Files}/{plan.Id}/content")).StatusCode);
 

@@ -183,7 +183,8 @@ internal static class HrAudience
 internal sealed class AudienceFields<T>(HrStoreContext context, Action<T> clearUnitColumn, Action<T> clearLegacyKey)
     where T : HrEntity, IAudienceContent
 {
-    private Dictionary<Guid, AudienceSet> audiences = [];
+    private readonly Dictionary<Guid, AudienceSet> audiences = [];
+    private readonly HashSet<Guid> written = [];
     private Dictionary<Guid, string> unitNames = [];
     private Guid? single;
     private IReadOnlyList<Guid>? units;
@@ -200,7 +201,8 @@ internal sealed class AudienceFields<T>(HrStoreContext context, Action<T> clearU
 
     public async Task PrepareAsync(IReadOnlyCollection<T> entities, CancellationToken cancellationToken)
     {
-        foreach (var (id, audience) in await HrAudience.LoadAsync(context, entities, cancellationToken))
+        // Bu istekte yazılan hedefler henüz kaydedilmemiştir (veritabanından okunursa boş gelir); yazılan küme geçerlidir.
+        foreach (var (id, audience) in await HrAudience.LoadAsync(context, [.. entities.Where(e => !written.Contains(e.Id))], cancellationToken))
         {
             audiences[id] = audience;
         }
@@ -238,6 +240,7 @@ internal sealed class AudienceFields<T>(HrStoreContext context, Action<T> clearU
         }
 
         audiences[entity.Id] = audience;
+        written.Add(entity.Id);
         await LoadNamesAsync(cancellationToken);
     }
 
