@@ -1,8 +1,10 @@
 @* Sevkiyatın teslimi ve teslim kanıtları (ADR-0038 K8, dilim 6). Yoldaki sevkiyatta "Teslimi kaydet" formu görünür: sonuç (teslim edildi, kısmi teslim,
    teslim edilemedi), teslim alan, hasar / eksik işareti, neden ve not. Zaman sunucuda verilir. Kayıt değişmezdir; düzeltme için sevkiyat kapanmadan
-   yeni kanıt girilemez (düzeltme sonraki dilim). Fotoğraf ve imza dosyaları kanıta eklenir (Core dosya deposu). Kurallar sunucudadır
-   (/api/logistics/shipments/{id}/delivery); sayfa içi küçük eylem formu olduğu için sekmesizdir. *@
+   yeni kanıt girilemez (düzeltme sonraki dilim). Fotoğraf ve imza dosyaları kanıta eklenir (Core dosya deposu); sevkiyatın seferi kapanınca
+   (tamamlandı ya da iptal) kanıt dosyalarıyla birlikte donar (ADR-0038 bölüm 24). Kurallar sunucudadır (/api/logistics/shipments/{id}/delivery,
+   dosyada IRecordWriteGuard); sayfa içi küçük eylem formu olduğu için sekmesizdir. *@
 @inject ApiClient Api
+@inject SessionState Session
 
 <section class="settings-group" aria-label="Teslim">
     <h2>Teslim</h2>
@@ -103,7 +105,7 @@
                         <div><dt>Not</dt><dd>@note</dd></div>
                     }
                 </dl>
-                <AttachmentPanel EntityKey="@LogisticsAccess.DeliveryProofEntityKey" RecordId="proof.Id" CanWrite="CanWrite" Title="Fotoğraf ve imza" EmptyText="Teslim fotoğrafı ya da imzası henüz eklenmedi." />
+                <AttachmentPanel EntityKey="@LogisticsAccess.DeliveryProofEntityKey" RecordId="proof.Id" CanWrite="@(CanWrite && LogisticsAccess.ProofFilesWritable(tripStatus))" Title="Fotoğraf ve imza" EmptyText="Teslim fotoğrafı ya da imzası henüz eklenmedi." />
             </article>
         }
     }
@@ -113,6 +115,7 @@
     private static readonly IReadOnlyList<SegmentOption<bool>> YesNo = [new(false, "Hayır"), new(true, "Evet")];
 
     private List<RecordResponse>? proofs;
+    private string? tripStatus; // sevkiyatın seferinin durumu; sefer okuma izni yoksa boş (karar sunucuda)
     private IReadOnlyDictionary<string, string[]>? errors;
     private string? message;
     private bool busy;
@@ -144,6 +147,12 @@
         var page = await Api.GetAsync<RecordPageResponse>($"/api/records/{LogisticsAccess.DeliveryProofEntityKey}?shipmentId={Shipment.Id}&pageSize=50");
         proofs = page.Value?.Items.ToList() ?? [];
         message = page.Error;
+        tripStatus = null;
+        if (proofs.Count > 0 && CanWrite && Session.Can(LogisticsAccess.TripsRead) && WarehouseLabels.Id(Shipment, "tripId") is { } tripId
+            && (await Api.GetAsync<RecordResponse>($"/api/records/{LogisticsAccess.TripEntityKey}/{tripId}")).Value is { } trip)
+        {
+            tripStatus = WarehouseLabels.Text(trip, "status");
+        }
     }
 
     private async Task SubmitAsync()

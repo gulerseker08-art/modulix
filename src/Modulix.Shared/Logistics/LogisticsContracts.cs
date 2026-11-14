@@ -100,6 +100,19 @@ public static class LogisticsAccess
         ("rejected", "Reddedildi"),
     ];
 
+    /// <summary>
+    /// Masrafın makbuzu ve fişi eklenip silinebilir mi (ADR-0038 bölüm 24): kaydın güncelleme kuralıyla aynı, beklemede ya da reddedilmiş masraf ve
+    /// iptal edilmemiş sefer. Arayüz yalnızca düğmeleri gizler; kararı sunucu verir. Sefer durumu bilinmiyorsa (boş) yalnızca masrafın durumuna bakılır.
+    /// </summary>
+    public static bool ExpenseFilesWritable(string? expenseStatus, string? tripStatus) =>
+        expenseStatus is "pending" or "rejected" && tripStatus != "cancelled";
+
+    /// <summary>
+    /// Teslim kanıtının fotoğrafı ve imzası eklenip silinebilir mi (ADR-0038 bölüm 24): sevkiyatın seferi açıkken; sefer tamamlanınca ya da iptal
+    /// edilince kanıt donar. Arayüz yalnızca düğmeleri gizler; kararı sunucu verir. Sefer durumu bilinmiyorsa (boş) düğmeler gösterilir.
+    /// </summary>
+    public static bool ProofFilesWritable(string? tripStatus) => tripStatus is not ("completed" or "cancelled");
+
     /// <summary>Masraf türü kategorileri (sabit; sunucudaki <c>ExpenseKindCategories</c>): arayüz yakıt alanlarını ve rücu işaretini kategoriye göre gösterir.</summary>
     public const string FuelCategory = "fuel";
     public const string FineCategory = "fine";

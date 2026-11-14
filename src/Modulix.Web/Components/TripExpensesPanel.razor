@@ -168,7 +168,7 @@
                     {
                         <tr>
                             <td colspan="6">
-                                <AttachmentPanel EntityKey="@LogisticsAccess.TripExpenseEntityKey" RecordId="expense.Id" CanWrite="CanWrite" Title="Makbuz ve fiş" EmptyText="Makbuz ya da fiş eklenmedi." />
+                                <AttachmentPanel EntityKey="@LogisticsAccess.TripExpenseEntityKey" RecordId="expense.Id" CanWrite="@(CanWrite && LogisticsAccess.ExpenseFilesWritable(status, WarehouseLabels.Text(Trip, "status")))" Title="Makbuz ve fiş" EmptyText="Makbuz ya da fiş eklenmedi." />
                             </td>
                         </tr>
                     }
