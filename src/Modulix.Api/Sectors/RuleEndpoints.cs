@@ -98,7 +98,7 @@ public static class RuleEndpoints
     private static List<FieldRule> ToRules(List<FieldRuleDto>? dtos) =>
         [.. (dtos ?? throw new ArgumentException("Kural listesi gerekli.", "rules")).Select(ToRule)];
 
-    private static FieldRule ToRule(FieldRuleDto dto)
+    internal static FieldRule ToRule(FieldRuleDto dto)
     {
         if (!Enum.TryParse<FieldRuleEffect>(dto.Effect, ignoreCase: true, out var effect) || !Enum.IsDefined(effect))
         {
@@ -121,7 +121,7 @@ public static class RuleEndpoints
         return new FieldRule(dto.Key, dto.Field, effect, condition) { Message = dto.Message, Value = dto.Value, Locked = dto.Locked };
     }
 
-    private static FieldRuleDto ToDto(FieldRule rule) => new(
+    internal static FieldRuleDto ToDto(FieldRule rule) => new(
         rule.Key,
         rule.Field,
         rule.Effect.ToString(),

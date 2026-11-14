@@ -14,7 +14,7 @@ public static class CrmRequests
         Description: o.Description, Priority: o.Priority, Type: o.Type, Source: o.Source, CustomerBudget: o.CustomerBudget, BudgetStatus: o.BudgetStatus,
         NeedDescription: o.NeedDescription, CurrentProblem: o.CurrentProblem, ExpectedBenefit: o.ExpectedBenefit, Scope: o.Scope,
         SuccessCriteria: o.SuccessCriteria, Risks: o.Risks, DecisionProcess: o.DecisionProcess, TargetDecisionDate: o.TargetDecisionDate,
-        NextAction: o.NextAction, NextActionDate: o.NextActionDate, ServiceScope: o.ServiceScope);
+        NextAction: o.NextAction, NextActionDate: o.NextActionDate, ServiceScope: o.ServiceScope, CampaignId: o.CampaignId);
 
     public static SaveActivityRequest From(ActivityDto a) => new(
         a.Subject, a.Type, a.DueAt, a.CompletedAt, a.CompanyId, a.ContactId, a.OpportunityId, a.Notes, a.Version, a.OwnerId,

@@ -61,7 +61,7 @@
             }
             else if (members.Count == 0)
             {
-                <p class="text-muted">@Texts.Get("admin.teamDetail.noUsers")</p>
+                <EmptyState Compact="true" Title="@Texts.Get("admin.teamDetail.noUsers")" />
             }
             else
             {

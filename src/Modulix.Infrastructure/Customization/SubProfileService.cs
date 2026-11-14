@@ -1,11 +1,13 @@
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Automation;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
+using Modulix.Core.FieldRules;
 using Modulix.Core.Modules;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Persistence;
@@ -28,6 +30,8 @@ internal sealed class SubProfileService(
     IActivityCodeCatalog activities,
     SubProfileStarterCatalog starters,
     CustomizationLimits limits,
+    IAutomationCatalog automation,
+    ITenantRuleSimulation simulation,
     IAuditWriter audit) : ISubProfileService
 {
     public async Task<IReadOnlyList<SubProfileView>> ListAsync(CancellationToken cancellationToken)
@@ -39,8 +43,10 @@ internal sealed class SubProfileService(
                 .Select(g => new { Id = g.Key, Total = g.Count(), Pending = g.Count(o => o.AppliedAt == null) })
                 .ToListAsync(cancellationToken))
             .ToDictionary(c => c.Id);
+        var features = (await db.SubProfileFeatures.AsNoTracking().OrderBy(f => f.SortOrder).ToListAsync(cancellationToken)).ToLookup(f => f.SubProfileId);
+        var rules = (await db.SubProfileRules.AsNoTracking().OrderBy(r => r.SortOrder).ToListAsync(cancellationToken)).ToLookup(r => r.SubProfileId);
         var names = await ActivityNamesAsync(rows.Select(r => r.ActivityCode), cancellationToken);
-        return [.. rows.Select(r => ToView(r, [], counts.GetValueOrDefault(r.Id)?.Total ?? 0, counts.GetValueOrDefault(r.Id)?.Pending ?? 0, names))];
+        return [.. rows.Select(r => ToView(r, [], counts.GetValueOrDefault(r.Id)?.Total ?? 0, counts.GetValueOrDefault(r.Id)?.Pending ?? 0, names, [.. features[r.Id].Select(ToView)], [.. rules[r.Id].Select(x => ToView(x, r.Code))]))];
     }
 
     public async Task<SubProfileView?> GetAsync(Guid id, CancellationToken cancellationToken)
@@ -129,6 +135,14 @@ internal sealed class SubProfileService(
         if (!allowed)
         {
             throw new SubProfileConflictException("Bu durum değişikliği yapılamaz.");
+        }
+
+        // Etkinleştirme, kuralların etkin kural kümesinde yeni çakışma doğurmadığını doğrular (ADR-0041 K4); çakışırsa durum değişmez.
+        if (status == SubProfileStatus.Active)
+        {
+            var mine = (await db.SubProfileRules.AsNoTracking().Where(r => r.SubProfileId == id).OrderBy(r => r.SortOrder).ToListAsync(cancellationToken))
+                .Select(r => r.ToRule(row.Code)).ToList();
+            await EnsureNoNewConflictsAsync(row, [], mine, cancellationToken);
         }
 
         var transaction = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
@@ -290,6 +304,147 @@ internal sealed class SubProfileService(
         return await GetAsync(id, cancellationToken);
     }
 
+    public async Task<SubProfileView?> AddFeatureAsync(Guid id, SubProfileFeatureInput input, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var row = await db.SubProfiles.SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
+        if (row is null)
+        {
+            return null;
+        }
+
+        var normalized = SubProfileRules.NormalizeFeature(input);
+        var features = await db.SubProfileFeatures.Where(f => f.SubProfileId == id).ToListAsync(cancellationToken);
+        if (SubProfileRules.IsDuplicateFeature(normalized, features))
+        {
+            throw new ArgumentException($"Bu özellik zaten var: '{normalized.Group}: {normalized.Value}'.", "value");
+        }
+
+        var before = FeatureSnapshot(row, features);
+        var feature = new SubProfileFeature(id, normalized.Group, normalized.Value, features.Count == 0 ? 0 : features.Max(f => f.SortOrder) + 1);
+        db.SubProfileFeatures.Add(feature);
+        features.Add(feature);
+        row.Touch();
+        Audit(tenant, row.Id, AuditAction.Updated, before, FeatureSnapshot(row, features));
+        await SaveAsync(cancellationToken);
+        return await GetAsync(id, cancellationToken);
+    }
+
+    public async Task<SubProfileView?> RemoveFeatureAsync(Guid id, Guid featureId, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var row = await db.SubProfiles.SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
+        var features = row is null ? [] : await db.SubProfileFeatures.Where(f => f.SubProfileId == id).ToListAsync(cancellationToken);
+        if (row is null || features.SingleOrDefault(f => f.Id == featureId) is not { } feature)
+        {
+            return null;
+        }
+
+        var before = FeatureSnapshot(row, features);
+        db.SubProfileFeatures.Remove(feature);
+        features.Remove(feature);
+        row.Touch();
+        Audit(tenant, row.Id, AuditAction.Updated, before, FeatureSnapshot(row, features));
+        await SaveAsync(cancellationToken);
+        return await GetAsync(id, cancellationToken);
+    }
+
+    public async Task<SubProfileView?> AddRuleAsync(Guid id, SubProfileRuleInput input, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var row = await db.SubProfiles.SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
+        if (row is null)
+        {
+            return null;
+        }
+
+        var normalized = SubProfileRules.NormalizeRule(input);
+        var rules = await db.SubProfileRules.Where(r => r.SubProfileId == id).ToListAsync(cancellationToken);
+        if (limits.MaxOptionsPerSubProfile is { } max && rules.Count + await db.SubProfileOptions.CountAsync(o => o.SubProfileId == id, cancellationToken) >= max)
+        {
+            throw new ArgumentException($"Bir alt profilde en fazla {max} seçenek olabilir.", "name");
+        }
+
+        EnsureRuleNameFree(normalized.Name, rules);
+        var taken = (await db.SubProfileRules.Select(r => r.Key).ToListAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
+        var rule = await ValidatedRuleAsync(normalized, SubProfileRules.RuleKey(row.Code, normalized.Name, taken), cancellationToken);
+        var stored = rules.Select(r => r.ToRule(row.Code)).ToList();
+        if (row.Status == SubProfileStatus.Active)
+        {
+            await EnsureNoNewConflictsAsync(row, stored, [.. stored, rule], cancellationToken);
+        }
+
+        var before = RuleSnapshot(row, rules);
+        var entity = new SubProfileRule(id, normalized.Name, rule, rules.Count == 0 ? 0 : rules.Max(r => r.SortOrder) + 1);
+        db.SubProfileRules.Add(entity);
+        rules.Add(entity);
+        row.Touch();
+        Audit(tenant, row.Id, AuditAction.Updated, before, RuleSnapshot(row, rules));
+        await SaveAsync(cancellationToken);
+        return await GetAsync(id, cancellationToken);
+    }
+
+    public async Task<SubProfileView?> UpdateRuleAsync(Guid id, Guid ruleId, SubProfileRuleInput input, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var row = await db.SubProfiles.SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
+        var rules = row is null ? [] : await db.SubProfileRules.Where(r => r.SubProfileId == id).ToListAsync(cancellationToken);
+        if (row is null || rules.SingleOrDefault(r => r.Id == ruleId) is not { } entity)
+        {
+            return null;
+        }
+
+        var normalized = SubProfileRules.NormalizeRule(input);
+        EnsureRuleNameFree(normalized.Name, rules.Where(r => r.Id != ruleId));
+        var rule = await ValidatedRuleAsync(normalized, entity.Key, cancellationToken);
+        var stored = rules.Select(r => r.ToRule(row.Code)).ToList();
+        if (row.Status == SubProfileStatus.Active)
+        {
+            await EnsureNoNewConflictsAsync(row, stored, [.. stored.Where(r => r.Key != entity.Key), rule], cancellationToken);
+        }
+
+        var before = RuleSnapshot(row, rules);
+        entity.Replace(normalized.Name, rule);
+        row.Touch();
+        Audit(tenant, row.Id, AuditAction.Updated, before, RuleSnapshot(row, rules));
+        await SaveAsync(cancellationToken);
+        return await GetAsync(id, cancellationToken);
+    }
+
+    public async Task<SubProfileView?> RemoveRuleAsync(Guid id, Guid ruleId, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        var row = await db.SubProfiles.SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
+        var rules = row is null ? [] : await db.SubProfileRules.Where(r => r.SubProfileId == id).ToListAsync(cancellationToken);
+        if (row is null || rules.SingleOrDefault(r => r.Id == ruleId) is not { } entity)
+        {
+            return null;
+        }
+
+        var before = RuleSnapshot(row, rules);
+        db.SubProfileRules.Remove(entity);
+        rules.Remove(entity);
+        row.Touch();
+        Audit(tenant, row.Id, AuditAction.Updated, before, RuleSnapshot(row, rules));
+        await SaveAsync(cancellationToken);
+        return await GetAsync(id, cancellationToken);
+    }
+
+    public async Task<SubProfileRulePreview?> PreviewRulesAsync(Guid id, CancellationToken cancellationToken)
+    {
+        RequireTenant();
+        var row = await db.SubProfiles.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
+        if (row is null)
+        {
+            return null;
+        }
+
+        var mine = (await db.SubProfileRules.AsNoTracking().Where(r => r.SubProfileId == id).OrderBy(r => r.SortOrder).ToListAsync(cancellationToken))
+            .Select(r => r.ToRule(row.Code)).ToList();
+        var (conflicts, warnings) = await SimulateAsync(row, row.Status == SubProfileStatus.Active ? mine : [], mine, cancellationToken);
+        return new SubProfileRulePreview(mine, conflicts, warnings);
+    }
+
     public async Task<IReadOnlyList<SubProfileStarterView>> ListStartersAsync(CancellationToken cancellationToken)
     {
         var tenant = RequireTenant();
@@ -302,6 +457,7 @@ internal sealed class SubProfileService(
             s.Description,
             s.ActivityCode is { } code ? names.GetValueOrDefault(code) : null,
             [.. s.Options.Select(o => o.Label)],
+            SubProfileRules.GroupLabels(s.Features ?? []),
             MissingModules(s, enabled),
             codes.Contains(s.Key)))];
     }
@@ -338,6 +494,11 @@ internal sealed class SubProfileService(
             foreach (var option in starter.Options)
             {
                 _ = await AddOptionAsync(created.Id, option, cancellationToken);
+            }
+
+            foreach (var feature in starter.Features ?? [])
+            {
+                _ = await AddFeatureAsync(created.Id, feature, cancellationToken);
             }
 
             if (transaction is not null)
@@ -449,13 +610,21 @@ internal sealed class SubProfileService(
     private async Task<SubProfileView> LoadViewAsync(SubProfile row, CancellationToken cancellationToken)
     {
         var options = await db.SubProfileOptions.AsNoTracking().Where(o => o.SubProfileId == row.Id).OrderBy(o => o.SortOrder).ToListAsync(cancellationToken);
+        var features = await db.SubProfileFeatures.AsNoTracking().Where(f => f.SubProfileId == row.Id).OrderBy(f => f.SortOrder).ToListAsync(cancellationToken);
+        var rules = await db.SubProfileRules.AsNoTracking().Where(r => r.SubProfileId == row.Id).OrderBy(r => r.SortOrder).ToListAsync(cancellationToken);
         var names = await ActivityNamesAsync([row.ActivityCode], cancellationToken);
-        return ToView(row, [.. options.Select(ToView)], options.Count, options.Count(o => !o.IsApplied), names);
+        return ToView(row, [.. options.Select(ToView)], options.Count, options.Count(o => !o.IsApplied), names, [.. features.Select(ToView)], [.. rules.Select(r => ToView(r, row.Code))]);
     }
 
-    private static SubProfileView ToView(SubProfile row, IReadOnlyList<SubProfileOptionView> options, int total, int pending, IReadOnlyDictionary<string, string> names) => new(
+    private static SubProfileView ToView(
+        SubProfile row, IReadOnlyList<SubProfileOptionView> options, int total, int pending, IReadOnlyDictionary<string, string> names,
+        IReadOnlyList<SubProfileFeatureView> features, IReadOnlyList<SubProfileRuleView> rules) => new(
         row.Id, row.Code, row.Name, row.Description, row.ActivityCode, row.ActivityCode is { } code ? names.GetValueOrDefault(code) : null,
-        row.Status, row.Revision, total, pending, row.CreatedAt, row.ActivatedAt, options);
+        row.Status, row.Revision, total, pending, row.CreatedAt, row.ActivatedAt, options, features, rules);
+
+    private static SubProfileFeatureView ToView(SubProfileFeature f) => new(f.Id, f.Group, f.Value);
+
+    private static SubProfileRuleView ToView(SubProfileRule r, string subProfileCode) => new(r.Id, r.Name, r.ToRule(subProfileCode));
 
     private static SubProfileOptionView ToView(SubProfileOption o) => new(
         o.Id, o.Kind, o.TargetKey, o.Label, o.FieldType, o.Required, o.ShowInList, o.Choices, o.Category, o.AppliedAt, o.SortOrder);
@@ -549,6 +718,75 @@ internal sealed class SubProfileService(
             RecordDiff.Compute(before, after),
             ExecutionSource.Api,
             Activity.Current?.TraceId.ToString()));
+
+    // Kuralı firmanın alan kümesine (özel alanlar dahil) karşı doğrular; anahtarı sunucu verir, alt profil kuralı kilitli olamaz.
+    private async Task<FieldRule> ValidatedRuleAsync(SubProfileRuleInput input, string key, CancellationToken cancellationToken)
+    {
+        var rule = input.Rule with { Key = key, Locked = false };
+        var issues = await FieldRuleChecker.ValidateAsync([rule], catalog, entityKey => automation.GetFieldSetAsync(entityKey, cancellationToken));
+        if (issues.Count > 0)
+        {
+            // Yol "<kural anahtarı>.<alan>" ile başlar; anahtar sunucu ürettiği için kullanıcıya gösterilmez.
+            string Readable(string path) => path.StartsWith(key + ".", StringComparison.Ordinal) ? path[(key.Length + 1)..] : path;
+            throw new ArgumentException(string.Join(" ", issues.Select(i => $"{Readable(i.Path)}: {i.Message}")), "rule");
+        }
+
+        return rule;
+    }
+
+    private static void EnsureRuleNameFree(string name, IEnumerable<SubProfileRule> others)
+    {
+        if (others.Any(r => string.Equals(r.Name, name, StringComparison.CurrentCultureIgnoreCase)))
+        {
+            throw new ArgumentException($"Bu kural zaten var: '{name}'.", "name");
+        }
+    }
+
+    // Diğer etkin alt profillerin kuralları (bu alt profil hariç): katmanın geri kalanı.
+    private async Task<List<FieldRule>> OtherActiveRulesAsync(Guid subProfileId, CancellationToken cancellationToken)
+    {
+        var rows = await (from r in db.SubProfileRules.AsNoTracking()
+                          join p in db.SubProfiles.AsNoTracking() on r.SubProfileId equals p.Id
+                          where p.Status == SubProfileStatus.Active && p.Id != subProfileId
+                          orderby p.Code, r.SortOrder
+                          select new { p.Code, Rule = r }).ToListAsync(cancellationToken);
+        return [.. rows.Select(x => x.Rule.ToRule(x.Code))];
+    }
+
+    // Değişiklikten önce ve sonra katman birleşimini karşılaştırır: yalnızca değişikliğin doğurduğu çakışmalar döner (başka katmandan gelen eski
+    // çakışma bu alt profilin düzenlenmesini engellemesin).
+    private async Task<(IReadOnlyList<RuleMergeIssue> Conflicts, IReadOnlyList<RuleMergeIssue> Warnings)> SimulateAsync(
+        SubProfile row, IReadOnlyList<FieldRule> beforeMine, IReadOnlyList<FieldRule> afterMine, CancellationToken cancellationToken)
+    {
+        var others = await OtherActiveRulesAsync(row.Id, cancellationToken);
+        var before = await simulation.GetEffectiveWithSubProfileRulesAsync([.. others, .. beforeMine], cancellationToken);
+        var after = await simulation.GetEffectiveWithSubProfileRulesAsync([.. others, .. afterMine], cancellationToken);
+        var known = before.Conflicts.Select(c => c.Message).ToHashSet(StringComparer.Ordinal);
+        return ([.. after.Conflicts.Where(c => !known.Contains(c.Message))], after.Warnings);
+    }
+
+    private async Task EnsureNoNewConflictsAsync(SubProfile row, IReadOnlyList<FieldRule> beforeMine, IReadOnlyList<FieldRule> afterMine, CancellationToken cancellationToken)
+    {
+        var (conflicts, _) = await SimulateAsync(row, beforeMine, afterMine, cancellationToken);
+        if (conflicts.Count > 0)
+        {
+            throw new ArgumentException(string.Join(" ", conflicts.Select(c => c.Message)), "rule");
+        }
+    }
+
+    // Kural değişiklikleri kendi kaydıyla denetlenir: yalnızca ad ve kurallar.
+    private static JsonObject RuleSnapshot(SubProfile row, IEnumerable<SubProfileRule> rules) => new()
+    {
+        ["name"] = row.Name,
+        ["rules"] = new JsonArray([.. rules.OrderBy(r => r.SortOrder).Select(r => JsonValue.Create($"{r.Name} ({r.Key})"))]),
+    };
+
+    // Özellik değişiklikleri kendi kaydıyla denetlenir: yalnızca ad ve özellikler (seçenek ve durum farkı gürültü olmasın).
+    private static JsonObject FeatureSnapshot(SubProfile row, IEnumerable<SubProfileFeature> features) => new()
+    {
+        ["name"] = row.Name,
+        ["features"] = new JsonArray([.. features.OrderBy(f => f.SortOrder).Select(f => JsonValue.Create($"{f.Group}: {f.Value}"))]),
+    };
 
     private static JsonObject Snapshot(SubProfile row, IEnumerable<SubProfileOption> options) => new()
     {

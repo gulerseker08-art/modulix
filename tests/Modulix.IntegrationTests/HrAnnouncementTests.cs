@@ -70,10 +70,16 @@ public class HrAnnouncementTests(ModulixApiFactory factory) : IClassFixture<Modu
         backwards["expiresOn"] = "2026-02-01";
         Assert.True((await ValidationProblemAsync(await hr.PostAsJsonAsync(Announcements, new RecordWriteRequest(backwards)))).Errors.ContainsKey("expiresOn"));
 
-        var unknownDepartment = Announcement("Bilinmeyen", "Metin", published: true, publishOn: "2026-02-10");
-        unknownDepartment["audienceDepartmentKey"] = "Yok-Boyle-Departman";
+        var unknownDepartment = Department(Announcement("Bilinmeyen", "Metin", published: true, publishOn: "2026-02-10"), Guid.NewGuid());
         Assert.True((await ValidationProblemAsync(await hr.PostAsJsonAsync(Announcements, new RecordWriteRequest(unknownDepartment)))).Errors
-            .ContainsKey("audienceDepartmentKey"));
+            .ContainsKey("audienceBusinessUnitId"));
+
+        // Kapalı departman yeni hedef olarak seçilemez.
+        var closed = await HrDepartments.CreateAsync(hr, "Kapanan birim");
+        await HrDepartments.DeactivateAsync(hr, closed);
+        var closedTarget = Department(Announcement("Kapalı", "Metin", published: true, publishOn: "2026-02-10"), closed);
+        Assert.True((await ValidationProblemAsync(await hr.PostAsJsonAsync(Announcements, new RecordWriteRequest(closedTarget)))).Errors
+            .ContainsKey("audienceBusinessUnitId"));
 
         // Okundu kaydı yalnızca duyuru açılınca yazılır ve değişmez.
         var announcement = await PostAsync(hr, Announcements, Announcement("Duyuru", "Metin", published: true, publishOn: "2026-01-01"));
@@ -98,8 +104,8 @@ public class HrAnnouncementTests(ModulixApiFactory factory) : IClassFixture<Modu
         using var staff = await LoginAsync(s.Staff);
 
         var all = await PostAsync(hr, Announcements, Announcement("Herkese", "Metin", published: true, publishOn: "2026-01-01"));
-        var mine = await PostAsync(hr, Announcements, Department(Announcement("Finans", "Metin", published: true, publishOn: "2026-01-02"), "Finance"));
-        var other = await PostAsync(hr, Announcements, Department(Announcement("Yönetim", "Metin", published: true, publishOn: "2026-01-03"), "Management"));
+        var mine = await PostAsync(hr, Announcements, Department(Announcement("Merkez", "Metin", published: true, publishOn: "2026-01-02"), s.Center));
+        var other = await PostAsync(hr, Announcements, Department(Announcement("Yönetim", "Metin", published: true, publishOn: "2026-01-03"), s.Management));
         var draft = await PostAsync(hr, Announcements, Announcement("Taslak", "Metin", published: false, publishOn: "2026-01-01"));
         var future = await PostAsync(hr, Announcements, Announcement("İleride", "Metin", published: true, publishOn: "2099-01-01"));
         var expiredValues = Announcement("Eski", "Metin", published: true, publishOn: "2025-01-01");
@@ -155,9 +161,12 @@ public class HrAnnouncementTests(ModulixApiFactory factory) : IClassFixture<Modu
 
     // --- yardımcılar ---
 
-    private sealed record Setup(Guid TenantId, ModulixUser Hr, ModulixUser Staff, ModulixUser Outsider);
+    private sealed record Setup(Guid TenantId, ModulixUser Hr, ModulixUser Staff, ModulixUser Outsider, Guid Center, Guid Finance, Guid Management);
 
-    /// <summary>İK (yönetici rolü), Finans departmanındaki çalışan (yalnızca duyuru okuma izni) ve izinsiz kullanıcı.</summary>
+    /// <summary>
+    /// İK (yönetici rolü), Core'da Merkez › Finans departmanındaki çalışan (yalnızca duyuru okuma izni) ve izinsiz kullanıcı. Üst departmana (Merkez)
+    /// hedeflenen duyuru alt departmandakine de görünür; Yönetim departmanına hedeflenen görünmez.
+    /// </summary>
     private async Task<Setup> SetUpAsync()
     {
         var tenant = await factory.CreateTenantAsync();
@@ -169,12 +178,16 @@ public class HrAnnouncementTests(ModulixApiFactory factory) : IClassFixture<Modu
         await factory.CreateRoleAsync(tenant.Id, [AnnouncementsRead], Scope.Own, staffUser);
 
         using var hr = await LoginAsync(hrUser);
+        var center = await HrDepartments.CreateAsync(hr, "Merkez ofis");
+        var finance = await HrDepartments.CreateAsync(hr, "Finans", center);
+        var management = await HrDepartments.CreateAsync(hr, "Yönetim");
+        await HrDepartments.MoveAsync(hr, factory, staffUser.Id, tenant.Id, finance);
         var person = await PostAsync(hr, People, new JsonObject { ["firstName"] = "Sinan", ["lastName"] = "Okur" });
         await PostAsync(hr, Employees, new JsonObject
         {
-            ["personId"] = person.Id.ToString(), ["hireDate"] = "2020-01-01", ["userId"] = staffUser.Id.ToString(), ["departmentKey"] = "Finance",
+            ["personId"] = person.Id.ToString(), ["hireDate"] = "2020-01-01", ["userId"] = staffUser.Id.ToString(),
         });
-        return new Setup(tenant.Id, hrUser, staffUser, outsider);
+        return new Setup(tenant.Id, hrUser, staffUser, outsider, center, finance, management);
     }
 
     private static JsonObject Announcement(string title, string body, bool published, string publishOn, bool pinned = false) => new()
@@ -182,9 +195,9 @@ public class HrAnnouncementTests(ModulixApiFactory factory) : IClassFixture<Modu
         ["title"] = title, ["body"] = body, ["isPublished"] = published, ["publishOn"] = publishOn, ["isPinned"] = pinned,
     };
 
-    private static JsonObject Department(JsonObject values, string department)
+    private static JsonObject Department(JsonObject values, Guid department)
     {
-        values["audienceDepartmentKey"] = department;
+        values["audienceBusinessUnitId"] = department.ToString();
         return values;
     }
 

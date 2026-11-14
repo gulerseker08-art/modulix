@@ -1,4 +1,4 @@
-namespace Modulix.Core.Pricing;
+namespace Modulix.Core.Contracts.Pricing;
 
 /// <summary>Fiyat listesi önceliği; küçük değer önce gelir.</summary>
 public enum PriceListScope

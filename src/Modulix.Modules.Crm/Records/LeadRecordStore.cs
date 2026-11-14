@@ -76,6 +76,8 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         Field.Text<Lead>("utmSource", Lead.UtmMaxLength, l => l.UtmSource, (l, v) => l.UtmSource = v),
         Field.Text<Lead>("utmMedium", Lead.UtmMaxLength, l => l.UtmMedium, (l, v) => l.UtmMedium = v),
         Field.Text<Lead>("utmCampaign", Lead.UtmMaxLength, l => l.UtmCampaign, (l, v) => l.UtmCampaign = v),
+        // Kampanya bağı (ADR-0025): Pazarlama modülünün kaydı; görünürlüğü kayıt sırasında boru hattından denetlenir (LookupGuard).
+        Field.Id<Lead>("campaignId", l => l.CampaignId, (l, v) => l.CampaignId = v),
         Field.Time<Lead>("firstReceivedAt", l => l.FirstReceivedAt, (l, v) => { if (v is { } time) { l.FirstReceivedAt = time; } }).AsSystem(),
         Field.Owner<Lead>(OwnerField, l => l.OwnerId, (l, v) => l.OwnerId = v).GatedUpdate(),
         Field.Time<Lead>("assignedAt", l => l.AssignedAt, (l, v) => l.AssignedAt = v).AsSystem(),
@@ -101,6 +103,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         ["ownerNot"] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(l => l.OwnerId == null || l.OwnerId != owner) : null,
         ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.CompanyId == id) : null,
         ["contactId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.ContactId == id) : null,
+        ["campaignId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.CampaignId == id) : null,
         // Sektör (ADR-0043): sektör kataloğu kodu, tam eşleşme.
         ["industry"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(l => l.IndustryCode == code) : null,
         ["convertedCompanyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(l => l.ConvertedCompanyId == id) : null,
@@ -304,7 +307,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         var companyScope = await Context.Access.GetOwnersAsync(CrmModule.Entities.Company, cancellationToken);
         var contactScope = await Context.Access.GetOwnersAsync(CrmModule.Entities.Contact, cancellationToken);
         var stored = await Context.Data.Set<Lead>().AsNoTracking().Where(l => l.Id == entity.Id)
-            .Select(l => new { l.CompanyId, l.ContactId, l.ServiceScope }).SingleOrDefaultAsync(cancellationToken);
+            .Select(l => new { l.CompanyId, l.ContactId, l.ServiceScope, l.CampaignId }).SingleOrDefaultAsync(cancellationToken);
 
         if (values.ContainsKey("companyId") && entity.CompanyId is { } companyId && stored?.CompanyId != companyId)
         {
@@ -331,6 +334,12 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
 
         await LookupGuard.AddContactCompanyErrorAsync(
             errors, Context, "contactId", entity.ContactId, entity.CompanyId, stored?.ContactId, stored?.CompanyId, cancellationToken);
+
+        // Kampanya bağı: iş akışı (sistem) yazımlarında bağ değişmez; değişen bağ çağıranın görebildiği kampanya olmalıdır.
+        if (!Context.LeadGate.IsOpen && values.ContainsKey("campaignId"))
+        {
+            await LookupGuard.AddCampaignErrorAsync(errors, Context, "campaignId", entity.CampaignId, stored?.CampaignId, cancellationToken);
+        }
 
         // Hizmet kapsamı: yeni eklenen kodlar katalogda aktif "Faaliyet" olmalı; iş akışı yazımlarında (dönüşüm vb.) denetlenmez.
         if (!Context.LeadGate.IsOpen && values.ContainsKey("serviceScope"))

@@ -7,26 +7,22 @@ using Modulix.Modules.Hr.Domain;
 namespace Modulix.Modules.Hr.Records;
 
 /// <summary>
-/// Anketin okura görünme kuralı (ADR-0042 dilim 7): yanıta açık, kapanış günü geçmemiş ve hedef departmanı boş ya da okurun departmanı. "Anket
+/// Anketin okura görünme kuralı (ADR-0042 dilim 7, bölüm 22): yanıta açık, kapanış günü geçmemiş ve hedef departmanı boş ya da okurun Core departmanı
+/// veya onun bir üst departmanı (<see cref="HrAudience"/>). "Anket
 /// yönetimi" izni olan bütün anketleri görür; yanıt verebilmek için ise herkes bu kurala uymalıdır.
 /// </summary>
 internal static class SurveyAudience
 {
     public static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
 
-    public static IQueryable<Survey> Available(IQueryable<Survey> source, string? department)
+    public static IQueryable<Survey> Available(IQueryable<Survey> source, HrReader reader)
     {
         var today = Today;
+        var path = reader.UnitPath;
+        var legacy = reader.LegacyDepartmentKey;
         return source.Where(s => s.Status == Survey.Statuses.Open && (s.ClosesOn == null || s.ClosesOn >= today)
-            && (s.AudienceDepartmentKey == null || s.AudienceDepartmentKey == department));
-    }
-
-    /// <summary>Kullanıcının etkin çalışan kartındaki departman (kartı yoksa boş; o zaman yalnızca herkese açık anketler).</summary>
-    public static Task<string?> DepartmentAsync(HrStoreContext context, CancellationToken cancellationToken)
-    {
-        var me = context.CurrentUserId ?? Guid.Empty;
-        return context.Data.Set<Employee>().AsNoTracking()
-            .Where(e => e.UserId == me && e.Status != Employee.Statuses.Terminated).Select(e => e.DepartmentKey).FirstOrDefaultAsync(cancellationToken);
+            && ((s.AudienceBusinessUnitId == null && (s.AudienceDepartmentKey == null || s.AudienceDepartmentKey == legacy))
+                || (s.AudienceBusinessUnitId != null && path.Contains(s.AudienceBusinessUnitId.Value))));
     }
 }
 
@@ -39,6 +35,7 @@ internal sealed class SurveyRecordStore(HrStoreContext context) : HrRecordStore<
     private readonly Dictionary<Guid, int> responseCounts = [];
     private readonly Dictionary<Guid, int> questionCounts = [];
     private readonly HashSet<Guid> respondedByMe = [];
+    private Dictionary<Guid, string> audienceNames = [];
 
     public override string EntityKey => HrModule.Entities.Survey;
 
@@ -57,7 +54,9 @@ internal sealed class SurveyRecordStore(HrStoreContext context) : HrRecordStore<
         Field.Text<Survey>("title", Survey.TitleMaxLength, s => s.Title, (s, v) => s.Title = v!, required: true),
         Field.Text<Survey>("description", Survey.DescriptionMaxLength, s => s.Description, (s, v) => s.Description = v),
         Field.Flag<Survey>("isAnonymous", s => s.IsAnonymous, (s, v) => s.IsAnonymous = v, createOnly: true),
-        Field.ListChoice<Survey>("audienceDepartmentKey", HrModule.Lists.Department, s => s.AudienceDepartmentKey, (s, v) => s.AudienceDepartmentKey = v, required: false),
+        Field.Id<Survey>("audienceBusinessUnitId", s => s.AudienceBusinessUnitId, (s, v) => s.AudienceBusinessUnitId = v),
+        Field.Computed<Survey>("audienceName", s => s.AudienceBusinessUnitId is { } unit ? audienceNames.GetValueOrDefault(unit) : null),
+        Field.Computed<Survey>("audienceDepartmentKey", s => s.AudienceDepartmentKey),
         Field.Date<Survey>("closesOn", s => s.ClosesOn, (s, v) => s.ClosesOn = v),
         Field.Computed<Survey>("status", s => s.Status),
         Field.Computed<Survey>("authorUserId", s => s.AuthorUserId?.ToString()),
@@ -99,7 +98,7 @@ internal sealed class SurveyRecordStore(HrStoreContext context) : HrRecordStore<
     protected override async Task<IQueryable<Survey>> RestrictAsync(IQueryable<Survey> source, CancellationToken cancellationToken) =>
         await Context.Access.HasPermissionAsync(HrModule.Permissions.SurveysManage, cancellationToken)
             ? source
-            : SurveyAudience.Available(source, await SurveyAudience.DepartmentAsync(Context, cancellationToken));
+            : SurveyAudience.Available(source, await HrAudience.ReaderAsync(Context, cancellationToken));
 
     protected override async Task PrepareAsync(IReadOnlyCollection<Survey> entities, CancellationToken cancellationToken)
     {
@@ -118,10 +117,20 @@ internal sealed class SurveyRecordStore(HrStoreContext context) : HrRecordStore<
 
         var me = Context.CurrentUserId ?? Guid.Empty;
         respondedByMe.UnionWith(await responses.Where(r => r.RespondentUserId == me).Select(r => r.SurveyId).ToListAsync(cancellationToken));
+        audienceNames = await BusinessUnitNames.PathsAsync(Context, entities.Select(s => s.AudienceBusinessUnitId), cancellationToken);
     }
 
     protected override async Task AppliedAsync(Survey entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
+        // Core departmanı seçimi (boş: herkes) eski İK departman hedefinin yerini alır.
+        if (values.ContainsKey("audienceBusinessUnitId"))
+        {
+            Guid? previous = isNew ? null : await Context.Data.Set<Survey>().AsNoTracking()
+                .Where(s => s.Id == entity.Id).Select(s => s.AudienceBusinessUnitId).SingleOrDefaultAsync(cancellationToken);
+            await HrAudience.ValidateAsync(Context, entity.AudienceBusinessUnitId, previous, cancellationToken);
+            entity.AudienceDepartmentKey = null;
+        }
+
         if (isNew)
         {
             entity.AuthorUserId = Context.CurrentUserId;
@@ -202,7 +211,7 @@ internal sealed class SurveyQuestionRecordStore(HrStoreContext context) : HrReco
             return source;
         }
 
-        var visible = SurveyAudience.Available(Context.Data.Set<Survey>().AsNoTracking(), await SurveyAudience.DepartmentAsync(Context, cancellationToken))
+        var visible = SurveyAudience.Available(Context.Data.Set<Survey>().AsNoTracking(), await HrAudience.ReaderAsync(Context, cancellationToken))
             .Select(s => s.Id);
         return source.Where(q => visible.Contains(q.SurveyId));
     }
@@ -460,8 +469,8 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
         }
 
         // Yönetici bütün anketleri görür; yanıt için o da hedef kitlede ve anket yanıta açık olmalıdır.
-        var department = await SurveyAudience.DepartmentAsync(context, cancellationToken);
-        if (!await SurveyAudience.Available(context.Data.Set<Survey>().AsNoTracking(), department).AnyAsync(s => s.Id == surveyId, cancellationToken))
+        var reader = await HrAudience.ReaderAsync(context, cancellationToken);
+        if (!await SurveyAudience.Available(context.Data.Set<Survey>().AsNoTracking(), reader).AnyAsync(s => s.Id == surveyId, cancellationToken))
         {
             return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Bu anket şu an size yönelik yanıta açık değil.");
         }

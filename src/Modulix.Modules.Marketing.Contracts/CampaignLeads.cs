@@ -1,7 +1,8 @@
 namespace Modulix.Modules.Marketing.Contracts;
 
 // Kampanya yanıtından lead (ADR-0025, dilim 7). Pazarlama modülü CRM'in alanlarını bilmez: gönderim anında çözülen kişi bilgisini bu sözleşmeyle verir, lead'i
-// lead alanını sağlayan modül (CRM) açar.
+// lead alanını sağlayan modül (CRM) açar. Kampanya kimliği (<c>CampaignId</c>) lead'e kayıt bağı olarak yazılır; kimliği kampanyanın sahibi modül verdiği için
+// yanıtı işleyen kullanıcının kampanya okuma izni aranmaz.
 
 public sealed record CampaignLeadRequest(
     string Subject,
@@ -15,7 +16,8 @@ public sealed record CampaignLeadRequest(
     string SourceDetail,
     string UtmSource,
     string UtmMedium,
-    string UtmCampaign);
+    string UtmCampaign,
+    Guid? CampaignId = null);
 
 /// <summary>Sonuç: oluştuysa lead kimliği, oluşmadıysa nedeni. <see cref="Unavailable"/>: lead modülü bu tenant için kapalı ya da kurulu değil; <see cref="Forbidden"/>: çağıranın lead açma yetkisi yok.</summary>
 public sealed record CampaignLeadResult(Guid? LeadId, string? Error, bool Unavailable = false, bool Forbidden = false)

@@ -6,7 +6,7 @@
 }
 else if (Owned.Count == 0 || Owned.All(o => o.Count == 0))
 {
-    <p class="text-muted">@Texts.Get("admin.handover.none")</p>
+    <EmptyState Compact="true" Title="@Texts.Get("admin.handover.none")" />
 }
 else
 {

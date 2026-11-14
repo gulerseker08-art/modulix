@@ -256,6 +256,24 @@ public sealed partial class ModuleCatalog
         {
             throw TemplateFail(module, template, $"kayıtlı olmayan aksiyon kullanıyor: {string.Join(", ", unknown)}");
         }
+
+        // Firmaya bırakılan parametre: adım ve parametre gerçekten var, parametre zorunlu ve şablonda verilmemiş olmalı (yoksa beyan
+        // başka bir doğrulama sorununu gizlerdi).
+        foreach (var blank in template.ToComplete)
+        {
+            var step = actions.FirstOrDefault(a => a.Id == blank.StepId);
+            var parameter = step is null
+                ? null
+                : automationActions[step.Action].Action.Definition.Parameters.FirstOrDefault(p => p.Name == blank.Parameter);
+            if (step is null
+                || parameter is not { Required: true }
+                || step.Parameters.ContainsKey(blank.Parameter)
+                || template.ToComplete.Count(b => b == blank) > 1)
+            {
+                throw TemplateFail(
+                    module, template, $"firmaya bıraktığı '{blank.StepId}.{blank.Parameter}' şablonda verilmemiş, zorunlu bir aksiyon parametresi olmalı ve bir kez yazılmalı");
+            }
+        }
     }
 
     private void ValidateAutomationField(

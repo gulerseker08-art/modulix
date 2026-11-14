@@ -1,4 +1,4 @@
-using Modulix.Core.Pricing;
+using Modulix.Core.Contracts.Pricing;
 
 namespace Modulix.Core.Tests.Pricing;
 

@@ -173,10 +173,10 @@ public class HrSurveyTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         using var staff = await LoginAsync(a.Staff);
         using var outsider = await LoginAsync(a.Outsider);
 
-        var finance = await PostAsync(hrA, Surveys, new JsonObject { ["title"] = "Finans", ["audienceDepartmentKey"] = "Finance" });
+        var finance = await PostAsync(hrA, Surveys, new JsonObject { ["title"] = "Finans", ["audienceBusinessUnitId"] = a.Finance.ToString() });
         var financeQuestion = await QuestionAsync(hrA, finance.Id, "Soru", "rating", null, required: true);
         await ActAsync(hrA, finance.Id, "open");
-        var management = await PostAsync(hrA, Surveys, new JsonObject { ["title"] = "Yönetim", ["audienceDepartmentKey"] = "Management" });
+        var management = await PostAsync(hrA, Surveys, new JsonObject { ["title"] = "Yönetim", ["audienceBusinessUnitId"] = a.Management.ToString() });
         var managementQuestion = await QuestionAsync(hrA, management.Id, "Soru", "rating", null, required: true);
         await ActAsync(hrA, management.Id, "open");
 
@@ -213,9 +213,11 @@ public class HrSurveyTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
 
     // --- yardımcılar ---
 
-    private sealed record Setup(Guid TenantId, ModulixUser Hr, ModulixUser Staff, ModulixUser Colleague, ModulixUser Outsider);
+    private sealed record Setup(Guid TenantId, ModulixUser Hr, ModulixUser Staff, ModulixUser Colleague, ModulixUser Outsider, Guid Finance, Guid Management);
 
-    /// <summary>İK (yönetici rolü, çalışan kartı yok), Finans departmanındaki iki çalışan (yalnızca yanıtlama izni) ve izinsiz kullanıcı.</summary>
+    /// <summary>
+    /// İK (yönetici rolü, çalışan kartı yok, kök departmanda), Core'da Finans departmanındaki iki çalışan (yalnızca yanıtlama izni) ve izinsiz kullanıcı.
+    /// </summary>
     private async Task<Setup> SetUpAsync()
     {
         var tenant = await factory.CreateTenantAsync();
@@ -228,16 +230,19 @@ public class HrSurveyTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         await factory.CreateRoleAsync(tenant.Id, [SurveysRespond], Scope.Own, staffUser, colleagueUser);
 
         using var hr = await LoginAsync(hrUser);
+        var finance = await HrDepartments.CreateAsync(hr, "Finans");
+        var management = await HrDepartments.CreateAsync(hr, "Yönetim");
         foreach (var (user, name) in new[] { (staffUser, "Sinan"), (colleagueUser, "Selin") })
         {
+            await HrDepartments.MoveAsync(hr, factory, user.Id, tenant.Id, finance);
             var person = await PostAsync(hr, People, new JsonObject { ["firstName"] = name, ["lastName"] = "Yanıtlar" });
             await PostAsync(hr, Employees, new JsonObject
             {
-                ["personId"] = person.Id.ToString(), ["hireDate"] = "2020-01-01", ["userId"] = user.Id.ToString(), ["departmentKey"] = "Finance",
+                ["personId"] = person.Id.ToString(), ["hireDate"] = "2020-01-01", ["userId"] = user.Id.ToString(),
             });
         }
 
-        return new Setup(tenant.Id, hrUser, staffUser, colleagueUser, outsider);
+        return new Setup(tenant.Id, hrUser, staffUser, colleagueUser, outsider, finance, management);
     }
 
     private static JsonObject Question(Guid surveyId, string text, string type, string? options, bool required) => new()

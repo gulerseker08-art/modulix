@@ -368,3 +368,13 @@ public interface ITenantFieldRules
     Task<TenantRuleAdaptationView> SaveAdaptationAsync(
         IReadOnlyList<FieldRule> rules, IReadOnlyList<string> disabledRuleKeys, long? expectedRevision, CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// Kural katmanlarını yazmadan sınamak için (ADR-0041 K4): firmanın etkin kural kümesi, <b>alt profil katmanı verilen kurallarla</b> değiştirilerek birleştirilir.
+/// Alt profil etkinleştirmeden ya da kuralı değiştirmeden önce çakışma var mı diye bakmak içindir; kaydı değiştirmez.
+/// </summary>
+public interface ITenantRuleSimulation
+{
+    /// <param name="subProfileRules">Alt profil katmanına girecek kuralların tamamı (diğer etkin alt profillerinki dahil); kayıtlı alt profil kuralları yok sayılır.</param>
+    Task<RuleMergeResult> GetEffectiveWithSubProfileRulesAsync(IReadOnlyList<FieldRule> subProfileRules, CancellationToken cancellationToken);
+}

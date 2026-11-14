@@ -46,7 +46,7 @@
                 }
                 else if (questions.Count == 0)
                 {
-                    <p class="text-muted" role="status">Henüz soru yok. Yanıta açmadan önce en az bir soru ekleyin.</p>
+                    <EmptyState Compact="true" Title="Henüz soru yok." Text="Yanıta açmadan önce en az bir soru ekleyin." />
                 }
                 else
                 {
@@ -114,7 +114,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu görünüme uyan anket yok.</p>
+        <EmptyState Compact="true" Title="Bu görünüme uyan anket yok." />
     }
     else
     {
@@ -293,7 +293,7 @@
     private RenderFragment CellContent(string key, RecordResponse record) => key switch
     {
         "title" => @<text>@WarehouseLabels.Text(record, "title")</text>,
-        "audience" => @<text>@(WarehouseLabels.Text(record, "audienceDepartmentKey") is { Length: > 0 } dep ? Lookups.Label(HrAccess.DepartmentList, dep) : "Herkes")</text>,
+        "audience" => @<text>@HrLabels.Audience(record, Lookups)</text>,
         "identity" => @<text>@(WarehouseLabels.Flag(record, "isAnonymous") ? "Gizli" : "Açık")</text>,
         "questionCount" => @<text>@WarehouseLabels.Number(record, "questionCount")</text>,
         "responseCount" => @<text>@WarehouseLabels.Number(record, "responseCount")</text>,

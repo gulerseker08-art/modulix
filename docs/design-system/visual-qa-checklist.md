@@ -16,7 +16,7 @@ Her yeni ya da değişen ekran için açık ve koyu temada, **1440px**, **1024px
 - [ ] Bütün input/select yükseklikleri aynı (40px; dokunmatikte 44px).
 - [ ] Etiketler 13px/600, yardım ve hata metni 12px, hata alanın altında.
 - [ ] Rozetlerde ton çiftleri (`--mx-tone-*`), durum metinle de yazılı.
-- [ ] CSS'te sabit renk yok (`grep -n '#[0-9a-fA-F]\{3,6\}' wwwroot/css/app.css` yalnızca token bloklarını ve açıklamalı istisnaları döndürmeli, örn. logo önizlemesinin beyaz zemini).
+- [ ] CSS'te sabit renk yok (`grep -n '#[0-9a-fA-F]\{3,6\}' wwwroot/css/*.css` yalnızca `tokens.css` içindeki token bloklarını ve açıklamalı istisnaları döndürmeli, örn. logo önizlemesinin beyaz zemini).
 
 ## Responsive
 - [ ] 390px'te yatay kaydırma yok (`document.documentElement.scrollWidth <= innerWidth`).

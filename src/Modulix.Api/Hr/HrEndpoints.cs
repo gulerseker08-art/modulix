@@ -9,7 +9,7 @@ using Modulix.Shared.Records;
 namespace Modulix.Api.Hr;
 
 /// <summary>
-/// İK iş akışı uçları (ADR-0042): izin talebi (dilim 2), masraf beyanı (dilim 3) ve zimmet (dilim 4, tutanak PDF'i dahil) işe giriş/çıkış (dilim 5), duyuru okundu işareti (dilim 6) ve anketler (dilim 7: durum, yanıt, sonuç). Talepler, haklar ve tatiller genel kayıt uçlarındadır (<c>/api/records/hr.leave-request</c>,
+/// İK iş akışı uçları (ADR-0042): izin talebi (dilim 2), masraf beyanı (dilim 3) ve zimmet (dilim 4, tutanak PDF'i dahil) işe giriş/çıkış (dilim 5), duyuru okundu işareti (dilim 6) ve anketler (dilim 7: durum, yanıt, sonuç) ve Core departmanları (bölüm 22: seçici, eski değerlerin eşlenmesi). Talepler, haklar ve tatiller genel kayıt uçlarındadır (<c>/api/records/hr.leave-request</c>,
 /// <c>hr.leave-balance</c>, <c>hr.holiday</c>); talebin durumu yalnızca buradaki komutlarla değişir. Yetki ve onaylayan kuralı serviste denetlenir;
 /// tenant oturumdan gelir. Önizleme yazmaz (yolu <c>/preview</c> ile biter); salt okunur lisans evresinde eylem POST'u 403'tür.
 /// </summary>
@@ -152,6 +152,30 @@ public static class HrEndpoints
                     [.. result.Value.Questions.Select(q => new SurveyQuestionResultDto(q.QuestionId, q.Text, q.QuestionType, q.AnswerCount, q.Average,
                         [.. q.Counts.Select(c => new SurveyOptionCountDto(c.Option, c.Count))], q.Texts))]))
                 : RecordEndpoints.ToProblem(result.Error!);
+        });
+
+        // Departmanlar Core'dan (ADR-0042 bölüm 22): seçici için ağaç; eski İK departman değerlerinin adla eşlenmesi (önizleme + uygulama).
+        group.MapGet("/business-units", async (IDepartmentMapping mapping, CancellationToken ct) =>
+        {
+            var result = await mapping.UnitsAsync(ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value!.Select(u => new HrBusinessUnitDto(u.Id, u.ParentId, u.Name, u.PathNames, u.Depth, u.IsActive)).ToList())
+                : RecordEndpoints.ToProblem(result.Error!);
+        });
+
+        group.MapGet("/department-mapping", async (IDepartmentMapping mapping, CancellationToken ct) =>
+        {
+            var result = await mapping.PreviewAsync(ct);
+            return result.IsSuccess
+                ? Results.Ok(result.Value!.Select(r => new DepartmentMappingRowDto(
+                    r.DepartmentKey, r.Label, r.BusinessUnitId, r.BusinessUnitName, r.EmployeeCount, r.AnnouncementCount, r.SurveyCount)).ToList())
+                : RecordEndpoints.ToProblem(result.Error!);
+        });
+
+        group.MapPost("/department-mapping", async (IDepartmentMapping mapping, CancellationToken ct) =>
+        {
+            var result = await mapping.ApplyAsync(ct);
+            return result.IsSuccess ? Results.Ok(new DepartmentMappingResultDto(result.Value)) : RecordEndpoints.ToProblem(result.Error!);
         });
 
         return app;

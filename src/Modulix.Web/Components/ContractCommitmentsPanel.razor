@@ -151,7 +151,7 @@
     }
     else if (commitments.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("contracts.commitmentsPanel.empty")</p>
+        <EmptyState Compact="true" Title="@Texts.Get("contracts.commitmentsPanel.empty")" />
     }
 
     @foreach (var c in commitments)

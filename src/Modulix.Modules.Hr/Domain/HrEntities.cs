@@ -89,7 +89,13 @@ public sealed class Employee : HrEntity
 
     public string? JobTitle { get; internal set; }
 
-    /// <summary>Departman (Y9b seçim listesi <c>hr.department</c>); boş olabilir.</summary>
+    /// <summary>
+    /// Departman: Core'un departman ağacından (ADR-0042 bölüm 22). Kullanıcı hesabı bağlı çalışanda kullanıcının Core departmanıdır ve kart kaydedilirken
+    /// ondan alınır; hesabı olmayan çalışanda kartta seçilir.
+    /// </summary>
+    public Guid? BusinessUnitId { get; internal set; }
+
+    /// <summary>Eski İK departman listesi değeri (<c>hr.department</c>); bölüm 22'den sonra yazılmaz, eşleme aracı bununla Core departmanına geçirir.</summary>
     public string? DepartmentKey { get; internal set; }
 
     /// <summary>Bağlı olduğu yönetici (başka bir çalışan kartı); en üst yöneticide boştur.</summary>
@@ -648,7 +654,13 @@ public sealed class Announcement : HrEntity
 
     public string Body { get; internal set; } = string.Empty;
 
-    /// <summary>Hedef departman (Y9b <c>hr.department</c>); boşsa bütün çalışanlar.</summary>
+    /// <summary>
+    /// Hedef Core departmanı (ADR-0026, ADR-0042 bölüm 22); alt departmanlar dahildir. Boşsa ve <see cref="AudienceDepartmentKey"/> da boşsa bütün
+    /// çalışanlar.
+    /// </summary>
+    public Guid? AudienceBusinessUnitId { get; internal set; }
+
+    /// <summary>Eski hedef departman (<c>hr.department</c>); yalnızca Core departmanına eşlenmemiş eski kayıtlarda doludur, yeni seçimle temizlenir.</summary>
     public string? AudienceDepartmentKey { get; internal set; }
 
     public bool IsPinned { get; internal set; }
@@ -704,7 +716,13 @@ public sealed class Survey : HrEntity
     /// <summary>Yalnızca oluştururken seçilir; yanıt toplandıktan sonra değişmesi verilen sözü bozar.</summary>
     public bool IsAnonymous { get; internal set; }
 
-    /// <summary>Hedef departman (Y9b <c>hr.department</c>); boşsa bütün çalışanlar.</summary>
+    /// <summary>
+    /// Hedef Core departmanı (ADR-0026, ADR-0042 bölüm 22); alt departmanlar dahildir. Boşsa ve <see cref="AudienceDepartmentKey"/> da boşsa bütün
+    /// çalışanlar.
+    /// </summary>
+    public Guid? AudienceBusinessUnitId { get; internal set; }
+
+    /// <summary>Eski hedef departman (<c>hr.department</c>); yalnızca Core departmanına eşlenmemiş eski kayıtlarda doludur, yeni seçimle temizlenir.</summary>
     public string? AudienceDepartmentKey { get; internal set; }
 
     /// <summary>Bu günden sonra yanıt alınmaz; boşsa elle kapatılana kadar açık.</summary>
@@ -824,4 +842,33 @@ public sealed class PhotoAlbum : HrEntity
     public DateTimeOffset? PublishedAt { get; internal set; }
 
     public Guid? AuthorUserId { get; internal set; }
+}
+
+/// <summary>
+/// Çalışanın görev dönemi (ADR-0042 bölüm 20, yol haritası M4.2): unvan, departman, yönetici ve çalışma şekli bir başlangıç gününden itibaren geçerlidir.
+/// Satırları yalnızca çalışan kartı yazar (kart açılınca ilk dönem, bu alanlardan biri değişince önceki dönem kapanır ve yenisi açılır; ayrılınca son dönem
+/// ayrılış günüyle kapanır). Elle yazılmaz, değişmez, silinmez; değişikliğin kendisi çalışan kartının denetim kaydındadır. Görünürlüğü çalışan kartınınkidir.
+/// </summary>
+public sealed class EmployeePosition : HrEntity
+{
+    public Guid EmployeeId { get; internal set; }
+
+    public DateOnly StartDate { get; internal set; }
+
+    /// <summary>Dönemin son günü; açık dönemde boş.</summary>
+    public DateOnly? EndDate { get; internal set; }
+
+    public string? JobTitle { get; internal set; }
+
+    public string? DepartmentKey { get; internal set; }
+
+    /// <summary>Core departmanı (bölüm 22).</summary>
+    public Guid? BusinessUnitId { get; internal set; }
+
+    public Guid? ManagerEmployeeId { get; internal set; }
+
+    public string EmploymentType { get; internal set; } = Employee.EmploymentTypes.FullTime;
+
+    /// <summary>Dönemi açan değişikliği yapan kullanıcı.</summary>
+    public Guid? ChangedByUserId { get; internal set; }
 }

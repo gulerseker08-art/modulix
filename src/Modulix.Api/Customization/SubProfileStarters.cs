@@ -22,7 +22,8 @@ internal static class SubProfileStarters
                 Field(CrmModule.Entities.Opportunity, "Güzergâh", CustomFieldType.Text, showInList: true),
                 Field(CrmModule.Entities.Opportunity, "Araç tipi", CustomFieldType.Choice, showInList: true, choices: ["Tır", "Kamyon", "Kamyonet", "Frigorifik"]),
                 Field(CrmModule.Entities.Opportunity, "Yük tipi", CustomFieldType.Choice, choices: ["Paletli", "Dökme", "Soğuk zincir", "Parsiyel"]),
-            ]),
+            ],
+            [new("Taşıma türü", "Komple"), new("Taşıma türü", "Parsiyel"), new("Kapsam", "Yurt içi"), new("Kapsam", "Uluslararası")]),
         new(
             "gumruklu-antrepo",
             "Gümrüklü antrepo",
@@ -43,7 +44,8 @@ internal static class SubProfileStarters
                 Field(CrmModule.Entities.Opportunity, "Varış limanı", CustomFieldType.Text, showInList: true),
                 Field(CrmModule.Entities.Opportunity, "Konteyner tipi", CustomFieldType.Choice, choices: ["20'", "40'", "40' HC", "Dökme"]),
                 Field(CrmModule.Entities.Opportunity, "Teslim şekli (Incoterm)", CustomFieldType.Choice, choices: ["EXW", "FCA", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"]),
-            ]),
+            ],
+            [new("Taşıma türü", "Tam konteyner"), new("Taşıma türü", "Parsiyel konteyner"), new("Taşıma türü", "Dökme"), new("Kapsam", "Uluslararası")]),
     ];
 
     private static SubProfileOptionInput Field(string entityKey, string label, CustomFieldType type, bool showInList = false, string[]? choices = null) =>

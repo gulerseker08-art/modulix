@@ -135,7 +135,7 @@
                                 }
                                 @if (!FilteredMembers().Any())
                                 {
-                                    <p class="text-muted mb-0">@Texts.Get("reports.noUserFound")</p>
+                                    <EmptyState Compact="true" Title="@Texts.Get("reports.noUserFound")" />
                                 }
                             </div>
                             <p class="small text-muted mt-1" role="status">@Texts.Get("reports.run.usersSelected", shareUsers.Count)</p>
