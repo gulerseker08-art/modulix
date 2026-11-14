@@ -52,6 +52,9 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
 
     protected override IReadOnlyDictionary<string, RecordFilter<Company>> Filters { get; } = new Dictionary<string, RecordFilter<Company>>
     {
+        // Oluşturulma anı aralığı (ana sayfa dönem karşılaştırması): alt sınır dahil, üst sınır hariç.
+        ["createdSince"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(c => c.CreatedAt >= time) : null,
+        ["createdBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(c => c.CreatedAt < time) : null,
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(c => c.OwnerId == owner) : null,
         ["partyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PartyId == id) : null,
         // Ada göre tam eşleşme (içe aktarmada firma bağlantısı ve aynı ad uyarısı); benzerlik mükerrer önerisindedir.
@@ -300,6 +303,9 @@ internal sealed partial class ContactRecordStore(CrmStoreContext context) : CrmR
 
     protected override IReadOnlyDictionary<string, RecordFilter<Contact>> Filters { get; } = new Dictionary<string, RecordFilter<Contact>>
     {
+        // Oluşturulma anı aralığı (ana sayfa dönem karşılaştırması): alt sınır dahil, üst sınır hariç.
+        ["createdSince"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(c => c.CreatedAt >= time) : null,
+        ["createdBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(c => c.CreatedAt < time) : null,
         ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.CompanyId == id) : null,
         ["personId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PersonId == id) : null,
         // Lookup bağımlılığı (ADR-0016): birincil firması ya da aktif ilişkisi bu firma olan kişiler.

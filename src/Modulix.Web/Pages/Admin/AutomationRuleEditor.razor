@@ -249,7 +249,7 @@
                     }
                     else if (definition.Condition.Leaves.Count == 0)
                     {
-                        <p class="text-muted" role="status">Koşul yok.</p>
+                        <EmptyState Compact="true" Title="Koşul yok." />
                     }
                     else
                     {
@@ -265,7 +265,7 @@
                 <ChildContent>
                     @if (definition.Actions.Count == 0)
                     {
-                        <p class="text-muted" role="status">Henüz aksiyon yok. Kuralın bir şey yapması için en az bir aksiyon ekleyin.</p>
+                        <EmptyState Compact="true" Title="Henüz aksiyon yok." Text="Kuralın bir şey yapması için en az bir aksiyon ekleyin." />
                     }
 
                     @for (var i = 0; i < definition.Actions.Count; i++)
@@ -342,6 +342,13 @@
                                                             <option value="@o.Key">@o.Label</option>
                                                         }
                                                     </select>
+                                                }
+                                                else if (p.Type == "Lookup" && p.LookupKey is { } lookupKey)
+                                                {
+                                                    @* Kayıt seçimi (ör. bildirimin alıcısı): ortak lookup ile seçilir (ADR-0016); kimlik elle yazılmaz. *@
+                                                    <LookupPicker Id="@($"param-{step.Id}-{p.Name}")" LookupKey="@lookupKey" Required="p.Required"
+                                                                  Value="@(Guid.TryParse(step.ValueText(p.Name), out var chosen) ? chosen : null)"
+                                                                  ValueChanged="id => step.SetValue(p.Name, p.Type, id?.ToString())" />
                                                 }
                                                 else if (p.Type == "Boolean")
                                                 {

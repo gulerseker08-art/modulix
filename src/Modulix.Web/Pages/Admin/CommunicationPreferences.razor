@@ -51,7 +51,7 @@
         }
         else if (prefs is not null && prefs.Items.Count == 0)
         {
-            <p class="text-muted" role="status">Bu süzgece uyan tercih kaydı yok.</p>
+            <EmptyState Compact="true" Title="Bu süzgece uyan tercih kaydı yok." />
         }
         else if (prefs is not null)
         {
@@ -157,7 +157,7 @@
         }
         else if (blocks is not null && blocks.Items.Count == 0)
         {
-            <p class="text-muted" role="status">Bu süzgece uyan engel yok.</p>
+            <EmptyState Compact="true" Title="Bu süzgece uyan engel yok." />
         }
         else if (blocks is not null)
         {
@@ -317,7 +317,7 @@
         }
         else if (topicPrefs is not null && topicPrefs.Items.Count == 0)
         {
-            <p class="text-muted" role="status">Konudan çıkış kaydı yok.</p>
+            <EmptyState Compact="true" Title="Konudan çıkış kaydı yok." />
         }
         else if (topicPrefs is not null)
         {

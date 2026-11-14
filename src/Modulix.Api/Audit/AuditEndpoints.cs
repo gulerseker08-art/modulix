@@ -35,11 +35,19 @@ public static class AuditEndpoints
     }
 
     private static async Task<IResult> ListAsync(
-        Guid? userId, string? entityKey, AuditOperation? action, AuditSource? source, DateOnly? from, DateOnly? to, int? page,
+        Guid? userId, string? entityKey, AuditOperation? action, AuditSource? source, DateOnly? from, DateOnly? to, int? page, string? sort,
         IAuditLog log, ITenantSettings settings, CancellationToken ct)
     {
+        // Başlığa göre sıralama (ADR-0036): yalnızca bilinen anahtarlar kabul edilir.
+        if (!string.IsNullOrEmpty(sort) && !AuditQuery.SortKeys.Contains(sort))
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]> { ["sort"] = ["Geçersiz sıralama."] }, statusCode: StatusCodes.Status422UnprocessableEntity);
+        }
+
         var zone = await ZoneAsync(settings, ct);
-        var result = await log.QueryAsync(Query(userId, entityKey, action, source, from, to, page ?? 1, zone), ct);
+        var query = Query(userId, entityKey, action, source, from, to, page ?? 1, zone) with { Sort = string.IsNullOrEmpty(sort) ? null : sort };
+        var result = await log.QueryAsync(query, ct);
         return Results.Ok(ToResponse(result));
     }
 

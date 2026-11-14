@@ -15,6 +15,8 @@ public static class CrmLookupDefinitions
     public const string OpportunityContact = "crm.opportunity.contact";
     public const string LeadCompany = "crm.lead.company";
     public const string LeadContact = "crm.lead.contact";
+    public const string LeadCampaign = "crm.lead.campaign";
+    public const string OpportunityCampaign = "crm.opportunity.campaign";
     public const string ActivityCompany = "crm.activity.company";
     public const string ActivityContact = "crm.activity.contact";
     public const string ActivityOpportunity = "crm.activity.opportunity";
@@ -63,6 +65,19 @@ public static class CrmLookupDefinitions
             DependsOnHint = dependsOn is null ? null : "Firma seçiliyse kişiler o firmayla sınırlanır.",
         };
 
+    /// <summary>
+    /// Kampanya (ADR-0025): hedef Pazarlama modülünün kaydıdır. Arama ve etiket kayıt boru hattından, kullanıcının kampanya okuma izni ve veri kapsamıyla gelir;
+    /// Pazarlama modülü kapalıysa ya da izin yoksa seçici boş kalır, kayıtlı bağ korunur.
+    /// </summary>
+    private static LookupDefinition Campaign(string key, string source) =>
+        new(key, source, "campaignId", "Kampanya", LookupTargetKind.Record, CrmModule.ExternalEntities.Campaign)
+        {
+            LabelFields = ["name"],
+            SecondaryFields = ["code"],
+            SearchDescription = "Kampanya adı ve kodu",
+            ViewPath = "pazarlama/kampanyalar/{id}",
+        };
+
     private static LookupDefinition Owner(string key, string source, string title) =>
         new(key, source, "ownerId", title, LookupTargetKind.Member)
         {
@@ -77,6 +92,8 @@ public static class CrmLookupDefinitions
         Contact(OpportunityContact, CrmModule.Entities.Opportunity, "contactId", "Kişi"),
         Company(LeadCompany, CrmModule.Entities.Lead, "companyId", "Mevcut firma"),
         Contact(LeadContact, CrmModule.Entities.Lead, "contactId", "Mevcut kişi"),
+        Campaign(LeadCampaign, CrmModule.Entities.Lead),
+        Campaign(OpportunityCampaign, CrmModule.Entities.Opportunity),
         Company(ActivityCompany, CrmModule.Entities.Activity, "companyId", "Firma"),
         Contact(ActivityContact, CrmModule.Entities.Activity, "contactId", "Kişi"),
         new(ActivityOpportunity, CrmModule.Entities.Activity, "opportunityId", "Fırsat", LookupTargetKind.Record, CrmModule.Entities.Opportunity)

@@ -42,6 +42,8 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
         Field.Reference<Opportunity, Contact>("contactId", "Kişi bulunamadı.", o => o.ContactId, (o, v) => o.ContactId = v),
         // Kaynak Lead yalnızca dönüşüm işleminde (iş akışı kapısı açıkken) yazılır; genel uçlardan gelen değer yok sayılır.
         Field.Id<Opportunity>("sourceLeadId", o => o.SourceLeadId, (o, v) => o.SourceLeadId = v).AsSystem(),
+        // Kampanya bağı (ADR-0025): Pazarlama modülünün kaydı; dönüşümde müşteri adayından geçer, elle seçilirse görünürlüğü denetlenir (LookupGuard).
+        Field.Id<Opportunity>("campaignId", o => o.CampaignId, (o, v) => o.CampaignId = v),
         // Aşama oluştururken serbesttir; sonra yalnızca aşama değiştirme eylemiyle (kapı) değişir.
         Field.ListChoice<Opportunity>("stage", CrmModule.Lists.OpportunityStage, o => o.Stage, (o, v) => o.Stage = v!).GatedUpdate(),
         Field.Text<Opportunity>("status", Opportunity.StatusMaxLength, o => o.Status, (o, v) => o.Status = v!).AsSystem(),
@@ -89,11 +91,15 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
 
     protected override IReadOnlyDictionary<string, RecordFilter<Opportunity>> Filters { get; } = new Dictionary<string, RecordFilter<Opportunity>>
     {
+        // Oluşturulma anı aralığı (ana sayfa dönem karşılaştırması): alt sınır dahil, üst sınır hariç.
+        ["createdSince"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(o => o.CreatedAt >= time) : null,
+        ["createdBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(o => o.CreatedAt < time) : null,
         // Hizmet kapsamı (ADR-0029 Dilim F): tam kod eşleşir.
         ["serviceScope"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(o => ("," + o.ServiceScope + ",").Contains("," + code + ",")) : null,
         ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(o => o.CompanyId == id) : null,
         ["contactId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(o => o.ContactId == id) : null,
         ["sourceLeadId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(o => o.SourceLeadId == id) : null,
+        ["campaignId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(o => o.CampaignId == id) : null,
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(o => o.OwnerId == owner) : null,
         ["number"] = (q, v, _) => v.Trim() is { Length: > 0 } number ? q.Where(o => o.OpportunityNumber == number) : null,
         ["status"] = (q, v, _) => OpportunityStatus.All.Contains(v) ? q.Where(o => o.Status == v) : null,
@@ -228,7 +234,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
     {
         await LoadAsync(cancellationToken);
         var stored = await Context.Data.Set<Opportunity>().AsNoTracking().Where(o => o.Id == entity.Id)
-            .Select(o => new Stored(o.CompanyId, o.ContactId, o.Stage, o.Status, o.ExpectedCloseDate, o.Probability, o.ServiceScope)).SingleOrDefaultAsync(cancellationToken);
+            .Select(o => new Stored(o.CompanyId, o.ContactId, o.Stage, o.Status, o.ExpectedCloseDate, o.Probability, o.ServiceScope, o.CampaignId)).SingleOrDefaultAsync(cancellationToken);
 
         // Lookup alanlarının sunucu doğrulaması (ADR-0016): bağlanan firma/kişi çağıranın görebildiği kayıt olmalı ve kişi seçili
         // firmayla ilişkili olmalıdır. İş akışı yazımlarında ve değişmeyen bağlarda denetlenmez.
@@ -240,6 +246,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
             await LookupGuard.AddContactCompanyErrorAsync(
                 errors, Context, "contactId", entity.ContactId, entity.CompanyId, stored?.ContactId, stored?.CompanyId, cancellationToken);
             await ServiceScopeGuard.AddErrorsAsync(errors, Context, "serviceScope", entity.ServiceScope, stored?.ServiceScope, cancellationToken);
+            await LookupGuard.AddCampaignErrorAsync(errors, Context, "campaignId", entity.CampaignId, stored?.CampaignId, cancellationToken);
             if (errors.Count > 0)
             {
                 throw new RecordValidationException(errors);
@@ -353,7 +360,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
     // ---- Yardımcılar
 
     private sealed record Stored(
-        Guid CompanyId, Guid? ContactId, string Stage, string Status, DateOnly? ExpectedCloseDate, int? Probability, string? ServiceScope);
+        Guid CompanyId, Guid? ContactId, string Stage, string Status, DateOnly? ExpectedCloseDate, int? Probability, string? ServiceScope, Guid? CampaignId);
 
     private async Task LoadAsync(CancellationToken cancellationToken)
     {

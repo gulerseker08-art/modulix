@@ -56,7 +56,7 @@
         <h2 id="rules-title">@Texts.Get("support.routing.rules")</h2>
         <p class="small text-muted">@Texts.Strong("support.routing.rulesHelp", Texts.Get("support.routing.firstMatch"))</p>
         @if (rules is null) { <LoadingState Kind="LoadingKind.Table" /> }
-        else if (rules.Count == 0) { <p class="text-muted">@Texts.Get("support.routing.noRules")</p> }
+        else if (rules.Count == 0) { <EmptyState Compact="true" Title="@Texts.Get("support.routing.noRules")" /> }
         else
         {
             <table class="table record-table">

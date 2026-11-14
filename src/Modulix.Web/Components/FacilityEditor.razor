@@ -9,7 +9,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Facility is null ? "Yeni tesis" : "Tesis kartı")</h2>
+            <h2>@(Facility is null ? Texts.Get("warehouse.facilities.new") : Texts.Get("warehouse.facilityEditor.card"))</h2>
             @if (Facility is not null)
             {
                 <p>@form.Code · @form.Name</p>
@@ -17,13 +17,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -38,24 +38,24 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Tesis özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("warehouse.facilityEditor.summary")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true"><AppIcon Name="warehouse" Size="24" /></span>
-                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Name) ? "Tesis adı" : form.Name)</strong>
-                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.Code) ? "Kod" : form.Code.ToUpperInvariant())</span>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Name) ? Texts.Get("warehouse.facilityEditor.namePlaceholder") : form.Name)</strong>
+                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.Code) ? Texts.Get("warehouse.code") : form.Code.ToUpperInvariant())</span>
                 </div>
-                <h3 class="summary-heading">Tesis özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("warehouse.facilityEditor.summary")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Ülke</dt><dd>@(string.IsNullOrWhiteSpace(form.CountryCode) ? "—" : form.CountryCode.ToUpperInvariant())</dd></div>
-                    <div><dt>Gümrük uzantısı</dt><dd>@(form.CustomsEnabled ? "Açık" : "Kapalı")</dd></div>
-                    <div><dt>Durum</dt><dd>@(form.IsActive ? "Etkin" : "Pasif")</dd></div>
+                    <div><dt>@Texts.Get("warehouse.country")</dt><dd>@(string.IsNullOrWhiteSpace(form.CountryCode) ? "—" : form.CountryCode.ToUpperInvariant())</dd></div>
+                    <div><dt>@Texts.Get("warehouse.customsExtension")</dt><dd>@WarehouseLabels.OnOffText(form.CustomsEnabled)</dd></div>
+                    <div><dt>@Texts.Get("common.field.status")</dt><dd>@WarehouseLabels.ActiveText(form.IsActive)</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Tesis formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("warehouse.facilityEditor.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
@@ -63,7 +63,7 @@
                             <label class="@f.LabelClass()" for="facility-code">@f.Label</label>
                             <input id="facility-code" class="form-control" maxlength="30" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Code" />
                             <FieldError Field="code" Errors="errors" />
-                            <small class="text-muted">Harf, rakam ve alt çizgi; büyük harfe çevrilir. Lokasyon kodlarında kullanılabilir.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.facilityEditor.codeHelp")</small>
                             break;
                         case "name":
                             <label class="@f.LabelClass()" for="facility-name">@f.Label</label>
@@ -90,7 +90,7 @@
                                 <label class="form-check-label" for="facility-customs">@f.Label</label>
                             </div>
                             <FieldError Field="customsEnabled" Errors="errors" />
-                            <small class="text-muted">Kapalı tesiste gümrük denetimli alan tanımlanamaz. Gümrük denetimli alanı olan tesiste kapatılamaz.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.facilityEditor.customsHelp")</small>
                             break;
                         case "allowMixedZones":
                             <div class="form-check form-switch">
@@ -98,18 +98,18 @@
                                 <label class="form-check-label" for="facility-mixed">@f.Label</label>
                             </div>
                             <FieldError Field="allowMixedZones" Errors="errors" />
-                            <small class="text-muted">Varsayılan kapalı. Hukuki doğrulama yapılmadan açılması önerilmez.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.facilityEditor.mixedHelp")</small>
                             break;
                     }
                 </Field>
             </LayoutForm>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </div>
@@ -147,7 +147,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir tesis verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>

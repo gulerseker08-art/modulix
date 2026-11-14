@@ -172,6 +172,10 @@ public class ModulixDbContext(
 
     public DbSet<SubProfileOption> SubProfileOptions => Set<SubProfileOption>();
 
+    public DbSet<SubProfileFeature> SubProfileFeatures => Set<SubProfileFeature>();
+
+    public DbSet<SubProfileRule> SubProfileRules => Set<SubProfileRule>();
+
     public DbSet<TenantLookupSetting> LookupSettings => Set<TenantLookupSetting>();
 
     public DbSet<TenantFormLayout> FormLayouts => Set<TenantFormLayout>();

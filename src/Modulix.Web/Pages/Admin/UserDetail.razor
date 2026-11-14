@@ -123,7 +123,7 @@
                                 {
                                     @if (oldUnitMembers.Count == 0)
                                     {
-                                        <p class="text-muted small">Eski departmanda devralabilecek etkin başka kullanıcı yok.</p>
+                                        <EmptyState Compact="true" Title="Eski departmanda devralabilecek etkin başka kullanıcı yok." />
                                     }
                                     else
                                     {
@@ -198,7 +198,7 @@
                 }
                 else if (companies.Count == 0)
                 {
-                    <p class="text-muted">Tanımlı işletici şirket yok.</p>
+                    <EmptyState Compact="true" Title="Tanımlı işletici şirket yok." />
                 }
                 else
                 {

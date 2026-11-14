@@ -1,4 +1,4 @@
-namespace Modulix.Core.Pricing;
+namespace Modulix.Core.Contracts.Pricing;
 
 /// <summary>Fiyatlandırma kuralı ihlali. <see cref="Code"/> makine okunur nedendir (arayüz kullanıcıya nedenini gösterir).</summary>
 public sealed class PricingException(string code, string message) : Exception(message)

@@ -10,7 +10,7 @@
     }
     else if (actions.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("orders.actions.none")</p>
+        <EmptyState Compact="true" Title="@Texts.Get("orders.actions.none")" />
     }
     else
     {

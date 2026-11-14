@@ -174,7 +174,7 @@
                             }
                             else if (links is not null)
                             {
-                                <p class="text-muted">@Texts.Get("crm.contact.companies.none")</p>
+                                <EmptyState Compact="true" Title="@Texts.Get("crm.contact.companies.none")" />
                             }
                         </section>
                     </div>
@@ -211,7 +211,7 @@
                                 }
                                 else if (activities is not null)
                                 {
-                                    <p class="text-muted">@Texts.Get("crm.contact.acts.none")</p>
+                                    <EmptyState Compact="true" Title="@Texts.Get("crm.contact.acts.none")" />
                                 }
                             </section>
                         }
@@ -248,7 +248,7 @@
                                 }
                                 else if (opportunities is not null)
                                 {
-                                    <p class="text-muted">@Texts.Get("crm.contact.opps.none")</p>
+                                    <EmptyState Compact="true" Title="@Texts.Get("crm.contact.opps.none")" />
                                 }
                             </section>
                         }

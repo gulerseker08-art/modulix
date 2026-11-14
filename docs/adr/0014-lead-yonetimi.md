@@ -86,7 +86,7 @@ Ayrı olay türü eklenmedi (gereksiz çoğaltma): `LeadCreated` = `RecordCreate
 ## Bilinçli sınırlar ve açık işler
 
 - **İzin/rıza (consent)** altyapısı yok; gönderim pazarlama izni sayılmaz ve izin kaydı oluşmaz. İzin amacı/kaynağı/zamanı izlemesi altyapı geldiğinde eklenecek.
-- **AI ajan:** altyapı yok (`Modulix.AI` boş). `ILeadWorkflow`, `ILeadConversion`, `ILeadIntake` ve Lead sorguları (kayıt boru hattı) araç olarak sunulabilecek biçimde tasarlandı; `SearchLeads`, `GetLeadDetails`, `ListLeadsNeedingFollowUp`, `GetLeadActivityHistory`, `SuggestLeadNextAction`, `CreateLeadFollowUpActivity` araçları **yapılmadı**. Kural: ajan Lead'i kendiliğinden elemez, birleştirmez, dönüştürmez; yazma eylemleri kullanıcının izin ve onay politikasından geçer.
+- **AI ajan:** altyapı yok (kurallar: [ADR-0047](0047-yapay-zeka-ajan-kurallari.md) taslağı) (`Modulix.AI` boş). `ILeadWorkflow`, `ILeadConversion`, `ILeadIntake` ve Lead sorguları (kayıt boru hattı) araç olarak sunulabilecek biçimde tasarlandı; `SearchLeads`, `GetLeadDetails`, `ListLeadsNeedingFollowUp`, `GetLeadActivityHistory`, `SuggestLeadNextAction`, `CreateLeadFollowUpActivity` araçları **yapılmadı**. Kural: ajan Lead'i kendiliğinden elemez, birleştirmez, dönüştürmez; yazma eylemleri kullanıcının izin ve onay politikasından geçer.
 - CSV/Excel içe aktarma, kampanya, e-posta ile Lead, Lead kuralı tabanlı otomatik atama (round-robin, bölge, ürün) ve Lead birleştirme yapılmadı; genişleme noktaları: `ExternalSource` + `ILeadIntake`, `ILeadQualificationRule`, atama eylemi.
 - Sunucu tarafı toplama (rapor), ilk temas gecikmesinin bildirimi/hatırlatıcısı ve Lead'e özel arka plan işi yapılmadı. Dönüşümde ilk temas gecikmesi yalnızca göstergedir.
 - Arkasında ters vekil (proxy) varsa hız sınırı için `ForwardedHeaders` yapılandırılmalıdır; aksi halde tüm istekler proxy IP'sinden sayılır.
@@ -96,7 +96,7 @@ Ayrı olay türü eklenmedi (gereksiz çoğaltma): `LeadCreated` = `RecordCreate
 "Bilinçli sınırlar ve açık işler" listesindeki bazı maddeler sonraki ADR'lerle kapandı ya da engeli kalktı; kodla karşılaştırıldı:
 
 - **CSV/Excel içe aktarma:** yapıldı. Genel içe aktarma altyapısı [ADR-0033](0033-import-takibi-ve-islem-gunlugu.md) ile geldi; ilk tanım müşteri adayıdır (`CrmImports`), XLSX dilim 4a ile eklendi.
-- **Kampanya:** kampanya ve segment modülü var ([ADR-0025](0025-kampanya-ve-segment-yonetimi.md)); müşteri adayına `CampaignId` bağı **henüz yok** (öncelik listesi A-12).
+- **Kampanya:** kampanya ve segment modülü var ([ADR-0025](0025-kampanya-ve-segment-yonetimi.md)); müşteri adayına `campaignId` bağı **yapıldı** (14 Kasım 2026, A-12): alan + lookup `crm.lead.campaign` + `campaignId` süzgeci; kampanya yanıtından açılan aday kampanyaya otomatik bağlanır, dönüşümde bağ fırsata geçer. Kampanya Pazarlama modülünün kaydı olduğundan veritabanında yabancı anahtar yoktur; bağ kayıt sırasında kayıt boru hattından çağıranın yetkisiyle doğrulanır (ayrıntı ADR-0025 "CRM kampanya bağı").
 - **Otomasyon/hatırlatma altyapısı:** kural ve zamanlanmış iş altyapısı ile bildirim kutusu var ([ADR-0027](0027-kural-ve-is-akisi-altyapisi.md)); CRM otomasyon şablonları müşteri adayı türünü tanır. İlk temas gecikmesi bildirimi ayrıca yazılmadı.
 - **Raporlama:** sunucu tarafı müşteri adayı raporları [ADR-0035](0035-raporlama-ve-satis-tahmini.md) kapsamındadır.
 - **Hâlâ geçerli:** kural tabanlı otomatik atama (ürün kararı bekliyor, öncelik listesi B), müşteri adayı birleştirme, e-posta ile müşteri adayı, izin/rıza altyapısı (hukuk kararı, ADR-0025) ve AI araçları (`Modulix.AI` hâlâ boş).

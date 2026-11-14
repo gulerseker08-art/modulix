@@ -75,6 +75,9 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
     /// </summary>
     protected override IReadOnlyDictionary<string, RecordFilter<Activity>> Filters { get; } = new Dictionary<string, RecordFilter<Activity>>
     {
+        // Oluşturulma anı aralığı (ana sayfa dönem karşılaştırması): alt sınır dahil, üst sınır hariç.
+        ["createdSince"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(a => a.CreatedAt >= time) : null,
+        ["createdBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(a => a.CreatedAt < time) : null,
         // Gecikmiş: açık durumda ve son tarihi verilen andan önce. Tamamlanmış/iptal kayıt hiçbir zaman gecikmiş sayılmaz.
         ["overdue"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(a => OpenStates.Contains(a.Status) && a.DueAt != null && a.DueAt < time) : null,
         ["open"] = (q, v, _) => FilterValue.Bool(v) is { } open

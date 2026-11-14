@@ -4,8 +4,8 @@
 @using System.Text.Json.Nodes
 @inject ApiClient Api
 
-<section class="settings-group" aria-label="Beyanname satırları">
-    <h2>Satırlar</h2>
+<section class="settings-group" aria-label="@Texts.Get("warehouse.linesPanel.label")">
+    <h2>@Texts.Get("warehouse.linesPanel.title")</h2>
 
     @if (message is not null)
     {
@@ -14,7 +14,7 @@
 
     @if (Locked)
     {
-        <div class="alert alert-info" role="status">Bu beyanname iptal durumunda; satırları değiştirilemez.</div>
+        <div class="alert alert-info" role="status">@Texts.Get("warehouse.linesPanel.locked")</div>
     }
 
     @if (editing)
@@ -25,7 +25,7 @@
     else if (CanWrite && !Locked)
     {
         <div class="form-actions">
-            <button type="button" class="btn btn-tonal" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Satır ekle</button>
+            <button type="button" class="btn btn-tonal" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("warehouse.linesPanel.add")</button>
         </div>
     }
 
@@ -35,19 +35,19 @@
     }
     else if (lines.Count == 0)
     {
-        <p class="text-muted" role="status">Bu beyannamede henüz satır yok.</p>
+        <EmptyState Compact="true" Title="@Texts.Get("warehouse.linesPanel.empty")" />
     }
     else
     {
         <p class="text-muted" role="status" aria-live="polite">
-            @lines.Count satır · Brüt @WarehouseLabels.Number(lines.Sum(l => WarehouseLabels.Decimal(l, "grossKg"))) kg · Net @WarehouseLabels.Number(lines.Sum(l => WarehouseLabels.Decimal(l, "netKg"))) kg
+            @Texts.Get("warehouse.linesPanel.totals", lines.Count, WarehouseLabels.Number(lines.Sum(l => WarehouseLabels.Decimal(l, "grossKg"))), WarehouseLabels.Number(lines.Sum(l => WarehouseLabels.Decimal(l, "netKg"))))
         </p>
         <table class="table record-table">
-            <caption class="visually-hidden">Beyanname satırları</caption>
+            <caption class="visually-hidden">@Texts.Get("warehouse.linesPanel.label")</caption>
             <thead>
                 <tr>
-                    <th scope="col">Satır</th><th scope="col">GTİP</th><th scope="col">Eşya tanımı</th><th scope="col">Kap</th>
-                    <th scope="col">Brüt kg</th><th scope="col">Net kg</th><th scope="col">Menşe</th><th scope="col">Miktar</th>
+                    <th scope="col">@Texts.Get("warehouse.line")</th><th scope="col">@Texts.Get("warehouse.gtip")</th><th scope="col">@Texts.Get("warehouse.goodsDescription")</th><th scope="col">@Texts.Get("warehouse.packages")</th>
+                    <th scope="col">@Texts.Get("warehouse.grossKg")</th><th scope="col">@Texts.Get("warehouse.netKg")</th><th scope="col">@Texts.Get("warehouse.origin")</th><th scope="col">@Texts.Get("warehouse.quantity")</th>
                     @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.CustomsDeclarationLineEntityKey)) { <th scope="col">@field.Label</th> }
                     <th scope="col"></th>
                 </tr>
@@ -56,14 +56,14 @@
                 @foreach (var line in lines)
                 {
                     <tr>
-                        <td data-label="Satır" class="primary">@WarehouseLabels.Number(line, "lineNo")</td>
-                        <td data-label="GTİP">@WarehouseLabels.Text(line, "gtip")</td>
-                        <td data-label="Eşya tanımı">@WarehouseLabels.Text(line, "description")</td>
-                        <td data-label="Kap">@WarehouseLabels.Number(line, "containerCount") × @Lookups.Label(WarehouseAccess.ContainerTypeList, WarehouseLabels.Text(line, "containerTypeKey"))</td>
-                        <td data-label="Brüt kg">@WarehouseLabels.Number(WarehouseLabels.Decimal(line, "grossKg"))</td>
-                        <td data-label="Net kg">@WarehouseLabels.Number(WarehouseLabels.Decimal(line, "netKg"))</td>
-                        <td data-label="Menşe">@Lookups.Label(WarehouseAccess.OriginCountryList, WarehouseLabels.Text(line, "originCountryKey"))</td>
-                        <td data-label="Miktar">@WarehouseLabels.Number(WarehouseLabels.Decimal(line, "quantity")) @Lookups.Label(WarehouseAccess.DeclarationLineUnitList, WarehouseLabels.Text(line, "unitKey"))</td>
+                        <td data-label="@Texts.Get("warehouse.line")" class="primary">@WarehouseLabels.Number(line, "lineNo")</td>
+                        <td data-label="@Texts.Get("warehouse.gtip")">@WarehouseLabels.Text(line, "gtip")</td>
+                        <td data-label="@Texts.Get("warehouse.goodsDescription")">@WarehouseLabels.Text(line, "description")</td>
+                        <td data-label="@Texts.Get("warehouse.packages")">@WarehouseLabels.Number(line, "containerCount") × @Lookups.Label(WarehouseAccess.ContainerTypeList, WarehouseLabels.Text(line, "containerTypeKey"))</td>
+                        <td data-label="@Texts.Get("warehouse.grossKg")">@WarehouseLabels.Number(WarehouseLabels.Decimal(line, "grossKg"))</td>
+                        <td data-label="@Texts.Get("warehouse.netKg")">@WarehouseLabels.Number(WarehouseLabels.Decimal(line, "netKg"))</td>
+                        <td data-label="@Texts.Get("warehouse.origin")">@Lookups.Label(WarehouseAccess.OriginCountryList, WarehouseLabels.Text(line, "originCountryKey"))</td>
+                        <td data-label="@Texts.Get("warehouse.quantity")">@WarehouseLabels.Number(WarehouseLabels.Decimal(line, "quantity")) @Lookups.Label(WarehouseAccess.DeclarationLineUnitList, WarehouseLabels.Text(line, "unitKey"))</td>
                         @foreach (var field in Lookups.ListFieldsOf(WarehouseAccess.CustomsDeclarationLineEntityKey))
                         {
                             <td data-label="@field.Label">@CustomFieldText.Format(field, line.Values["custom"] as JsonObject)</td>
@@ -71,7 +71,7 @@
                         <td class="actions">
                             @if (CanWrite && !Locked)
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(line)">Düzenle</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Open(line)">@Texts.Get("common.edit")</button>
                             }
                         </td>
                     </tr>

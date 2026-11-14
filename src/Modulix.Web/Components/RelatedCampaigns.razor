@@ -6,28 +6,28 @@
 @if (Available)
 {
     <section class="detail-section" aria-labelledby="related-campaigns">
-        <div class="section-header"><h2 id="related-campaigns">Pazarlama geçmişi</h2></div>
+        <div class="section-header"><h2 id="related-campaigns">@Texts.Get("marketing.related.title")</h2></div>
         @if (history is null)
         {
             <LoadingState Kind="LoadingKind.Table" />
         }
         else if (history.Items.Count == 0)
         {
-            <EmptyState Title="Bu müşteriye giden kampanya iletisi ya da gelen yanıt yok." />
+            <EmptyState Title="@Texts.Get("marketing.related.empty")" />
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">Pazarlama geçmişi</caption>
-                <thead><tr><th scope="col">Kampanya</th><th scope="col">Tür</th><th scope="col">Durum</th><th scope="col">Zaman</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("marketing.related.title")</caption>
+                <thead><tr><th scope="col">@Texts.Get("marketing.campaigns.col.name")</th><th scope="col">@Texts.Get("common.field.kind")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("marketing.col.time")</th></tr></thead>
                 <tbody>
                     @foreach (var i in history.Items)
                     {
                         <tr>
-                            <td data-label="Kampanya" class="primary"><a href="pazarlama/kampanyalar/@i.CampaignId">@i.CampaignName</a></td>
-                            <td data-label="Tür">@(i.Kind == "Delivery" ? "İleti" : "Yanıt: " + MarketingLabels.ResponseKind(i.Detail ?? "Other"))</td>
-                            <td data-label="Durum">@(i.Kind == "Delivery" ? MarketingLabels.DeliveryStatus(i.Status) : MarketingLabels.ResponseStatus(i.Status))</td>
-                            <td data-label="Zaman">@CrmLabels.Time(i.At)</td>
+                            <td data-label="@Texts.Get("marketing.campaigns.col.name")" class="primary"><a href="pazarlama/kampanyalar/@i.CampaignId">@i.CampaignName</a></td>
+                            <td data-label="@Texts.Get("common.field.kind")">@(i.Kind == "Delivery" ? Texts.Get("marketing.related.delivery") : Texts.Get("marketing.related.response", MarketingLabels.ResponseKind(i.Detail ?? "Other")))</td>
+                            <td data-label="@Texts.Get("common.field.status")">@(i.Kind == "Delivery" ? MarketingLabels.DeliveryStatus(i.Status) : MarketingLabels.ResponseStatus(i.Status))</td>
+                            <td data-label="@Texts.Get("marketing.col.time")">@CrmLabels.Time(i.At)</td>
                         </tr>
                     }
                 </tbody>

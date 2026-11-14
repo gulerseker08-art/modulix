@@ -12,7 +12,7 @@
     }
     else if (Block.Value is null)
     {
-        <p class="text-muted">@Texts.Get("crm.salesTarget.none")</p>
+        <EmptyState Compact="true" Title="@Texts.Get("crm.salesTarget.none")" />
         @if (Block.Problem is not null)
         {
             <div class="alert alert-warning" role="status">@Block.Problem</div>

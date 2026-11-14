@@ -169,7 +169,12 @@ public sealed class LogisticsModule : IModule
             new("logistics.trip.updated", AutomationEntityKeys.Trip, DomainEventTypes.RecordUpdated, "Sefer güncellendi"),
             new("logistics.trip-expense.created", AutomationEntityKeys.TripExpense, DomainEventTypes.RecordCreated, "Sefer masrafı girildi"),
             new("logistics.trip-expense.updated", AutomationEntityKeys.TripExpense, DomainEventTypes.RecordUpdated, "Sefer masrafı güncellendi"),
+
+            // İş olayları (ADR-0039): teslim komutu yayınlar; kuralda "İş olayı" tetikleyicisiyle kullanılır.
+            new(Events.ShipmentDelivered, AutomationEntityKeys.Shipment, Events.ShipmentDelivered, "Sevkiyat teslim edildi"),
+            new(Events.ShipmentDeliveryFailed, AutomationEntityKeys.Shipment, Events.ShipmentDeliveryFailed, "Sevkiyat teslim edilemedi"),
         ],
+        Templates = Automation.LogisticsAutomationTemplates.All,
         Fields = [.. CargoAutomationFields(AutomationEntityKeys.TransportRequest, Domain.TransportRequest.Statuses.All, RequestStatusLabels),
             .. CargoAutomationFields(AutomationEntityKeys.Shipment, Domain.Shipment.Statuses.All, ShipmentStatusLabels),
             new(AutomationEntityKeys.Trip, "status", "Durum", AutomationFieldType.Choice)

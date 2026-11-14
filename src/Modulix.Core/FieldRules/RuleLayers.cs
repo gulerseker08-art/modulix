@@ -1,15 +1,21 @@
 namespace Modulix.Core.FieldRules;
 
 /// <summary>
-/// Kural katmanı sırası (ADR-0029 K8): ürün standardı → sektör paketi → tenant uyarlaması → kapsam (şirket/şube/tesis; ileride).
+/// Kural katmanı sırası (ADR-0029 K8): ürün standardı → sektör paketi → alt profil (ADR-0041 K4) → tenant uyarlaması → kapsam (şirket/şube/tesis; ileride).
 /// Kullanıcı görünüm tercihi kural katmanı değildir: kural koyamaz, yalnızca kendi ekran görünümünü etkiler.
 /// </summary>
 public enum RuleLayerKind
 {
     ProductStandard = 0,
     SectorPackage = 1,
-    TenantAdaptation = 2,
-    Scope = 3,
+
+    /// <summary>
+    /// Etkin firma alt profillerinin kuralları (ADR-0041 K4). Tenant uyarlaması bunun üstündedir ve geçersiz kılabilir. Platform paketi bu katmanda olmaz.
+    /// Paket katmanı veritabanında metin olarak saklandığından sıra değerini kaydırmak güvenlidir.
+    /// </summary>
+    SubProfile = 2,
+    TenantAdaptation = 3,
+    Scope = 4,
 }
 
 /// <summary>Bir katmanın kuralları ve alttaki katmandan kapattığı kuralların anahtarları.</summary>

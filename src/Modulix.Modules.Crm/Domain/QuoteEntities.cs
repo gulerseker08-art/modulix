@@ -70,7 +70,7 @@ public sealed class Quote : CrmEntity, IOwnedEntity
     /// <summary>Teklifin hesaplandığı kural sürümü; tenant ayarı sonradan değişse de tarihsel teklif bu sürümle okunur.</summary>
     public int CalculationPolicyVersion { get; internal set; } = 1;
 
-    /// <summary><see cref="Core.Pricing.QuoteDiscountKind"/> adı (None, Percent, Amount).</summary>
+    /// <summary><see cref="Modulix.Core.Contracts.Pricing.QuoteDiscountKind"/> adı (None, Percent, Amount).</summary>
     public string DocumentDiscountKind { get; internal set; } = "None";
 
     public decimal DocumentDiscountValue { get; internal set; }
@@ -173,7 +173,7 @@ public sealed class QuoteLine : CrmEntity
 
     public string? TaxCode { get; internal set; }
 
-    /// <summary><see cref="Core.Pricing.QuoteLineRole"/> adı.</summary>
+    /// <summary><see cref="Modulix.Core.Contracts.Pricing.QuoteLineRole"/> adı.</summary>
     public string Role { get; internal set; } = "Standard";
 
     public bool IsSelected { get; internal set; }

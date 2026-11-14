@@ -1,7 +1,7 @@
 # ADR-0044: Modül sözleşme projeleri (modüller arası sözleşmeler Core'dan çıkar)
 
-- **Durum:** Uygulanıyor, 13 Kasım 2026. Dilim 1 (Fleet), Dilim 2 (Crm: `Sales`, `Activities`), Dilim 3 (Marketing) ve Dilim 6 (ad alanı izin listesi testi) teslim edildi; `Customs` ve `Pricing` testte geçici istisna olarak durur. Açık sorular 1-4 hâlâ karar bekliyor ve ilgili dilimlerden (4, 5) önce yanıtlanmalı.
-- **Karar (öneri):** Bir modülün başka modüllere açtığı arayüzler ve veri tipleri `Modulix.Core.Contracts` yerine o modülün kendi sözleşme projesinde (`Modulix.Modules.<Ad>.Contracts`) durur. Bir modül başka bir modülün yalnızca sözleşme projesine başvurabilir; bu bağımlılık mimari test tablosunda açıkça yazılır. `Modulix.Core.Contracts` yalnızca bütün modüllerin ortak kullandığı çekirdek sözleşmeleri tutar ve içine modüle özel alan adı eklenmesi testle engellenir.
+- **Durum:** Kabul edildi ve uygulandı, 14 Kasım 2026. Dilim 1 (Fleet), 2 (Crm), 3 (Marketing), 4 (Pricing ad alanı) ve 6 (ad alanı izin listesi testi) teslim edildi. Açık sorular 14 Kasım 2026'da karara bağlandı (aşağıda): sözleşme modülünün yeniden adlandırılması ertelendi, `Customs` sonraki ADR'ye devredildi.
+- **Karar:** Bir modülün başka modüllere açtığı arayüzler ve veri tipleri `Modulix.Core.Contracts` yerine o modülün kendi sözleşme projesinde (`Modulix.Modules.<Ad>.Contracts`) durur. Bir modül başka bir modülün yalnızca sözleşme projesine başvurabilir; bu bağımlılık mimari test tablosunda açıkça yazılır. `Modulix.Core.Contracts` yalnızca bütün modüllerin ortak kullandığı çekirdek sözleşmeleri tutar ve içine modüle özel alan adı eklenmesi testle engellenir.
 
 > Numara notu: 0043 numarası açık dallarda iki ayrı ADR tarafından kullanılıyor (`0043-firma-sektor-katalogu`, `0043-sevkiyatta-ulke-ve-uluslararasi-tasima`). Bu taslak 0044 aldı; birleştirmeden önce numara yeniden kontrol edilmeli.
 
@@ -16,7 +16,7 @@ Mimari kural: modüller yalnızca `Modulix.Core.Contracts`'a başvurur (`Project
 | `Activities` | `IFollowUpActivities` | Crm | Orders, Contracts, Marketing |
 | `Marketing` | `ICampaignLeads`, `IRecipientResolver`, `ISegmentFieldSource`, `IMessageProvider`, `IAddressLookup` | Marketing | Crm (3 dosya), Api |
 | `Customs` | GTİP kataloğu, rejim profili | Antrepo/gümrük | Warehouse, Core, Infrastructure, Api |
-| `Pricing` | `Money`, `QuoteCalculator`, `LineCalculation`, `PriceSelection`, `UnitConversion` | Belirsiz (aşağıda) | Sayılmadı |
+| `Pricing` | `Money`, `QuoteCalculator`, `LineCalculation`, `PriceSelection`, `UnitConversion` | Ortak (karar 2) | Crm, Contracts |
 
 Sonuçları:
 
@@ -60,14 +60,14 @@ Değişmez. Bugünkü kalıp korunur: sağlayan modül tenant'ta kapalıysa ya d
 
 ### `Core.Contracts`'ta kalanlar
 
-`Authorization`, `Records`, `Tenancy`, `Persistence`, `Events`, `Modules`, `Lookups`, `Customization`, `Files`, `Notifications`, `Automation`, `Approvals`, `Reporting`, `Sectors`, `SharedRecords` gibi her modülün kullandığı altyapı sözleşmeleri kalır. Mimari teste bir izin listesi eklenir: `Core.Contracts` altındaki üst düzey ad alanları bu listeyle sabitlenir, listede olmayan yeni ad alanı testi kırar.
+`Authorization`, `Records`, `Tenancy`, `Persistence`, `Events`, `Modules`, `Lookups`, `Customization`, `Files`, `Notifications`, `Automation`, `Approvals`, `Reporting`, `Sectors`, `SharedRecords` gibi her modülün kullandığı altyapı sözleşmeleri ve ortak hesap çekirdeği `Pricing` (karar 2) kalır. Mimari teste bir izin listesi eklenir: `Core.Contracts` altındaki üst düzey ad alanları bu listeyle sabitlenir, listede olmayan yeni ad alanı testi kırar.
 
-### Açık sorular (karar verilmeden kodlanmaz)
+### Açık soruların kararı (14 Kasım 2026)
 
-1. **Sözleşme modülünün adı.** `Modulix.Modules.Contracts` (satış sözleşmeleri) bu kuralla `Modulix.Modules.Contracts.Contracts` projesine yol açar. Önce modülün proje adı değiştirilmeli (ör. `Modulix.Modules.Agreements`); modül anahtarı, tablo şeması ve izin anahtarları değişmez, yalnızca proje ve ad alanı değişir.
-2. **`Pricing`.** `Money` ve birim dönüşümü birden çok modülün ihtiyacı olabilecek genel tipler; `QuoteCalculator` ise teklif alanına ait görünüyor. Kullananlar çıkarılıp ikiye ayrılmalı: genel olan Core'da kalır, teklif hesabı Crm sözleşmesine gider.
-3. **`Customs` uygulaması.** Sözleşmeler Warehouse sözleşme projesine taşınabilir. Uygulama ise `platform` şemasındaki tenant'sız tabloları kullanıyor, modüller bugün yalnızca `ITenantEntity` tablolarına erişebiliyor (`IModuleData`). Uygulamayı modüle taşımak için modüllerin platform tablosu sahibi olabilmesi gerekir; bu ayrı bir karar. Gümrük ayrı bir modül mü olmalı sorusu da burada yanıtlanmalı (ADR-0032).
-4. **Kalıcı tip adları.** Taşınan tiplerden herhangi biri outbox yükünde, denetim kaydında ya da ayarlarda .NET tip adıyla saklanıyorsa ad alanı değişikliği eski kayıtları okunamaz yapar. Her dilimde taşımadan önce kontrol edilir.
+1. **Sözleşme modülünün adı: ertelendi, ad kaydedildi.** `Modulix.Modules.Contracts` (satış sözleşmeleri) bugün başka modüle sözleşme açmıyor, bu yüzden sözleşme projesine ihtiyacı yok. Modül ilk sözleşmesini açacağı gün proje ve ad alanı `Modulix.Modules.Agreements` olur (sözleşme projesi `Modulix.Modules.Agreements.Contracts`); modül anahtarı (`contracts`), tablo şeması ve izin anahtarları değişmez. O güne kadar ad kalır; `RepositoryLayout.IsModuleContracts` dört parçalı ad kalıbıyla bu modülü sözleşme projelerinden ayırır. Not: modülün ad alanı migration anlık görüntülerinde entity adı olarak geçer; yeniden adlandırmada model anlık görüntüsünü güncelleyen boş bir migration gerekir.
+2. **`Pricing`: Core'da kalır.** İçerik arayüz değil saf hesap kodudur (`Money`, birim dönüşümü, `DiscountEngine`, `PriceSelector`, `QuoteCalculator`); Crm ve sözleşme modülü kullanır, sipariş ve faturalanabilir kalem (ADR-0037) de aynı hesaba ihtiyaç duyabilir. Sözleşme projeleri iş mantığı taşımadığı için oraya konmaz; `Core.Contracts` içinde ortak hesap çekirdeği sayılır. Yalnızca ad alanı düzeltildi: `Modulix.Core.Pricing` → `Modulix.Core.Contracts.Pricing`. Sektöre ya da modüle özel bir kural (ör. belirli bir modülün fiyat politikası) buraya eklenmez.
+3. **`Customs`: sonraki ADR'ye devredildi.** Arayüzleri (`IGtipCatalog`, `IRegimeProfileCatalog`) `Modulix.Infrastructure` `platform` şemasındaki tenant'sız tablolarla uygular. Yalnızca sözleşmeyi Warehouse sözleşme projesine taşımak `Infrastructure`'ın bir modül sözleşmesine başvurmasını gerektirir; bu bugünkü durumdan kötüdür. Sözleşme ve uygulama birlikte, uç noktaların ve platform tablolarının modüle taşınmasını ele alacak ADR'de taşınır; gümrüğün ayrı modül olup olmayacağı da orada yanıtlanır (ADR-0032). O zamana kadar `Modulix.Core.Contracts.Customs` izin listesi testinde tek geçici istisnadır (`PendingMoves`).
+4. **Kalıcı tip adları: karar değil, taşıma kontrolü.** Taşınan bir tip outbox yükünde, denetim kaydında ya da ayarlarda .NET tip adıyla saklanıyorsa ad alanı değişikliği eski kayıtları okunamaz yapar. Dilim 1-4'te kontrol edildi, böyle bir kullanım bulunmadı. İleride yapılacak her ad alanı taşımasında aynı kontrol yapılır.
 
 ### Dilimler
 
@@ -76,13 +76,13 @@ Her dilim yalnızca taşıma yapar, davranış değiştirmez; ayrı PR'dır.
 1. **Fleet.** `IVehicleDirectory` → `Modulix.Modules.Fleet.Contracts`. En küçük örnek (1 dosya, 1 kullanan modül); kural tablosu ve yeni mimari test bu dilimde eklenir.
 2. **Crm.** `Sales` ve `Activities` → `Modulix.Modules.Crm.Contracts`.
 3. **Marketing.** `Marketing` alanı → `Modulix.Modules.Marketing.Contracts`.
-4. **Sözleşme modülünün adı** (açık soru 1) ve **Pricing ayrımı** (açık soru 2).
-5. **Customs** (açık soru 3 karara bağlandıktan sonra).
+4. **Pricing ad alanı.** `Modulix.Core.Pricing` → `Modulix.Core.Contracts.Pricing` (karar 2). Sözleşme modülünün yeniden adlandırılması ertelendi (karar 1).
+5. **Customs.** Bu ADR'de yapılmaz; sonraki ADR'ye devredildi (karar 3).
 6. **Kapanış.** `Core.Contracts` ad alanı izin listesi testi (`CoreContractsNamespaceRulesTests`; Dilim 4 ve 5 beklenmeden eklendi, taşınmamış alanlar `PendingMoves` listesinde); `CLAUDE.md` ve README'deki "modüller yalnızca `Core.Contracts`'a başvurur" cümlesinin güncellenmesi.
 
 ## Kabul ölçütleri
 
-- `Core.Contracts` altında modüle özel ad alanı kalmaz (Customs ve Pricing kendi dilimlerine kadar istisna olarak listede durur).
+- `Core.Contracts` altında modüle özel ad alanı kalmaz (tek istisna `Customs`; sonraki ADR'ye kadar `PendingMoves` listesinde durur. `Pricing` ortak hesap çekirdeği olarak kalır).
 - Modüller arası her bağımlılık `AllowedReferences` tablosunda okunur.
 - Bir modül başka bir modülün ana projesine başvurursa ya da sözleşme projesi `Core.Contracts` dışında bir projeye başvurursa mimari test kırılır.
 - Sözleşme projelerinde entity ya da `DbContext` kullanımı varsa mimari test kırılır.

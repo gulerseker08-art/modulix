@@ -50,11 +50,11 @@
 
     @if (industries is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (industries.Count == 0)
     {
-        <p class="text-muted">Henüz sektör yok.</p>
+        <EmptyState Compact="true" Title="Henüz sektör yok." />
     }
     else
     {
@@ -62,14 +62,21 @@
         <p class="text-muted" role="status">@industries.Count(i => i.IsActive) etkin, @industries.Count(i => !i.IsActive) pasif sektör@(search.Length > 0 ? $" · {shown.Count} sonuç" : "")</p>
         @if (shown.Count == 0)
         {
-            <p class="text-muted">Aramaya uyan sektör yok.</p>
+            <EmptyState Icon="search" Title="Aramaya uyan sektör yok." />
         }
         else
         {
             <table class="table record-table">
-                <thead><tr><th>Ad</th><th>Kod</th><th>Durum</th><th></th></tr></thead>
+                <thead>
+                    <tr>
+                        <th scope="col"><SortHeader Label="Ad" ColumnIcon="type" Asc="name" Desc="-name" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                        <th scope="col"><SortHeader Label="Kod" ColumnIcon="hash" Asc="code" Desc="-code" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                        <th scope="col"><SortHeader Label="Durum" ColumnIcon="tag" Asc="active" Desc="-active" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                        <th scope="col"><span class="visually-hidden">Eylemler</span></th>
+                    </tr>
+                </thead>
                 <tbody>
-                    @foreach (var industry in shown)
+                    @foreach (var industry in ClientSort.Apply(shown, sort, SortColumns))
                     {
                         <tr>
                             <td data-label="Ad" class="primary">@industry.Name</td>
@@ -97,6 +104,18 @@
     private string? notice;
     private bool failed;
     private bool busy;
+
+    // Liste tamamı yüklü geldiği için sıralama istemcidedir (ClientSort); boş değer sunucunun sırasıdır.
+    private string sort = "";
+
+    private void SortBy(string value) => sort = value;
+
+    private static readonly Dictionary<string, Func<IndustryDto, object?>> SortColumns = new()
+    {
+        ["name"] = i => i.Name,
+        ["code"] = i => i.Code,
+        ["active"] = i => i.IsActive,
+    };
 
     private List<IndustryDto> Filtered
     {

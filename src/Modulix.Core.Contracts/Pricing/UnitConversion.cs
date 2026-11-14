@@ -1,4 +1,4 @@
-namespace Modulix.Core.Pricing;
+namespace Modulix.Core.Contracts.Pricing;
 
 /// <summary>Birim: bir birim grubuna (adet, ağırlık, uzunluk, süre) ait; <see cref="FactorToBase"/> grubun temel birimine katsayıdır (temel birimde 1).</summary>
 public sealed record UnitDefinition(string Key, string GroupKey, decimal FactorToBase);
