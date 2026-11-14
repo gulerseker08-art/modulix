@@ -1,8 +1,8 @@
 @* Rapor sonucunun tablosu (özet ya da kayıt satırları). Sütun başlıkları scope="col" ile etiketlidir; dar ekranda tablo yatay kaydırılabilir kapta durur.
    Özet satırında "Ayrıntı" düğmesi klavye ve ekran okuyucu yoludur (satıra tıklamak yalnızca fare kolaylığıdır). Biçim kuralları ReportCenterLabels'tadır. *@
-<div class="table-responsive report-table-wrap" tabindex="0" role="region" aria-label="@Caption">
+<div class="table-responsive report-table-wrap" tabindex="0" role="region" aria-label="@CaptionText">
     <table class="table report-table">
-        <caption class="visually-hidden">@Caption</caption>
+        <caption class="visually-hidden">@CaptionText</caption>
         <thead>
             <tr>
                 @foreach (var column in Result.Columns)
@@ -11,11 +11,11 @@
                 }
                 @if (CanDrill)
                 {
-                    <th scope="col"><span class="visually-hidden">Ayrıntı</span></th>
+                    <th scope="col"><span class="visually-hidden">@Texts.Get("reports.table.detail")</span></th>
                 }
                 @if (HasRecordLink)
                 {
-                    <th scope="col"><span class="visually-hidden">Kayıt</span></th>
+                    <th scope="col"><span class="visually-hidden">@Texts.Get("reports.table.record")</span></th>
                 }
             </tr>
         </thead>
@@ -33,9 +33,9 @@
                     @if (CanDrill)
                     {
                         <td class="text-end">
-                            <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="Ayrıntıyı göster: @title"
+                            <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="@Texts.Get("reports.table.detailAria", title)"
                                     aria-pressed="@(ReferenceEquals(row, Selected) ? "true" : "false")" @onclick="() => DrillAsync(row)" @onclick:stopPropagation>
-                                Ayrıntı
+                                @Texts.Get("reports.table.detail")
                             </button>
                         </td>
                     }
@@ -44,7 +44,7 @@
                         <td class="text-end">
                             @if (link is not null)
                             {
-                                <a href="@link" aria-label="Kaydı aç: @title">Aç</a>
+                                <a href="@link" aria-label="@Texts.Get("reports.table.openRecordAria", title)">@Texts.Get("common.open")</a>
                             }
                         </td>
                     }
@@ -62,7 +62,7 @@
                             var column = Result.Columns[i];
                             if (i == 0)
                             {
-                                <th scope="row">Toplam@(total.Currency is { Length: > 0 } currency ? $" ({currency})" : null)</th>
+                                <th scope="row">@(total.Currency is { Length: > 0 } currency ? Texts.Get("reports.table.totalCurrency", currency) : Texts.Get("reports.table.total"))</th>
                             }
                             else if (column.Role == "group")
                             {
@@ -88,7 +88,9 @@
     [Parameter, EditorRequired] public ReportResultDto Result { get; set; } = default!;
 
     /// <summary>Tablonun ekran okuyucu başlığı.</summary>
-    [Parameter] public string Caption { get; set; } = "Rapor sonucu";
+    [Parameter] public string? Caption { get; set; }
+
+    private string CaptionText => Caption ?? Texts.Get("reports.table.caption");
 
     /// <summary>Özet satırında ayrıntıya inilebilir mi (çalıştırıcı verilmişse).</summary>
     [Parameter] public bool Drillable { get; set; }

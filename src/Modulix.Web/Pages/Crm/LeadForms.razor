@@ -90,7 +90,7 @@
     }
     else if (forms.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("crm.leadForms.none")</p>
+        <EmptyState Compact="true" Title="@Texts.Get("crm.leadForms.none")" />
     }
     else
     {

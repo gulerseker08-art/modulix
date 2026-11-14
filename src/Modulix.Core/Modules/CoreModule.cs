@@ -686,7 +686,7 @@ public sealed class CoreModule : IModule
         }, "rules"),
         new(AuditedEntityKeys.SubProfile, "Alt profil", null, new Dictionary<string, string>
         {
-            ["name"] = "Ad", ["code"] = "Kod", ["description"] = "Açıklama", ["activity"] = "Bağlı faaliyet", ["status"] = "Durum", ["options"] = "Seçenekler",
+            ["name"] = "Ad", ["code"] = "Kod", ["description"] = "Açıklama", ["activity"] = "Bağlı faaliyet", ["status"] = "Durum", ["options"] = "Seçenekler", ["features"] = "Hizmet özellikleri", ["rules"] = "Kurallar",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>

@@ -77,9 +77,19 @@
     else
     {
         <table class="table record-table">
-            <thead><tr><th>Ad</th><th>Anahtar</th><th>Modüller</th><th>Koltuk</th><th>Abone</th><th>Durum</th><th></th></tr></thead>
+            <thead>
+                <tr>
+                    <th scope="col"><SortHeader Label="Ad" ColumnIcon="type" Asc="name" Desc="-name" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                    <th scope="col"><SortHeader Label="Anahtar" ColumnIcon="hash" Asc="key" Desc="-key" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                    <th scope="col">Modüller</th>
+                    <th scope="col"><SortHeader Label="Koltuk" ColumnIcon="users" Asc="seats" Desc="-seats" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                    <th scope="col"><SortHeader Label="Abone" ColumnIcon="building" Asc="subscribers" Desc="-subscribers" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                    <th scope="col"><SortHeader Label="Durum" ColumnIcon="tag" Asc="active" Desc="-active" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
             <tbody>
-                @foreach (var plan in plans)
+                @foreach (var plan in ClientSort.Apply(plans, sort, SortColumns))
                 {
                     <tr>
                         <td data-label="Ad" class="primary">@plan.Name</td>
@@ -88,7 +98,11 @@
                         <td data-label="Koltuk">@(plan.Limits.TryGetValue("seats", out var seats) ? seats.ToString() : "Sınırsız")</td>
                         <td data-label="Abone">@plan.SubscriberCount</td>
                         <td data-label="Durum"><span class="badge @(plan.IsActive ? "user-active" : "user-disabled")">@(plan.IsActive ? "Etkin" : "Kapalı")</span></td>
-                        <td class="actions"><button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => Edit(plan)">Düzenle</button></td>
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{plan.Name} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Edit(plan)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                            </RowMenu>
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -113,6 +127,20 @@
     }
 
     private IReadOnlyList<PlanDto>? plans;
+
+    // Liste tamamı yüklü geldiği için sıralama istemcidedir (ClientSort); boş değer sunucunun sırasıdır.
+    private string sort = "";
+
+    private void SortBy(string value) => sort = value;
+
+    private static readonly Dictionary<string, Func<PlanDto, object?>> SortColumns = new()
+    {
+        ["name"] = p => p.Name,
+        ["key"] = p => p.Key,
+        ["seats"] = p => p.Limits.TryGetValue("seats", out var seats) ? seats : null,
+        ["subscribers"] = p => p.SubscriberCount,
+        ["active"] = p => p.IsActive,
+    };
     private PlatformModulesResponse? modules;
     private PlanEditor? editing;
     private IReadOnlyDictionary<string, string[]>? errors;

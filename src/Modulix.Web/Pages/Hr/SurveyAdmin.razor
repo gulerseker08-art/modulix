@@ -46,7 +46,7 @@
                 }
                 else if (questions.Count == 0)
                 {
-                    <p class="text-muted" role="status">Henüz soru yok. Yanıta açmadan önce en az bir soru ekleyin.</p>
+                    <EmptyState Compact="true" Title="Henüz soru yok." Text="Yanıta açmadan önce en az bir soru ekleyin." />
                 }
                 else
                 {
@@ -114,7 +114,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu görünüme uyan anket yok.</p>
+        <EmptyState Compact="true" Title="Bu görünüme uyan anket yok." />
     }
     else
     {

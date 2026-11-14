@@ -72,6 +72,11 @@
                     <input id="lead-source-detail" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.SourceDetail" />
                     <FieldError Field="sourceDetail" Errors="errors" />
                     break;
+                case "campaignId":
+                    <label class="@f.LabelClass()" for="lead-campaign">@f.Label</label>
+                    <LookupPicker Id="lead-campaign" LookupKey="crm.lead.campaign" @bind-Value="form.CampaignId" Required="f.Required" Placeholder="—" Invalid="@(errors?.ContainsKey("campaignId") == true)" />
+                    <FieldError Field="campaignId" Errors="errors" />
+                    break;
                 case "productInterest":
                     <label class="@f.LabelClass()" for="lead-product">@f.Label</label>
                     <input id="lead-product" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ProductInterest" />
@@ -290,7 +295,7 @@
                 Country = l.Country, City = l.City, CompanyId = l.CompanyId, ContactId = l.ContactId, ProductInterest = l.ProductInterest,
                 ServiceScope = [.. l.ServiceScope ?? []], NeedDescription = l.NeedDescription, EstimatedBudget = l.EstimatedBudget, Currency = l.Currency,
                 TargetPurchaseDate = l.TargetPurchaseDate, Industry = l.Industry, Source = l.Source, SourceDetail = l.SourceDetail,
-                Referrer = l.Referrer, UtmSource = l.UtmSource, UtmMedium = l.UtmMedium, UtmCampaign = l.UtmCampaign,
+                Referrer = l.Referrer, UtmSource = l.UtmSource, UtmMedium = l.UtmMedium, UtmCampaign = l.UtmCampaign, CampaignId = l.CampaignId,
                 Custom = l.Custom?.DeepClone().AsObject() ?? [],
             }
             : new LeadForm { Source = "Manual" };
@@ -335,7 +340,7 @@
             form.CompanyId, form.ContactId, Clean(form.ProductInterest), Clean(form.NeedDescription), form.EstimatedBudget,
             string.IsNullOrWhiteSpace(form.Currency) ? "TRY" : form.Currency.Trim(), form.TargetPurchaseDate, Clean(form.Industry),
             Clean(form.Source), Clean(form.SourceDetail), Clean(form.Referrer), Clean(form.UtmSource), Clean(form.UtmMedium),
-            Clean(form.UtmCampaign), Lead is null ? form.OwnerId : null, form.Version, CustomFieldText.ForSave(CustomFields, form.Custom), form.ServiceScope);
+            Clean(form.UtmCampaign), Lead is null ? form.OwnerId : null, form.Version, CustomFieldText.ForSave(CustomFields, form.Custom), form.ServiceScope, form.CampaignId);
         var result = Lead is { } existing
             ? await Api.PutAsync<LeadDto>($"{Url}/{existing.Id}", request)
             : await Api.PostAsync<LeadDto>(Url, request);
@@ -431,6 +436,8 @@
         public string? UtmMedium { get; set; }
 
         public string? UtmCampaign { get; set; }
+
+        public Guid? CampaignId { get; set; }
 
         public Guid? OwnerId { get; set; }
     }

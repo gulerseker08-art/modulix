@@ -5,13 +5,12 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>@(editing ? "Raporu düzenle" : "Yeni rapor") · Modulix</PageTitle>
+<PageTitle>@(editing ? Texts.Get("reports.builder.editTitle") : Texts.Get("reports.center.newReport")) · Modulix</PageTitle>
 
 <AuthGate Permission="@ReportAccess.Manage">
-    <a class="back-link" href="@(editing && currentId is { } backId ? $"raporlar/{backId}" : "raporlar")"><AppIcon Name="arrow-left" Size="16" /> @(editing ? "Rapora dön" : "Raporlar")</a>
+    <a class="back-link" href="@(editing && currentId is { } backId ? $"raporlar/{backId}" : "raporlar")"><AppIcon Name="arrow-left" Size="16" /> @(editing ? Texts.Get("reports.builder.backToReport") : Texts.Get("nav.app.reports"))</a>
 
-    <PageHeader Title="@(editing ? "Raporu düzenle" : "Yeni rapor")" Icon="file-text"
-                Subtitle="Bir veri kümesinin bildirilmiş sütunlarından tablo ya da özet rapor kurun. Serbest sorgu yoktur; rapor her zaman çalıştıranın yetkisiyle çalışır." />
+    <PageHeader Title="@(editing ? Texts.Get("reports.builder.editTitle") : Texts.Get("reports.center.newReport"))" Icon="file-text" Subtitle="@Texts.Get("reports.builder.subtitle")" />
 
     @if (loading)
     {
@@ -23,14 +22,14 @@
             @loadError
             @if (!notFound)
             {
-                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="InitializeAsync">Tekrar dene</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="InitializeAsync">@Texts.Get("crm.sales.retry")</button>
             }
         </div>
     }
     else if (notOwner)
     {
         <div class="alert alert-warning" role="alert">
-            Bu raporu yalnızca sahibi düzenleyebilir. <a href="raporlar/@currentId">Raporu açın</a> ya da kopyasını oluşturun.
+            @((MarkupString)Texts.Get("reports.builder.notOwner", $"<a href=\"raporlar/{currentId}\">", "</a>"))
         </div>
     }
     else
@@ -43,9 +42,8 @@
         @if (conflict)
         {
             <div class="alert alert-danger" role="alert">
-                <strong>Rapor başka biri tarafından değiştirilmiş.</strong> Kaydetmek, o değişikliğin üzerine yazardı; bu yüzden kaydedilmedi.
-                Değişikliklerinizi not edip raporu yeniden yükleyin, sonra tekrar uygulayın.
-                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@saving" @onclick="InitializeAsync">Raporu yeniden yükle (yaptığım değişiklikler kaybolur)</button>
+                <strong>@Texts.Get("reports.builder.conflictTitle")</strong> @Texts.Get("reports.builder.conflict")
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@saving" @onclick="InitializeAsync">@Texts.Get("reports.builder.reload")</button>
             </div>
         }
         else if (saveError is not null)
@@ -58,61 +56,61 @@
             <ErrorSummary Errors="errors" />
         }
 
-        <form @onsubmit="SaveAsync" @onsubmit:preventDefault aria-label="Rapor oluşturucu" novalidate>
+        <form @onsubmit="SaveAsync" @onsubmit:preventDefault aria-label="@Texts.Get("reports.builder.formLabel")" novalidate>
             <section class="report-builder-section" aria-labelledby="rb-general-title">
-                <h2 id="rb-general-title">Genel</h2>
+                <h2 id="rb-general-title">@Texts.Get("crm.quoteDetail.tab.general")</h2>
                 <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label" for="rb-name">Rapor adı <span class="text-danger" aria-hidden="true">*</span></label>
+                        <label class="form-label" for="rb-name">@Texts.Get("reports.builder.name") <span class="text-danger" aria-hidden="true">*</span></label>
                         <input id="rb-name" class="form-control @(HasError("name") ? "is-invalid" : null)" maxlength="150" required aria-required="true" @bind="name" @bind:event="oninput" />
                         <FieldError Field="name" Errors="errors" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="rb-description">Açıklama</label>
+                        <label class="form-label" for="rb-description">@Texts.Get("common.field.description")</label>
                         <input id="rb-description" class="form-control" maxlength="500" @bind="description" @bind:event="oninput" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="rb-dataset">Veri kümesi</label>
+                        <label class="form-label" for="rb-dataset">@Texts.Get("reports.builder.dataset")</label>
                         <select id="rb-dataset" class="form-select" value="@datasetKey" disabled="@editing" aria-describedby="rb-dataset-help" @onchange="e => ChooseDatasetAsync(e.Value?.ToString())">
-                            <option value="">Veri kümesi seçin</option>
+                            <option value="">@Texts.Get("reports.builder.chooseDataset")</option>
                             @foreach (var d in catalog!.Datasets.Where(d => d.Available))
                             {
                                 <option value="@d.Key">@d.Name</option>
                             }
                             @if (catalog.Datasets.Any(d => !d.Available))
                             {
-                                <optgroup label="Kullanılamayan veri kümeleri">
+                                <optgroup label="@Texts.Get("reports.builder.unavailableDatasets")">
                                     @foreach (var d in catalog.Datasets.Where(d => !d.Available))
                                     {
-                                        <option value="@d.Key" disabled>@d.Name (@(d.UnavailableReason ?? "kullanılamıyor"))</option>
+                                        <option value="@d.Key" disabled>@d.Name (@(d.UnavailableReason ?? Texts.Get("reports.builder.unavailable")))</option>
                                     }
                                 </optgroup>
                             }
                         </select>
                         <div id="rb-dataset-help" class="form-text">
-                            @(editing ? "Kayıtlı raporun veri kümesi değiştirilemez; farklı bir veri kümesi için yeni rapor oluşturun." : "Yalnızca sizin için kullanılabilir veri kümeleri seçilebilir.")
+                            @(editing ? Texts.Get("reports.builder.datasetLocked") : Texts.Get("reports.builder.datasetHelp"))
                         </div>
                         <FieldError Field="dataset" Errors="errors" />
                     </div>
                     <div class="span-6">
-                        <span class="form-label d-block" id="rb-kind-label">Rapor türü</span>
+                        <span class="form-label d-block" id="rb-kind-label">@Texts.Get("reports.builder.kind")</span>
                         <div class="segmented" role="group" aria-labelledby="rb-kind-label">
-                            <button type="button" class="chip @(mode == ReportCenterLabels.Table ? "active" : null)" aria-pressed="@(mode == ReportCenterLabels.Table ? "true" : "false")" @onclick="() => SetMode(ReportCenterLabels.Table)">Tablo</button>
-                            <button type="button" class="chip @(mode == ReportCenterLabels.Summary ? "active" : null)" aria-pressed="@(mode == ReportCenterLabels.Summary ? "true" : "false")" @onclick="() => SetMode(ReportCenterLabels.Summary)">Özet</button>
+                            <button type="button" class="chip @(mode == ReportCenterLabels.Table ? "active" : null)" aria-pressed="@(mode == ReportCenterLabels.Table ? "true" : "false")" @onclick="() => SetMode(ReportCenterLabels.Table)">@Texts.Get("reports.builder.modeTable")</button>
+                            <button type="button" class="chip @(mode == ReportCenterLabels.Summary ? "active" : null)" aria-pressed="@(mode == ReportCenterLabels.Summary ? "true" : "false")" @onclick="() => SetMode(ReportCenterLabels.Summary)">@Texts.Get("reports.builder.modeSummary")</button>
                         </div>
-                        <div class="form-text">Tablo: kayıtları sütunlar halinde listeler. Özet: gruplar halinde sayar ve toplar; isteğe bağlı grafik çizer.</div>
+                        <div class="form-text">@Texts.Get("reports.builder.kindHelp")</div>
                     </div>
                 </div>
                 @if (Dataset is { Available: false } unavailable)
                 {
                     <div class="alert alert-warning mt-3" role="alert">
-                        <strong>Bu veri kümesi şu an kullanılamıyor.</strong> @(unavailable.UnavailableReason ?? "Yetkiniz ya da modül durumu uygun değil.") Rapor kaydedilemez.
+                        <strong>@Texts.Get("reports.datasetUnavailable")</strong> @(unavailable.UnavailableReason ?? Texts.Get("reports.unavailableFallback")) @Texts.Get("reports.builder.cannotSave")
                     </div>
                 }
                 @if (editing && Dataset is { } current && datasetVersion > 0 && datasetVersion < current.Version)
                 {
                     <div class="alert alert-info mt-3" role="status">
-                        Bu rapor veri kümesinin eski sürümüyle (v@datasetVersion) kaydedilmiş; güncel sürüm v@(current.Version). Sütunları gözden geçirin.
+                        @Texts.Get("reports.builder.versionDrift", datasetVersion, current.Version)
                     </div>
                 }
             </section>
@@ -122,19 +120,19 @@
                 @if (RemovedFields().Count > 0)
                 {
                     <div class="alert alert-warning" role="alert">
-                        <strong>Raporda artık kullanılamayan alan var:</strong> @string.Join(", ", RemovedFields()).
-                        Bunlar "(kaldırılmış alan)" olarak işaretlidir; özel alan arşivlenmiş, sütun kaldırılmış ya da bu sütun için yetkiniz yok olabilir. Kaydetmeden önce raporun dışına çıkarın.
+                        <strong>@Texts.Get("reports.builder.removedTitle")</strong> @string.Join(", ", RemovedFields()).
+                        @Texts.Get("reports.builder.removedHelp")
                     </div>
                 }
 
                 @if (mode == ReportCenterLabels.Table)
                 {
                     <section class="report-builder-section" aria-labelledby="rb-columns-title">
-                        <h2 id="rb-columns-title">Sütunlar</h2>
-                        <p class="small text-muted">Tabloda gösterilecek sütunlar, yukarıdan aşağıya sırayla (en çok @MaxColumns).</p>
+                        <h2 id="rb-columns-title">@Texts.Get("common.columns")</h2>
+                        <p class="small text-muted">@Texts.Get("reports.builder.columnsHelp", MaxColumns)</p>
                         @if (columns.Count == 0)
                         {
-                            <p class="text-muted" role="status">Henüz sütun seçilmedi.</p>
+                            <p class="text-muted" role="status">@Texts.Get("reports.builder.noColumns")</p>
                         }
                         else
                         {
@@ -145,9 +143,9 @@
                                     var field = columns[index];
                                     <li class="list-group-item d-flex flex-wrap align-items-center gap-2">
                                         <span class="me-auto">@LabelOf(field)</span>
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(index == 0)" aria-label="Yukarı taşı: @LabelOf(field)" @onclick="() => MoveColumn(index, -1)">↑</button>
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(index == columns.Count - 1)" aria-label="Aşağı taşı: @LabelOf(field)" @onclick="() => MoveColumn(index, 1)">↓</button>
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="Sütunu çıkar: @LabelOf(field)" @onclick="() => RemoveColumn(index)">Çıkar</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(index == 0)" aria-label="@Texts.Get("reports.builder.moveUpAria", LabelOf(field))" @onclick="() => MoveColumn(index, -1)">↑</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(index == columns.Count - 1)" aria-label="@Texts.Get("reports.builder.moveDownAria", LabelOf(field))" @onclick="() => MoveColumn(index, 1)">↓</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" aria-label="@Texts.Get("reports.builder.removeColumnAria", LabelOf(field))" @onclick="() => RemoveColumn(index)">@Texts.Get("reports.builder.removeColumn")</button>
                                         <FieldError Field="@field" Errors="errors" />
                                     </li>
                                 }
@@ -156,42 +154,42 @@
 
                         <div class="report-builder-row">
                             <div class="grow">
-                                <label class="form-label" for="rb-add-column">Sütun ekle</label>
+                                <label class="form-label" for="rb-add-column">@Texts.Get("reports.builder.addColumn")</label>
                                 <select id="rb-add-column" class="form-select" disabled="@(columns.Count >= MaxColumns)" @onchange="e => AddColumn(e.Value?.ToString())">
-                                    <option value="">Sütun seçin</option>
+                                    <option value="">@Texts.Get("reports.builder.chooseColumn")</option>
                                     @foreach (var c in ColumnsWith("show").Where(c => !columns.Contains(c.Field)))
                                     {
                                         <option value="@c.Field">@c.Label (@ReportCenterLabels.Kind(c.Kind))</option>
                                     }
                                 </select>
                             </div>
-                            <button type="button" class="btn btn-outline-secondary" @onclick="UseDefaultColumns">Varsayılan sütunlar</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="UseDefaultColumns">@Texts.Get("reports.builder.defaultColumns")</button>
                         </div>
                     </section>
                 }
 
                 <section class="report-builder-section" aria-labelledby="rb-filters-title">
-                    <h2 id="rb-filters-title">Süzgeçler</h2>
-                    <p class="small text-muted">En çok @MaxFilters süzgeç. Hepsi birlikte sağlanmalıdır (VE). Süzgeç yetkinizi genişletmez; yalnızca görebildiğiniz kayıtları daraltır.</p>
+                    <h2 id="rb-filters-title">@Texts.Get("reports.builder.filters")</h2>
+                    <p class="small text-muted">@Texts.Get("reports.builder.filtersHelp", MaxFilters)</p>
                     @for (var i = 0; i < filters.Count; i++)
                     {
                         var index = i;
                         var row = filters[index];
                         var column = Column(row.Field);
-                        <div class="cond-leaf" role="group" aria-label="Süzgeç @(index + 1)">
-                            <label class="visually-hidden" for="rb-f@(index)-field">Süzgeç @(index + 1) alanı</label>
+                        <div class="cond-leaf" role="group" aria-label="@Texts.Get("reports.builder.filter", index + 1)">
+                            <label class="visually-hidden" for="rb-f@(index)-field">@Texts.Get("reports.builder.filterField", index + 1)</label>
                             <select id="rb-f@(index)-field" class="form-select form-select-sm" value="@row.Field" @onchange="e => SetFilterField(row, e.Value?.ToString())">
-                                <option value="">Alan seçin</option>
+                                <option value="">@Texts.Get("marketing.conditionEditor.chooseField")</option>
                                 @foreach (var c in ColumnsWith("filter"))
                                 {
                                     <option value="@c.Field">@c.Label</option>
                                 }
                                 @if (row.Field.Length > 0 && !ColumnsWith("filter").Any(c => c.Field == row.Field))
                                 {
-                                    <option value="@row.Field">@row.Field (kaldırılmış alan)</option>
+                                    <option value="@row.Field">@Texts.Get("reports.builder.removedField", row.Field)</option>
                                 }
                             </select>
-                            <label class="visually-hidden" for="rb-f@(index)-op">Süzgeç @(index + 1) işleci</label>
+                            <label class="visually-hidden" for="rb-f@(index)-op">@Texts.Get("reports.builder.filterOperator", index + 1)</label>
                             <select id="rb-f@(index)-op" class="form-select form-select-sm" value="@row.Operator" disabled="@(column is null)" @onchange="e => SetFilterOperator(row, e.Value?.ToString())">
                                 @foreach (var op in ReportCenterLabels.OperatorsFor(column?.Kind ?? "text"))
                                 {
@@ -199,10 +197,10 @@
                                 }
                             </select>
                             @FilterValue(row, column, index)
-                            <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Süzgeç @(index + 1) sil" @onclick="() => RemoveFilter(index)">Sil</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="@Texts.Get("reports.builder.filterDeleteAria", index + 1)" @onclick="() => RemoveFilter(index)">@Texts.Get("common.delete")</button>
                             @if (column is { Kind: "lookup" } && ReportCenterLabels.NeedsValue(row.Operator))
                             {
-                                <small class="text-muted cond-hint">Kayıt kimliğini (GUID) girin; kayıt seçici bu sürümde yok. Kimlik, ilgili kaydın adres çubuğundaki son bölümdür.</small>
+                                <small class="text-muted cond-hint">@Texts.Get("reports.builder.lookupHint")</small>
                             }
                             @if (row.Field.Length > 0)
                             {
@@ -211,35 +209,35 @@
                         </div>
                     }
 
-                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(filters.Count >= MaxFilters)" @onclick="AddFilter">Süzgeç ekle</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(filters.Count >= MaxFilters)" @onclick="AddFilter">@Texts.Get("reports.builder.addFilter")</button>
                 </section>
 
                 @if (mode == ReportCenterLabels.Summary)
                 {
                     <section class="report-builder-section" aria-labelledby="rb-groups-title">
-                        <h2 id="rb-groups-title">Gruplama</h2>
-                        <p class="small text-muted">En çok @MaxGroups gruplama. Tarih sütunlarında ayrıntıyı (gün, ay, yıl) seçebilirsiniz.</p>
+                        <h2 id="rb-groups-title">@Texts.Get("reports.builder.groups")</h2>
+                        <p class="small text-muted">@Texts.Get("reports.builder.groupsHelp", MaxGroups)</p>
                         @for (var i = 0; i < groups.Count; i++)
                         {
                             var index = i;
                             var row = groups[index];
                             var column = Column(row.Field);
-                            <div class="cond-leaf" role="group" aria-label="Gruplama @(index + 1)">
-                                <label class="visually-hidden" for="rb-g@(index)-field">Gruplama @(index + 1) alanı</label>
+                            <div class="cond-leaf" role="group" aria-label="@Texts.Get("reports.builder.group", index + 1)">
+                                <label class="visually-hidden" for="rb-g@(index)-field">@Texts.Get("reports.builder.groupField", index + 1)</label>
                                 <select id="rb-g@(index)-field" class="form-select form-select-sm" value="@row.Field" @onchange="e => SetGroupField(row, e.Value?.ToString())">
-                                    <option value="">Alan seçin</option>
+                                    <option value="">@Texts.Get("marketing.conditionEditor.chooseField")</option>
                                     @foreach (var c in ColumnsWith("group"))
                                     {
                                         <option value="@c.Field">@c.Label</option>
                                     }
                                     @if (row.Field.Length > 0 && !ColumnsWith("group").Any(c => c.Field == row.Field))
                                     {
-                                        <option value="@row.Field">@row.Field (kaldırılmış alan)</option>
+                                        <option value="@row.Field">@Texts.Get("reports.builder.removedField", row.Field)</option>
                                     }
                                 </select>
                                 @if (column is not null && ReportCenterLabels.IsDate(column.Kind))
                                 {
-                                    <label class="visually-hidden" for="rb-g@(index)-grain">Gruplama @(index + 1) tarih ayrıntısı</label>
+                                    <label class="visually-hidden" for="rb-g@(index)-grain">@Texts.Get("reports.builder.groupGrain", index + 1)</label>
                                     <select id="rb-g@(index)-grain" class="form-select form-select-sm" @bind="row.Grain">
                                         @foreach (var (key, label) in ReportCenterLabels.Grains)
                                         {
@@ -247,7 +245,7 @@
                                         }
                                     </select>
                                 }
-                                <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Gruplama @(index + 1) sil" @onclick="() => RemoveGroup(index)">Sil</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="@Texts.Get("reports.builder.groupDeleteAria", index + 1)" @onclick="() => RemoveGroup(index)">@Texts.Get("common.delete")</button>
                                 @if (row.Field.Length > 0)
                                 {
                                     <div class="cond-hint"><FieldError Field="@row.Field" Errors="errors" /></div>
@@ -255,32 +253,32 @@
                             </div>
                         }
 
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(groups.Count >= MaxGroups)" @onclick="AddGroup">Gruplama ekle</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(groups.Count >= MaxGroups)" @onclick="AddGroup">@Texts.Get("reports.builder.addGroup")</button>
                     </section>
 
                     <section class="report-builder-section" aria-labelledby="rb-measures-title">
-                        <h2 id="rb-measures-title">Ölçüler</h2>
-                        <p class="small text-muted">En çok @MaxMeasures ölçü. "Kayıt sayısı" her grupta kaç kayıt olduğunu verir; sayı ve tutar sütunları toplanabilir, ortalaması ya da en düşük/en yüksek değeri alınabilir.</p>
+                        <h2 id="rb-measures-title">@Texts.Get("reports.builder.measures")</h2>
+                        <p class="small text-muted">@Texts.Get("reports.builder.measuresHelp", MaxMeasures)</p>
                         @for (var i = 0; i < measures.Count; i++)
                         {
                             var index = i;
                             var row = measures[index];
-                            <div class="cond-leaf" role="group" aria-label="Ölçü @(index + 1)">
-                                <label class="visually-hidden" for="rb-m@(index)-field">Ölçü @(index + 1) sütunu</label>
+                            <div class="cond-leaf" role="group" aria-label="@Texts.Get("reports.builder.measure", index + 1)">
+                                <label class="visually-hidden" for="rb-m@(index)-field">@Texts.Get("reports.builder.measureField", index + 1)</label>
                                 <select id="rb-m@(index)-field" class="form-select form-select-sm" value="@row.Field" @onchange="e => SetMeasureField(row, e.Value?.ToString())">
-                                    <option value="">Kayıt sayısı</option>
+                                    <option value="">@ReportCenterLabels.CountText</option>
                                     @foreach (var c in ColumnsWith("measure"))
                                     {
                                         <option value="@c.Field">@c.Label (@ReportCenterLabels.Kind(c.Kind))</option>
                                     }
                                     @if (row.Field.Length > 0 && !ColumnsWith("measure").Any(c => c.Field == row.Field))
                                     {
-                                        <option value="@row.Field">@row.Field (kaldırılmış alan)</option>
+                                        <option value="@row.Field">@Texts.Get("reports.builder.removedField", row.Field)</option>
                                     }
                                 </select>
                                 @if (row.Field.Length > 0)
                                 {
-                                    <label class="visually-hidden" for="rb-m@(index)-agg">Ölçü @(index + 1) toplama türü</label>
+                                    <label class="visually-hidden" for="rb-m@(index)-agg">@Texts.Get("reports.builder.measureAggregation", index + 1)</label>
                                     <select id="rb-m@(index)-agg" class="form-select form-select-sm" @bind="row.Aggregation">
                                         @foreach (var (key, label) in ReportCenterLabels.Aggregations)
                                         {
@@ -288,7 +286,7 @@
                                         }
                                     </select>
                                 }
-                                <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Ölçü @(index + 1) sil" @onclick="() => RemoveMeasure(index)">Sil</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="@Texts.Get("reports.builder.measureDeleteAria", index + 1)" @onclick="() => RemoveMeasure(index)">@Texts.Get("common.delete")</button>
                                 @if (row.Field.Length > 0)
                                 {
                                     <div class="cond-hint"><FieldError Field="@row.Field" Errors="errors" /></div>
@@ -296,36 +294,35 @@
                             </div>
                         }
 
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(measures.Count >= MaxMeasures)" @onclick="AddMeasure">Ölçü ekle</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(measures.Count >= MaxMeasures)" @onclick="AddMeasure">@Texts.Get("reports.builder.addMeasure")</button>
                         @if (HasMoneyMeasure())
                         {
                             <div class="alert alert-info mt-3" role="note">
-                                <strong>Tutarlar para birimine göre ayrı toplanır.</strong> Farklı para birimleri birbirine çevrilmez ya da toplanmaz; sonuçta her para birimi ayrı satırda görünür.
-                                Aynı raporda yalnızca aynı para birimi alanına bağlı tutar ölçüleri kullanılabilir.
+                                <strong>@Texts.Get("reports.builder.moneyTitle")</strong> @Texts.Get("reports.builder.money")
                             </div>
                         }
                     </section>
                 }
 
                 <section class="report-builder-section" aria-labelledby="rb-order-title">
-                    <h2 id="rb-order-title">Sıralama@(mode == ReportCenterLabels.Summary ? " ve grafik" : null)</h2>
+                    <h2 id="rb-order-title">@(mode == ReportCenterLabels.Summary ? Texts.Get("reports.builder.sortAndChart") : Texts.Get("reports.builder.sorting"))</h2>
                     <div class="form-grid">
                         <div class="span-6">
-                            <label class="form-label" for="rb-sort">Sırala</label>
+                            <label class="form-label" for="rb-sort">@Texts.Get("reports.builder.sort")</label>
                             <select id="rb-sort" class="form-select" @bind="sortField">
-                                <option value="">Varsayılan sıra</option>
+                                <option value="">@Texts.Get("reports.builder.defaultOrder")</option>
                                 @foreach (var option in SortOptions())
                                 {
                                     <option value="@option.Key">@option.Label</option>
                                 }
                                 @if (sortField.Length > 0 && SortOptions().All(o => o.Key != sortField))
                                 {
-                                    <option value="@sortField">@sortField (raporda yok)</option>
+                                    <option value="@sortField">@Texts.Get("reports.builder.notInReport", sortField)</option>
                                 }
                             </select>
                         </div>
                         <div class="span-3">
-                            <label class="form-label" for="rb-direction">Yön</label>
+                            <label class="form-label" for="rb-direction">@Texts.Get("reports.builder.direction")</label>
                             <select id="rb-direction" class="form-select" disabled="@(sortField.Length == 0)" @bind="sortDirection">
                                 @foreach (var (key, label) in ReportCenterLabels.Directions)
                                 {
@@ -336,16 +333,16 @@
                         @if (mode == ReportCenterLabels.Summary)
                         {
                             <div class="span-3">
-                                <label class="form-label" for="rb-chart">Grafik türü</label>
+                                <label class="form-label" for="rb-chart">@Texts.Get("reports.builder.chartKind")</label>
                                 <select id="rb-chart" class="form-select" aria-describedby="rb-chart-help" @bind="chart">
                                     @foreach (var (key, label) in ReportCenterLabels.Charts)
                                     {
                                         var problem = ChartProblem(key);
-                                        <option value="@key" disabled="@(problem is not null && key != chart)">@label@(problem is not null ? $" (uygun değil: {problem})" : null)</option>
+                                        <option value="@key" disabled="@(problem is not null && key != chart)">@(problem is not null ? Texts.Get("reports.builder.chartOptionUnsuitable", label, problem) : label)</option>
                                     }
                                 </select>
                                 <div id="rb-chart-help" class="form-text">
-                                    @(ChartProblem(chart) is { } currentProblem ? $"Seçili grafik uygun değil: {currentProblem}." : "Grafik her zaman tablo ile birlikte gösterilir.")
+                                    @(ChartProblem(chart) is { } currentProblem ? Texts.Get("reports.builder.chartUnsuitable", currentProblem) : Texts.Get("reports.builder.chartHelp"))
                                 </div>
                             </div>
                         }
@@ -356,20 +353,20 @@
             <div class="form-actions">
                 <button type="button" class="btn btn-outline-secondary" disabled="@(saving || previewing || Dataset is not { Available: true })" @onclick="() => PreviewAsync(1, fresh: true)">
                     @if (previewing) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
-                    Önizle
+                    @Texts.Get("marketing.preview")
                 </button>
                 <button type="submit" class="btn btn-primary" disabled="@(saving || previewing || Dataset is not { Available: true })">
                     @if (saving) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
-                    Kaydet
+                    @Texts.Get("common.save")
                 </button>
-                <a class="btn btn-outline-secondary" href="@(editing && currentId is { } cancelId ? $"raporlar/{cancelId}" : "raporlar")">Vazgeç</a>
+                <a class="btn btn-outline-secondary" href="@(editing && currentId is { } cancelId ? $"raporlar/{cancelId}" : "raporlar")">@Texts.Get("common.dismiss")</a>
             </div>
         </form>
 
         @if (localIssues.Count > 0)
         {
             <div class="alert alert-danger mt-3" role="alert">
-                <strong>Önce şunları düzeltin:</strong>
+                <strong>@Texts.Get("reports.builder.fixFirst")</strong>
                 <ul class="mb-0">
                     @foreach (var issue in localIssues)
                     {
@@ -383,15 +380,15 @@
         {
             <div class="alert alert-danger mt-3" role="alert">
                 @previewError
-                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@previewing" @onclick="() => PreviewAsync(previewPage, fresh: previewSpec is null)">Tekrar dene</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@previewing" @onclick="() => PreviewAsync(previewPage, fresh: previewSpec is null)">@Texts.Get("crm.sales.retry")</button>
             </div>
         }
 
         @if (previewResult is not null || previewing)
         {
             <section class="detail-section mt-4" aria-labelledby="rb-preview-title">
-                <div class="section-header"><h2 id="rb-preview-title">Önizleme</h2></div>
-                <p class="small text-muted">Önizleme, "Önizle" düğmesine bastığınız andaki tanımla çalıştı; sonradan yaptığınız değişiklikleri görmek için yeniden önizleyin. Kaydetmeden de çalışır.</p>
+                <div class="section-header"><h2 id="rb-preview-title">@Texts.Get("contracts.templates.preview")</h2></div>
+                <p class="small text-muted">@Texts.Get("reports.builder.previewNote")</p>
                 <ReportResultView Result="previewResult" Loading="previewing" DrillRunner="PreviewDrillAsync" PageChanged="PreviewPageAsync" />
                 @if (previewSpec is not null && previewResult is { Status: "ok" })
                 {
@@ -544,7 +541,7 @@
             {
                 loading = false;
                 notFound = response.Status == HttpStatusCode.NotFound;
-                loadError = notFound ? "Rapor bulunamadı ya da bu raporu görme yetkiniz yok." : response.Error;
+                loadError = notFound ? Texts.Get("reports.notFound") : response.Error;
                 return;
             }
 
@@ -567,16 +564,16 @@
             var response = await Api.GetAsync<ReportDetailDto>($"/api/reports/{copy}");
             if (response.IsSuccess)
             {
-                name = $"{response.Value!.Summary.Name} (kopya)";
+                name = Texts.Get("reports.builder.copyName", response.Value!.Summary.Name);
                 description = response.Value.Summary.Description ?? string.Empty;
                 ApplySpec(response.Value.Spec);
-                startNotice = "Kopya, kaynak raporun tanımıyla başlatıldı. Kaydedene kadar yeni bir rapor oluşmaz.";
+                startNotice = Texts.Get("reports.builder.copyStarted");
             }
             else
             {
                 startNotice = response.Status == HttpStatusCode.NotFound
-                    ? "Kopyalanacak rapor bulunamadı ya da görme yetkiniz yok; boş bir rapor ile başladınız."
-                    : $"Kopyalanacak rapor yüklenemedi ({response.Error}); boş bir rapor ile başladınız.";
+                    ? Texts.Get("reports.builder.copyNotFound")
+                    : Texts.Get("reports.builder.copyFailed", response.Error);
             }
         }
         else if (!string.IsNullOrEmpty(ReadyKey))
@@ -587,11 +584,11 @@
                 name = ready.Title;
                 description = ready.Description;
                 ApplySpec(ready.Spec);
-                startNotice = "Hazır rapor tanımı kopyalandı. Kaydedene kadar yeni bir rapor oluşmaz.";
+                startNotice = Texts.Get("reports.builder.readyCopied");
             }
             else
             {
-                startNotice = "Hazır rapor bulunamadı; boş bir rapor ile başladınız.";
+                startNotice = Texts.Get("reports.builder.readyNotFound");
             }
         }
         else if (catalog!.Datasets.Count(d => d.Available) == 1)
@@ -730,7 +727,7 @@
 
     private IEnumerable<ReportColumnInfoDto> ColumnsWith(string use) => (Dataset?.Columns ?? []).Where(c => c.Use.Contains(use));
 
-    private string LabelOf(string field) => Column(field)?.Label ?? $"{field} (kaldırılmış alan)";
+    private string LabelOf(string field) => Column(field)?.Label ?? Texts.Get("reports.builder.removedField", field);
 
     private bool HasError(string key) => errors.ContainsKey(key);
 
@@ -781,7 +778,7 @@
             : new ReportMeasureDto { Field = row.Field, Aggregation = row.Aggregation is "count" or "" ? "sum" : row.Aggregation };
 
     private string MeasureLabel(MeasureRow row) =>
-        row.Field.Length == 0 ? "Kayıt sayısı" : $"{ReportCenterLabels.Aggregation(row.Aggregation is "count" or "" ? "sum" : row.Aggregation)} {LabelOf(row.Field)}";
+        row.Field.Length == 0 ? ReportCenterLabels.CountText : Texts.Get("reports.builder.measureLabel", ReportCenterLabels.Aggregation(row.Aggregation is "count" or "" ? "sum" : row.Aggregation), LabelOf(row.Field));
 
     /// <summary>Sunucudaki <c>ReportSpecValidator.ValidateChart</c> kurallarının aynısı; uygun değilse nedeni döner.</summary>
     private string? ChartProblem(string kind)
@@ -793,17 +790,17 @@
 
         if (groups.Count == 0 || measures.Count == 0)
         {
-            return "gruplama ve en az bir ölçü gerekir";
+            return Texts.Get("reports.builder.chartNeedsGroup");
         }
 
         if (kind == "pie" && (groups.Count != 1 || measures.Count != 1))
         {
-            return "tek gruplama ve tek ölçü ister";
+            return Texts.Get("reports.builder.chartPieRule");
         }
 
         if (kind == "line" && !(Column(groups[0].Field) is { } first && ReportCenterLabels.IsDate(first.Kind)))
         {
-            return "ilk gruplama bir tarih sütunu olmalı";
+            return Texts.Get("reports.builder.chartLineRule");
         }
 
         return null;
@@ -996,7 +993,7 @@
         }
         else if (row.Operator == "in" && kind is "choice" or "user" && options is not null)
         {
-            <span class="report-choice-list" role="group" aria-label="Süzgeç @(index + 1) değerleri">
+            <span class="report-choice-list" role="group" aria-label="@Texts.Get("reports.builder.filterValues", index + 1)">
                 @foreach (var option in options)
                 {
                     var key = option.Key;
@@ -1009,13 +1006,13 @@
         }
         else if (row.Operator == "in")
         {
-            <textarea id="@inputId" class="form-control form-control-sm" rows="3" aria-label="Süzgeç @(index + 1) değerleri (her satıra bir değer)" placeholder="Her satıra bir değer (en çok 50)"
+            <textarea id="@inputId" class="form-control form-control-sm" rows="3" aria-label="@Texts.Get("reports.builder.filterValuesLines", index + 1)" placeholder="@Texts.Get("reports.builder.valuesPlaceholder")"
                       @onchange="e => SetInText(row, e.Value?.ToString())">@row.InText</textarea>
         }
         else if (kind is "choice" or "user" && options is not null)
         {
-            <select id="@inputId" class="form-select form-select-sm" aria-label="Süzgeç @(index + 1) değeri" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString() ?? string.Empty">
-                <option value="">Seçin</option>
+            <select id="@inputId" class="form-select form-select-sm" aria-label="@Texts.Get("reports.builder.filterValue", index + 1)" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString() ?? string.Empty">
+                <option value="">@Texts.Get("support.choose")</option>
                 @foreach (var option in options)
                 {
                     <option value="@option.Key">@option.Label</option>
@@ -1024,27 +1021,27 @@
         }
         else if (kind == "flag")
         {
-            <select id="@inputId" class="form-select form-select-sm" aria-label="Süzgeç @(index + 1) değeri" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString() ?? string.Empty">
-                <option value="">Seçin</option>
-                <option value="true">Evet</option>
-                <option value="false">Hayır</option>
+            <select id="@inputId" class="form-select form-select-sm" aria-label="@Texts.Get("reports.builder.filterValue", index + 1)" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString() ?? string.Empty">
+                <option value="">@Texts.Get("support.choose")</option>
+                <option value="true">@Texts.Get("common.yes")</option>
+                <option value="false">@Texts.Get("common.no")</option>
             </select>
         }
         else if (ReportCenterLabels.IsDate(kind))
         {
-            <input id="@inputId" class="form-control form-control-sm" type="date" aria-label="Süzgeç @(index + 1) tarihi" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString() ?? string.Empty" />
+            <input id="@inputId" class="form-control form-control-sm" type="date" aria-label="@Texts.Get("reports.builder.filterDate", index + 1)" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString() ?? string.Empty" />
         }
         else if (kind is "number" or "money")
         {
-            <input id="@inputId" class="form-control form-control-sm" type="number" step="any" inputmode="decimal" aria-label="Süzgeç @(index + 1) sayısı" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString() ?? string.Empty" />
+            <input id="@inputId" class="form-control form-control-sm" type="number" step="any" inputmode="decimal" aria-label="@Texts.Get("reports.builder.filterNumber", index + 1)" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString() ?? string.Empty" />
         }
         else if (kind == "lookup")
         {
-            <input id="@inputId" class="form-control form-control-sm" aria-label="Süzgeç @(index + 1) kayıt kimliği (GUID)" placeholder="Kayıt kimliği (GUID)" maxlength="36" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString()?.Trim() ?? string.Empty" />
+            <input id="@inputId" class="form-control form-control-sm" aria-label="@Texts.Get("reports.builder.filterRecordId", index + 1)" placeholder="@Texts.Get("reports.builder.recordIdPlaceholder")" maxlength="36" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString()?.Trim() ?? string.Empty" />
         }
         else
         {
-            <input id="@inputId" class="form-control form-control-sm" maxlength="200" aria-label="Süzgeç @(index + 1) değeri" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString() ?? string.Empty" />
+            <input id="@inputId" class="form-control form-control-sm" maxlength="200" aria-label="@Texts.Get("reports.builder.filterValue", index + 1)" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString() ?? string.Empty" />
         }
     </span>;
 
@@ -1068,12 +1065,12 @@
 
         if (forSave && string.IsNullOrWhiteSpace(name))
         {
-            Add("name", "Rapor adı gerekli.");
+            Add("name", Texts.Get("reports.builder.nameRequired"));
         }
 
         if (Dataset is not { Available: true })
         {
-            Add("dataset", "Kullanılabilir bir veri kümesi seçin.");
+            Add("dataset", Texts.Get("reports.builder.datasetRequired"));
             errors = local.ToDictionary(p => p.Key, p => p.Value.ToArray());
             return issues;
         }
@@ -1081,17 +1078,17 @@
         var removed = RemovedFields();
         if (removed.Count > 0)
         {
-            Add("spec", $"Kaldırılmış alan(lar): {string.Join(", ", removed)}. Bunları raporun dışına çıkarın.");
+            Add("spec", Texts.Get("reports.builder.removedFields", string.Join(", ", removed)));
         }
 
         if (mode == ReportCenterLabels.Table && columns.Count == 0)
         {
-            Add("spec", "En az bir sütun seçin.");
+            Add("spec", Texts.Get("reports.builder.columnRequired"));
         }
 
         if (mode == ReportCenterLabels.Summary && groups.Count == 0 && measures.Count == 0)
         {
-            Add("spec", "Özet rapor için en az bir gruplama ya da ölçü ekleyin.");
+            Add("spec", Texts.Get("reports.builder.summaryRequired"));
         }
 
         for (var i = 0; i < filters.Count; i++)
@@ -1099,11 +1096,11 @@
             var f = filters[i];
             if (f.Field.Length == 0)
             {
-                Add("spec", $"Süzgeç {i + 1}: alan seçin ya da süzgeci silin.");
+                Add("spec", Texts.Get("reports.builder.filterFieldRequired", i + 1));
             }
             else if (ReportCenterLabels.NeedsValue(f.Operator) && (f.Operator == "in" ? f.InValues.Count == 0 : string.IsNullOrWhiteSpace(f.Value)))
             {
-                Add(f.Field, $"Süzgeç {i + 1} ({LabelOf(f.Field)}): değer girin.");
+                Add(f.Field, Texts.Get("reports.builder.filterValueRequired", i + 1, LabelOf(f.Field)));
             }
         }
 
@@ -1113,19 +1110,19 @@
             {
                 if (groups[i].Field.Length == 0)
                 {
-                    Add("spec", $"Gruplama {i + 1}: alan seçin ya da gruplamayı silin.");
+                    Add("spec", Texts.Get("reports.builder.groupFieldRequired", i + 1));
                 }
             }
 
             if (ChartProblem(chart) is { } problem)
             {
-                Add("spec", $"Grafik türü uygun değil: {problem}.");
+                Add("spec", Texts.Get("reports.builder.chartInvalid", problem));
             }
         }
 
         if (sortField.Length > 0 && SortOptions().All(o => o.Key != sortField))
         {
-            Add("spec", "Sıralama alanı raporda yok; sıralamayı güncelleyin.");
+            Add("spec", Texts.Get("reports.builder.sortInvalid"));
         }
 
         errors = local.ToDictionary(p => p.Key, p => p.Value.ToArray());

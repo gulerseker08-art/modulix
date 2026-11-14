@@ -23,7 +23,7 @@
         }
         else if (listing.Items.Count == 0)
         {
-            <p class="text-muted">@Texts.Get("support.related.none")</p>
+            <EmptyState Compact="true" Title="@Texts.Get("support.related.none")" />
         }
         else
         {

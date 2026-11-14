@@ -557,3 +557,30 @@ Dilim 8'in "bilerek yapılmadı" listesindeki bekleyen masraf kuyruğu eklendi; 
 | `dotnet test tests/Modulix.Web.Tests` | 138 (1 yeni): Masraflar menüsü kendi okuma iznine ve modüle bağlı |
 | `dotnet test tests/Modulix.ArchitectureTests` | 73/73 |
 | `... --filter "LogisticsExpenseTests"` (SQL Server; CI koşar) | 5 (1 yeni): sefer numarası çözümlemesi yalnızca sefer okuma izni olan ve aynı tenant'taki kullanıcıya açık. **Yerelde çalıştırılamadı** (Docker Desktop kapalı) |
+
+## 23. Kural şablonları (14 Kasım 2026)
+
+Lojistik, kural altyapısına (ADR-0027) kayıt türlerini ve alanlarını dilim 4'ten beri beyan ediyordu, ama hazır şablonu yoktu: firma her kuralı sıfırdan kurmak zorundaydı. Bu dilim başlangıç şablonlarını ekler.
+
+- **Şablonlar** (`LogisticsAutomationTemplates`, on adet; Yönetim > Otomasyon > Şablonlar): yeni taşıma talebi açılınca bildir; tehlikeli madde (ADR) talebi açılınca bildir; yükleme gününe 1 gün kala onaylanmamış talebi hatırlat; yükleme gününe 1 gün kala planlanmamış sevkiyatı hatırlat; teslim tarihi geçen sevkiyatı bildir; sevkiyat teslim edilince bildir; sevkiyat teslim edilemeyince bildir; başlangıcına 1 gün kala hazır olmayan seferi hatırlat; planlanan bitişi geçen seferi bildir; 3 gündür onay bekleyen masrafı hatırlat.
+- **Yalnızca bildirim:** hepsi Core'un "Bildirim gönder" aksiyonunu (`core.notify`) kullanır; kayıt değiştirmez, durum ilerletmez, dışarıya ileti göndermez. İleti kayıt değişkenlidir (yük tanımı, güzergâh, sefer numarası, tarih).
+- **Alıcı firmaya bırakılır:** lojistik kayıtlarında sorumlu kullanıcı alanı yoktur ve kimin uyarılacağı firmaya özgüdür; bu yüzden şablon alıcıyı boş bırakır (ADR-0027 Dilim 3b eki, `ToComplete`). "Kullan" taslak açar, firma alıcıyı seçmeden kural yayınlanamaz. Alıcı kaydı kendi yetkisiyle göremiyorsa Core bildirimi göndermez.
+- **Teslim iş olayları kurala açıldı:** `logistics.shipment.delivered` ve `logistics.shipment.delivery-failed` otomasyon olayı olarak beyan edildi; kuralda "İş olayı" tetikleyicisiyle seçilir (şablonların ikisi bunu kullanır).
+- **Düzenleyicide alıcı seçimi:** kural düzenleyici kayıt seçimi türündeki aksiyon parametresini (bildirimin "Kime"si) düz metin kutusuyla çiziyordu, firma kullanıcı kimliğini elle yazmak zorundaydı. Artık ortak `LookupPicker` (ADR-0016) ile seçilir. Tarayıcıda doğrulandı (açık ve koyu tema): şablondan taslak, "Kime zorunlu" uyarısı ve kapalı yayın düğmeleri, alıcı seçimi, kaydet, kapalı yayınla.
+- **Migration yok:** şablon kodda beyandır (ADR-0027 Dilim 3b).
+
+### Bilerek yapılmadı
+
+- **Onaya gönderen şablon** (ör. eşiği aşan masraf): eşik ve onay süreci firmaya özgüdür; ayrıca lojistik kayıtlarında talep sahibini veren sorumlu alanı (`OwnerField`) yoktur.
+- **Kayıt değiştiren aksiyon** ("sefer başlayınca sevkiyatı Yolda yap", "talep onaylanınca sevkiyat aç"): Lojistik kendi aksiyonunu beyan etmiyor; ayrı dilim.
+- **Müşteriye e-posta / SMS:** dış bildirim aksiyonu yok.
+- **Sürücü ve taşıyıcı anlaşması** kural türü olarak beyan edilmedi ("anlaşma bitişine 30 gün kala" kurulamıyor); navlun tutarı kural alanı değil.
+- **Tutar ya da masraf türüne göre şablon:** eşik ve tür anahtarları firmaya özgü; firma taslakta koşul ekleyebilir.
+
+### Test sonuçları (Kural şablonları)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 36 (6 yeni): gerçek katalog ve gerçek tanım doğrulayıcısıyla on şablonun her biri; tek sorun boş alıcı, alıcı seçilince sorun yok; sevkiyat okuma izni olmayana sevkiyat şablonları kapalı; modül kapalıyken liste boş; tarama şablonları kayıt kaynağının desteklediği tarih alanlarını kullanır |
+| `dotnet test tests/Modulix.Core.Tests --filter "AutomationTemplate"` | 6 yeni: boşluk beyanının katalog denetimi; beyan edilen boşluk şablonu açık tutar, beyan edilmeyen eksik / izin / modül sorunu tutmaz |
+| `... --filter "LogisticsAutomationTemplateTests"` (SQL Server; CI koşar) | 4 test yazıldı. **Mutlu yol:** şablon taslak açar, alıcı seçilince yayınlanır, tarama yalnızca yarın yüklenecek talebi bulur ve alıcıya bildirim yazar. **Doğrulama:** alıcı seçilmeden yayın reddedilir; on şablonun hepsi alıcıyla yayın doğrulamasından geçer. **Tenant izolasyonu:** bir firmada kullanılan şablon diğerinde kural açmaz. **Yetki:** yönetme izni olmayan 403, kayıt türünü okuyamayan 400, modül kapalıyken 404 |

@@ -116,7 +116,7 @@
                                 }
                                 else
                                 {
-                                    <p class="text-muted small">Bu şirketin şubesi yok.</p>
+                                    <EmptyState Compact="true" Title="Bu şirketin şubesi yok." />
                                 }
                                 <div class="branch-add">
                                     <input class="form-control form-control-sm" maxlength="200" placeholder="Yeni şube adı" @bind="newBranchName" @bind:event="oninput" />

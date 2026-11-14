@@ -208,7 +208,12 @@
                 <caption class="visually-hidden">@Texts.Get("crm.salesTargets.title")</caption>
                 <thead>
                     <tr>
-                        <th scope="col">@Texts.Get("crm.salesOverview.col.period")</th><th scope="col">@Texts.Get("crm.salesTargets.metric")</th><th scope="col">@Texts.Get("crm.salesForecasts.scope")</th><th scope="col">@Texts.Get("crm.salesTarget.target")</th><th scope="col">@Texts.Get("crm.salesTargets.col.revision")</th><th scope="col">@Texts.Get("crm.salesTargets.note")</th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("crm.salesOverview.col.period")" ColumnIcon="calendar" Asc="periodStart" Desc="-periodStart" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("crm.salesTargets.metric")" ColumnIcon="target" Asc="metric" Desc="-metric" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("crm.salesForecasts.scope")" ColumnIcon="users" Asc="scopeType" Desc="-scopeType" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("crm.salesTarget.target")" ColumnIcon="coins" Asc="value" Desc="-value" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("crm.salesTargets.col.revision")" ColumnIcon="history" Asc="revisionNo" Desc="-revisionNo" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col">@Texts.Get("crm.salesTargets.note")</th>
                         @if (CanManage) { <th scope="col"><span class="visually-hidden">@Texts.Get("crm.lead.actions")</span></th> }
                     </tr>
                 </thead>
@@ -280,6 +285,15 @@
 
     private Task ApplyFiltersAsync() => LoadAsync(1);
 
+    // Sıralama sunucudadır (SalesTargetRecordStore.SortKeys); boş değer varsayılan sıradır (en yeni dönem önce).
+    private string sort = "";
+
+    private async Task SortAsync(string value)
+    {
+        sort = value;
+        await LoadAsync(1);
+    }
+
     private async Task LoadAsync(int pageNumber)
     {
         var id = ++requestId;
@@ -292,6 +306,8 @@
         if (filterMetric.Length > 0) { query.Add($"metric={filterMetric}"); }
         if (filterScope.Length > 0) { query.Add($"scopeType={filterScope}"); }
         if (filterScope == SalesTargetScopes.User && filterUser.Length > 0) { query.Add($"scopeUserId={Uri.EscapeDataString(filterUser)}"); }
+
+        if (sort.Length > 0) { query.Add($"sort={Uri.EscapeDataString(sort)}"); }
 
         var result = await Api.GetAsync<CrmPage<SalesTargetDto>>($"{Url}?{string.Join('&', query)}");
         if (id != requestId)

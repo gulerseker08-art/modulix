@@ -87,8 +87,36 @@ public sealed class AutomationTemplateService(
         }
 
         var issues = await validator.ValidateAsync(moduleKey, template.EntityKey, template.Definition, cancellationToken);
+
+        // Şablonun firmaya bıraktığı zorunlu parametreler (ör. bildirimin alıcısı) kullanmaya engel değildir: taslakta sorun olarak görünür
+        // ve doldurulmadan yayınlanamaz. Katalog bu parametrelerin şablonda hiç verilmediğini açılışta doğrular; o yolda başka sorun çıkmaz.
+        if (template.ToComplete.Count > 0)
+        {
+            var open = BlankPaths(template);
+            issues = [.. issues.Where(i => !open.Contains(i.Path))];
+        }
+
         return new AutomationTemplateView(
             template.Key, moduleKey, template.EntityKey, template.DisplayName, template.Description, issues.Count == 0, issues);
+    }
+
+    /// <summary>Firmaya bırakılan parametrelerin doğrulama yolları (<c>actions[i].parameters.ad</c>; doğrulayıcının yol biçimi).</summary>
+    public static IReadOnlySet<string> BlankPaths(AutomationTemplateDefinition template)
+    {
+        var steps = template.Definition.Actions;
+        var paths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var blank in template.ToComplete)
+        {
+            for (var i = 0; i < steps.Count; i++)
+            {
+                if (steps[i].Id == blank.StepId)
+                {
+                    paths.Add($"actions[{i}].parameters.{blank.Parameter}");
+                }
+            }
+        }
+
+        return paths;
     }
 
     // Beyandaki JsonObject düğümleri paylaşılan sabittir; kurala kopyalanırken yeni ağaç kurulur.

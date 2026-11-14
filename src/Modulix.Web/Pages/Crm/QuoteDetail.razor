@@ -499,7 +499,7 @@
                 <h2 id="hist-title">@Texts.Get("common.history.tab")</h2>
                 @if (history.Count == 0)
                 {
-                    <p class="text-muted">@Texts.Get("common.noRecords")</p>
+                    <EmptyState Compact="true" />
                 }
                 else
                 {

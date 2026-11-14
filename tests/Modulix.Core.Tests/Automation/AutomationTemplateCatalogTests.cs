@@ -75,4 +75,31 @@ public class AutomationTemplateCatalogTests
         Assert.Throws<InvalidOperationException>(Build(Template(definition: new AutomationDefinition(new ManualTrigger(), null, []))));
         Assert.Throws<InvalidOperationException>(Build(Template(definition: Definition("sales.follow-up.create", "a", "a"))));
     }
+
+    private static AutomationDefinition WithoutSubject() =>
+        new(new ManualTrigger(), null, [new AutomationActionStep("a", "sales.follow-up.create", new JsonObject { ["dueInDays"] = 1 })]);
+
+    [Fact]
+    public void A_template_may_leave_a_required_parameter_for_the_company_to_fill()
+    {
+        var template = Template(definition: WithoutSubject()) with { ToComplete = [new AutomationTemplateBlank("a", "subject")] };
+
+        var found = Catalog(With(template)).FindAutomationTemplate(template.Key);
+
+        Assert.Equal([new AutomationTemplateBlank("a", "subject")], found!.Value.Template.ToComplete);
+    }
+
+    [Fact]
+    public void A_blank_must_name_an_existing_step_and_a_required_parameter_the_template_does_not_supply()
+    {
+        AutomationTemplateDefinition Blank(AutomationDefinition definition, params AutomationTemplateBlank[] blanks) =>
+            Template(definition: definition) with { ToComplete = blanks };
+
+        Assert.Throws<InvalidOperationException>(Build(Blank(WithoutSubject(), new AutomationTemplateBlank("yok", "subject"))));
+        Assert.Throws<InvalidOperationException>(Build(Blank(WithoutSubject(), new AutomationTemplateBlank("a", "yok"))));
+        Assert.Throws<InvalidOperationException>(Build(Blank(WithoutSubject(), new AutomationTemplateBlank("a", "priority")))); // isteğe bağlı
+        Assert.Throws<InvalidOperationException>(Build(Blank(Definition(), new AutomationTemplateBlank("a", "subject")))); // şablon zaten veriyor
+        Assert.Throws<InvalidOperationException>(
+            Build(Blank(WithoutSubject(), new AutomationTemplateBlank("a", "subject"), new AutomationTemplateBlank("a", "subject"))));
+    }
 }

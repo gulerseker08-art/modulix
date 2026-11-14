@@ -1,5 +1,6 @@
 @* Yapılandırılmış adresler (ADR-0012): firma düzeyinde (LocationId boş) ya da bir lokasyonun adresleri. Liste ve satır içi düzenleme. *@
 @inject ApiClient Api
+@inject ToastService Toasts
 
 <div class="sub-section @(open ? null : "closed")">
     <div class="section-header">
@@ -98,21 +99,28 @@
             @foreach (var item in items)
             {
                 <li class="@(item.IsActive ? null : "done")">
-                    <div class="item-main">
-                        <strong>@item.Line1@(item.Line2 is { Length: > 0 } ? $", {item.Line2}" : null)</strong>
-                        <span>
-                            @string.Join(", ", new[] { item.PostalCode, item.District, item.City, item.Country }.Where(s => !string.IsNullOrWhiteSpace(s)))
-                            · @SharedLabels.Address(item.Type)
-                            @if (item.IsPrimary) { <text> · </text><span class="badge status-customer">@Texts.Get("common.primaryBadge")</span> }
-                            @if (!item.IsActive) { <text> · @Texts.Get("common.inactive")</text> }
-                        </span>
-                    </div>
-                    @if (CanWrite)
+                    @if (confirming == item.Id)
                     {
-                        <RowMenu Label="@Texts.Get("common.rowActionsOf", item.Line1)">
-                            <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(item)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
-                            <button type="button" class="view-menu-item is-danger" role="menuitem" disabled="@busy" @onclick="() => DeleteAsync(item)"><AppIcon Name="trash" Size="16" /> <span>@Texts.Get("common.delete")</span></button>
-                        </RowMenu>
+                        <ConfirmBox Text="@Texts.Get("common.confirm.deleteOf", AddressTitle(item))" Busy="busy" Confirm="() => DeleteAsync(item)" Cancel="() => confirming = null" />
+                    }
+                    else
+                    {
+                        <div class="item-main">
+                            <strong>@item.Line1@(item.Line2 is { Length: > 0 } ? $", {item.Line2}" : null)</strong>
+                            <span>
+                                @string.Join(", ", new[] { item.PostalCode, item.District, item.City, item.Country }.Where(s => !string.IsNullOrWhiteSpace(s)))
+                                · @SharedLabels.Address(item.Type)
+                                @if (item.IsPrimary) { <text> · </text><span class="badge status-customer">@Texts.Get("common.primaryBadge")</span> }
+                                @if (!item.IsActive) { <text> · @Texts.Get("common.inactive")</text> }
+                            </span>
+                        </div>
+                        @if (CanWrite)
+                        {
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", AddressTitle(item))">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(item)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
+                                <button type="button" class="view-menu-item is-danger" role="menuitem" @onclick="() => confirming = item.Id"><AppIcon Name="trash" Size="16" /> <span>@Texts.Get("common.delete")</span></button>
+                            </RowMenu>
+                        }
                     }
                 </li>
             }
@@ -120,7 +128,7 @@
     }
     else if (items is not null)
     {
-        <p class="text-muted">@Texts.Get("crm.address.none")</p>
+        <EmptyState Compact="true" Title="@Texts.Get("crm.address.none")" />
     }
     </div>
     }
@@ -208,12 +216,25 @@
         message = result.Error;
     }
 
+    // Adres satırı boş olabilir (yalnızca şehir girilmiş adres); o zaman şehir ya da tür adı kullanılır.
+    private static string AddressTitle(AddressDto address) =>
+        new[] { address.Line1, address.City }.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v)) ?? SharedLabels.Address(address.Type);
+
+    // Silme iki adımlıdır: menüdeki "Sil" onay kutusunu açar, kutudaki düğme siler.
+    private Guid? confirming;
+
     private async Task DeleteAsync(AddressDto address)
     {
         busy = true;
         var result = await Api.DeleteAsync($"{Url}/{address.Id}?version={address.Version}");
         busy = false;
+        confirming = null;
         message = result.Error;
+        if (result.IsSuccess)
+        {
+            Toasts.Success(Texts.Get("common.deleted"));
+        }
+
         await LoadAsync();
         await Changed.InvokeAsync();
     }

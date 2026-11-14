@@ -80,6 +80,25 @@ internal sealed class SalesTargetRecordStore(CrmStoreContext context) : CrmRecor
     protected override IOrderedQueryable<SalesTarget> Order(IQueryable<SalesTarget> source) =>
         source.OrderByDescending(t => t.PeriodStart).ThenBy(t => t.Metric).ThenBy(t => t.ScopeType);
 
+    // Liste başlıklarına göre sıralama (sort=periodStart, sort=-value ...); eşitlikte en yeni dönem önce.
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        ["periodStart", "-periodStart", "metric", "-metric", "scopeType", "-scopeType", "value", "-value", "revisionNo", "-revisionNo"];
+
+    protected override IOrderedQueryable<SalesTarget> Order(IQueryable<SalesTarget> source, string? sort) => sort switch
+    {
+        "periodStart" => source.OrderBy(t => t.PeriodStart).ThenBy(t => t.Metric).ThenBy(t => t.ScopeType),
+        "-periodStart" => source.OrderByDescending(t => t.PeriodStart).ThenBy(t => t.Metric).ThenBy(t => t.ScopeType),
+        "metric" => source.OrderBy(t => t.Metric).ThenByDescending(t => t.PeriodStart),
+        "-metric" => source.OrderByDescending(t => t.Metric).ThenByDescending(t => t.PeriodStart),
+        "scopeType" => source.OrderBy(t => t.ScopeType).ThenByDescending(t => t.PeriodStart),
+        "-scopeType" => source.OrderByDescending(t => t.ScopeType).ThenByDescending(t => t.PeriodStart),
+        "value" => source.OrderBy(t => t.Value).ThenByDescending(t => t.PeriodStart),
+        "-value" => source.OrderByDescending(t => t.Value).ThenByDescending(t => t.PeriodStart),
+        "revisionNo" => source.OrderBy(t => t.RevisionNo).ThenByDescending(t => t.PeriodStart),
+        "-revisionNo" => source.OrderByDescending(t => t.RevisionNo).ThenByDescending(t => t.PeriodStart),
+        _ => Order(source),
+    };
+
     protected override IQueryable<SalesTarget> Search(IQueryable<SalesTarget> source, string term) =>
         source.Where(t => t.Note != null && t.Note.Contains(term));
 

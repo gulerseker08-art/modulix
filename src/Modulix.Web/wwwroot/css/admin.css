@@ -1,0 +1,511 @@
+/* Kullanıcı yönetimi (Y2) */
+.badge.user-active {
+    background: var(--mx-tone-success-bg);
+    color: var(--mx-tone-success-fg);
+}
+
+.badge.user-disabled {
+    background: var(--mx-tone-neutral-bg);
+    color: var(--mx-tone-neutral-fg);
+}
+
+.badge.user-invited {
+    background: var(--mx-tone-warning-bg);
+    color: var(--mx-tone-warning-fg);
+}
+
+.badge.user-locked {
+    background: var(--mx-tone-danger-bg);
+    color: var(--mx-tone-danger-fg);
+}
+
+.role-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+
+.account-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+    .account-actions > div {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 0.75rem;
+    }
+
+.confirm p {
+    margin-bottom: 0.75rem;
+}
+
+.confirm .btn {
+    margin-right: 0.5rem;
+}
+
+.search .form-select {
+    max-width: 14rem;
+}
+
+@media (max-width: 767.98px) {
+    /* Arama kutusu tam satır; rol seçimi ve düğme alt satırda. */
+    .search.has-select {
+        flex-wrap: wrap;
+    }
+
+        .search.has-select .form-control {
+            flex: 1 1 100%;
+        }
+
+        .search.has-select .form-select {
+            flex: 1;
+            max-width: none;
+        }
+}
+
+/* ---- Rol formu: izin matrisi ---- */
+.permission-module {
+    margin: 1rem 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+}
+
+    .permission-module header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+
+        .permission-module header h3 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .permission-module header .form-check {
+            margin: 0;
+            font-size: 0.85rem;
+        }
+
+    .permission-module .form-check-input {
+        border-color: var(--mx-border-strong);
+    }
+
+.permission-matrix {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+    .permission-matrix th, .permission-matrix td {
+        padding: 0.45rem 0.25rem;
+        border-top: 1px solid var(--mx-border);
+    }
+
+    .permission-matrix thead th {
+        border-top: 0;
+        color: var(--mx-muted);
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .permission-matrix th[scope="row"] {
+        font-weight: 500;
+    }
+
+    .permission-matrix td, .permission-matrix thead th:not(:first-child) {
+        width: 8rem;
+        text-align: center;
+    }
+
+    .permission-matrix .form-check-input {
+        float: none;
+        margin: 0;
+    }
+
+.permission-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding-top: 0.35rem;
+}
+
+@media (max-width: 767.98px) {
+    .permission-matrix td, .permission-matrix thead th:not(:first-child) {
+        width: 5.5rem;
+    }
+}
+
+/* Platform (Y4): bölüm içindeki kısa formlar (yönetici daveti, firma adı). */
+.inline-form {
+    margin-top: 1rem;
+}
+
+    .inline-form h3 {
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+/* Modül hakları (Y4b): tablo hücresindeki anahtar ve kapatma uyarısı. */
+.module-toggle .form-check {
+    margin-bottom: 0;
+}
+
+.module-toggle .confirm {
+    margin-top: 0.5rem;
+    max-width: 22rem;
+    font-size: 0.875rem;
+}
+
+/* Modül kataloğu (Y4b). */
+.catalog-module {
+    margin-bottom: 1.5rem;
+}
+
+    .catalog-module code {
+        font-size: 0.8rem;
+    }
+
+/* Denetim kaydı (Y5). */
+.audit-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.75rem;
+    align-items: end;
+    margin-bottom: 1rem;
+}
+
+.audit-filter-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.audit-row {
+    cursor: pointer;
+}
+
+.link-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    text-decoration: underline dotted;
+}
+
+.audit-detail > td {
+    background: var(--mx-surface-muted);
+}
+
+.audit-changes {
+    margin: 0;
+    max-width: 48rem;
+}
+
+.audit-table td[data-label="Tarih"] {
+    white-space: nowrap;
+}
+
+/* Kayıt geçmişi (Y5b). */
+.history-list .item-main strong {
+    font-weight: 600;
+}
+
+.history-action {
+    font-weight: 400;
+    color: inherit !important;
+    font-size: inherit !important;
+}
+
+.history-changes {
+    list-style: none;
+    padding: 0;
+    margin: 0.35rem 0 0;
+    font-size: 0.875rem;
+}
+
+    .history-changes li {
+        display: block;
+        padding: 0.1rem 0;
+        border: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .history-changes span {
+        color: inherit;
+        font-size: inherit;
+    }
+
+    .history-changes .history-field {
+        color: var(--mx-muted);
+    }
+
+    .history-changes .history-old {
+        text-decoration: line-through;
+        color: var(--mx-muted);
+    }
+
+.audit-changes td:first-child, .audit-changes th:first-child {
+    white-space: nowrap;
+}
+
+/* Firma ayarları (Y6). */
+.settings-group {
+    margin-bottom: 1.5rem;
+}
+
+.tenant-logo {
+    max-height: 32px;
+    max-width: 120px;
+    object-fit: contain;
+}
+
+.logo-preview {
+    max-height: 64px;
+    max-width: 200px;
+    object-fit: contain;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    padding: 0.25rem;
+    background: #fff; /* logo her temada beyaz zeminde önizlenir */
+}
+
+/* Hesabım (Y7a). */
+.session-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+}
+
+.session-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--mx-border);
+}
+
+.session-item:last-child {
+    border-bottom: 0;
+}
+
+.session-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.session-link:hover {
+    text-decoration: underline;
+}
+
+/* İki adımlı doğrulama (Y7b). */
+.recovery-codes {
+    columns: 2;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--mx-surface-muted);
+    border-radius: var(--mx-radius);
+}
+
+.qr-code {
+    width: 200px;
+    height: 200px;
+    image-rendering: pixelated;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+}
+
+.shared-key {
+    word-break: break-all;
+}
+
+.setup-steps {
+    padding-left: 1.25rem;
+}
+
+/* Kayıt kapsamı (Y8). */
+.scope-choice {
+    margin: 1.25rem 0;
+}
+
+.scope-choice .form-check {
+    margin-bottom: 0.35rem;
+}
+
+.scope-line {
+    margin-bottom: 0.75rem;
+}
+
+/* Özel alanlar (Y9a) */
+.form-section {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0.75rem 0 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--mx-border);
+}
+
+.check-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+}
+
+    .check-list .form-check {
+        min-height: 32px;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+.option-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+    .option-row .form-control {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .option-row .form-check {
+        flex: none;
+        margin: 0;
+    }
+
+.record-table tr.is-archived td {
+    color: var(--mx-muted);
+}
+
+/* Seçim listeleri (Y9b): değer, kategori, etkinlik ve sıra tek satırda; dar ekranda alt alta. */
+.choice-rows {
+    margin-bottom: 0.75rem;
+}
+
+    /* Kategori sütunu sabit genişlikte: seçim kutusu (yeni değer) ve rozet (hazır değer) alt alta hizalanır. */
+    .choice-row .form-select,
+    .choice-row .badge.category {
+        flex: 0 0 10rem;
+        width: 10rem;
+    }
+
+    .choice-row .badge.category {
+        text-align: center;
+    }
+
+    .choice-row .order {
+        flex: none;
+        white-space: nowrap;
+    }
+
+    .choice-row.is-archived .form-control {
+        color: var(--mx-muted);
+    }
+
+@media (max-width: 575.98px) {
+    .choice-row {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+        .choice-row .form-control {
+            flex-basis: 100%;
+        }
+}
+
+/* Sektör profilleri (Y9c): profil kartları; seçilen kartın altında "Şunlar eklenecek" önizlemesi. */
+.profile-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.profile-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    padding: 1rem;
+    text-align: left;
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    box-shadow: var(--mx-shadow);
+    color: var(--mx-ink);
+}
+
+    .profile-card span {
+        color: var(--mx-muted);
+        font-size: 0.875rem;
+    }
+
+    .profile-card:hover,
+    .profile-card.active {
+        border-color: var(--mx-indigo);
+    }
+
+    .profile-card.active {
+        box-shadow: 0 0 0 2px rgba(var(--mx-indigo-rgb), 0.25);
+    }
+
+    .profile-card .badge.category {
+        color: var(--mx-ink);
+    }
+
+/* Organizasyon ağacı (İK organizasyon şeması): girintili iç içe liste, alt düzeyler sol çizgiyle bağlanır. */
+.org-tree,
+.org-tree ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+    .org-tree ul {
+        margin-left: 1.25rem;
+        padding-left: 1rem;
+        border-left: 1px solid var(--mx-border);
+    }
+
+    .org-tree li {
+        padding-top: 0.5rem;
+    }
+
+.org-node {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    color: var(--mx-ink);
+}
+
+    .org-node small {
+        display: block;
+        color: var(--mx-muted);
+    }
+
+    .org-node.active {
+        background: var(--mx-tone-brand-bg);
+        border-color: var(--mx-tone-brand-fg);
+    }
+
+.profile-plan {
+    padding-left: 1.25rem;
+    margin-bottom: 0.75rem;
+}
+
+    .profile-plan li {
+        margin-bottom: 0.25rem;
+    }
