@@ -9,7 +9,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Item is null ? "Yeni stok kartı" : "Stok kartı")</h2>
+            <h2>@(Item is null ? Texts.Get("warehouse.stockItems.new") : Texts.Get("warehouse.stockItemEditor.card"))</h2>
             @if (Item is not null)
             {
                 <p>@form.Code · @form.Name</p>
@@ -17,13 +17,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -38,24 +38,24 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Stok kartı özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("warehouse.stockItemEditor.summary")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true"><AppIcon Name="package" Size="24" /></span>
-                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Name) ? "Stok kartı adı" : form.Name)</strong>
-                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.Code) ? "Stok kodu" : form.Code)</span>
+                    <strong class="summary-name">@(string.IsNullOrWhiteSpace(form.Name) ? Texts.Get("warehouse.stockItemEditor.namePlaceholder") : form.Name)</strong>
+                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.Code) ? Texts.Get("warehouse.stockItemEditor.codePlaceholder") : form.Code)</span>
                 </div>
-                <h3 class="summary-heading">Kart özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("warehouse.stockItemEditor.summaryHeading")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Birim</dt><dd>@(string.IsNullOrEmpty(form.UnitKey) ? "—" : Lookups.Label(WarehouseAccess.StockUnitList, form.UnitKey))</dd></div>
-                    <div><dt>GTİP</dt><dd>@(string.IsNullOrWhiteSpace(form.Gtip) ? "—" : form.Gtip)</dd></div>
-                    <div><dt>Durum</dt><dd>@(form.IsActive ? "Etkin" : "Pasif")</dd></div>
+                    <div><dt>@Texts.Get("warehouse.unit")</dt><dd>@(string.IsNullOrEmpty(form.UnitKey) ? "—" : Lookups.Label(WarehouseAccess.StockUnitList, form.UnitKey))</dd></div>
+                    <div><dt>@Texts.Get("warehouse.gtip")</dt><dd>@(string.IsNullOrWhiteSpace(form.Gtip) ? "—" : form.Gtip)</dd></div>
+                    <div><dt>@Texts.Get("common.field.status")</dt><dd>@WarehouseLabels.ActiveText(form.IsActive)</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Stok kartı formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("warehouse.stockItemEditor.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
@@ -63,7 +63,7 @@
                             <label class="@f.LabelClass()" for="stock-code">@f.Label</label>
                             <input id="stock-code" class="form-control" maxlength="50" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Code" />
                             <FieldError Field="code" Errors="errors" />
-                            <small class="text-muted">Harf, rakam ve - _ . / karakterleri; büyük/küçük harf farkı yok sayılır, firma içinde benzersizdir.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.stockItemEditor.codeHelp")</small>
                             break;
                         case "name":
                             <label class="@f.LabelClass()" for="stock-name">@f.Label</label>
@@ -88,7 +88,7 @@
                             <label class="@f.LabelClass()" for="stock-gtip">@f.Label</label>
                             <input id="stock-gtip" class="form-control" inputmode="numeric" maxlength="40" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Gtip" @bind:event="onchange" />
                             <FieldError Field="gtip" Errors="errors" />
-                            <small class="text-muted">Yalnızca rakamlar (nokta ve boşluk atılır, 6-14 hane). Varsayılan önerisidir; yasal gerçek beyanname satırındadır.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.stockItemEditor.gtipHelp")</small>
                             @* Katalog denetimi yalnızca bilgidir (ADR-0032 K9): bulunamayan kod uyarı üretir, kaydı engellemez. *@
                             <GtipCheckHint Code="@form.Gtip" />
                             break;
@@ -102,11 +102,11 @@
             </LayoutForm>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </div>
@@ -143,7 +143,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir kart verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>

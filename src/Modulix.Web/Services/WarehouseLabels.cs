@@ -4,9 +4,29 @@ using Modulix.Shared.Warehouse;
 
 namespace Modulix.Web.Services;
 
+// Bu dosyadaki tablolarda Türkçe ad kaynak metindir (ADR-0034, dilim 14a); etkin dilin sözlüğünde `{grup}.{anahtar küçük harf}` yoksa o gösterilir.
+// Tablolar özellik olarak tanımlıdır: metinler sınıf yüklenirken değil, her okunuşta çözülür (sözlük sonradan yüklenir). Yeni değer eklenince
+// üç sözlüğe de anahtar eklenir (`WarehouseLabelsTests` kapsamı denetler).
+
 /// <summary>Depo ekranlarının ortak etiket ve rozet kuralları. Rozet tonları yalnızca mevcut tasarım sınıflarından seçilir.</summary>
 public static class WarehouseLabels
 {
+    public const string CharacterSetGroup = "warehouse.character-set";
+
+    public static string KeyOf(string group, string key) => $"{group}.{key.Replace(':', '-').ToLowerInvariant()}";
+
+    public static string Of(string group, string key, string fallback) => Texts.GetOr(KeyOf(group, key), fallback);
+
+    /// <summary>Tabloyu her okunuşta çevirir.</summary>
+    public static IReadOnlyList<(string Key, string Label)> Translate(string group, IReadOnlyList<(string Key, string Label)> source) =>
+        [.. source.Select(x => (x.Key, Of(group, x.Key, x.Label)))];
+
+    /// <summary>Etkin/pasif durum metni (liste rozetleri ve form özetleri).</summary>
+    public static string ActiveText(bool active) => active ? Texts.GetOr("warehouse.active", "Etkin") : Texts.GetOr("common.inactive", "Pasif");
+
+    /// <summary>Açık/kapalı ayar metni (gümrük uzantısı gibi anahtarlar).</summary>
+    public static string OnOffText(bool on) => on ? Texts.GetOr("warehouse.on", "Açık") : Texts.GetOr("warehouse.off", "Kapalı");
+
     /// <summary>Etkin/açık için başarı tonu, pasif/kapalı için nötr ton.</summary>
     public static string ActiveBadge(bool active) => active ? "status-customer" : "status-inactive";
 
@@ -37,14 +57,28 @@ public static class WarehouseLabels
     public static decimal Decimal(RecordResponse record, string field) => record.Values[field]?.GetValue<decimal>() ?? 0m;
 
     /// <summary>Seviye değerinde izin verilen karakter kümeleri (sunucudaki <c>LocationLevel.CharacterSets</c>).</summary>
-    public static IReadOnlyList<(string Key, string Label)> CharacterSets { get; } =
+    internal static readonly (string Key, string Label)[] CharacterSetSource =
     [
         ("alphanumeric", "Harf ve rakam"),
         ("letters", "Yalnızca harf"),
         ("digits", "Yalnızca rakam"),
     ];
 
-    public static string CharacterSetLabel(string? key) => CharacterSets.FirstOrDefault(c => c.Key == key).Label ?? key ?? string.Empty;
+    public static IReadOnlyList<(string Key, string Label)> CharacterSets => Translate(CharacterSetGroup, CharacterSetSource);
+
+    /// <summary>Karakter kümesinin adı; tabloda olmayan anahtar olduğu gibi döner.</summary>
+    public static string CharacterSetLabel(string? key)
+    {
+        foreach (var (k, label) in CharacterSetSource)
+        {
+            if (k == key)
+            {
+                return Of(CharacterSetGroup, k, label);
+            }
+        }
+
+        return key ?? string.Empty;
+    }
 
     public static string Text(RecordResponse record, string field) => record.Values[field]?.GetValue<string>() ?? string.Empty;
 

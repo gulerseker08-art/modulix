@@ -9,7 +9,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Location is null ? "Yeni lokasyon" : "Lokasyon kartı")</h2>
+            <h2>@(Location is null ? Texts.Get("warehouse.locations.new") : Texts.Get("warehouse.locationEditor.card"))</h2>
             @if (Location is not null)
             {
                 <p>@form.Code</p>
@@ -17,13 +17,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Kaydet
+                @Texts.Get("common.save")
             </button>
         </div>
     </div>
@@ -38,55 +38,55 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Lokasyon özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("warehouse.locationEditor.summary")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true"><AppIcon Name="map-pin" Size="24" /></span>
-                    <strong class="summary-name">@(Location is null ? (string.IsNullOrWhiteSpace(form.Value) ? "Yeni lokasyon" : form.Value.ToUpperInvariant()) : form.Code)</strong>
+                    <strong class="summary-name">@(Location is null ? (string.IsNullOrWhiteSpace(form.Value) ? Texts.Get("warehouse.locations.new") : form.Value.ToUpperInvariant()) : form.Code)</strong>
                     @if (!string.IsNullOrWhiteSpace(form.Name))
                     {
                         <span class="summary-sub">@form.Name</span>
                     }
                 </div>
-                <h3 class="summary-heading">Lokasyon özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("warehouse.locationEditor.summary")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Derinlik</dt><dd>@(Location is null ? "—" : form.Depth.ToString())</dd></div>
-                    <div><dt>Durum</dt><dd>@(form.IsActive ? "Etkin" : "Pasif")</dd></div>
+                    <div><dt>@Texts.Get("warehouse.depth")</dt><dd>@(Location is null ? "—" : form.Depth.ToString())</dd></div>
+                    <div><dt>@Texts.Get("common.field.status")</dt><dd>@WarehouseLabels.ActiveText(form.IsActive)</dd></div>
                 </dl>
                 @if (Location is null)
                 {
-                    <p class="small text-muted">Kod, kaydedilirken üst lokasyonun kodu, seviyenin ayracı ve girdiğiniz değerden üretilir.</p>
+                    <p class="small text-muted">@Texts.Get("warehouse.locationEditor.codeNote")</p>
                 }
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Lokasyon formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("warehouse.locationEditor.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
                         case "facilityId":
                             <label class="@f.LabelClass()" for="location-facility">@f.Label</label>
-                            <LookupPicker Id="location-facility" LookupKey="@WarehouseAccess.LocationFacilityLookup" Value="form.FacilityId" ValueChanged="FacilityChangedAsync" Required="f.Required" Disabled="@(Location is not null || locked)" Placeholder="Tesis seçin…" Invalid="@(errors?.ContainsKey("facilityId") == true)" />
+                            <LookupPicker Id="location-facility" LookupKey="@WarehouseAccess.LocationFacilityLookup" Value="form.FacilityId" ValueChanged="FacilityChangedAsync" Required="f.Required" Disabled="@(Location is not null || locked)" Placeholder="@Texts.Get("warehouse.chooseFacility")" Invalid="@(errors?.ContainsKey("facilityId") == true)" />
                             <FieldError Field="facilityId" Errors="errors" />
                             break;
                         case "parentId":
                             <label class="@f.LabelClass()" for="location-parent">@f.Label</label>
-                            <LookupPicker Id="location-parent" LookupKey="@WarehouseAccess.LocationParentLookup" ParentId="form.FacilityId" @bind-Value="form.ParentId" Disabled="@(Location is not null || locked)" Placeholder="Yok (kök lokasyon)" Invalid="@(errors?.ContainsKey("parentId") == true)" />
+                            <LookupPicker Id="location-parent" LookupKey="@WarehouseAccess.LocationParentLookup" ParentId="form.FacilityId" @bind-Value="form.ParentId" Disabled="@(Location is not null || locked)" Placeholder="@Texts.Get("warehouse.locationEditor.noParent")" Invalid="@(errors?.ContainsKey("parentId") == true)" />
                             <FieldError Field="parentId" Errors="errors" />
-                            <small class="text-muted">Boş bırakılırsa tesisin ilk seviyesinde (kök) açılır. Üst lokasyon sonradan değiştirilemez.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.locationEditor.parentHelp")</small>
                             break;
                         case "value":
                             <label class="@f.LabelClass()" for="location-value">@f.Label</label>
                             <input id="location-value" class="form-control" maxlength="20" required="@f.Required" aria-required="@f.AriaRequired()" disabled="@(Location is not null)" @bind="form.Value" />
                             <FieldError Field="value" Errors="errors" />
-                            <small class="text-muted">Seviyenin karakter kümesine ve uzunluğuna uymalı; büyük harfe çevrilir.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.locationEditor.valueHelp")</small>
                             break;
                         case "zoneId":
                             <label class="@f.LabelClass()" for="location-zone">@f.Label</label>
                             <LookupPicker Id="location-zone" LookupKey="@WarehouseAccess.LocationZoneLookup" ParentId="form.FacilityId" @bind-Value="form.ZoneId" Required="f.Required" Placeholder="—" Invalid="@(errors?.ContainsKey("zoneId") == true)" />
                             <FieldError Field="zoneId" Errors="errors" />
-                            <small class="text-muted">Üst lokasyonun alanı varsa alt lokasyon aynı alanı taşır.</small>
+                            <small class="text-muted">@Texts.Get("warehouse.locationEditor.zoneHelp")</small>
                             break;
                         case "name":
                             <label class="@f.LabelClass()" for="location-name">@f.Label</label>
@@ -102,11 +102,11 @@
             </LayoutForm>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </div>
@@ -150,7 +150,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir kayıt ya da ön ayar verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
