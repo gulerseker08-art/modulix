@@ -2,18 +2,18 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Ölçü birimleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.measureUnits.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.ProductsRead">
     <div class="page-header">
-        <h1>Ölçü birimleri</h1>
+        <h1>@Texts.Get("crm.measureUnits.title")</h1>
         @if (Session.Can(CrmAccess.ProductsWrite) && form is null)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => form = new()">Yeni birim</button>
+            <button type="button" class="btn btn-primary" @onclick="() => form = new()">@Texts.Get("crm.measureUnits.new")</button>
         }
     </div>
 
-    <p class="text-muted">Her birim bir gruba ve o grubun temel birimine katsayıyla bağlıdır (1 kutu = 12 adet için grup "Adet", katsayı 12; temel birimin katsayısı 1'dir). Ürünlerde kullanılan birimin grubu ve katsayısı değiştirilemez.</p>
+    <p class="text-muted">@Texts.Get("crm.measureUnits.intro")</p>
 
     @if (message is not null)
     {
@@ -23,21 +23,21 @@
     @if (form is not null)
     {
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>@(form.Id is null ? "Yeni birim" : "Birimi düzenle")</h2>
-            <FormTabs Title="Birim bilgileri" Label="Ölçü birimi formu bölümleri">
+            <h2>@(form.Id is null ? Texts.Get("crm.measureUnits.new") : Texts.Get("crm.measureUnits.edit"))</h2>
+            <FormTabs Title="@Texts.Get("crm.measureUnits.info")" Label="@Texts.Get("crm.measureUnits.formSections")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="code">Kod *</label>
+                    <label class="form-label" for="code">@Texts.Get("crm.products.field.code")</label>
                     <input id="code" class="form-control" maxlength="20" @bind="form.Code" />
                     <FieldError Field="code" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="name">Ad *</label>
+                    <label class="form-label" for="name">@Texts.Get("common.field.nameRequired")</label>
                     <input id="name" class="form-control" maxlength="100" @bind="form.Name" />
                     <FieldError Field="name" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="group">Grup *</label>
+                    <label class="form-label" for="group">@Texts.Get("crm.measureUnits.field.group")</label>
                     <select id="group" class="form-select" @bind="form.GroupKey">
                         @foreach (var group in CatalogLabels.UnitGroups)
                         {
@@ -47,18 +47,18 @@
                     <FieldError Field="groupKey" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="factor">Temel birime katsayı *</label>
+                    <label class="form-label" for="factor">@Texts.Get("crm.measureUnits.field.factor")</label>
                     <input id="factor" class="form-control" type="number" step="any" min="0" @bind="form.Factor" />
                     <FieldError Field="factorToBase" Errors="errors" />
                 </div>
             </div>
             </FormTabs>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
                 @if (form.Id is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
                 }
             </div>
         </form>
@@ -66,28 +66,28 @@
 
     @if (page is null)
     {
-        <p class="text-muted">Yükleniyor…</p>
+        <p class="text-muted">@Texts.Get("common.loading")</p>
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Birim yok.</p>
+        <p class="text-muted">@Texts.Get("crm.measureUnits.none")</p>
     }
     else
     {
         <table class="table record-table">
-            <thead><tr><th>Kod</th><th>Ad</th><th>Grup</th><th>Katsayı</th><th></th></tr></thead>
+            <thead><tr><th>@Texts.Get("crm.products.col.code")</th><th>@Texts.Get("common.field.name")</th><th>@Texts.Get("crm.measureUnits.col.group")</th><th>@Texts.Get("crm.measureUnits.col.factor")</th><th></th></tr></thead>
             <tbody>
                 @foreach (var unit in page.Items)
                 {
                     <tr>
-                        <td data-label="Kod" class="primary">@unit.Code</td>
-                        <td data-label="Ad">@unit.Name</td>
-                        <td data-label="Grup">@CatalogLabels.Label(CatalogLabels.UnitGroups, unit.GroupKey)</td>
-                        <td data-label="Katsayı">@unit.FactorToBase.ToString("0.######")</td>
+                        <td data-label="@Texts.Get("crm.products.col.code")" class="primary">@unit.Code</td>
+                        <td data-label="@Texts.Get("common.field.name")">@unit.Name</td>
+                        <td data-label="@Texts.Get("crm.measureUnits.col.group")">@CatalogLabels.Label(CatalogLabels.UnitGroups, unit.GroupKey)</td>
+                        <td data-label="@Texts.Get("crm.measureUnits.col.factor")">@unit.FactorToBase.ToString("0.######")</td>
                         <td class="actions">
                             @if (Session.Can(CrmAccess.ProductsWrite))
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(unit)">Düzenle</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(unit)">@Texts.Get("common.edit")</button>
                             }
                         </td>
                     </tr>
