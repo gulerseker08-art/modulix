@@ -12,7 +12,22 @@ public static class LogisticsLabels
     public const string Shipments = "shipments";
     public const string Trips = "trips";
 
-    public static string TripStatus(string? key) => LogisticsAccess.TripStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Seçenek tabloları her okunuşta etkin dile göre kurulur (Türkçe kaynak metin sözlükte yoksa yedek kalır).</summary>
+    public static IReadOnlyList<(string Key, string Label)> TripStatuses => WarehouseLabels.Translate("logistics.trip-status", LogisticsAccess.TripStatuses);
+
+    public static IReadOnlyList<(string Key, string Label)> StopTypes => WarehouseLabels.Translate("logistics.stop-type", LogisticsAccess.StopTypes);
+
+    public static IReadOnlyList<(string Key, string Label)> RequestStatuses => WarehouseLabels.Translate("logistics.request-status", LogisticsAccess.RequestStatuses);
+
+    public static IReadOnlyList<(string Key, string Label)> ShipmentStatuses => WarehouseLabels.Translate("logistics.shipment-status", LogisticsAccess.ShipmentStatuses);
+
+    public static IReadOnlyList<(string Key, string Label)> DeliveryOutcomes => WarehouseLabels.Translate("logistics.delivery-outcome", LogisticsAccess.DeliveryOutcomes);
+
+    public static IReadOnlyList<(string Key, string Label)> DriverTypes => WarehouseLabels.Translate("logistics.driver-type", LogisticsAccess.DriverTypes);
+
+    public static IReadOnlyList<(string Key, string Label)> Statuses => WarehouseLabels.Translate("logistics.driver-status", LogisticsAccess.Statuses);
+
+    public static string TripStatus(string? key) => TripStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Planlanan marka tonu, hazır bilgi tonu, yolda dikkat tonu, tamamlanan başarı tonu, iptal nötr ton.</summary>
     public static string TripStatusBadge(string? key) => key switch
@@ -24,7 +39,7 @@ public static class LogisticsLabels
         _ => "status-inactive",
     };
 
-    public static string StopType(string? key) => LogisticsAccess.StopTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    public static string StopType(string? key) => StopTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Durak türü ikonu: yükleme, boşaltma, sınır, mola, boş dönüş.</summary>
     public static string StopIcon(string? key) => key switch
@@ -37,7 +52,7 @@ public static class LogisticsLabels
     };
 
     public static string CargoStatus(string kind, string? key) =>
-        (kind == Requests ? LogisticsAccess.RequestStatuses : LogisticsAccess.ShipmentStatuses).FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+        (kind == Requests ? RequestStatuses : ShipmentStatuses).FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Yeni ve planlama bekleyen marka tonu, ilerleyen dikkat tonu, tamamlanan başarı tonu, ret/iptal/başarısız kayıp ya da nötr ton.</summary>
     public static string CargoStatusBadge(string? key) => key switch
@@ -60,11 +75,11 @@ public static class LogisticsLabels
         return country.Length == 0 || country == CountryCatalog.DefaultCode ? city : $"{city} ({country})";
     }
 
-    public static string DriverType(string? key) => LogisticsAccess.DriverTypes.FirstOrDefault(t => t.Key == key).Label ?? key ?? string.Empty;
+    public static string DriverType(string? key) => DriverTypes.FirstOrDefault(t => t.Key == key).Label ?? key ?? string.Empty;
 
-    public static string DeliveryOutcome(string? key) => LogisticsAccess.DeliveryOutcomes.FirstOrDefault(o => o.Key == key).Label ?? key ?? string.Empty;
+    public static string DeliveryOutcome(string? key) => DeliveryOutcomes.FirstOrDefault(o => o.Key == key).Label ?? key ?? string.Empty;
 
-    public static string Status(string? key) => LogisticsAccess.Statuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    public static string Status(string? key) => Statuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Etkin başarı tonu, izinde dikkat tonu, pasif nötr ton.</summary>
     public static string StatusBadge(string? key) => key switch
@@ -81,8 +96,8 @@ public static class LogisticsLabels
         var to = FleetLabels.Day(WarehouseLabels.Text(terms, "validTo"));
         return (from, to) switch
         {
-            ({ } f, { } t) => $"{FleetLabels.Date(f)} – {FleetLabels.Date(t)}",
-            ({ } f, null) => $"{FleetLabels.Date(f)} tarihinden itibaren",
+            ({ } f, { } t) => Texts.Get("logistics.validity.range", FleetLabels.Date(f), FleetLabels.Date(t)),
+            ({ } f, null) => Texts.Get("logistics.validity.since", FleetLabels.Date(f)),
             _ => "—",
         };
     }
@@ -95,17 +110,17 @@ public static class LogisticsLabels
     {
         if (!WarehouseLabels.Flag(terms, "isActive", true))
         {
-            return ("status-inactive", "Pasif");
+            return ("status-inactive", Texts.Get("common.inactive"));
         }
 
         var from = FleetLabels.Day(WarehouseLabels.Text(terms, "validFrom"));
         var to = FleetLabels.Day(WarehouseLabels.Text(terms, "validTo"));
         return (from, to) switch
         {
-            (_, { } t) when t < today => ("stage-lost", "Süresi doldu"),
-            ({ } f, _) when f > today => ("stage-qualified", "Başlamadı"),
-            (_, { } t) when t <= today.AddDays(30) => ("stage-negotiation", "Bitiyor"),
-            _ => ("status-customer", "Geçerli"),
+            (_, { } t) when t < today => ("stage-lost", Texts.Get("logistics.terms-state.expired")),
+            ({ } f, _) when f > today => ("stage-qualified", Texts.Get("logistics.terms-state.not-started")),
+            (_, { } t) when t <= today.AddDays(30) => ("stage-negotiation", Texts.Get("logistics.terms-state.ending")),
+            _ => ("status-customer", Texts.Get("logistics.terms-state.valid")),
         };
     }
 
