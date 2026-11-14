@@ -51,7 +51,7 @@
         <table class="table record-table">
             <thead>
                 <tr>
-                    <th>Firma</th>
+                    <th scope="col"><SortHeader Label="Firma" ColumnIcon="building" Asc="name" Desc="-name" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
                     @foreach (var module in modules.Modules)
                     {
                         <th>@module.DisplayName</th>
@@ -110,12 +110,26 @@
         await LoadAsync(1);
     }
 
+    // Sıralama sunucudadır (PlatformTenantQuery.SortKeys); boş değer varsayılan sıradır.
+    private string sort = "";
+
+    private async Task SortAsync(string value)
+    {
+        sort = value;
+        await LoadAsync(1);
+    }
+
     private async Task LoadAsync(int pageNumber)
     {
         var url = $"/api/platform/tenants?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
         if (status is { } s)
         {
             url += $"&status={s}";
+        }
+
+        if (sort.Length > 0)
+        {
+            url += $"&sort={Uri.EscapeDataString(sort)}";
         }
 
         var result = await Api.GetAsync<PlatformTenantPageResponse>(url);

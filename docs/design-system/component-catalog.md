@@ -124,3 +124,9 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 - Ana sayfa (`Pages/Home.razor`): `PageHeader` ("Hoş geldiniz, {ad}"), ilgili listeye bağlanan özet kutuları (`stat-grid`), solda satış hunisi (`BarChart`), sağda kullanıcının bugünkü işleri (`TodayActivities`). Aynı veri iki grafikle yinelenmez; özet kutuları zaten bağlantı olduğu için ayrıca kısayol kartı (`tiles`) çizilmez.
 - `ViewTabs` çubuğu içerik panelini genişletmez (`contain: inline-size`): sekmeler sığmayınca çubuk kendi içinde yatay kayar. Telefonda sayfa yatay taşmamalıdır; yeni ekranın görsel denetiminde 390 px genişlikte `scrollWidth` kontrol edilir.
 
+## Sıralama: sunucuda mı istemcide mi (14.11.2026)
+
+- **Sayfalanan liste** sunucuda sıralanır: kayıt deposu `SortKeys` + `Order(source, sort)` tanımlar, başlık `SortHeader`/`GridHeader` ile bu anahtarları gönderir; bilinmeyen anahtar reddedilir. Her yeni `sort` anahtarı dört testle gelir (yön, geçersiz anahtar, tenant izolasyonu, yetki). Örnek: `MeasureUnitSortTests`, `SalesTargetSortTests`.
+- **Tamamı yüklü küçük liste** (sayfalanmayan: platform planları, sektörler, onay bekleyenler) istemcide `ClientSort.Apply(liste, sort, sütunlar)` ile sıralanır; Türkçe sıra, boş değerler sonda, eşit satırlar yerinde kalır. Sayfalanan listede `ClientSort` kullanılmaz (yalnızca görünen sayfayı sıralar, yanıltır).
+- **Sıralanmayan listeler (bilinçli istisna):** zaman sıralı günlükler (denetim kaydı, otomasyon çalışma geçmişi, olay teslimleri) her zaman en yeni önce gelir ve süzgeçle daraltılır; durum raporu tabloları (platform sağlığı) ve kod sırasıyla gezilen kataloglar (GTİP) başlığa göre sıralanmaz.
+
