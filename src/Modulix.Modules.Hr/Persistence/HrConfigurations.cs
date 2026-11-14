@@ -279,6 +279,25 @@ internal sealed class AudienceTargetConfiguration : IEntityTypeConfiguration<Aud
     }
 }
 
+internal sealed class ContentCommentConfiguration : IEntityTypeConfiguration<ContentComment>
+{
+    public void Configure(EntityTypeBuilder<ContentComment> builder)
+    {
+        HrTables.ConfigureCommon(builder, "ContentComments");
+        builder.Property(c => c.Body).HasMaxLength(ContentComment.BodyMaxLength).IsRequired();
+        builder.HasIndex(c => new { c.TenantId, c.ContentId, c.CreatedAt }).HasDatabaseName("IX_ContentComments_Content");
+    }
+}
+
+internal sealed class ContentLikeConfiguration : IEntityTypeConfiguration<ContentLike>
+{
+    public void Configure(EntityTypeBuilder<ContentLike> builder)
+    {
+        HrTables.ConfigureCommon(builder, "ContentLikes");
+        builder.HasIndex(l => new { l.TenantId, l.ContentId, l.UserId }).IsUnique().HasDatabaseName("UX_ContentLikes_User");
+    }
+}
+
 internal sealed class AnnouncementReadConfiguration : IEntityTypeConfiguration<AnnouncementRead>
 {
     public void Configure(EntityTypeBuilder<AnnouncementRead> builder)

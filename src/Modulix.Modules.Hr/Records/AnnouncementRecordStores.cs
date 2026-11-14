@@ -18,6 +18,8 @@ internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecord
     private readonly AudienceFields<Announcement> audience =
         new(context, a => a.AudienceBusinessUnitId = null, a => a.AudienceDepartmentKey = null);
 
+    private readonly ContentStats stats = new(context);
+
     public override string EntityKey => HrModule.Entities.Announcement;
 
     protected override string ReadPermission => HrModule.Permissions.AnnouncementsRead;
@@ -29,6 +31,7 @@ internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecord
         Field.Text<Announcement>("title", Announcement.TitleMaxLength, a => a.Title, (a, v) => a.Title = v!, required: true),
         Field.Text<Announcement>("body", Announcement.BodyMaxLength, a => a.Body, (a, v) => a.Body = v!, required: true),
         .. audience.Fields(),
+        .. stats.Fields<Announcement>(),
         Field.Flag<Announcement>("isPinned", a => a.IsPinned, (a, v) => a.IsPinned = v),
         Field.Flag<Announcement>("isPublished", a => a.IsPublished, (a, v) => a.IsPublished = v),
         Field.Date<Announcement>("publishOn", a => a.PublishOn == default ? null : a.PublishOn, (a, v) => a.PublishOn = v ?? default),
@@ -86,17 +89,21 @@ internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecord
     protected override IQueryable<Announcement> Search(IQueryable<Announcement> source, string term) =>
         source.Where(a => a.Title.Contains(term) || a.Body.Contains(term));
 
-    protected override async Task<IQueryable<Announcement>> RestrictAsync(IQueryable<Announcement> source, CancellationToken cancellationToken)
+    protected override Task<IQueryable<Announcement>> RestrictAsync(IQueryable<Announcement> source, CancellationToken cancellationToken) =>
+        ForReaderAsync(Context, source, cancellationToken);
+
+    /// <summary>Kullanıcının görebildiği duyurular (yorum ve beğeni de bu kuralı kullanır; bölüm 23d).</summary>
+    internal static async Task<IQueryable<Announcement>> ForReaderAsync(HrStoreContext context, IQueryable<Announcement> source, CancellationToken cancellationToken)
     {
-        if (await Context.Access.HasPermissionAsync(HrModule.Permissions.AnnouncementsManage, cancellationToken))
+        if (await context.Access.HasPermissionAsync(HrModule.Permissions.AnnouncementsManage, cancellationToken))
         {
             return source;
         }
 
-        var reader = await HrAudience.ReaderAsync(Context, cancellationToken);
+        var reader = await HrAudience.ReaderAsync(context, cancellationToken);
         var today = Today;
         return HrAudience.Visible(source.Where(a => a.IsPublished && a.PublishOn <= today && (a.ExpiresOn == null || a.ExpiresOn >= today)),
-            reader, Context.Data.Set<AudienceTarget>().AsNoTracking());
+            reader, context.Data.Set<AudienceTarget>().AsNoTracking());
     }
 
     protected override async Task PrepareAsync(IReadOnlyCollection<Announcement> entities, CancellationToken cancellationToken)
@@ -111,6 +118,7 @@ internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecord
         var me = Context.CurrentUserId ?? Guid.Empty;
         readByMe.UnionWith(await reads.Where(r => r.UserId == me).Select(r => r.AnnouncementId).ToListAsync(cancellationToken));
         await audience.PrepareAsync(entities, cancellationToken);
+        await stats.LoadAsync(ids, cancellationToken);
     }
 
     protected override async Task AppliedAsync(Announcement entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
@@ -139,6 +147,7 @@ internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecord
         Context.Data.Set<AnnouncementRead>().RemoveRange(
             await Context.Data.Set<AnnouncementRead>().Where(r => r.AnnouncementId == entity.Id).ToListAsync(cancellationToken));
         await HrAudience.RemoveAsync(Context, entity.Id, cancellationToken);
+        await ContentStats.RemoveAsync(Context, entity.Id, cancellationToken);
     }
 }
 

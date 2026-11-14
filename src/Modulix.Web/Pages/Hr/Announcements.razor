@@ -55,6 +55,8 @@
                     {
                         <p class="preline mb-2">@WarehouseLabels.Text(announcement, "body")</p>
                         <AttachmentPanel EntityKey="@HrAccess.AnnouncementEntityKey" RecordId="announcement.Id" Title="Ekler" EmptyText="Bu duyurunun eki yok." />
+                        <ContentDiscussion Route="announcements" CommentEntityKey="@HrAccess.AnnouncementCommentEntityKey" Content="announcement" Lookups="Lookups"
+                                           CanModerate="@Session.Can(HrAccess.AnnouncementsManage)" />
                     }
                     <button type="button" class="btn btn-ghost" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleAsync(announcement)">
                         <AppIcon Name="@(open ? "chevron-down" : "chevron-right")" Size="16" /> @(open ? "Kapat" : "Oku")

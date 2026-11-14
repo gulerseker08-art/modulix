@@ -707,6 +707,34 @@ public sealed class AudienceTarget : HrEntity
     public Guid? UserId { get; internal set; }
 }
 
+/// <summary>
+/// Duyuruya ya da blog yazısına yorum (ADR-0042 bölüm 23d). İçeriği görebilen okur yazar; yazar kendi yorumunu siler; içeriği yönetme izni olan
+/// yorumu gizler (gizli yorumun metni okura gösterilmez) ya da siler. Metin düz metindir. Yalnızca yorum servisi yazar.
+/// </summary>
+public sealed class ContentComment : HrEntity
+{
+    public const int BodyMaxLength = 2000;
+
+    /// <summary>Duyuru ya da blog yazısının kimliği.</summary>
+    public Guid ContentId { get; internal set; }
+
+    public Guid AuthorUserId { get; internal set; }
+
+    public string Body { get; internal set; } = string.Empty;
+
+    public bool IsHidden { get; internal set; }
+
+    public Guid? HiddenByUserId { get; internal set; }
+}
+
+/// <summary>Duyuru ya da blog yazısının bir kullanıcı tarafından beğenilmesi (içerik başına kullanıcı tekil; ADR-0042 bölüm 23d).</summary>
+public sealed class ContentLike : HrEntity
+{
+    public Guid ContentId { get; internal set; }
+
+    public Guid UserId { get; internal set; }
+}
+
 /// <summary>Duyurunun bir kullanıcı tarafından okunduğu an (duyuru başına kullanıcı tekil). Okur duyuruyu açınca yazılır; değişmez.</summary>
 public sealed class AnnouncementRead : HrEntity
 {

@@ -154,6 +154,33 @@ public static class HrEndpoints
                 : RecordEndpoints.ToProblem(result.Error!);
         });
 
+        // Yorum ve beğeni (bölüm 23d): içeriği görebilen yazar ve beğenir; yorumu yazarı siler, içeriği yöneten gizler/gösterir/siler.
+        foreach (var (route, contentEntity, commentEntity) in new[]
+        {
+            ("announcements", HrModule.Entities.Announcement, HrModule.Entities.AnnouncementComment),
+            ("blog-posts", HrModule.Entities.BlogPost, HrModule.Entities.BlogComment),
+        })
+        {
+            group.MapPost($"/{route}/{{id:guid}}/comments", async (Guid id, WriteCommentRequest request, IContentInteractions interactions, CancellationToken ct) =>
+            {
+                var result = await interactions.CommentAsync(contentEntity, id, request.Body, ct);
+                return result.IsSuccess
+                    ? Results.Ok(new RecordResponse(result.Value!.EntityKey, result.Value.Id, result.Value.Version, result.Value.Values))
+                    : RecordEndpoints.ToProblem(result.Error!);
+            });
+
+            group.MapPost($"/{route}/{{id:guid}}/like", async (Guid id, IContentInteractions interactions, CancellationToken ct) =>
+                Record(await interactions.ToggleLikeAsync(contentEntity, id, ct)));
+
+            group.MapPost($"/{commentEntity["hr.".Length..]}s/{{id:guid}}/actions", async (Guid id, RunHrActionRequest request, IContentInteractions interactions, CancellationToken ct) =>
+            {
+                var result = await interactions.ModerateAsync(commentEntity, id, request.Action ?? string.Empty, request.Version, ct);
+                return !result.IsSuccess ? RecordEndpoints.ToProblem(result.Error!)
+                    : result.Value is { } comment ? Results.Ok(new RecordResponse(comment.EntityKey, comment.Id, comment.Version, comment.Values))
+                    : Results.NoContent();
+            });
+        }
+
         // Sonucun CSV dışa aktarımı (bölüm 23b): sonuç ekranıyla aynı özet, aynı izin ve kimliği gizli ankette aynı eşik (eşik altında 409).
         group.MapGet("/surveys/{id:guid}/results/export", async (Guid id, ISurveyService surveys, CancellationToken ct) =>
         {

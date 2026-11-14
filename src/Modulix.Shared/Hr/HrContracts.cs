@@ -65,6 +65,12 @@ public static class HrAccess
     public const string PhotoAlbumEntityKey = "hr.photo-album";
     public const string AnnouncementReadEntityKey = "hr.announcement-read";
 
+    /// <summary>Yorum ve beğeni kayıt türleri (ADR-0042 bölüm 23d).</summary>
+    public const string AnnouncementCommentEntityKey = "hr.announcement-comment";
+    public const string BlogCommentEntityKey = "hr.blog-comment";
+    public const string AnnouncementLikeEntityKey = "hr.announcement-like";
+    public const string BlogLikeEntityKey = "hr.blog-like";
+
     /// <summary>Yalnızca bu kategorideki izin türü yıllık haktan düşer.</summary>
     public const string AnnualCategory = "annual";
 
@@ -233,3 +239,6 @@ public sealed record DepartmentMappingRowDto(
 
 /// <summary>Eşleme uygulamasının sonucu: güncellenen kayıt sayısı.</summary>
 public sealed record DepartmentMappingResultDto(int Updated);
+
+/// <summary>Yorum yazma isteği (duyuru ya da blog yazısı; ADR-0042 bölüm 23d).</summary>
+public sealed record WriteCommentRequest(string? Body);

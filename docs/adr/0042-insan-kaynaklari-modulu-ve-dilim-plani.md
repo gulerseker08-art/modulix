@@ -438,3 +438,23 @@ Kullanıcı kararı (14 Kasım 2026): dört ek özelliğin hepsi, ayrı ve küç
 - **Alanlar:** `audienceBusinessUnitIds` (en çok 50) ve `audienceUserIds` (en çok 200) kimlik listesidir; gönderilen tür tamamen değiştirilir, gönderilmeyen tür kalır. Yeni seçilen departman ağaçta olmalı ve etkin olmalı (kapalı departmanda kalan eski hedef korunur), yeni seçilen kişi kuruluşun etkin üyesi olmalı (başka firmanın kullanıcısı reddedilir); tekrar ve biçimsiz değer alan hatasıdır. Tek departman `audienceBusinessUnitId` uyumluluk için tek elemanlı liste gibi yazılır; okunurken yalnızca hedef tam olarak tek departmansa doludur. Departmanlar seçilince eski İK departmanı ve tek departman kolonu temizlenir (kolondaki hedef satıra taşınır).
 - **Arayüz:** duyuru ve anket formunda "Hedef departmanlar" ve "Hedef kişiler" alanları (`HrAudiencePicker`: seçilenler listelenir, tek tek kaldırılır). Yeni CSS sınıfı yok.
 - **Bilerek yapılmadı:** çalışma yerine göre hedefleme (çalışma yeri serbest metindir), hedef kitle önizlemesi (kaç kişiye ulaşır), hariç tutma ("şu departman hariç").
+
+### 23d. Duyuru ve blog yazısına yorum ve beğeni
+
+- **Model:** iki yeni tenant tablosu: `hr.ContentComments` (içerik, yazar, metin ≤ 2000, gizli mi, gizleyen) ve `hr.ContentLikes` (içerik, kullanıcı; içerik başına kullanıcı tekil). RLS `TenantIsolationSql.AddTable`, migration `HrContentComments`.
+- **Kayıt türleri:** kayıt boru hattı işlem başına tek izin denetlediği için içerik türü başına ayrı kayıt türü vardır: `hr.announcement-comment` / `hr.announcement-like` (duyuru okuma izni) ve `hr.blog-comment` / `hr.blog-like` (blog okuma izni). Tablolar ve depo kodu ortaktır (`ContentCommentRecordStore<T>`, `ContentLikeRecordStore<T>`).
+- **Görünürlük:** yorum ve beğeni, içeriğin görünürlüğünü izler. İçerik deposunun okur kuralı kullanılır (`ForReaderAsync`: duyuruda yayın aralığı ve hedef kitle, blogda yayın). Görülmeyen içeriğe yorum ve beğeni 404'tür, yorumları da listede yoktur.
+- **Yazma:** yalnızca `IContentInteractions` ile ve kayıt boru hattından yapılır (yetki, denetim kaydı, olay); genel uçtan yazma, değiştirme ve silme 409'dur.
+  - Yorumu ve beğeniyi içeriği görebilen kullanıcı yazar.
+  - Yorumunu yazarı siler.
+  - İçeriği yöneten (`hr.announcements.manage` / `hr.blog.manage`) yorumu gizler, yeniden gösterir ya da siler. Gizli yorumun metni okura gönderilmez ve gizli yorum sayılmaz.
+  - Yorum metni değiştirilmez.
+  - İçerik silinince yorumları ve beğenileri de silinir.
+- **Arayüz:** duyuru akışında ve blogda açılan içerikte `ContentDiscussion` bileşeni yer alır: beğen düğmesi (`btn-tonal`, `aria-pressed`) ve sayı, yorum listesi (`LoadingState`/`EmptyState`), yorum formu, yazar ve yönetici eylemleri, toast. Yeni CSS sınıfı yoktur.
+- **Bilerek yapılmadı:**
+  - yoruma yanıt (iç içe yorum)
+  - yorumu düzenleme
+  - yorum ve beğeni bildirimi (yazara)
+  - beğenenlerin adlarının listesi (arayüzde)
+  - galeri albümüne yorum
+  - içeriğin yorumlara kapatılması
