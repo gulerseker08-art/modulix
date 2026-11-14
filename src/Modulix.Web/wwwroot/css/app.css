@@ -279,3 +279,10 @@
         animation: none;
     }
 }
+
+/* ---- Satır içi silme onayı (docs/design-system/component-catalog.md → ConfirmBox) ---- */
+/* Liste satırının yerinde açılır: satırın bütün genişliğini alır, alt boşluk bırakmaz. */
+.item-list li > .confirm {
+    flex: 1;
+    margin: 0;
+}

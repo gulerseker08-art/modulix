@@ -2,6 +2,8 @@
   "common.save": "Kaydet",
   "common.saved": "Kaydedildi.",
   "common.deleted": "Silindi.",
+  "common.confirm.deleteOf": "\"{0}\" silinsin mi?",
+  "common.confirm.cancel": "Vazgeç",
   "common.email": "E-posta",
   "common.password": "Şifre",
   "common.loading": "Yükleniyor…",

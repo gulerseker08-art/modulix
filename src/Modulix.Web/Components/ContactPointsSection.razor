@@ -1,6 +1,7 @@
 @* Telefon/e-posta noktaları (ADR-0012): firma, lokasyon ya da kişi (isteğe bağlı olarak tek bir firma–kişi ilişkisi) için liste ve satır içi
    düzenleme. İletişim noktası pazarlama izni değildir; aynı e-posta/santral başka kayıtlarda da olabilir. *@
 @inject ApiClient Api
+@inject ToastService Toasts
 
 <div class="sub-section @(open ? null : "closed")">
     <div class="section-header">
@@ -89,25 +90,32 @@
             @foreach (var item in items)
             {
                 <li class="@(item.IsActive ? null : "done")">
-                    <div class="item-main">
-                        <strong>
-                            @if (item.Channel == CrmContactPointTypes.Email) { <a href="mailto:@item.Value">@item.Value</a> }
-                            else { <a href="tel:@item.Value">@item.Value</a> }
-                        </strong>
-                        <span>
-                            @SharedLabels.ContactPoint(item.Type)
-                            @if (item.IsPrimary) { <text> · </text><span class="badge status-customer">@Texts.Get("common.primaryBadge")</span> }
-                            @if (item.IsShared) { <text> · </text><span class="badge tag">@Texts.Get("crm.contactPoint.shared")</span> }
-                            @if (!item.IsActive) { <text> · @Texts.Get("common.inactive")</text> }
-                            @if (item.Note is { Length: > 0 } note) { <text> · @note</text> }
-                        </span>
-                    </div>
-                    @if (CanWrite)
+                    @if (confirming == item.Id)
                     {
-                        <RowMenu Label="@Texts.Get("common.rowActionsOf", item.Value)">
-                            <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(item)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
-                            <button type="button" class="view-menu-item is-danger" role="menuitem" disabled="@busy" @onclick="() => DeleteAsync(item)"><AppIcon Name="trash" Size="16" /> <span>@Texts.Get("common.delete")</span></button>
-                        </RowMenu>
+                        <ConfirmBox Text="@Texts.Get("common.confirm.deleteOf", item.Value)" Busy="busy" Confirm="() => DeleteAsync(item)" Cancel="() => confirming = null" />
+                    }
+                    else
+                    {
+                        <div class="item-main">
+                            <strong>
+                                @if (item.Channel == CrmContactPointTypes.Email) { <a href="mailto:@item.Value">@item.Value</a> }
+                                else { <a href="tel:@item.Value">@item.Value</a> }
+                            </strong>
+                            <span>
+                                @SharedLabels.ContactPoint(item.Type)
+                                @if (item.IsPrimary) { <text> · </text><span class="badge status-customer">@Texts.Get("common.primaryBadge")</span> }
+                                @if (item.IsShared) { <text> · </text><span class="badge tag">@Texts.Get("crm.contactPoint.shared")</span> }
+                                @if (!item.IsActive) { <text> · @Texts.Get("common.inactive")</text> }
+                                @if (item.Note is { Length: > 0 } note) { <text> · @note</text> }
+                            </span>
+                        </div>
+                        @if (CanWrite)
+                        {
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", item.Value)">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(item)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
+                                <button type="button" class="view-menu-item is-danger" role="menuitem" @onclick="() => confirming = item.Id"><AppIcon Name="trash" Size="16" /> <span>@Texts.Get("common.delete")</span></button>
+                            </RowMenu>
+                        }
                     }
                 </li>
             }
@@ -115,7 +123,7 @@
     }
     else if (items is not null)
     {
-        <p class="text-muted">@Texts.Get("common.noRecords")</p>
+        <EmptyState Compact="true" />
     }
     </div>
     }
@@ -222,12 +230,21 @@
     private Task<ApiResult<T>> Send<T>(object request, Guid? id) =>
         id is { } existing ? Api.PutAsync<T>($"{Url}/{existing}", request) : Api.PostAsync<T>(Url, request);
 
+    // Silme iki adımlıdır: menüdeki "Sil" onay kutusunu açar, kutudaki düğme siler.
+    private Guid? confirming;
+
     private async Task DeleteAsync(PointRow row)
     {
         busy = true;
         var result = await Api.DeleteAsync($"{Url}/{row.Id}?version={row.Version}");
         busy = false;
+        confirming = null;
         message = result.Error;
+        if (result.IsSuccess)
+        {
+            Toasts.Success(Texts.Get("common.deleted"));
+        }
+
         await LoadAsync();
         await Changed.InvokeAsync();
     }

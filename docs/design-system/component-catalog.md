@@ -130,3 +130,8 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 - **Tamamı yüklü küçük liste** (sayfalanmayan: platform planları, sektörler, onay bekleyenler) istemcide `ClientSort.Apply(liste, sort, sütunlar)` ile sıralanır; Türkçe sıra, boş değerler sonda, eşit satırlar yerinde kalır. Sayfalanan listede `ClientSort` kullanılmaz (yalnızca görünen sayfayı sıralar, yanıltır).
 - **Sıralanmayan listeler (bilinçli istisna):** zaman sıralı günlükler (denetim kaydı, otomasyon çalışma geçmişi, olay teslimleri) her zaman en yeni önce gelir ve süzgeçle daraltılır; durum raporu tabloları (platform sağlığı) ve kod sırasıyla gezilen kataloglar (GTİP) başlığa göre sıralanmaz.
 
+## Silme onayı (14.11.2026)
+
+- `ConfirmBox`: yıkıcı eylem ayrı adımda onaylanır. `Text` (soru), isteğe bağlı `ConfirmLabel` (varsayılan "Sil"), `Busy`, `Confirm`, `Cancel`. Kutu `alert alert-warning confirm` + `role="alertdialog"`; onay düğmesi `btn-danger`, yanında "Vazgeç". Açılınca odak "Vazgeç"tedir, Escape kapatır.
+- Liste satırında (`ul.item-list`) menüdeki "Sil" satırın yerinde `ConfirmBox` açar; silme başarılıysa toast ("Silindi.") gösterilir. Onaysız tek tıkla silme yazılmaz. Örnek: `AddressesSection`, `ContactPointsSection`.
+

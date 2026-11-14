@@ -2,6 +2,8 @@
   "common.save": "Yadda saxla",
   "common.saved": "Yadda saxlanıldı.",
   "common.deleted": "Silindi.",
+  "common.confirm.deleteOf": "\"{0}\" silinsin?",
+  "common.confirm.cancel": "İmtina et",
   "common.email": "E-poçt",
   "common.password": "Şifrə",
   "common.loading": "Yüklənir…",
