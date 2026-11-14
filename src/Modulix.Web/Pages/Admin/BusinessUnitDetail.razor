@@ -2,11 +2,11 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>@(detail?.Unit.Name ?? "Departman") · Modulix</PageTitle>
+<PageTitle>@(detail?.Unit.Name ?? Texts.Get("admin.unit")) · Modulix</PageTitle>
 
 @* Departman ayrıntısı (ADR-0026): bilgiler, kapatma ve kullanıcılar. Kullanıcıyı başka departmana taşıma kullanıcı kartındadır. *@
 <AuthGate Permission="@CoreAccess.ManageUsers">
-    <a class="back-link" href="yonetim/departmanlar">← Departmanlar</a>
+    <a class="back-link" href="yonetim/departmanlar">← @Texts.Get("nav.app.admin.business-units")</a>
 
     @if (notice is not null)
     {
@@ -32,10 +32,10 @@
             <div>
                 <h1>@unit.Name</h1>
                 <div class="header-meta">
-                    <span class="badge tag">@BusinessUnitKindLabels.Of(unit.Kind)</span>
+                    <span class="badge tag">@AdminLabels.UnitKind(unit.Kind)</span>
                     @if (!unit.IsActive)
                     {
-                        <span class="badge tag">Kapalı</span>
+                        <span class="badge tag">@Texts.Get("admin.units.closed")</span>
                     }
                     <small class="text-muted">@unit.PathNames</small>
                 </div>
@@ -43,30 +43,30 @@
         </div>
 
         <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <h2>Departman bilgileri</h2>
-            <FormTabs Title="Departman bilgileri" Label="Departman formu bölümleri">
+            <h2>@Texts.Get("admin.units.section")</h2>
+            <FormTabs Title="@Texts.Get("admin.units.section")" Label="@Texts.Get("admin.units.sections")">
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="unit-name">Departman adı *</label>
+                    <label class="form-label" for="unit-name">@Texts.Get("admin.units.name")</label>
                     <input id="unit-name" class="form-control" maxlength="200" @bind="name" @bind:event="oninput" />
                     <FieldError Field="name" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="unit-code">Kod</label>
+                    <label class="form-label" for="unit-code">@Texts.Get("crm.products.col.code")</label>
                     <input id="unit-code" class="form-control" maxlength="50" @bind="code" @bind:event="oninput" />
                     <FieldError Field="code" Errors="errors" />
                 </div>
                 <div>
-                    <label class="form-label" for="unit-kind">Tür *</label>
+                    <label class="form-label" for="unit-kind">@Texts.Get("admin.units.kind")</label>
                     @if (unit.ParentId is null)
                     {
-                        <input id="unit-kind" class="form-control" value="@BusinessUnitKindLabels.Of(unit.Kind)" disabled />
+                        <input id="unit-kind" class="form-control" value="@AdminLabels.UnitKind(unit.Kind)" disabled />
                     }
                     else
                     {
                         <select id="unit-kind" class="form-select" @bind="kind">
-                            <option value="@BusinessUnitKindLabels.Dealer">@BusinessUnitKindLabels.Of(BusinessUnitKindLabels.Dealer)</option>
-                            <option value="@BusinessUnitKindLabels.Other">@BusinessUnitKindLabels.Of(BusinessUnitKindLabels.Other)</option>
+                            <option value="@BusinessUnitKindLabels.Dealer">@AdminLabels.UnitKind(BusinessUnitKindLabels.Dealer)</option>
+                            <option value="@BusinessUnitKindLabels.Other">@AdminLabels.UnitKind(BusinessUnitKindLabels.Other)</option>
                         </select>
                     }
                     <FieldError Field="kind" Errors="errors" />
@@ -75,26 +75,26 @@
             </FormTabs>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary"
-                        disabled="@(busy || string.IsNullOrWhiteSpace(name) || (name.Trim() == unit.Name && (code ?? "") == (unit.Code ?? "") && kind == unit.Kind))">Kaydet</button>
+                        disabled="@(busy || string.IsNullOrWhiteSpace(name) || (name.Trim() == unit.Name && (code ?? "") == (unit.Code ?? "") && kind == unit.Kind))">@Texts.Get("common.save")</button>
             </div>
         </form>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Kullanıcılar</h2></div>
+            <div class="section-header"><h2>@Texts.Get("nav.app.admin.users")</h2></div>
             @if (detail.Members.Count == 0)
             {
-                <p class="text-muted">Bu departmanda kullanıcı yok. Kullanıcıyı <a href="yonetim/kullanicilar">kullanıcı kartından</a> bu departmana atayabilirsiniz.</p>
+                <p class="text-muted">@((MarkupString)Texts.Get("admin.unitDetail.noUsers", "<a href=\"yonetim/kullanicilar\">", "</a>"))</p>
             }
             else
             {
                 <table class="table record-table">
-                    <thead><tr><th>Kullanıcı</th><th>E-posta</th></tr></thead>
+                    <thead><tr><th>@Texts.Get("admin.userDetail.user")</th><th>@Texts.Get("common.field.email")</th></tr></thead>
                     <tbody>
                         @foreach (var member in detail.Members)
                         {
                             <tr>
-                                <td data-label="Kullanıcı" class="primary"><a href="yonetim/kullanicilar/@member.MembershipId">@member.DisplayName</a></td>
-                                <td data-label="E-posta">@member.Email</td>
+                                <td data-label="@Texts.Get("admin.userDetail.user")" class="primary"><a href="yonetim/kullanicilar/@member.MembershipId">@member.DisplayName</a></td>
+                                <td data-label="@Texts.Get("common.field.email")">@member.Email</td>
                             </tr>
                         }
                     </tbody>
@@ -104,20 +104,14 @@
 
         @* Departman rolleri (ADR-0026 K6): departmandaki her kullanıcı bu rollerin izinlerini ve kayıt kapsamını alır; kullanıcıya doğrudan atanan rollerle toplanır. *@
         <section class="detail-section">
-            <div class="section-header"><h2>Departman rolleri</h2></div>
+            <div class="section-header"><h2>@Texts.Get("admin.unitDetail.roles")</h2></div>
             @if (assignable.Count == 0)
             {
-                <p class="text-muted">
-                    Departmana atanabilecek rol yok. Bir rolün "Atanabilir düzey"ini "departmana" ya da "kullanıcıya ve departmana"
-                    yaparak buradan atanabilir hâle getirin (<a href="yonetim/roller">Roller</a>).
-                </p>
+                <p class="text-muted">@((MarkupString)Texts.Get("admin.unitDetail.noAssignable", "<a href=\"yonetim/roller\">", "</a>"))</p>
             }
             else
             {
-                <p class="text-muted small">
-                    Seçilen roller bu departmandaki @unit.MemberCount kullanıcının tamamına verilir. "Alt departmanlara da uygula"
-                    kapalıyken rol yalnızca bu departmandaki kullanıcılar içindir; merkeze verilen rol kendiliğinden bayilere inmez.
-                </p>
+                <p class="text-muted small">@Texts.Get("admin.unitDetail.rolesHelp", unit.MemberCount)</p>
                 <div class="role-picker">
                     @foreach (var option in assignable)
                     {
@@ -126,14 +120,14 @@
                                 <input class="form-check-input" type="checkbox" checked="@selectedRoles.ContainsKey(option.Id)"
                                        disabled="@(!unit.IsActive && !selectedRoles.ContainsKey(option.Id))"
                                        @onchange="e => ToggleRole(option.Id, e.Value is true)" />
-                                <span class="form-check-label">@option.Name <small class="text-muted">· @RecordScopeLabels.Of(option.Scope)</small></span>
+                                <span class="form-check-label">@option.Name <small class="text-muted">· @AdminLabels.Scope(option.Scope)</small></span>
                             </label>
                             @if (selectedRoles.TryGetValue(option.Id, out var inherit))
                             {
                                 <label class="form-check ms-4">
                                     <input class="form-check-input" type="checkbox" checked="@inherit"
                                            @onchange="e => selectedRoles[option.Id] = e.Value is true" />
-                                    <span class="form-check-label">Alt departmanlara da uygula</span>
+                                    <span class="form-check-label">@Texts.Get("admin.unitDetail.inherit")</span>
                                 </label>
                             }
                         </div>
@@ -141,7 +135,7 @@
                 </div>
                 <FieldError Field="roles" Errors="roleErrors" />
                 <div class="form-actions">
-                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveRolesAsync">Departman rollerini kaydet</button>
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveRolesAsync">@Texts.Get("admin.unitDetail.saveRoles")</button>
                 </div>
             }
         </section>
@@ -149,17 +143,17 @@
         @if (unit.ParentId is not null)
         {
             <section class="detail-section">
-                <div class="section-header"><h2>@(unit.IsActive ? "Departmanı kapat" : "Departmanı yeniden aç")</h2></div>
+                <div class="section-header"><h2>@(unit.IsActive ? Texts.Get("admin.unitDetail.close") : Texts.Get("admin.unitDetail.reopen"))</h2></div>
                 <div class="account-actions">
                     <div>
                         <button type="button" class="@(unit.IsActive ? "btn btn-outline-danger" : "btn btn-outline-secondary")" disabled="@busy" @onclick="ToggleActiveAsync">
-                            @(unit.IsActive ? "Departmanı kapat" : "Departmanı yeniden aç")
+                            @(unit.IsActive ? Texts.Get("admin.unitDetail.close") : Texts.Get("admin.unitDetail.reopen"))
                         </button>
                         <small class="text-muted">
-                            Departmanlar silinmez. Kapalı departmana yeni departman ya da kullanıcı eklenemez.
+                            @Texts.Get("admin.unitDetail.closeHint")
                             @if (unit.IsActive)
                             {
-                                <text> Kullanıcısı veya etkin alt departmanı olan departman kapatılamaz.</text>
+                                <text> @Texts.Get("admin.unitDetail.closeBlocked")</text>
                             }
                         </small>
                     </div>
@@ -241,7 +235,7 @@
 
         message = null;
         await LoadRolesAsync();
-        notice = "Departman rolleri kaydedildi.";
+        notice = Texts.Get("admin.unitDetail.rolesSaved");
     }
 
     private void Show(BusinessUnitDetailDto loaded)
@@ -262,7 +256,7 @@
         if (result.Value is { } saved)
         {
             Show(saved);
-            (notice, message) = ("Departman kaydedildi.", null);
+            (notice, message) = (Texts.Get("admin.unitDetail.saved"), null);
             return;
         }
 
@@ -279,7 +273,7 @@
         if (result.Value is { } saved)
         {
             Show(saved);
-            (notice, message) = (open ? "Departman kapatıldı." : "Departman yeniden açıldı.", null);
+            (notice, message) = (open ? Texts.Get("admin.unitDetail.closed") : Texts.Get("admin.unitDetail.reopened"), null);
             return;
         }
 

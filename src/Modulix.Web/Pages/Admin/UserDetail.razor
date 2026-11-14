@@ -3,10 +3,10 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 
-<PageTitle>@(user?.DisplayName ?? "Kullanıcı") · Modulix</PageTitle>
+<PageTitle>@(user?.DisplayName ?? Texts.Get("admin.userDetail.user")) · Modulix</PageTitle>
 
 <AuthGate Permission="@CoreAccess.ManageUsers">
-    <a class="back-link" href="yonetim/kullanicilar">← Kullanıcılar</a>
+    <a class="back-link" href="yonetim/kullanicilar">← @Texts.Get("nav.app.admin.users")</a>
 
     @if (notice is not null)
     {
@@ -34,61 +34,61 @@
                     <UserStatusBadge User="user" />
                     @if (user.IsAdministrator)
                     {
-                        <span class="badge tag">Yönetici</span>
+                        <span class="badge tag">@Texts.Get("admin.userDetail.administrator")</span>
                     }
                     @if (user.IsCurrentUser)
                     {
-                        <span class="badge tag">Siz</span>
+                        <span class="badge tag">@Texts.Get("admin.userDetail.you")</span>
                     }
                 </div>
             </div>
         </div>
 
         <dl class="detail-grid">
-            <div><dt>E-posta</dt><dd>@user.Email</dd></div>
-            <div><dt>Departman</dt><dd>@(currentUnit?.PathNames ?? user.BusinessUnitName ?? "—")</dd></div>
-            <div><dt>Son giriş</dt><dd>@(user.LastSignInAt is { } at ? CrmLabels.Time(at) : "—")</dd></div>
-            <div><dt>Eklenme</dt><dd>@CrmLabels.Time(user.CreatedAt)</dd></div>
+            <div><dt>@Texts.Get("common.field.email")</dt><dd>@user.Email</dd></div>
+            <div><dt>@Texts.Get("admin.unit")</dt><dd>@(currentUnit?.PathNames ?? user.BusinessUnitName ?? "—")</dd></div>
+            <div><dt>@Texts.Get("admin.users.col.lastSignIn")</dt><dd>@(user.LastSignInAt is { } at ? CrmLabels.Time(at) : "—")</dd></div>
+            <div><dt>@Texts.Get("admin.userDetail.created")</dt><dd>@CrmLabels.Time(user.CreatedAt)</dd></div>
             @if (user.InvitedAt is { } invitedAt)
             {
-                <div><dt>Son davet</dt><dd>@CrmLabels.Time(invitedAt)</dd></div>
+                <div><dt>@Texts.Get("admin.userDetail.lastInvite")</dt><dd>@CrmLabels.Time(invitedAt)</dd></div>
             }
         </dl>
 
         @if (Locked)
         {
-            <div class="alert alert-info">Bu kullanıcı bir yönetici. Hesabında yalnızca bir yönetici işlem yapabilir.</div>
+            <div class="alert alert-info">@Texts.Get("admin.userDetail.locked")</div>
         }
 
         @* Departman (ADR-0026): kullanıcı tam bir departmandadır. Departman değişince kullanıcının sorumlu olduğu kayıtlar da yeni departmanla görünür. *@
         <section class="detail-section">
-            <div class="section-header"><h2>Departman</h2></div>
+            <div class="section-header"><h2>@Texts.Get("admin.unit")</h2></div>
             @if (units.Count == 0)
             {
-                <p class="text-muted">Departman bilgisi yüklenemedi.</p>
+                <p class="text-muted">@Texts.Get("admin.userDetail.unitLoadFailed")</p>
             }
             else
             {
                 <div class="form-grid">
                     <div>
-                        <label class="form-label" for="user-unit">Departman</label>
+                        <label class="form-label" for="user-unit">@Texts.Get("admin.unit")</label>
                         <select id="user-unit" class="form-select" @bind="selectedUnitId" @bind:after="ResetUnitChange" disabled="@Locked">
                             @foreach (var unit in units.Where(u => u.IsActive || u.Id == currentUnit?.Id))
                             {
-                                <option value="@unit.Id">@unit.PathNames@(unit.IsActive ? "" : " (kapalı)")</option>
+                                <option value="@unit.Id">@unit.PathNames@(unit.IsActive ? "" : " " + Texts.Get("admin.userDetail.closedUnit"))</option>
                             }
                         </select>
                     </div>
                 </div>
-                <p class="text-muted small">Departmanı değiştirmek, kullanıcının sorumlu olduğu kayıtların hangi departmanda görüneceğini değiştirir. Değiştirmeden önce etkisi gösterilir.</p>
+                <p class="text-muted small">@Texts.Get("admin.userDetail.unitHelp")</p>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-primary" disabled="@(busy || Locked || selectedUnitId == currentUnit?.Id || unitPreview is not null)" @onclick="PreviewUnitAsync">Departmanı değiştir…</button>
+                    <button type="button" class="btn btn-primary" disabled="@(busy || Locked || selectedUnitId == currentUnit?.Id || unitPreview is not null)" @onclick="PreviewUnitAsync">@Texts.Get("admin.userDetail.changeUnitStart")</button>
                 </div>
 
                 @* Etki ve onay (ADR-0026 K7): kayıtlar kullanıcıyla taşınır ya da eski departmanda kalan birine devredilir; gerekçe denetim kaydına yazılır. *@
                 @if (unitPreview is { IsChange: true } preview)
                 {
-                    <div class="alert alert-warning confirm" role="alertdialog" aria-label="Departman değişikliği onayı">
+                    <div class="alert alert-warning confirm" role="alertdialog" aria-label="@Texts.Get("admin.userDetail.unitConfirm")">
                         <p><strong>@(preview.CurrentPath ?? "—") → @preview.TargetPath</strong></p>
                         @foreach (var warning in preview.Warnings)
                         {
@@ -108,27 +108,27 @@
                         @if (preview.DecisionRequired)
                         {
                             <fieldset class="scope-choice">
-                                <legend class="form-label">Kayıtlar ne olsun?</legend>
+                                <legend class="form-label">@Texts.Get("admin.userDetail.recordsChoice")</legend>
                                 <div class="form-check">
                                     <input id="rec-move" class="form-check-input" type="radio" name="rec-choice" checked="@(recordChoice == "move")"
                                            @onchange="ChooseMove" />
-                                    <label class="form-check-label" for="rec-move">Kullanıcıyla birlikte yeni departmana geçsin</label>
+                                    <label class="form-check-label" for="rec-move">@Texts.Get("admin.userDetail.recordsMove")</label>
                                 </div>
                                 <div class="form-check">
                                     <input id="rec-transfer" class="form-check-input" type="radio" name="rec-choice" checked="@(recordChoice == "transfer")"
                                            @onchange="ChooseTransfer" />
-                                    <label class="form-check-label" for="rec-transfer">Eski departmanda kalan bir kullanıcıya devredilsin</label>
+                                    <label class="form-check-label" for="rec-transfer">@Texts.Get("admin.userDetail.recordsTransfer")</label>
                                 </div>
                                 @if (recordChoice == "transfer")
                                 {
                                     @if (oldUnitMembers.Count == 0)
                                     {
-                                        <EmptyState Compact="true" Title="Eski departmanda devralabilecek etkin başka kullanıcı yok." />
+                                        <EmptyState Compact="true" Title="@Texts.Get("admin.userDetail.noReceiver")" />
                                     }
                                     else
                                     {
-                                        <select class="form-select" aria-label="Kayıtları devralacak kullanıcı" @bind="transferTo">
-                                            <option value="">Kullanıcı seçin</option>
+                                        <select class="form-select" aria-label="@Texts.Get("admin.userDetail.receiver")" @bind="transferTo">
+                                            <option value="">@Texts.Get("admin.userDetail.chooseUser")</option>
                                             @foreach (var member in oldUnitMembers)
                                             {
                                                 <option value="@member.MembershipId">@member.DisplayName</option>
@@ -141,13 +141,13 @@
 
                         @if (preview.ReasonRequired)
                         {
-                            <label class="form-label" for="unit-reason">Gerekçe *</label>
+                            <label class="form-label" for="unit-reason">@Texts.Get("crm.act.reasonRequired")</label>
                             <textarea id="unit-reason" class="form-control" rows="2" maxlength="500" @bind="unitReason" @bind:event="oninput"></textarea>
                         }
 
                         <div class="form-actions">
-                            <button type="button" class="btn btn-warning" disabled="@(busy || !CanConfirmUnitChange)" @onclick="ApplyUnitAsync">Departmanı değiştir</button>
-                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ResetUnitChange">Vazgeç</button>
+                            <button type="button" class="btn btn-warning" disabled="@(busy || !CanConfirmUnitChange)" @onclick="ApplyUnitAsync">@Texts.Get("admin.userDetail.changeUnit")</button>
+                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ResetUnitChange">@Texts.Get("common.dismiss")</button>
                         </div>
                     </div>
                 }
@@ -155,34 +155,34 @@
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Roller</h2></div>
+            <div class="section-header"><h2>@Texts.Get("nav.app.admin.roles")</h2></div>
             <RolePicker Roles="roles" Selected="selectedRoles" CanGrantAdministrator="Session.IsAdministrator" />
             <div class="form-actions">
-                <button type="button" class="btn btn-primary" disabled="@(busy || Locked)" @onclick="SaveRolesAsync">Rolleri kaydet</button>
+                <button type="button" class="btn btn-primary" disabled="@(busy || Locked)" @onclick="SaveRolesAsync">@Texts.Get("admin.userDetail.saveRoles")</button>
             </div>
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Ekipler</h2></div>
+            <div class="section-header"><h2>@Texts.Get("nav.app.admin.teams")</h2></div>
             @if (teams.Count == 0)
             {
-                <p class="text-muted">Tanımlı ekip yok. <a href="yonetim/ekipler">Ekip ekleyin</a>.</p>
+                <p class="text-muted">@((MarkupString)Texts.Get("admin.userDetail.noTeams", "<a href=\"yonetim/ekipler\">", "</a>"))</p>
             }
             else
             {
-                <p class="text-muted small">"Ekibinin kayıtları" kapsamındaki kişi, ekip arkadaşlarının sorumlu olduğu kayıtları da görür.</p>
+                <p class="text-muted small">@Texts.Get("admin.userDetail.teamsHelp")</p>
                 <div class="role-picker">
                     @foreach (var team in teams)
                     {
                         <label class="form-check">
                             <input class="form-check-input" type="checkbox" checked="@selectedTeams.Contains(team.Id)"
                                    @onchange="e => ToggleTeam(team.Id, e.Value is true)" />
-                            <span class="form-check-label">@team.Name <small class="text-muted">· @team.MemberCount üye</small></span>
+                            <span class="form-check-label">@team.Name <small class="text-muted">· @Texts.Get("admin.userDetail.memberCount", team.MemberCount)</small></span>
                         </label>
                     }
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveTeamsAsync">Ekipleri kaydet</button>
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveTeamsAsync">@Texts.Get("admin.userDetail.saveTeams")</button>
                 </div>
             }
         </section>
@@ -191,18 +191,18 @@
         @if (Session.Can(CoreAccess.ManageCompanies))
         {
             <section class="detail-section">
-                <div class="section-header"><h2>Şirketler</h2></div>
+                <div class="section-header"><h2>@Texts.Get("nav.app.admin.companies")</h2></div>
                 @if (user.IsAdministrator)
                 {
-                    <p class="text-muted small">Bu kullanıcı yönetici; tenant'ın bütün işletici şirketlerine erişir. Şirket görevi yöneticiler için gerekmez.</p>
+                    <p class="text-muted small">@Texts.Get("admin.userDetail.companiesAdministrator")</p>
                 }
                 else if (companies.Count == 0)
                 {
-                    <EmptyState Compact="true" Title="Tanımlı işletici şirket yok." />
+                    <EmptyState Compact="true" Title="@Texts.Get("admin.userDetail.noCompanies")" />
                 }
                 else
                 {
-                    <p class="text-muted small">Kullanıcı yalnızca erişimi olan şirketlerin kayıtlarını görür. Şirket seçili değilse yalnızca ortak veriyi görür. Geçici vekâlet için bitiş tarihi girin; süresi dolunca erişim kendiliğinden kapanır.</p>
+                    <p class="text-muted small">@Texts.Get("admin.userDetail.companiesHelp")</p>
                     <div class="role-picker">
                         @foreach (var company in companies)
                         {
@@ -211,20 +211,20 @@
                                 <label class="form-check">
                                     <input class="form-check-input" type="checkbox" checked="@state.Selected"
                                            @onchange="e => ToggleCompany(company.Id, e.Value is true)" />
-                                    <span class="form-check-label">@company.Name @if (company.IsDefault) { <small class="text-muted">· varsayılan</small> }</span>
+                                    <span class="form-check-label">@company.Name @if (company.IsDefault) { <small class="text-muted">· @Texts.Get("admin.userDetail.defaultCompany")</small> }</span>
                                 </label>
                                 @if (state.Selected)
                                 {
                                     <div class="company-assignment-detail">
                                         <label class="small text-muted">
-                                            Vekâlet bitişi (boşsa süresiz)
+                                            @Texts.Get("admin.userDetail.validUntil")
                                             <input type="date" class="form-control form-control-sm" value="@(state.ValidUntil?.ToString("yyyy-MM-dd"))"
                                                    @onchange="e => SetValidUntil(company.Id, e.Value?.ToString())" />
                                         </label>
                                         @if (branchesByCompany.TryGetValue(company.Id, out var branches) && branches.Count > 0)
                                         {
                                             <label class="small text-muted">
-                                                Varsayılan şube
+                                                @Texts.Get("admin.userDetail.defaultBranch")
                                                 <select class="form-select form-select-sm" @onchange="e => SetBranch(company.Id, e.Value?.ToString())">
                                                     <option value="">—</option>
                                                     @foreach (var branch in branches)
@@ -240,7 +240,7 @@
                         }
                     </div>
                     <div class="form-actions">
-                        <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveCompaniesAsync">Şirketleri kaydet</button>
+                        <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveCompaniesAsync">@Texts.Get("admin.userDetail.saveCompanies")</button>
                     </div>
                 }
             </section>
@@ -249,7 +249,7 @@
         <UserAccessPanel MembershipId="MembershipId" Disabled="user.Status == UserStatus.Disabled" Version="accessVersion" />
 
         <section class="detail-section">
-            <div class="section-header"><h2>Hesap</h2></div>
+            <div class="section-header"><h2>@Texts.Get("admin.userDetail.account")</h2></div>
 
             @if (confirming is { } pending)
             {
@@ -261,7 +261,7 @@
                     }
                     <button type="button" class="btn btn-danger" disabled="@(busy || (pending.Url.EndsWith(TransferPath) && receiverId is null))"
                             @onclick="() => RunAsync(pending)">@pending.Label</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = null">Vazgeç</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = null">@Texts.Get("common.dismiss")</button>
                 </div>
             }
             else
@@ -359,34 +359,34 @@
         switch (user!.Status)
         {
             case UserStatus.Invited:
-                yield return new("Daveti yeniden gönder", "Yeni bağlantı 7 gün geçerli olur.", $"{url}/invitation/resend", false,
-                    "Davet yeniden gönderildi.", null, false);
-                yield return new("Daveti iptal et", "Bağlantı çalışmaz; kişi listeden çıkar.", $"{url}/invitation", true,
-                    "Davet iptal edildi.", $"{user.Email} adresine gönderilen davet iptal edilsin mi?", true);
+                yield return new(Texts.Get("admin.userDetail.resend"), Texts.Get("admin.userDetail.resendHint"), $"{url}/invitation/resend", false,
+                    Texts.Get("admin.userDetail.resendDone"), null, false);
+                yield return new(Texts.Get("admin.userDetail.revoke"), Texts.Get("admin.userDetail.revokeHint"), $"{url}/invitation", true,
+                    Texts.Get("admin.userDetail.revokeDone"), Texts.Get("admin.userDetail.revokeQuestion", user.Email), true);
                 break;
             case UserStatus.Active:
-                yield return new("Şifre sıfırlama bağlantısı gönder",
-                    "Kişi yeni şifresini kendisi belirler (24 saat geçerli). Diğer kuruluşlardaki girişi de bu şifreyle olur.",
-                    $"{url}/password-reset", false, $"Şifre sıfırlama bağlantısı {user.Email} adresine gönderildi.", null, false);
+                yield return new(Texts.Get("admin.userDetail.reset"),
+                    Texts.Get("admin.userDetail.resetHint"),
+                    $"{url}/password-reset", false, Texts.Get("admin.userDetail.resetDone", user.Email), null, false);
                 if (!user.IsCurrentUser)
                 {
-                    yield return new("Oturumlarını kapat",
-                        "Kişinin tüm cihazlardaki oturumları kapanır, diğer kuruluşlardakiler de. Yeniden giriş yapması gerekir.",
-                        $"{url}/close-sessions", false, "Kişinin oturumları kapatıldı.",
-                        $"{user.DisplayName} kişisinin tüm oturumları kapatılsın mı?", true);
-                    yield return new("Devre dışı bırak", "Kişi bu kuruluşa erişemez; kayıtları ve diğer kuruluşlardaki üyelikleri kalır.",
-                        $"{url}/disable", false, "Kullanıcı devre dışı bırakıldı.",
-                        $"{user.DisplayName} devre dışı bırakılsın mı? Bir sonraki işleminde erişimi kesilir.", true, Handover: true);
+                    yield return new(Texts.Get("admin.userDetail.closeSessions"),
+                        Texts.Get("admin.userDetail.closeSessionsHint"),
+                        $"{url}/close-sessions", false, Texts.Get("admin.userDetail.closeSessionsDone"),
+                        Texts.Get("admin.userDetail.closeSessionsQuestion", user.DisplayName), true);
+                    yield return new(Texts.Get("admin.userDetail.disable"), Texts.Get("admin.userDetail.disableHint"),
+                        $"{url}/disable", false, Texts.Get("admin.userDetail.disableDone"),
+                        Texts.Get("admin.userDetail.disableQuestion", user.DisplayName), true, Handover: true);
                 }
 
                 break;
             case UserStatus.Disabled:
-                yield return new("Yeniden etkinleştir", "Kişi rolleriyle birlikte erişimini geri alır.", $"{url}/enable", false,
-                    "Kullanıcı yeniden etkinleştirildi.", null, false);
+                yield return new(Texts.Get("admin.userDetail.enable"), Texts.Get("admin.userDetail.enableHint"), $"{url}/enable", false,
+                    Texts.Get("admin.userDetail.enableDone"), null, false);
                 if (OwnedTotal > 0)
                 {
-                    yield return new("Kayıtlarını devret", $"Kişinin üzerinde {HandoverChoice.Describe(owned!)} var.", $"{url}{TransferPath}", false,
-                        "Tamamlandı.", $"{user.DisplayName} kişisinin kayıtları kime devredilsin?", false, Handover: true);
+                    yield return new(Texts.Get("admin.userDetail.transfer"), Texts.Get("admin.userDetail.transferHint", HandoverChoice.Describe(owned!)), $"{url}{TransferPath}", false,
+                        Texts.Get("admin.userDetail.transferDone"), Texts.Get("admin.userDetail.transferQuestion", user.DisplayName), false, Handover: true);
                 }
 
                 break;
@@ -394,8 +394,8 @@
 
         if (user.IsLockedOut)
         {
-            yield return new("Kilidi aç", "Hesap hatalı şifre denemeleri yüzünden kilitlendi.", $"{url}/unlock", false,
-                "Hesabın kilidi açıldı.", null, false);
+            yield return new(Texts.Get("admin.userDetail.unlock"), Texts.Get("admin.userDetail.unlockHint"), $"{url}/unlock", false,
+                Texts.Get("admin.userDetail.unlockDone"), null, false);
         }
     }
 
@@ -446,7 +446,7 @@
 
         await LoadAsync();
         notice = action.Handover && receiverId is not null
-            ? $"{action.Done} Kayıtlar {receivers.FirstOrDefault(r => r.MembershipId == receiverId)?.DisplayName} kişisine devredildi."
+            ? action.Done + " " + Texts.Get("admin.userDetail.handedOver", receivers.FirstOrDefault(r => r.MembershipId == receiverId)?.DisplayName)
             : action.Done;
     }
 
@@ -542,7 +542,7 @@
         await LoadAsync();
         await LoadUnitAsync();
         accessVersion++;
-        notice = "Departman değiştirildi.";
+        notice = Texts.Get("admin.userDetail.unitChanged");
     }
 
     private async Task LoadTeamsAsync()
@@ -577,7 +577,7 @@
 
         await LoadTeamsAsync();
         accessVersion++;
-        notice = "Ekipler kaydedildi.";
+        notice = Texts.Get("admin.userDetail.teamsSaved");
     }
 
     private async Task LoadCompaniesAsync()
@@ -633,7 +633,7 @@
         }
 
         await LoadCompaniesAsync();
-        notice = "Şirketler kaydedildi.";
+        notice = Texts.Get("admin.userDetail.companiesSaved");
         if (user?.IsCurrentUser == true)
         {
             await Session.RefreshAsync();
@@ -655,7 +655,7 @@
 
         await LoadAsync();
         accessVersion++;
-        notice = "Roller kaydedildi.";
+        notice = Texts.Get("admin.userDetail.rolesSaved");
         if (user?.IsCurrentUser == true)
         {
             await Session.RefreshAsync();

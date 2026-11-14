@@ -2,11 +2,11 @@
 @inject SessionState Session
 @inject AppNavigation Navigation
 
-<PageTitle>Yönetim - Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin") - Modulix</PageTitle>
 
 @* Menüdeki "Yönetim" bölümünün giriş sayfası. Her kart yalnızca izni olana görünür; asıl denetim sunucudadır. *@
 <AuthGate AnyPermission="CoreAccess.AdministrationPermissions">
-    <h1>Yönetim</h1>
+    <h1>@Texts.Get("nav.app.admin")</h1>
     <p class="text-muted">@Session.ActiveTenantName</p>
 
     <div class="tiles">
@@ -28,11 +28,11 @@
     @* Modül ayarları kendi modülünde yaşar; buradan yalnızca bağlantı verilir. *@
     @if (Navigation.ModuleSettings() is { Count: > 0 } moduleSettings)
     {
-        <h2 class="mt-4">Modül ayarları</h2>
+        <h2 class="mt-4">@Texts.Get("admin.home.moduleSettings")</h2>
         <div class="tiles">
             @foreach (AppDefinition screen in moduleSettings)
             {
-                <a class="tile" href="@screen.Route"><strong>@AppNames.Of(screen)</strong><span>@(Navigation.RootOf(screen) is { } root ? AppNames.Of(root) : null) modülüne özgü kurallar ve varsayılanlar</span></a>
+                <a class="tile" href="@screen.Route"><strong>@AppNames.Of(screen)</strong><span>@Texts.Get("admin.home.moduleSettingsDescription", Navigation.RootOf(screen) is { } root ? AppNames.Of(root) : null)</span></a>
             }
         </div>
     }
@@ -40,25 +40,26 @@
 
 @code {
     // Href boş olan bölümün ekranı henüz yoktur; kart "Yakında" olarak görünür.
-    private static readonly (string Title, string Description, string Permission, string? Href)[] Sections =
+    // Özellik olarak tanımlıdır: metinler her okunuşta etkin dilden çözülür (ADR-0034).
+    private static (string Title, string Description, string Permission, string? Href)[] Sections =>
     [
-        ("Kullanıcılar", "Davet, rol atama, devre dışı bırakma, şifre sıfırlama", CoreAccess.ManageUsers, "yonetim/kullanicilar"),
-        ("Ekipler", "Çalışma grupları; \"ekibinin kayıtları\" kapsamı", CoreAccess.ManageUsers, "yonetim/ekipler"),
-        ("Departmanlar", "Merkez ve bayilerden oluşan departman ağacı; kullanıcıların departmanı", CoreAccess.ManageUsers, "yonetim/departmanlar"),
-        ("Destek erişimi", "Platform ekibinin firmanızda açtığı süreli, salt okunur erişimler; erken kapatma", CoreAccess.ManageUsers, "yonetim/destek-erisimi"),
-        ("Roller", "Roller, izinleri ve kayıt kapsamı", CoreAccess.ManageRoles, "yonetim/roller"),
-        ("Şirketler", "İşletici şirketler ve kullanıcıların şirket erişimi", CoreAccess.ManageCompanies, "yonetim/sirketler"),
-        ("Kuruluş ayarları", "Kuruluş profili, logo, saat dilimi, para birimi, güvenlik", CoreAccess.ManageSettings, "yonetim/ayarlar"),
-        ("Denetim kaydı", "Kim, neyi, ne zaman değiştirdi", CoreAccess.ReadAudit, "yonetim/denetim"),
-        ("İşlem günlüğü", "İçe aktarmalar: hangi dosya, kaç satır alındı, hatalar", CoreAccess.ReadImports, "yonetim/gunluk"),
-        ("Onay süreçleri", "Satın alma, masraf gibi işlerde kimin hangi sırayla onay vereceğini tanımlayın", CoreAccess.ManageApprovals, "yonetim/onay-surecleri"),
-        ("Otomasyon", "Olay ya da zamanlamayla çalışan kurallar; hazır şablonlardan taslak açın, gözden geçirip yayınlayın", CoreAccess.ReadAutomation, "yonetim/otomasyon"),
-        ("Çalışma geçmişi", "Otomasyon kurallarının çalışmaları: hangi kayıt, hangi adım, sonuç; yeniden deneme ve iptal", CoreAccess.ReadAutomationLogs, "yonetim/otomasyon/calismalar"),
-        ("İletişim tercihleri", "Kişilerin kanal ve amaç bazlı iletişim izinleri, engeller ve konular", CoreAccess.ReadCommunication, "yonetim/iletisim-tercihleri"),
-        ("Özel alanlar", "Kayıtlara firmanıza özgü alanlar ekleyin", CoreAccess.ManageCustomization, "yonetim/ozel-alanlar"),
-        ("Form tasarımı", "Formların sekmelerini, bölümlerini ve alanlarını firmanıza göre düzenleyin", CoreAccess.ManageCustomization, "yonetim/form-tasarimi"),
-        ("Listeler", "Fırsat aşamaları, firma durumu ve diğer seçim listeleri", CoreAccess.ManageCustomization, "yonetim/listeler"),
-        ("Alan ve lookup ayarları", "Formlardaki kayıt seçim alanlarında metin aramasını açın veya kapatın", CoreAccess.ManageCustomization, "yonetim/alan-ve-lookup-ayarlari"),
-        ("Sektör profili", "Hazır alanlar ve liste değerleri, alt profilleriniz ve faaliyet seçiminiz", CoreAccess.ManageCustomization, "yonetim/sektor-profili"),
+        (Texts.Get("nav.app.admin.users"), Texts.Get("admin.home.users"), CoreAccess.ManageUsers, "yonetim/kullanicilar"),
+        (Texts.Get("nav.app.admin.teams"), Texts.Get("admin.home.teams"), CoreAccess.ManageUsers, "yonetim/ekipler"),
+        (Texts.Get("nav.app.admin.business-units"), Texts.Get("admin.home.units"), CoreAccess.ManageUsers, "yonetim/departmanlar"),
+        (Texts.Get("admin.supportAccess.title"), Texts.Get("admin.home.supportAccess"), CoreAccess.ManageUsers, "yonetim/destek-erisimi"),
+        (Texts.Get("nav.app.admin.roles"), Texts.Get("admin.home.roles"), CoreAccess.ManageRoles, "yonetim/roller"),
+        (Texts.Get("nav.app.admin.companies"), Texts.Get("admin.home.companies"), CoreAccess.ManageCompanies, "yonetim/sirketler"),
+        (Texts.Get("nav.app.admin.settings"), Texts.Get("admin.home.settings"), CoreAccess.ManageSettings, "yonetim/ayarlar"),
+        (Texts.Get("nav.app.admin.audit"), Texts.Get("admin.home.audit"), CoreAccess.ReadAudit, "yonetim/denetim"),
+        (Texts.Get("nav.app.admin.import-log"), Texts.Get("admin.home.importLog"), CoreAccess.ReadImports, "yonetim/gunluk"),
+        (Texts.Get("nav.app.admin.approvals"), Texts.Get("admin.home.approvals"), CoreAccess.ManageApprovals, "yonetim/onay-surecleri"),
+        (Texts.Get("nav.app.admin.automation"), Texts.Get("admin.home.automation"), CoreAccess.ReadAutomation, "yonetim/otomasyon"),
+        (Texts.Get("nav.app.admin.automation-logs"), Texts.Get("admin.home.automationLogs"), CoreAccess.ReadAutomationLogs, "yonetim/otomasyon/calismalar"),
+        (Texts.Get("nav.app.admin.communication"), Texts.Get("admin.home.communication"), CoreAccess.ReadCommunication, "yonetim/iletisim-tercihleri"),
+        (Texts.Get("nav.app.admin.custom-fields"), Texts.Get("admin.home.customFields"), CoreAccess.ManageCustomization, "yonetim/ozel-alanlar"),
+        (Texts.Get("nav.app.admin.form-designer"), Texts.Get("admin.home.formDesigner"), CoreAccess.ManageCustomization, "yonetim/form-tasarimi"),
+        (Texts.Get("nav.app.admin.lists"), Texts.Get("admin.home.lists"), CoreAccess.ManageCustomization, "yonetim/listeler"),
+        (Texts.Get("admin.home.lookupSettingsTitle"), Texts.Get("admin.home.lookupSettings"), CoreAccess.ManageCustomization, "yonetim/alan-ve-lookup-ayarlari"),
+        (Texts.Get("nav.app.admin.sector-profile"), Texts.Get("admin.home.sectorProfile"), CoreAccess.ManageCustomization, "yonetim/sektor-profili"),
     ];
 }

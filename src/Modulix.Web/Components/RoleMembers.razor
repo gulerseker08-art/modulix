@@ -3,7 +3,7 @@
 @inject SessionState Session
 
 <section class="detail-section">
-    <div class="section-header"><h2>Bu rolde kimler var</h2></div>
+    <div class="section-header"><h2>@Texts.Get("admin.roleMembers.title")</h2></div>
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
@@ -14,19 +14,19 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Title="Bu rolde kimse yok." />
+        <EmptyState Title="@Texts.Get("admin.roleMembers.empty")" />
     }
     else
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Ad</th><th>E-posta</th><th>Durum</th></tr>
+                <tr><th>@Texts.Get("common.field.name")</th><th>@Texts.Get("common.field.email")</th><th>@Texts.Get("common.field.status")</th></tr>
             </thead>
             <tbody>
                 @foreach (var user in page.Items)
                 {
                     <tr>
-                        <td data-label="Ad" class="primary">
+                        <td data-label="@Texts.Get("common.field.name")" class="primary">
                             @if (Session.Can(CoreAccess.ManageUsers))
                             {
                                 <a href="yonetim/kullanicilar/@user.MembershipId">@user.DisplayName</a>
@@ -36,8 +36,8 @@
                                 @user.DisplayName
                             }
                         </td>
-                        <td data-label="E-posta">@user.Email</td>
-                        <td data-label="Durum"><UserStatusBadge User="user" /></td>
+                        <td data-label="@Texts.Get("common.field.email")">@user.Email</td>
+                        <td data-label="@Texts.Get("common.field.status")"><UserStatusBadge User="user" /></td>
                     </tr>
                 }
             </tbody>
