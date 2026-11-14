@@ -1,0 +1,354 @@
+/* ---- Marka (BrandLogo) ---- */
+.brand-logo {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+}
+
+    .brand-logo img {
+        display: none;
+        flex: none;
+        max-width: 100%;
+        height: auto;
+    }
+
+    /* Varsayılan: açık tema, tam logo. Koyu temada koyu sürüm görünür. */
+    .brand-logo .brand-full.brand-light {
+        display: block;
+    }
+
+[data-theme="dark"] .brand-logo .brand-full.brand-light {
+    display: none;
+}
+
+[data-theme="dark"] .brand-logo .brand-full.brand-dark {
+    display: block;
+}
+
+/* Daraltılmış menüde yalnızca işaret görünür. */
+@media (min-width: 641px) {
+    html.sidebar-collapsed .sidebar .brand-logo .brand-full {
+        display: none;
+    }
+
+    html.sidebar-collapsed .sidebar .brand-logo .brand-mark.brand-light {
+        display: block;
+    }
+
+    html.sidebar-collapsed[data-theme="dark"] .sidebar .brand-logo .brand-mark.brand-light {
+        display: none;
+    }
+
+    html.sidebar-collapsed[data-theme="dark"] .sidebar .brand-logo .brand-mark.brand-dark {
+        display: block;
+    }
+
+    html.sidebar-collapsed .sidebar .app-launcher .brand-button {
+        margin-left: 0;
+    }
+}
+
+/* ---- IconButton: kare, yalnızca ikonlu düğme (erişilebilir ad zorunlu) ---- */
+.icon-button {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: var(--mx-control-height);
+    height: var(--mx-control-height);
+    border: 0;
+    border-radius: var(--mx-radius-button);
+    background: transparent;
+    color: var(--mx-text-secondary);
+}
+
+    .icon-button:hover {
+        background: var(--mx-surface-muted);
+        color: var(--mx-text-primary);
+    }
+
+/* ---- "İçeriğe geç" bağlantısı: yalnızca klavye odağında görünür ---- */
+.skip-link {
+    position: absolute;
+    left: var(--mx-space-4);
+    top: -100px;
+    z-index: 2000;
+    padding: var(--mx-space-2) var(--mx-space-4);
+    border-radius: var(--mx-radius-button);
+    background: var(--mx-brand-primary);
+    color: var(--mx-text-on-brand);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+    .skip-link:focus {
+        top: var(--mx-space-2);
+        color: var(--mx-text-on-brand);
+    }
+
+#main-content:focus {
+    outline: none;
+}
+
+/* ---- Modulix uygulama paneli (AppLauncher) ---- */
+.app-launcher {
+    display: flex;
+    align-items: center;
+}
+
+.app-launcher .navbar-brand {
+    display: flex;
+    align-items: center;
+    margin-right: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    color: var(--mx-text-primary);
+    text-decoration: none;
+}
+
+.brand-button {
+    background: transparent;
+    border: 0;
+    border-radius: var(--mx-radius-button);
+    padding: 0.35rem 0.5rem;
+    margin-left: -0.5rem;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+    .brand-button:hover,
+    .brand-button[aria-expanded="true"] {
+        background-color: var(--mx-surface-muted);
+    }
+
+.app-launcher .brand-button:focus-visible,
+.app-launcher .navbar-brand:focus-visible {
+    outline: 2px solid var(--mx-brand-primary);
+    outline-offset: 2px;
+}
+
+/* Panel sayfanın üzerinde durur (fixed); içerik kaymaz. */
+.app-panel {
+    position: fixed;
+    top: 3.75rem;
+    left: 0.75rem;
+    z-index: 1060;
+    display: flex;
+    flex-direction: column;
+    width: min(25rem, calc(100vw - 1.5rem));
+    max-height: calc(100vh - 4.75rem);
+    max-height: calc(100dvh - 4.75rem);
+    padding: 1rem;
+    background: var(--mx-surface);
+    color: var(--mx-ink);
+    border: 1px solid var(--mx-border);
+    border-radius: 1rem;
+    box-shadow: var(--mx-shadow-popover);
+}
+
+    .app-panel:focus {
+        outline: none;
+    }
+
+.app-panel-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.app-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.app-panel-title-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.6rem;
+}
+
+.app-back {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 36px;
+    padding: 0.25rem 0.6rem 0.25rem 0.4rem;
+    background: transparent;
+    border: 0;
+    border-radius: 0.5rem;
+    color: var(--mx-indigo);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+    .app-back:hover {
+        background: var(--mx-lilac);
+    }
+
+.app-search {
+    position: relative;
+    margin-bottom: 0.75rem;
+}
+
+    .app-search .app-icon {
+        position: absolute;
+        left: 0.85rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--mx-muted);
+        pointer-events: none;
+    }
+
+    .app-search .form-control {
+        padding-left: 2.4rem;
+        border-radius: 999px;
+    }
+
+/* Çok sayıda uygulamada panel taşmaz; liste içeride kayar. */
+.app-panel-body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.app-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.app-group + .app-group {
+    margin-top: 0.9rem;
+}
+
+.app-group-title {
+    margin: 0 0 0.4rem 0.15rem;
+    color: var(--mx-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.app-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 5.5rem;
+    padding: 0.75rem 0.4rem;
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-border);
+    border-radius: 0.875rem;
+    color: var(--mx-ink);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+    .app-tile:hover {
+        background: var(--mx-surface-hover);
+        border-color: var(--mx-indigo);
+        box-shadow: var(--mx-shadow);
+        color: var(--mx-ink);
+    }
+
+    .app-tile.is-current {
+        border-color: var(--mx-indigo);
+        background: var(--mx-lilac);
+    }
+
+/* Pasif kart (yol haritasındaki uygulama): tıklanmaz, odak almaz; kontrastı AA'nın altına inmez, pasifliği "Yakında" başlığı ve imleç anlatır. */
+.app-tile.is-planned {
+    cursor: default;
+    background: var(--mx-surface-muted);
+    border-style: dashed;
+    color: var(--mx-text-secondary);
+}
+
+    .app-tile.is-planned:hover {
+        background: var(--mx-surface-muted);
+        border-color: var(--mx-border);
+        box-shadow: none;
+        color: var(--mx-text-secondary);
+    }
+
+    .app-tile.is-planned .app-tile-icon {
+        background: transparent;
+        color: var(--mx-text-secondary);
+    }
+
+.app-tile-name {
+    overflow-wrap: anywhere;
+}
+
+.app-tile-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.75rem;
+}
+
+.tone-indigo .app-tile-icon,
+.app-panel-title-icon.tone-indigo {
+    background: var(--mx-lilac);
+    color: var(--mx-indigo);
+}
+
+.tone-teal .app-tile-icon,
+.app-panel-title-icon.tone-teal {
+    background: var(--mx-tone-success-bg);
+    color: var(--mx-teal);
+}
+
+.app-tile:focus-visible,
+.app-back:focus-visible {
+    outline: 2px solid var(--mx-indigo);
+    outline-offset: 2px;
+}
+
+.app-search .form-control:focus-visible {
+    outline: none;
+}
+
+.app-state {
+    margin: 0;
+    padding: 1.5rem 0.5rem;
+    color: var(--mx-muted);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+@media (max-width: 640.98px) {
+    .app-panel {
+        left: 0.5rem;
+        width: calc(100vw - 1rem);
+    }
+
+    .app-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Sayfa başlığındaki eylem düğmeleri (ör. Düzenle + Birleştir). */
+.header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}

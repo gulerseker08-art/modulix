@@ -1,0 +1,650 @@
+/* Sayfa başlığı 28px / 700 */
+h1 {
+    font-size: var(--mx-fs-page-title);
+    line-height: 1.25;
+}
+
+/* Bölüm başlığı 18px / 600–700 */
+h2 {
+    font-size: var(--mx-fs-section-title);
+    font-weight: 650;
+}
+
+/* Kart başlığı 16px / 600 */
+h3 {
+    font-size: var(--mx-fs-card-title);
+    font-weight: 600;
+}
+
+h1:focus {
+    outline: none;
+}
+
+a, .btn-link {
+    color: var(--mx-brand-primary);
+}
+
+/* ---- Button ---- */
+.btn {
+    --bs-btn-padding-y: 0.25rem;
+    --bs-btn-padding-x: 0.8rem;
+    font-weight: 600; /* ikincil, tonal ve ghost; birincil ve yıkıcı 700 (aşağıda) */
+    font-size: var(--mx-fs-label);
+    border-radius: var(--mx-radius-button);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--mx-space-2);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn {
+        transition: none;
+    }
+
+        .btn:hover,
+        .btn:active {
+            transform: none !important;
+        }
+}
+
+/* Yalnızca ikonlu düğme: kare, erişilebilir ad aria-label ile verilir. */
+.btn-icon {
+    --bs-btn-padding-x: 0;
+    width: var(--mx-control-height);
+}
+
+/* Birincil (12.11.2026 görsel kararı): dolu turkuaz→mavi degrade, hafif ışıma, yuvarlatılmış dikdörtgen. Yazı --mx-text-on-brand
+   (açıkta beyaz, koyuda koyu lacivert); degradenin iki ucu da metinle AA. Hover'da bir ton koyulaşır ve 1 px yükselir. */
+.btn-primary {
+    --bs-btn-color: var(--mx-text-on-brand);
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-text-on-brand);
+    --bs-btn-hover-bg: transparent;
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-text-on-brand);
+    --bs-btn-active-bg: transparent;
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
+    --bs-btn-disabled-opacity: 1;
+    font-weight: 700;
+    border-width: 0;
+    background-image: var(--mx-gradient-cta);
+    box-shadow: var(--mx-shadow-cta);
+}
+
+    .btn-primary:hover:not(:disabled):not(.disabled) {
+        background-image: var(--mx-gradient-cta-hover);
+        box-shadow: var(--mx-shadow-cta-hover);
+        transform: translateY(-1px);
+    }
+
+    .btn-primary:active:not(:disabled):not(.disabled) {
+        transform: translateY(1px);
+        box-shadow: var(--mx-shadow-control);
+    }
+
+    .btn-primary:disabled,
+    .btn-primary.disabled {
+        background-image: none;
+        box-shadow: none;
+    }
+
+/* Yıkıcı onay düğmesi: düz kırmızı dolgu; koyu temada açık kırmızı + koyu metin. Hover'da bir ton açılır ve 1 px yükselir. */
+.btn-danger {
+    --bs-btn-color: var(--mx-text-on-brand);
+    --bs-btn-bg: var(--mx-fill-danger);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-text-on-brand);
+    --bs-btn-hover-bg: var(--mx-fill-danger-hover);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-text-on-brand);
+    --bs-btn-active-bg: var(--mx-fill-danger-hover);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
+    --bs-btn-disabled-opacity: 1;
+    font-weight: 700;
+    box-shadow: var(--mx-shadow-control);
+}
+
+    .btn-danger:hover:not(:disabled):not(.disabled) {
+        transform: translateY(-1px);
+        box-shadow: var(--mx-shadow-raised);
+    }
+
+    .btn-danger:active:not(:disabled):not(.disabled) {
+        transform: translateY(1px);
+        box-shadow: none;
+    }
+
+    .btn-danger:disabled,
+    .btn-danger.disabled {
+        box-shadow: none;
+    }
+
+/* Kaydetme sırasında: tıklanmaz, genişlik ve yükseklik sabit, metin hafif solar (aria-busy="true"). */
+.btn[aria-busy="true"] {
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+/* Büyük düğme: yalnızca boş durum ve sihirbaz gibi tek eylemli ekranlarda. */
+.btn-lg {
+    --bs-btn-padding-x: 1.1rem;
+    font-size: var(--mx-fs-body);
+}
+
+/* Tonal düğme: üçüncül eylem (ör. "Satır ekle"); hayalet düğme: araç çubuğu eylemleri (Filtrele, Sütunlar). */
+.btn-tonal,
+.btn-outline-primary {
+    --bs-btn-color: var(--mx-tone-brand-fg);
+    --bs-btn-bg: var(--mx-tone-brand-bg);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-tone-brand-fg);
+    --bs-btn-hover-bg: var(--mx-tone-info-bg);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-tone-brand-fg);
+    --bs-btn-active-bg: var(--mx-tone-info-bg);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
+}
+
+.btn-ghost {
+    --bs-btn-color: var(--mx-text-label);
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-text-primary);
+    --bs-btn-hover-bg: var(--mx-surface-muted);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-text-primary);
+    --bs-btn-active-bg: var(--mx-surface-muted);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: transparent;
+}
+
+/* Not: btn-outline-primary yukarıda btn-tonal ile aynı yumuşak görünümü paylaşır (çerçeve yok, hover'da bir ton koyulaşır). */
+
+/* İkincil düğmeler (İptal, Ara, sayfalama): dolgulu, çerçevesiz; hover'da bir ton koyulaşır. */
+.btn-outline-secondary {
+    --bs-btn-color: var(--mx-text-primary);
+    --bs-btn-bg: var(--mx-surface-control);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-text-primary);
+    --bs-btn-hover-bg: var(--mx-border);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-text-primary);
+    --bs-btn-active-bg: var(--mx-border);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
+}
+
+/* Yıkıcı eylem: yumuşak kırmızı; hover'da dolgu koyulaşır (onay gerektiren eylemler zaten ayrı adımda). */
+.btn-outline-danger {
+    --bs-btn-color: var(--mx-tone-danger-fg);
+    --bs-btn-bg: var(--mx-tone-danger-bg);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--mx-text-on-brand);
+    --bs-btn-hover-bg: var(--mx-fill-danger);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--mx-text-on-brand);
+    --bs-btn-active-bg: var(--mx-fill-danger);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    --bs-btn-disabled-bg: var(--mx-surface-muted);
+    --bs-btn-disabled-border-color: transparent;
+}
+
+/* Kaydetme sırasında düğmenin genişliği değişmez; spinner metnin yanında görünür. */
+.btn .spinner-border-sm {
+    width: 0.9rem;
+    height: 0.9rem;
+    border-width: 0.15em;
+}
+
+/* ---- Alert / bildirim ---- */
+.alert {
+    border: 1px solid transparent;
+    border-radius: var(--mx-radius-card);
+    font-size: var(--mx-fs-body);
+}
+
+.alert-success {
+    background: var(--mx-tone-success-bg);
+    color: var(--mx-tone-success-fg);
+}
+
+.alert-danger {
+    background: var(--mx-tone-danger-bg);
+    color: var(--mx-tone-danger-fg);
+}
+
+.alert-warning {
+    background: var(--mx-tone-warning-bg);
+    color: var(--mx-tone-warning-fg);
+}
+
+.alert-info {
+    background: var(--mx-tone-info-bg);
+    color: var(--mx-tone-info-fg);
+}
+
+/* ---- Form alanları: Default / Hover / Focus / Disabled / Read-only / Required / Invalid ---- */
+.form-label {
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+    color: var(--mx-text-label);
+    margin-bottom: var(--mx-space-1);
+}
+
+/* Zorunlu alan: etikete .required eklenir ya da [aria-required] alanın etiketi işaretlenir. */
+.form-label.required::after {
+    content: " *";
+    color: var(--mx-danger-text);
+}
+
+.form-text, .helper-text {
+    font-size: var(--mx-fs-helper);
+    color: var(--mx-text-secondary);
+}
+
+/* Alan açıklaması baloncuğu: giriş alanıyla aynı kapsayıcıdaki .form-text, alanın üzerine gelince ya da
+   odaklanınca alanın üstünde açılır; formda yer kaplamaz. Hata/uyarı metni (.text-danger) hariçtir.
+   Koyu/açık tema: yüzey ve metin renkleri ters çevrilir. */
+div:has(> .form-text:not(.text-danger)):has(> :is(.form-control, .form-select, input, select, textarea)) {
+    position: relative;
+}
+
+div:has(> :is(.form-control, .form-select, input, select, textarea)) > .form-text:not(.text-danger) {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 0.5rem);
+    z-index: 30;
+    width: max-content;
+    max-width: min(20rem, 100%);
+    margin: 0 !important;
+    padding: var(--mx-space-2) 0.75rem;
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-text-primary);
+    color: var(--mx-surface);
+    box-shadow: var(--mx-shadow-popover);
+    line-height: 1.5;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    pointer-events: none;
+}
+
+div:has(> :is(.form-control, .form-select, input, select, textarea)) > .form-text:not(.text-danger)::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 1.25rem;
+    border: 6px solid transparent;
+    border-top-color: var(--mx-text-primary);
+}
+
+div:has(> :is(.form-control, .form-select, input, select, textarea)):hover > .form-text:not(.text-danger),
+div:has(> :is(.form-control, .form-select, input, select, textarea)):focus-within > .form-text:not(.text-danger) {
+    opacity: 1;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    div:has(> :is(.form-control, .form-select, input, select, textarea)) > .form-text:not(.text-danger) {
+        transition: none;
+    }
+}
+
+.form-control, .form-select {
+    background-color: var(--mx-surface);
+    color: var(--mx-text-primary);
+    border-color: var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    font-size: var(--mx-fs-label);
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+/* Kayıt formlarında alanlar dolgulu görünür; odakta yüzey rengine döner. Sayfa zemininde (arama, süzgeç) yüzey rengi kalır. */
+:where(.record-form, .section-card, .drawer) .form-control,
+:where(.record-form, .section-card, .drawer) .form-select {
+    background-color: var(--mx-surface-hover);
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: var(--mx-surface);
+    color: var(--mx-text-primary);
+}
+
+    .form-control::placeholder {
+        color: var(--mx-text-secondary);
+        opacity: 0.85;
+    }
+
+    .form-control:hover:not(:disabled):not([readonly]):not(:focus),
+    .form-select:hover:not(:disabled):not(:focus) {
+        border-color: var(--mx-border-strong);
+    }
+
+    .form-control:disabled, .form-select:disabled {
+        background-color: var(--mx-surface-muted);
+        color: var(--mx-text-secondary);
+        opacity: 1;
+    }
+
+    /* Salt okunur alan dolgulu düzenlenebilir alandan ayrılır; metin pasif alandaki gibi soluklaşmaz. */
+    .form-control[readonly],
+    .form-control[readonly]:focus {
+        background-color: var(--mx-surface-muted);
+    }
+
+.btn:focus-visible, .btn-link.nav-link:focus, .form-control:focus, .form-select:focus, .form-check-input:focus {
+    border-color: var(--mx-brand-primary);
+    box-shadow: var(--mx-focus-ring);
+    outline: none;
+}
+
+.btn:focus:not(:focus-visible) {
+    box-shadow: none;
+}
+
+/* Birincil ve yıkıcı düğmede odak halkası iki katmanlı: iç halka sayfa zemini, dış halka marka rengi. */
+.btn-primary:focus-visible,
+.btn-danger:focus-visible {
+    box-shadow: 0 0 0 2px var(--mx-surface), 0 0 0 4px var(--mx-brand-primary);
+}
+
+.btn-primary:focus-visible {
+    border-color: transparent;
+}
+
+.btn-danger:focus-visible {
+    border-color: transparent;
+}
+
+.form-check-input {
+    border-color: var(--mx-border-strong);
+    background-color: var(--mx-surface);
+}
+
+.form-check-input:checked {
+    background-color: var(--mx-brand-primary);
+    border-color: var(--mx-brand-primary);
+}
+
+/* Satır düzenindeki anahtar (form-check-row): Bootstrap'ın negatif girintisi flex satırında gerekmez. */
+.form-check-row.form-switch {
+    padding-left: 0;
+}
+
+    .form-check-row.form-switch .form-check-input {
+        margin-left: 0;
+    }
+
+/* Düğme grubu (SegmentedChoice): iki-üç seçenekli alan. Seçim renk dışında zemin, gölge ve kalın yazıyla da ayrılır. */
+.choice-group {
+    display: flex;
+    gap: 2px;
+    min-height: var(--mx-control-height);
+    padding: 2px;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-surface-control);
+}
+
+.choice-option {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+    .choice-option span {
+        display: grid;
+        place-items: center;
+        height: 100%;
+        padding: 0 var(--mx-space-2);
+        border-radius: 7px;
+        color: var(--mx-text-secondary);
+        font-size: var(--mx-fs-label);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .choice-option input:checked + span {
+        background: var(--mx-surface);
+        box-shadow: var(--mx-shadow-control);
+        color: var(--mx-tone-brand-fg);
+        font-weight: 700;
+    }
+
+    .choice-option input:focus-visible + span {
+        box-shadow: var(--mx-focus-ring);
+    }
+
+    .choice-option input:disabled + span {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+/* Etiket girişi (TagInput): form alanı gibi görünür, etiketler hap biçimindedir. */
+.tag-input {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-1);
+    min-height: var(--mx-control-height);
+    padding: 2px var(--mx-space-2);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-surface-hover);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+    .tag-input:focus-within {
+        border-color: var(--mx-brand-primary);
+        background: var(--mx-surface);
+        box-shadow: var(--mx-focus-ring);
+    }
+
+    .tag-input input {
+        flex: 1;
+        min-width: 6rem;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--mx-text-primary);
+        font-size: var(--mx-fs-label);
+    }
+
+        .tag-input input::placeholder {
+            color: var(--mx-text-secondary);
+            opacity: 0.85;
+        }
+
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px var(--mx-space-1) 1px var(--mx-space-2);
+    border-radius: var(--mx-radius-badge);
+    background: var(--mx-tone-brand-bg);
+    color: var(--mx-tone-brand-fg);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+}
+
+    .tag-chip button {
+        display: grid;
+        place-items: center;
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: inherit;
+        line-height: 1;
+    }
+
+        .tag-chip button:hover {
+            background: var(--mx-tone-info-bg);
+        }
+
+/* Erişilebilir, görünür klavye odağı (WCAG 2.2 — 2.4.7 / 2.4.11) */
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--mx-brand-primary);
+    outline-offset: 2px;
+}
+
+.content {
+    padding-top: var(--mx-space-6);
+    padding-bottom: var(--mx-space-8);
+}
+
+/* Blazor doğrulama durumları: renk dışında kenar kalınlığı ve ileti ile de belirtilir. */
+.valid.modified:not([type=checkbox]) {
+    border-color: var(--mx-success);
+}
+
+.invalid, .form-control.invalid, .form-select.invalid, [aria-invalid="true"] {
+    border-color: var(--mx-danger) !important;
+    box-shadow: inset 0 0 0 1px var(--mx-danger);
+}
+
+.form-control.invalid, .form-select.invalid,
+.form-control[aria-invalid="true"], .form-select[aria-invalid="true"] {
+    background-color: var(--mx-tone-danger-bg);
+}
+
+.validation-message, .invalid-feedback {
+    color: var(--mx-danger-text);
+    font-size: var(--mx-fs-helper);
+    margin-top: var(--mx-space-1);
+}
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }
+
+.blazor-error-boundary {
+    background: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNDkiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIG92ZXJmbG93PSJoaWRkZW4iPjxkZWZzPjxjbGlwUGF0aCBpZD0iY2xpcDAiPjxyZWN0IHg9IjIzNSIgeT0iNTEiIHdpZHRoPSI1NiIgaGVpZ2h0PSI0OSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMCkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0yMzUgLTUxKSI+PHBhdGggZD0iTTI2My41MDYgNTFDMjY0LjcxNyA1MSAyNjUuODEzIDUxLjQ4MzcgMjY2LjYwNiA1Mi4yNjU4TDI2Ny4wNTIgNTIuNzk4NyAyNjcuNTM5IDUzLjYyODMgMjkwLjE4NSA5Mi4xODMxIDI5MC41NDUgOTIuNzk1IDI5MC42NTYgOTIuOTk2QzI5MC44NzcgOTMuNTEzIDI5MSA5NC4wODE1IDI5MSA5NC42NzgyIDI5MSA5Ny4wNjUxIDI4OS4wMzggOTkgMjg2LjYxNyA5OUwyNDAuMzgzIDk5QzIzNy45NjMgOTkgMjM2IDk3LjA2NTEgMjM2IDk0LjY3ODIgMjM2IDk0LjM3OTkgMjM2LjAzMSA5NC4wODg2IDIzNi4wODkgOTMuODA3MkwyMzYuMzM4IDkzLjAxNjIgMjM2Ljg1OCA5Mi4xMzE0IDI1OS40NzMgNTMuNjI5NCAyNTkuOTYxIDUyLjc5ODUgMjYwLjQwNyA1Mi4yNjU4QzI2MS4yIDUxLjQ4MzcgMjYyLjI5NiA1MSAyNjMuNTA2IDUxWk0yNjMuNTg2IDY2LjAxODNDMjYwLjczNyA2Ni4wMTgzIDI1OS4zMTMgNjcuMTI0NSAyNTkuMzEzIDY5LjMzNyAyNTkuMzEzIDY5LjYxMDIgMjU5LjMzMiA2OS44NjA4IDI1OS4zNzEgNzAuMDg4N0wyNjEuNzk1IDg0LjAxNjEgMjY1LjM4IDg0LjAxNjEgMjY3LjgyMSA2OS43NDc1QzI2Ny44NiA2OS43MzA5IDI2Ny44NzkgNjkuNTg3NyAyNjcuODc5IDY5LjMxNzkgMjY3Ljg3OSA2Ny4xMTgyIDI2Ni40NDggNjYuMDE4MyAyNjMuNTg2IDY2LjAxODNaTTI2My41NzYgODYuMDU0N0MyNjEuMDQ5IDg2LjA1NDcgMjU5Ljc4NiA4Ny4zMDA1IDI1OS43ODYgODkuNzkyMSAyNTkuNzg2IDkyLjI4MzcgMjYxLjA0OSA5My41Mjk1IDI2My41NzYgOTMuNTI5NSAyNjYuMTE2IDkzLjUyOTUgMjY3LjM4NyA5Mi4yODM3IDI2Ny4zODcgODkuNzkyMSAyNjcuMzg3IDg3LjMwMDUgMjY2LjExNiA4Ni4wNTQ3IDI2My41NzYgODYuMDU0N1oiIGZpbGw9IiNGRkU1MDAiIGZpbGwtcnVsZT0iZXZlbm9kZCIvPjwvZz48L3N2Zz4=) no-repeat 1rem/1.8rem, #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+    .blazor-error-boundary::after {
+        content: "Bir hata oluştu."
+    }
+
+.loading-progress {
+    position: absolute;
+    display: block;
+    width: 8rem;
+    height: 8rem;
+    inset: 20vh 0 auto 0;
+    margin: 0 auto 0 auto;
+}
+
+    .loading-progress circle {
+        fill: none;
+        stroke: var(--mx-lilac);
+        stroke-width: 0.6rem;
+        transform-origin: 50% 50%;
+        transform: rotate(-90deg);
+    }
+
+        .loading-progress circle:last-child {
+            stroke: var(--mx-indigo);
+            stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
+            transition: stroke-dasharray 0.05s ease-in-out;
+        }
+
+.loading-progress-text {
+    position: absolute;
+    text-align: center;
+    font-weight: bold;
+    inset: calc(20vh + 3.25rem) 0 auto 0.2rem;
+}
+
+    .loading-progress-text:after {
+        content: var(--blazor-load-percentage-text, "Yükleniyor");
+    }
+
+code {
+    color: var(--mx-indigo);
+}
+
+.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+    color: var(--bs-secondary-color);
+    text-align: end;
+}
+
+.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+    text-align: start;
+}
+/* ---- Modulix ekranları (mobile-first; kırılımlar: 768 px tablet, 1200 px masaüstü) ---- */
+
+.btn, .form-control, .form-select {
+    min-height: var(--mx-control-height); /* bütün giriş alanları aynı yükseklikte */
+}
+
+/* Dokunmatik ekranda hedef 44px'e büyür. */
+.btn-sm {
+    --bs-btn-padding-y: 0.125rem;
+    --bs-btn-padding-x: 0.6rem;
+    min-height: 30px;
+}
+
+.btn-lg {
+    min-height: 44px; /* büyük düğme: dokunmatik hedef boyutu her cihazda */
+}
+
+@media (pointer: coarse) {
+    .btn, .form-control, .form-select {
+        min-height: 44px;
+    }
+
+    .btn-sm {
+        min-height: 36px;
+    }
+
+    .btn-icon {
+        width: 44px;
+    }
+}
+
+.narrow {
+    max-width: 26rem;
+    margin: 2rem auto;
+}

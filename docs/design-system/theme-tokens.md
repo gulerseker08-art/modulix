@@ -1,6 +1,6 @@
 # Tema tokenları
 
-Kaynak: `src/Modulix.Web/wwwroot/css/app.css` başındaki `:root, [data-theme="light"]` ve `[data-theme="dark"]` blokları. Bileşenler yalnızca bu adları kullanır.
+Kaynak: `src/Modulix.Web/wwwroot/css/tokens.css` içindeki `:root, [data-theme="light"]` ve `[data-theme="dark"]` blokları. Bileşenler yalnızca bu adları kullanır.
 
 ## Marka renkleri
 

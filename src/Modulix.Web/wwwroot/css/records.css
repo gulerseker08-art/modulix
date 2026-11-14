@@ -1,0 +1,590 @@
+/* Mükerrer önerisi paneli (ADR-0013). */
+.duplicate-box {
+    margin-top: 0.25rem;
+}
+
+/* ---- Pano: istatistik kartları ve grafikler ---- */
+
+.chart-c0 { stroke: var(--chart-c0); }
+.chart-c1 { stroke: var(--chart-c1); }
+.chart-c2 { stroke: var(--chart-c2); }
+.chart-c3 { stroke: var(--chart-c3); }
+.chart-c4 { stroke: var(--chart-c4); }
+.chart-c5 { stroke: var(--chart-c5); }
+.chart-bg-c0 { background: var(--chart-c0); }
+.chart-bg-c1 { background: var(--chart-c1); }
+.chart-bg-c2 { background: var(--chart-c2); }
+.chart-bg-c3 { background: var(--chart-c3); }
+.chart-bg-c4 { background: var(--chart-c4); }
+.chart-bg-c5 { background: var(--chart-c5); }
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1.1rem 1.25rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+    color: inherit;
+    text-decoration: none;
+}
+
+    .stat-card span {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--mx-muted);
+    }
+
+    .stat-card strong {
+        font-size: var(--mx-fs-kpi);
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+    }
+
+    .stat-card:hover {
+        border-color: rgba(var(--mx-indigo-rgb), 0.4);
+    }
+
+.chart-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.chart-grid > .today-panel {
+    margin: 0;
+}
+
+.chart-card {
+    padding: 1.25rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+}
+
+    .chart-card h2 {
+        margin: 0 0 1rem;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+.donut-chart {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+    .donut-chart svg {
+        width: 11rem;
+        max-width: 100%;
+    }
+
+.donut-track {
+    stroke: var(--mx-lilac);
+}
+
+.donut-total {
+    font-size: 6px;
+    font-weight: 700;
+    fill: var(--mx-ink);
+}
+
+.donut-caption {
+    font-size: 2.6px;
+    fill: var(--mx-muted);
+}
+
+.chart-legend {
+    flex: 1;
+    min-width: 10rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.875rem;
+}
+
+    .chart-legend li {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.3rem 0;
+        border-bottom: 1px solid var(--mx-border);
+    }
+
+        .chart-legend li:last-child {
+            border-bottom: 0;
+        }
+
+    .chart-legend strong {
+        margin-left: auto;
+    }
+
+.chart-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    flex: none;
+}
+
+.bar-row {
+    display: grid;
+    grid-template-columns: 7rem 1fr 2.5rem;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.35rem 0;
+    font-size: 0.875rem;
+}
+
+.bar-track {
+    height: 0.65rem;
+    border-radius: 999px;
+    background: var(--mx-lilac);
+    overflow: hidden;
+}
+
+.bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+}
+
+.bar-value {
+    text-align: right;
+}
+
+@media (min-width: 768px) {
+    .stat-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .chart-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* ---- Açılır alt bölümler (adresler, telefon ve e-posta) ---- */
+.sub-section {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow);
+    overflow: hidden;
+}
+
+    /* Bölüm kartının içindeki alt bölüm ikinci bir kart çizmez (kart içinde kart yok): çerçeve ve gölge kalkar,
+       kardeş alt bölümler ince çizgiyle ayrılır. Satır menüsü taşabilsin diye kırpılmaz. */
+    .section-card-body > .sub-section {
+        margin-bottom: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible;
+    }
+
+        .section-card-body > .sub-section + .sub-section {
+            margin-top: var(--mx-space-2);
+            padding-top: var(--mx-space-2);
+            border-top: 1px solid var(--mx-border);
+        }
+
+    .sub-section > .section-header {
+        margin: 0;
+        padding: 0.35rem 0.75rem 0.35rem 0;
+    }
+
+        .sub-section > .section-header h3 {
+            flex: 1;
+            min-width: 0;
+            margin: 0;
+            font-size: 1rem;
+        }
+
+.section-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem 0.5rem 1rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+
+    .section-toggle:hover .section-title {
+        color: var(--mx-indigo);
+    }
+
+    .section-toggle:focus-visible {
+        outline: 2px solid var(--mx-indigo);
+        outline-offset: -2px;
+    }
+
+.section-icon {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.65rem;
+    background: var(--mx-lilac);
+    color: var(--mx-indigo);
+}
+
+.section-title {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.count-pill {
+    padding: 0.1rem 0.6rem;
+    border-radius: 999px;
+    background: var(--mx-lilac);
+    color: var(--mx-indigo);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.section-chevron {
+    display: inline-grid;
+    margin-left: auto;
+    color: var(--mx-muted);
+    transition: transform 0.2s;
+}
+
+.sub-section.closed .section-chevron {
+    transform: rotate(-90deg);
+}
+
+.section-body {
+    padding: 0.75rem 1rem 1rem;
+    border-top: 1px solid var(--mx-border);
+}
+
+    .section-body .item-list {
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+        .section-body .item-list li {
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+/* Pano kartlarındaki simge kutusu */
+.stat-card .stat-icon {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-bottom: 0.4rem;
+    border-radius: var(--mx-radius-button);
+    background: var(--mx-tone-brand-bg);
+    color: var(--mx-tone-brand-fg);
+}
+
+/* ---- Aktivite takvimi (ADR-0015) ---- */
+
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--mx-border);
+    border: 1px solid var(--mx-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+    .cal-grid.cal-day {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+.cal-weekday {
+    padding: 0.35rem;
+    background: var(--mx-surface);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.cal-cell {
+    min-height: 6.5rem;
+    padding: 0.25rem;
+    background: var(--mx-surface);
+}
+
+    .cal-cell:focus-visible {
+        outline: 2px solid var(--mx-indigo);
+        outline-offset: -2px;
+    }
+
+    .cal-cell.today {
+        background: var(--mx-lilac);
+    }
+
+    .cal-cell.outside {
+        opacity: 0.55;
+    }
+
+.cal-date {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.cal-day-link {
+    min-width: 28px;
+    min-height: 28px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--mx-ink);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+    .cal-day-link:hover {
+        background: var(--mx-lilac);
+    }
+
+.cal-item {
+    margin-top: 2px;
+    border-radius: 0.35rem;
+    background: var(--mx-lilac);
+}
+
+    .cal-item.done {
+        opacity: 0.6;
+        text-decoration: line-through;
+    }
+
+    .cal-item.overdue {
+        background: var(--mx-tone-danger-bg);
+    }
+
+    .cal-item.busy {
+        background: repeating-linear-gradient(45deg, var(--mx-border), var(--mx-border) 4px, var(--mx-surface) 4px, var(--mx-surface) 8px);
+    }
+
+.cal-entry {
+    display: block;
+    width: 100%;
+    min-height: 28px;
+    padding: 0.15rem 0.35rem;
+    border: 0;
+    background: transparent;
+    color: var(--mx-ink);
+    font-size: 0.78rem;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cal-agenda-day h3 {
+    margin: 1rem 0 0.25rem;
+    font-size: 1rem;
+}
+
+.chip-group {
+    display: inline-flex;
+    gap: 2px;
+}
+
+@media (max-width: 720px) {
+    .cal-grid.cal-month, .cal-grid.cal-week {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cal-weekday {
+        display: none;
+    }
+
+    .cal-cell {
+        min-height: 3rem;
+    }
+}
+
+/* Ortak lookup bileşeni (ADR-0016) */
+.lookup { position: relative; }
+.lookup-field { position: relative; display: flex; align-items: center; gap: .25rem; }
+.lookup-field .form-control { flex: 1; min-width: 0; min-height: var(--mx-control-height); padding-right: 2.25rem; }
+.lookup-field .form-control[readonly]:not(:disabled) { cursor: pointer; background-color: var(--mx-surface-hover); }
+@media (pointer: coarse) { .lookup-field .form-control { min-height: 44px; } }
+.lookup-clear { position: absolute; right: .35rem; width: 2rem; height: 2rem; border: 0; background: transparent; font-size: 1.25rem; line-height: 1; color: var(--mx-text-secondary); border-radius: .25rem; }
+.lookup-clear:hover, .lookup-clear:focus-visible { background: var(--mx-surface-muted); outline: 2px solid var(--mx-brand-primary); }
+.lookup-view { white-space: nowrap; font-size: .875rem; padding: .5rem; }
+.lookup-list { position: absolute; z-index: 1050; left: 0; right: 0; margin: .15rem 0 0; padding: .25rem 0; list-style: none; max-height: 18rem; overflow-y: auto; background: var(--bs-body-bg); border: 1px solid var(--mx-border); border-radius: .5rem; box-shadow: var(--mx-shadow-popover); }
+.lookup-list[hidden] { display: none; }
+.lookup-option { padding: .6rem .75rem; min-height: 2.75rem; cursor: pointer; }
+.lookup-option:hover, .lookup-option.is-active { background: rgba(var(--mx-brand-primary-rgb), .12); }
+.lookup-option[aria-selected="true"] { font-weight: 600; }
+.lookup-note { padding: .5rem .75rem; font-size: .875rem; }
+@media (max-width: 576px) { .lookup-list { position: fixed; left: .5rem; right: .5rem; bottom: .5rem; top: auto; max-height: 55vh; } }
+
+/* Teklif ekranları (ADR-0019) */
+.quote-totals,
+section[aria-labelledby] {
+    margin-top: 1.5rem;
+}
+
+section[aria-labelledby] > h2 {
+    font-size: 1.15rem;
+    margin-bottom: .75rem;
+}
+
+.summary-list {
+    max-width: 34rem;
+    margin: 0 0 .5rem;
+    border: 1px solid var(--mx-border);
+    border-radius: .5rem;
+    background: var(--mx-surface);
+}
+
+    .summary-list > div {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: .5rem .85rem;
+        border-bottom: 1px solid var(--mx-border);
+    }
+
+    .summary-list > div:last-child {
+        border-bottom: 0;
+    }
+
+    .summary-list dt {
+        font-weight: 400;
+    }
+
+    .summary-list dd {
+        margin: 0;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+.timeline {
+    padding-left: 1.25rem;
+}
+
+    .timeline li {
+        margin-bottom: .5rem;
+    }
+
+.action-reasons {
+    margin-top: .75rem;
+    padding-left: 1.1rem;
+}
+
+/* Teklif paylaşımı ve oturumsuz müşteri sayfası (ADR-0019, dilim 3) */
+.quote-sharing .share-url {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-top: .5rem;
+}
+
+.quote-sharing .share-url input {
+    flex: 1 1 18rem;
+    min-width: 0;
+}
+
+.public-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--mx-surface);
+}
+
+.public-content {
+    flex: 1;
+    width: 100%;
+    max-width: 56rem;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 3rem;
+}
+
+.public-footer {
+    text-align: center;
+    font-size: .8rem;
+    padding: 1rem;
+}
+
+.public-quote-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.public-seller {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-bottom: .25rem;
+}
+
+.public-totals {
+    max-width: 22rem;
+    margin-left: auto;
+}
+
+.public-totals .total dt,
+.public-totals .total dd {
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+
+.public-decision {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--mx-border);
+}
+
+.preline {
+    white-space: pre-line;
+}
+
+/* Revizyon karşılaştırma ve onay gerekçesi (ADR-0019, dilim 4) */
+.compare-lines {
+    list-style: none;
+    padding-left: 0;
+}
+
+.compare-line {
+    padding: .5rem .75rem;
+    margin-bottom: .5rem;
+    border-left: 4px solid var(--mx-border-strong);
+    background: var(--mx-surface-hover);
+}
+
+.compare-line > ul {
+    margin: .25rem 0 0;
+}
+
+.compare-unchanged {
+    opacity: .7;
+}
+
+.approval-reasons {
+    margin-bottom: .5rem;
+}
