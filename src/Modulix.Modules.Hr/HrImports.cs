@@ -3,9 +3,10 @@ using Modulix.Core.Contracts.Modules;
 namespace Modulix.Modules.Hr;
 
 /// <summary>
-/// İK'nın içe aktarma tanımları (ADR-0033; ADR-0042 bölüm 19). Sütunlar elle girilebilen alanlardır; durum ve zimmet gibi iş akışı alanları dışarıdadır
-/// (yeni demirbaş depoda başlar). İzin hakkı çalışana sicil numarasıyla bağlanır: önce çalışan kartları (formdan), sonra haklar yüklenir. Çalışan kartının
-/// toplu içe aktarılması kişi kaydını da açmayı gerektirdiğinden Core kararına bırakıldı (bölüm 19).
+/// İK'nın içe aktarma tanımları (ADR-0033; ADR-0042 bölüm 19 ve 21). Sütunlar elle girilebilen alanlardır; zimmet gibi iş akışı alanları dışarıdadır
+/// (yeni demirbaş depoda başlar). Sıra: önce kişiler (Core, <c>core.people.import</c>), sonra çalışan kartları (kişi e-postayla, yönetici sicil numarasıyla
+/// bağlanır; yöneticiler dosyada astlarından önce gelmelidir; departman Core departmanının adı ya da ağaç yoludur, bölüm 22), sonra izin hakları
+/// (sicil numarasıyla).
 /// </summary>
 internal static class HrImports
 {
@@ -13,6 +14,43 @@ internal static class HrImports
 
     public static IReadOnlyList<ImportDefinition> All { get; } =
     [
+        new(HrModule.Entities.Employee, "Çalışan kartı", HrModule.Permissions.EmployeesWrite,
+        [
+            new("personId", "Kişi e-postası", ImportFieldType.Reference, Required: true) { Reference = new("core.person", ["email"]) },
+            new("employeeNumber", "Sicil no"),
+            new("hireDate", "İşe giriş tarihi", ImportFieldType.Date, Required: true),
+            new("jobTitle", "Unvan"),
+            new("businessUnitName", "Departman"),
+            new("managerEmployeeId", "Yönetici sicil no", ImportFieldType.Reference) { Reference = EmployeeByNumber },
+            new("employmentType", "Çalışma şekli", ImportFieldType.Choice)
+            {
+                Options =
+                [
+                    new(Domain.Employee.EmploymentTypes.FullTime, "Tam zamanlı"), new(Domain.Employee.EmploymentTypes.PartTime, "Yarı zamanlı"),
+                    new(Domain.Employee.EmploymentTypes.FixedTerm, "Belirli süreli"), new(Domain.Employee.EmploymentTypes.Intern, "Stajyer"),
+                ],
+            },
+            new("workLocation", "Çalışma yeri"),
+            new("userId", "Kullanıcı hesabı", ImportFieldType.User),
+            new("status", "Durum", ImportFieldType.Choice)
+            {
+                Options =
+                [
+                    new(Domain.Employee.Statuses.Active, "Çalışıyor"), new(Domain.Employee.Statuses.OnLeave, "İzinde"),
+                    new(Domain.Employee.Statuses.Terminated, "Ayrıldı"),
+                ],
+            },
+            new("terminationDate", "Ayrılış tarihi", ImportFieldType.Date),
+
+            // Özlük alanları hassastır: içe aktarıcının özlük izni yoksa dolu hücre satır hatası olur (kayıt boru hattı reddeder).
+            new("nationalId", "T.C. kimlik no"),
+            new("birthDate", "Doğum tarihi", ImportFieldType.Date),
+            new("iban", "IBAN"),
+            new("notes", "Notlar"),
+        ])
+        {
+            MatchRules = [new("employeeNumber", null, Exact: true), new("personId", null, Exact: true)],
+        },
         new(HrModule.Entities.Asset, "Demirbaş", HrModule.Permissions.AssetsManage,
         [
             new("assetTag", "Envanter no", Required: true),

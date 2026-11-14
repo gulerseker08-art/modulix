@@ -51,16 +51,19 @@
                     </div>
                     <small class="text-muted">Sonuçlarda kimin ne yanıtladığı gösterilmez; en az @MinAnonymousResponses yanıt gelince özet görünür. Kaydettikten sonra değişmez.</small>
                     break;
-                case "audienceDepartmentKey":
+                case "audienceBusinessUnitId":
                     <label class="@f.LabelClass()" for="survey-audience">@f.Label</label>
-                    <select id="survey-audience" class="form-select" @bind="form.AudienceDepartmentKey">
-                        <option value="">Bütün çalışanlar</option>
-                        @foreach (var department in Lookups.Choices(HrAccess.DepartmentList, form.AudienceDepartmentKey))
-                        {
-                            <option value="@department.Key">@department.Label</option>
-                        }
-                    </select>
-                    <FieldError Field="audienceDepartmentKey" Errors="errors" />
+                    <HrBusinessUnitSelect Id="survey-audience" EmptyLabel="Bütün çalışanlar" Value="form.AudienceBusinessUnitId" ValueChanged="AudienceChanged"
+                                          Invalid="@(errors?.ContainsKey("audienceBusinessUnitId") == true)" />
+                    <FieldError Field="audienceBusinessUnitId" Errors="errors" />
+                    @if (!form.AudienceTouched && form.AudienceBusinessUnitId is null && form.LegacyAudience is { Length: > 0 } legacy)
+                    {
+                        <small class="text-muted">Eski İK departmanına hedefli: @Lookups.Label(HrAccess.DepartmentList, legacy). Departman seçilince Core departmanına geçer.</small>
+                    }
+                    else
+                    {
+                        <small class="text-muted">Alt departmanlardakiler de dahildir.</small>
+                    }
                     break;
                 case "closesOn":
                     <label class="@f.LabelClass()" for="survey-closes">@f.Label</label>
@@ -101,12 +104,29 @@
             ? new SurveyForm
             {
                 Id = s.Id, Version = s.Version, Title = WarehouseLabels.Text(s, "title"), Description = WarehouseLabels.Text(s, "description"),
-                IsAnonymous = WarehouseLabels.Flag(s, "isAnonymous"), AudienceDepartmentKey = WarehouseLabels.Text(s, "audienceDepartmentKey"),
+                IsAnonymous = WarehouseLabels.Flag(s, "isAnonymous"), AudienceBusinessUnitId = WarehouseLabels.Id(s, "audienceBusinessUnitId"),
+                LegacyAudience = WarehouseLabels.Text(s, "audienceDepartmentKey"),
                 ClosesOn = FleetLabels.Day(WarehouseLabels.Text(s, "closesOn")), Custom = s.Values["custom"]?.DeepClone().AsObject() ?? [],
             }
             : new SurveyForm();
         layout = await Layouts.ForAsync(EntityKey);
         layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+    }
+
+    // Hedef Core departmanıdır (bölüm 22). Eski İK departman hedefi olan kayıtta hedef değiştirilmedikçe alan gönderilmez (sunucu eski hedefi korur).
+    private void AddAudience(JsonObject values)
+    {
+        if (form.AudienceTouched || string.IsNullOrEmpty(form.LegacyAudience))
+        {
+            values["audienceBusinessUnitId"] = form.AudienceBusinessUnitId?.ToString();
+        }
+    }
+
+    private void AudienceChanged(Guid? unit)
+    {
+        form.AudienceBusinessUnitId = unit;
+        form.AudienceTouched = true;
+        dirty = true;
     }
 
     private async Task SaveAsync()
@@ -118,7 +138,6 @@
         {
             ["title"] = string.IsNullOrWhiteSpace(form.Title) ? null : form.Title.Trim(),
             ["description"] = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim(),
-            ["audienceDepartmentKey"] = string.IsNullOrEmpty(form.AudienceDepartmentKey) ? null : form.AudienceDepartmentKey,
             ["closesOn"] = form.ClosesOn?.ToString("yyyy-MM-dd"),
             ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
         };
@@ -127,6 +146,7 @@
             values["isAnonymous"] = form.IsAnonymous;
         }
 
+        AddAudience(values);
         var request = new RecordWriteRequest(values, form.Version);
         var url = "/api/records/" + EntityKey;
         var result = form.Id is { } id ? await Api.PutAsync<RecordResponse>($"{url}/{id}", request) : await Api.PostAsync<RecordResponse>(url, request);
@@ -157,7 +177,12 @@
 
         public bool IsAnonymous { get; set; }
 
-        public string? AudienceDepartmentKey { get; set; }
+        public Guid? AudienceBusinessUnitId { get; set; }
+
+        /// <summary>Eski İK departman hedefi (Core'a eşlenmemiş kayıtta); hedef değiştirilmedikçe korunur.</summary>
+        public string? LegacyAudience { get; init; }
+
+        public bool AudienceTouched { get; set; }
 
         public DateOnly? ClosesOn { get; set; }
     }

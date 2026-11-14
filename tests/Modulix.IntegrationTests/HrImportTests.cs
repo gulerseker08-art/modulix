@@ -25,7 +25,10 @@ public class HrImportTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
     private const string Balances = "hr.leave-balance";
     private const string Holidays = "hr.holiday";
 
-    private static readonly string[] Importer = [RunImports, EmployeesRead, AssetsRead, AssetsManage, LeavesRead, LeavesManage];
+    private const string People = "core.person";
+    private const string EmployeeCards = "hr.employee";
+
+    private static readonly string[] Importer = [RunImports, ImportPeople, EmployeesRead, EmployeesWrite, AssetsRead, AssetsManage, LeavesRead, LeavesManage];
 
     [Fact]
     public async Task Assets_leave_balances_and_holidays_are_imported_and_balances_link_to_employees_by_number()
@@ -91,6 +94,66 @@ public class HrImportTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         Assert.DoesNotContain(definitions, d => d.EntityKey == Assets);
         Assert.Contains(definitions, d => d.EntityKey == Balances);
         Assert.NotEqual(HttpStatusCode.Accepted, (await PostAsync(clerkClient, "/api/imports", Assets, "Envanter no;Ad\r\nX;Y\r\n")).StatusCode);
+    }
+
+    [Fact]
+    public async Task People_then_employee_cards_are_imported_linking_people_by_email_and_managers_by_employee_number()
+    {
+        var s = await SetUpAsync();
+        var people = await RunAsync(s.Client, People, "Ad;Soyad;E-posta\r\nAyşe;Yılmaz;ayse@ornek.test\r\nBurak;Demir;burak@ornek.test\r\nCem;Kaya;cem@ornek.test\r\n");
+        Assert.Equal(("Succeeded", 3), (people.Run.Status, people.Run.CreatedCount));
+
+        // Departman Core departmanının adı ya da ağaç yoludur (bölüm 22); bulunamayan departman satır hatasıdır.
+        using var admin = await AdminAsync(s.Tenant);
+        var management = await HrDepartments.CreateAsync(admin, "Yönetim");
+        var office = await HrDepartments.CreateAsync(admin, "Merkez ofis");
+        var finance = await HrDepartments.CreateAsync(admin, "Finans ve Muhasebe", office);
+
+        // Yönetici dosyada astından önce gelir: satırlar sırayla yazıldığı için sonraki satır onu sicil numarasıyla bulur.
+        var cards = await RunAsync(s.Client, EmployeeCards, "Kişi e-postası;Sicil no;İşe giriş tarihi;Unvan;Departman;Yönetici sicil no;Çalışma şekli\r\n"
+            + "ayse@ornek.test;y-1;01.02.2020;Genel müdür;yönetim;;Tam zamanlı\r\nburak@ornek.test;y-2;01.03.2021;Uzman;Merkez ofis / Finans ve Muhasebe;Y-1;Yarı zamanlı\r\n"
+            + "cem@ornek.test;y-3;01.03.2021;Uzman;Olmayan Departman;;Tam zamanlı\r\n");
+        Assert.Equal(("PartiallySucceeded", 2, 1), (cards.Run.Status, cards.Run.CreatedCount, cards.Run.FailedCount));
+        Assert.Contains(cards.Issues.Items, i => i.ColumnKey == "businessUnitName");
+
+        var employees = (await s.Client.GetFromJsonAsync<RecordPageResponse>("/api/records/hr.employee?pageSize=50"))!.Items;
+        var ayse = Assert.Single(employees, e => Text(e, "employeeNumber") == "Y-1");
+        var burak = Assert.Single(employees, e => Text(e, "employeeNumber") == "Y-2");
+        Assert.Equal(("Burak Demir", ayse.Id.ToString(), finance.ToString(), "partTime"),
+            (Text(burak, "fullName"), Text(burak, "managerEmployeeId"), Text(burak, "businessUnitId"), Text(burak, "employmentType")));
+        Assert.Equal(management.ToString(), Text(ayse, "businessUnitId"));
+
+        // Görev geçmişi içe aktarmada da açılır (bölüm 20).
+        var period = Assert.Single((await s.Client.GetFromJsonAsync<RecordPageResponse>($"/api/records/hr.employee-position?employeeId={burak.Id}"))!.Items);
+        Assert.Equal(("2021-03-01", "Uzman"), (Text(period, "startDate"), Text(period, "jobTitle")));
+    }
+
+    [Fact]
+    public async Task Unknown_emails_and_second_cards_for_a_person_fail_and_people_import_needs_its_own_permission()
+    {
+        var s = await SetUpAsync();
+        await RunAsync(s.Client, People, "Ad;Soyad;E-posta\r\nCem;Kaya;cem@ornek.test\r\n");
+
+        var cards = await RunAsync(s.Client, EmployeeCards, "Kişi e-postası;İşe giriş tarihi\r\nyok@ornek.test;01.01.2022\r\ncem@ornek.test;01.01.2022\r\ncem@ornek.test;01.02.2022\r\n");
+        Assert.Equal((1, 2), (cards.Run.CreatedCount, cards.Run.FailedCount));
+        Assert.Contains(cards.Issues.Items, i => i is { RowNo: 2, ColumnKey: "personId", Code: "lookup-unresolved" });
+        Assert.Contains(cards.Issues.Items, i => i.RowNo == 4 && i.Severity == "Error"); // aynı kişiye ikinci kart
+
+        // Aynı e-postalı kişi olası mükerrerdir: kişi oluşur, uyarı yazılır (birleştirilmez).
+        var again = await RunAsync(s.Client, People, "Ad;Soyad;E-posta\r\nCem;Kaya;cem@ornek.test\r\n");
+        Assert.Equal(1, again.Run.CreatedCount);
+        Assert.Contains(again.Issues.Items, i => i.Severity == "Warning");
+
+        // Kişi içe aktarma izni olmayan kullanıcı kişi türünü görmez ve yükleyemez; başka firmanın kişisi e-postayla bulunmaz.
+        var clerk = await factory.CreateUserAsync(s.Tenant);
+        await factory.CreateRoleAsync(s.Tenant.Id, [RunImports, EmployeesRead, EmployeesWrite], Scope.All, clerk);
+        using var clerkClient = await LoginAsync(clerk);
+        Assert.DoesNotContain((await clerkClient.GetFromJsonAsync<List<ImportDefinitionDto>>("/api/imports/definitions"))!, d => d.EntityKey == People);
+        Assert.NotEqual(HttpStatusCode.Accepted, (await PostAsync(clerkClient, "/api/imports", People, "Ad;Soyad\r\nX;Y\r\n")).StatusCode);
+
+        var other = await SetUpAsync();
+        var crossTenant = await RunAsync(other.Client, EmployeeCards, "Kişi e-postası;İşe giriş tarihi\r\ncem@ornek.test;01.01.2022\r\n");
+        Assert.Contains(crossTenant.Issues.Items, i => i is { ColumnKey: "personId", Code: "lookup-unresolved" });
     }
 
     // --- yardımcılar ---

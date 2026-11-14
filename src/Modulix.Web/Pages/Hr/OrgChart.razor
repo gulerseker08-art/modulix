@@ -7,7 +7,7 @@
 
 @* Organizasyon şeması (ADR-0042 dilim 1): ayrılmamış çalışanların yönetici bağından çizilen ağaç. Yöneticisi olmayan (ya da yöneticisi
    ayrılmış) çalışan köktür. Döngü sunucuda engellenir; yine de ziyaret edilen düğüm ikinci kez çizilmez. Departman süzgeci ağacı daraltmaz,
-   yalnızca o departmandaki kişileri vurgular (yönetim zinciri bozulmasın diye). *@
+   yalnızca o departmandaki (alt departmanlar dahil; departmanlar Core'dan, bölüm 22) kişileri vurgular (yönetim zinciri bozulmasın diye). *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.EmployeesRead">
     <PageHeader Title="Organizasyon şeması" Icon="layers" Subtitle="@(employees is null ? "Yönetici bağlarına göre kurum yapısı." : $"{employees.Count} çalışan · {roots.Count} üst düzey")" />
 
@@ -17,13 +17,9 @@
     }
 
     <div class="list-toolbar">
-        <select class="form-select w-auto" aria-label="Vurgulanacak departman" @bind="departmentKey">
-            <option value="">Departman vurgusu yok</option>
-            @foreach (var department in Lookups.ValuesOf(HrAccess.DepartmentList))
-            {
-                <option value="@department.Key">@department.Label</option>
-            }
-        </select>
+        <div class="w-auto">
+            <HrBusinessUnitSelect AriaLabel="Vurgulanacak departman" EmptyLabel="Departman vurgusu yok" Value="highlightUnit" ValueChanged="Highlight" Loaded="u => units = u" />
+        </div>
     </div>
 
     @if (employees is null)
@@ -32,7 +28,7 @@
     }
     else if (employees.Count == 0)
     {
-        <EmptyState Compact="true" Title="Henüz çalışan kartı yok." />
+        <EmptyState Icon="layers" Title="Henüz çalışan kartı yok." Text="Şema, çalışan kartlarındaki yönetici bağlarından çizilir." />
     }
     else
     {
@@ -59,7 +55,9 @@
     private ILookup<Guid, RecordResponse> reports = Enumerable.Empty<RecordResponse>().ToLookup(_ => Guid.Empty);
     private HashSet<Guid> drawn = [];
     private string? message;
-    private string? departmentKey;
+    private IReadOnlyList<HrBusinessUnitDto> units = [];
+    private Guid? highlightUnit;
+    private HashSet<Guid> highlighted = [];
     private bool truncated;
 
     protected override async Task OnInitializedAsync()
@@ -110,14 +108,14 @@
         }
 
         var children = reports[employee.Id].OrderBy(HrLabels.Name).ToList();
-        var department = WarehouseLabels.Text(employee, "departmentKey");
-        var highlighted = !string.IsNullOrEmpty(departmentKey) && department == departmentKey;
+        var department = WarehouseLabels.Text(employee, "businessUnitName");
+        var active = WarehouseLabels.Id(employee, "businessUnitId") is { } unit && highlighted.Contains(unit);
         <li role="treeitem" aria-level="@level" aria-expanded="@(children.Count > 0 ? "true" : null)">
-            <div class="org-node @(highlighted ? "active" : null)">
+            <div class="org-node @(active ? "active" : null)">
                 <span class="avatar avatar-tone-@(Math.Abs(employee.Id.GetHashCode()) % 5)" aria-hidden="true">@HrLabels.Initials(employee)</span>
                 <span>
                     <strong>@HrLabels.Name(employee)</strong>
-                    <small>@(string.IsNullOrWhiteSpace(WarehouseLabels.Text(employee, "jobTitle")) ? "Unvan girilmedi" : WarehouseLabels.Text(employee, "jobTitle"))@(department.Length > 0 ? $" · {Lookups.Label(HrAccess.DepartmentList, department)}" : "")@(children.Count > 0 ? $" · {children.Count} kişi bağlı" : "")</small>
+                    <small>@(string.IsNullOrWhiteSpace(WarehouseLabels.Text(employee, "jobTitle")) ? "Unvan girilmedi" : WarehouseLabels.Text(employee, "jobTitle"))@(department.Length > 0 ? $" · {department}" : "")@(children.Count > 0 ? $" · {children.Count} kişi bağlı" : "")</small>
                 </span>
             </div>
             @if (children.Count > 0)
@@ -131,4 +129,21 @@
             }
         </li>
     };
+
+    /// <summary>Seçilen departman ve bütün alt departmanları vurgulanır.</summary>
+    private void Highlight(Guid? unit)
+    {
+        highlightUnit = unit;
+        highlighted = unit is { } root ? [root] : [];
+        bool added;
+        do
+        {
+            added = false;
+            foreach (var child in units.Where(u => u.ParentId is { } parent && highlighted.Contains(parent)))
+            {
+                added |= highlighted.Add(child.Id);
+            }
+        }
+        while (added);
+    }
 }

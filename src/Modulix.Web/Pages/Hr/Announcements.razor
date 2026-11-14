@@ -48,7 +48,7 @@
                         }
                     </div>
                     <p class="text-muted mb-2">
-                        @HrLabels.Date(WarehouseLabels.Text(announcement, "publishOn"))@(WarehouseLabels.Text(announcement, "audienceDepartmentKey") is { Length: > 0 } dep ? $" · {Lookups.Label(HrAccess.DepartmentList, dep)}" : "")
+                        @HrLabels.Date(WarehouseLabels.Text(announcement, "publishOn"))@(HrLabels.Audience(announcement, Lookups) is var audience && audience != HrLabels.Everyone ? $" · {audience}" : "")
                     </p>
                     @if (open)
                     {

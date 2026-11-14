@@ -88,6 +88,7 @@ public static class PersistenceSetup
 
         services.AddScoped<IMembershipDirectory, MembershipDirectory>();
         services.AddScoped<ITenantMembers, TenantMembers>();
+        services.AddScoped<IBusinessUnitDirectory, Organization.BusinessUnitDirectory>();
         services.AddScoped<ITenantDataTransfer, TenantDataTransfer>();
         services.AddScoped<IModuleData, ModuleData>();
         services.AddScoped<ITransactionLock, SqlTransactionLock>();

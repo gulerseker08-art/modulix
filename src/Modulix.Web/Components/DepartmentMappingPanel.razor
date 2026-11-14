@@ -1,0 +1,109 @@
+@* Eski İK departmanlarının Core departmanına eşlenmesi (ADR-0042 bölüm 22). Yalnızca henüz Core departmanı olmayan çalışan kartı, duyuru ya da anket
+   varsa görünür. Değer, Yönetim › Departmanlar'da aynı adlı (ya da aynı ağaç yollu) tek bir etkin departmanla eşleşir; eşleşmeyen satır için o adla
+   departman açılıp sayfa yenilenir. Uygulama kayıt boru hattından geçer (denetim kaydı); hesabı bağlı çalışan kullanıcının departmanını alır. *@
+@inject ApiClient Api
+@inject ToastService Toasts
+
+@if (rows is { Count: > 0 } && rows.Any(Pending))
+{
+    <section class="settings-group" aria-label="Departman eşleme">
+        <h3>Departmanlar Core'a taşınıyor</h3>
+        <p class="text-muted">
+            Departmanlar artık Yönetim › Departmanlar ağacından seçilir. Aşağıdaki eski İK departmanları aynı adlı Core departmanına eşlenir;
+            kullanıcı hesabı bağlı çalışanlar kullanıcının departmanını alır.
+        </p>
+
+        @if (message is not null)
+        {
+            <div class="alert alert-danger" role="alert">@message</div>
+        }
+
+        <table class="table record-table">
+            <caption class="visually-hidden">Departman eşleme önizlemesi</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> Eski departman</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="building" Size="14" /> Core departmanı</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="users" Size="14" /> Çalışan</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="bell" Size="14" /> Duyuru</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="clipboard-list" Size="14" /> Anket</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in rows.Where(Pending))
+                {
+                    <tr>
+                        <td data-label="Eski departman" class="primary">@row.Label</td>
+                        <td data-label="Core departmanı">
+                            @if (row.BusinessUnitName is { } unit)
+                            {
+                                @unit
+                            }
+                            else
+                            {
+                                <span class="badge stage-negotiation">Eşleşmedi</span>
+                            }
+                        </td>
+                        <td data-label="Çalışan">@row.EmployeeCount</td>
+                        <td data-label="Duyuru">@row.AnnouncementCount</td>
+                        <td data-label="Anket">@row.SurveyCount</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        @if (rows.Any(r => Pending(r) && r.BusinessUnitId is null))
+        {
+            <p class="text-muted">Eşleşmeyen değer için Yönetim › Departmanlar'da aynı adla departman açın (ya da birden çok departman aynı adı taşıyorsa adlardan birini değiştirin) ve sayfayı yenileyin.</p>
+        }
+
+        @if (rows.Any(r => Pending(r) && r.BusinessUnitId is not null))
+        {
+            <div class="form-actions">
+                <button type="button" class="btn btn-tonal" disabled="@busy" aria-busy="@(busy ? "true" : null)" @onclick="ApplyAsync">
+                    @if (busy)
+                    {
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                    }
+                    Eşleşenleri uygula
+                </button>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private List<DepartmentMappingRowDto>? rows;
+    private string? message;
+    private bool busy;
+
+    /// <summary>Uygulamadan sonra liste yeniden yüklenir.</summary>
+    [Parameter] public EventCallback Applied { get; set; }
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private static bool Pending(DepartmentMappingRowDto row) => row.EmployeeCount + row.AnnouncementCount + row.SurveyCount > 0;
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<DepartmentMappingRowDto>>("/api/hr/department-mapping");
+        rows = result.Value;
+    }
+
+    private async Task ApplyAsync()
+    {
+        busy = true;
+        message = null;
+        var result = await Api.PostAsync<DepartmentMappingResultDto>("/api/hr/department-mapping", new { });
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        Toasts.Success($"{result.Value!.Updated} kayıt Core departmanına taşındı.");
+        await LoadAsync();
+        await Applied.InvokeAsync();
+    }
+}

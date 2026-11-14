@@ -53,7 +53,7 @@
                 </div>
                 <h3 class="summary-heading">Çalışan özeti</h3>
                 <dl class="summary-facts">
-                    <div><dt>Departman</dt><dd>@(string.IsNullOrEmpty(form.DepartmentKey) ? "—" : Lookups.Label(HrAccess.DepartmentList, form.DepartmentKey))</dd></div>
+                    <div><dt>Departman</dt><dd>@(UnitName ?? "—")</dd></div>
                     <div><dt>İşe giriş</dt><dd>@(form.HireDate is { } hired ? FleetLabels.Date(hired) : "—")</dd></div>
                     <div><dt>Kıdem</dt><dd>@Seniority</dd></div>
                     <div><dt>Durum</dt><dd>@HrLabels.Status(form.Status)</dd></div>
@@ -150,16 +150,23 @@
                             <input id="employee-title" class="form-control" maxlength="150" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.JobTitle" />
                             <FieldError Field="jobTitle" Errors="errors" />
                             break;
-                        case "departmentKey":
+                        case "businessUnitId":
                             <label class="@f.LabelClass()" for="employee-department">@f.Label</label>
-                            <select id="employee-department" class="form-select" @bind="form.DepartmentKey">
-                                <option value="">Seçilmedi</option>
-                                @foreach (var department in Lookups.Choices(HrAccess.DepartmentList, form.DepartmentKey))
-                                {
-                                    <option value="@department.Key">@department.Label</option>
-                                }
-                            </select>
-                            <FieldError Field="departmentKey" Errors="errors" />
+                            <HrBusinessUnitSelect Id="employee-department" Value="form.BusinessUnitId" ValueChanged="UnitChanged" Loaded="u => units = u"
+                                                  Disabled="UnitFromAccount" Invalid="@(errors?.ContainsKey("businessUnitId") == true)" />
+                            <FieldError Field="businessUnitId" Errors="errors" />
+                            @if (UnitFromAccount)
+                            {
+                                <small class="text-muted">Kullanıcı hesabı bağlı çalışanın departmanı kullanıcının departmanıdır; Yönetim › Kullanıcılar'dan değiştirilir.</small>
+                            }
+                            else if (form.UserId is not null && form.UserId != form.SavedUserId)
+                            {
+                                <small class="text-muted">Kaydedince bağlanan kullanıcının departmanı (varsa) alınır.</small>
+                            }
+                            else if (form.LegacyDepartmentKey is { Length: > 0 } legacy && form.BusinessUnitId is null)
+                            {
+                                <small class="text-muted">Eski İK departmanı: @Lookups.Label(HrAccess.DepartmentList, legacy). Departman artık Yönetim › Departmanlar ağacından seçilir.</small>
+                            }
                             break;
                         case "managerEmployeeId":
                             <label class="@f.LabelClass()" for="employee-manager">@f.Label</label>
@@ -171,6 +178,15 @@
                             <label class="@f.LabelClass()" for="employee-location">@f.Label</label>
                             <input id="employee-location" class="form-control" maxlength="150" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.WorkLocation" />
                             <FieldError Field="workLocation" Errors="errors" />
+                            break;
+                        case "positionEffectiveDate":
+                            @if (form.Id is not null)
+                            {
+                                <label class="@f.LabelClass()" for="employee-position-day">@f.Label</label>
+                                <input id="employee-position-day" class="form-control" type="date" @bind="form.PositionEffectiveDate" />
+                                <FieldError Field="positionEffectiveDate" Errors="errors" />
+                                <small class="text-muted">Unvan, departman, yönetici ya da çalışma şekli değişirse yeni dönem bu günden başlar; boşsa bugün.</small>
+                            }
                             break;
                         case "employmentType":
                             <label class="@f.LabelClass()" for="employee-type">@f.Label</label>
@@ -273,6 +289,19 @@
 
     private bool CanSeePersonal => Session.Can(HrAccess.EmployeesPersonal);
 
+    private IReadOnlyList<HrBusinessUnitDto> units = [];
+
+    /// <summary>Kayıtlı kartta hesap bağlıysa departman kullanıcının Core departmanıdır (sunucu kaydederken alır); seçici kapalıdır.</summary>
+    private bool UnitFromAccount => form.UnitFromAccount && form.SavedUserId == form.UserId;
+
+    private string? UnitName => form.BusinessUnitId is { } unit ? units.FirstOrDefault(u => u.Id == unit)?.PathName ?? Employee?.Values["businessUnitName"]?.ToString() : null;
+
+    private void UnitChanged(Guid? unit)
+    {
+        form.BusinessUnitId = unit;
+        dirty = true;
+    }
+
     private string? SummaryName => form.Id is not null
         ? personName
         : newPerson ? $"{form.FirstName} {form.LastName}".Trim() is { Length: > 0 } typed ? typed : null : null;
@@ -315,7 +344,9 @@
             {
                 Id = r.Id, Version = r.Version, PersonId = WarehouseLabels.Id(r, "personId"),
                 EmployeeNumber = WarehouseLabels.Text(r, "employeeNumber"), UserId = WarehouseLabels.Id(r, "userId"),
-                JobTitle = WarehouseLabels.Text(r, "jobTitle"), DepartmentKey = WarehouseLabels.Text(r, "departmentKey"),
+                JobTitle = WarehouseLabels.Text(r, "jobTitle"), BusinessUnitId = WarehouseLabels.Id(r, "businessUnitId"),
+                LegacyDepartmentKey = WarehouseLabels.Text(r, "departmentKey"), SavedUserId = WarehouseLabels.Id(r, "userId"),
+                UnitFromAccount = WarehouseLabels.Flag(r, "businessUnitFromAccount"),
                 ManagerEmployeeId = WarehouseLabels.Id(r, "managerEmployeeId"), EmploymentType = WarehouseLabels.Text(r, "employmentType"),
                 WorkLocation = WarehouseLabels.Text(r, "workLocation"), HireDate = FleetLabels.Day(WarehouseLabels.Text(r, "hireDate")),
                 TerminationDate = FleetLabels.Day(WarehouseLabels.Text(r, "terminationDate")), Status = WarehouseLabels.Text(r, "status"),
@@ -369,16 +400,22 @@
             ["employeeNumber"] = Optional(form.EmployeeNumber),
             ["userId"] = form.UserId?.ToString(),
             ["jobTitle"] = Optional(form.JobTitle),
-            ["departmentKey"] = Optional(form.DepartmentKey),
             ["managerEmployeeId"] = form.ManagerEmployeeId?.ToString(),
             ["employmentType"] = form.EmploymentType,
             ["workLocation"] = Optional(form.WorkLocation),
             ["hireDate"] = form.HireDate?.ToString("yyyy-MM-dd"),
             ["terminationDate"] = form.TerminationDate?.ToString("yyyy-MM-dd"),
+            ["positionEffectiveDate"] = form.Id is null ? null : form.PositionEffectiveDate?.ToString("yyyy-MM-dd"),
             ["status"] = form.Status,
             ["notes"] = Optional(form.Notes),
             ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
         };
+
+        // Hesabı bağlı çalışanın departmanı sunucuda kullanıcının departmanından alınır; seçici kapalıyken değer gönderilmez.
+        if (!UnitFromAccount)
+        {
+            values["businessUnitId"] = form.BusinessUnitId?.ToString();
+        }
 
         // Özlük alanları yalnızca izni olan kullanıcı tarafından gönderilir (izinsiz gönderim sunucuda reddedilir).
         if (CanSeePersonal)
@@ -443,7 +480,16 @@
 
         public string? JobTitle { get; set; }
 
-        public string? DepartmentKey { get; set; }
+        public Guid? BusinessUnitId { get; set; }
+
+        /// <summary>Eski İK departman değeri (Core'a eşlenmemiş kartlarda bilgi için gösterilir, gönderilmez).</summary>
+        public string? LegacyDepartmentKey { get; init; }
+
+        /// <summary>Kayıttaki kullanıcı hesabı; hesabı bağlı kartta departman kullanıcıdan gelir.</summary>
+        public Guid? SavedUserId { get; init; }
+
+        /// <summary>Sunucuya göre kartın departmanı bağlı kullanıcının Core departmanından geliyor.</summary>
+        public bool UnitFromAccount { get; init; }
 
         public Guid? ManagerEmployeeId { get; set; }
 
@@ -454,6 +500,9 @@
         public DateOnly? HireDate { get; set; }
 
         public DateOnly? TerminationDate { get; set; }
+
+        /// <summary>Görev geçmişi için yeni dönemin başladığı gün (kartta saklanmaz, her açılışta boştur).</summary>
+        public DateOnly? PositionEffectiveDate { get; set; }
 
         public string Status { get; set; } = "active";
 

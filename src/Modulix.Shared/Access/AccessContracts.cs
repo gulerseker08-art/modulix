@@ -239,9 +239,12 @@ public static class CoreAccess
     public const string ReadImports = "core.imports.read";
     public const string RollbackImports = "core.imports.rollback";
 
+    /// <summary>Ortak kişi kayıtlarını toplu içe aktarma (ADR-0042 bölüm 21); kişiyi kullanan bir modülün yazma izniyle birlikte.</summary>
+    public const string ImportPeople = "core.people.import";
+
     /// <summary>Bunlardan biri olan kullanıcı menüde "Yönetim" bölümünü görür.</summary>
     public static IReadOnlyList<string> AdministrationPermissions { get; } =
         [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies, ReadCommunication, ManageCommunication, SuppressCommunication,
          ReadAutomation, ManageAutomation, PublishAutomation, RunAutomation, ReadAutomationLogs, ApproveAutomation, ManageApprovals,
-         RunImports, ReadImports, RollbackImports];
+         RunImports, ReadImports, RollbackImports, ImportPeople];
 }
