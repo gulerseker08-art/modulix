@@ -2,19 +2,18 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Özel alanlar · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.custom-fields") · Modulix</PageTitle>
 
 @* Özel alanlar (Y9a). Alanlar formun sonundaki "Ek bilgiler" bölümünde çıkar; anahtar ve tip kaydedildikten sonra değişmez. *@
 <AuthGate Permission="@CoreAccess.ManageCustomization">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
     <div class="page-header">
-        <h1>Özel alanlar</h1>
+        <h1>@Texts.Get("nav.app.admin.custom-fields")</h1>
     </div>
 
     <p class="text-muted">
-        Kayıtlara firmanıza özgü alanlar ekleyin (ör. fırsatta "Araç tipi"). Alanlar formda "Ek bilgiler" bölümünde çıkar.
-        Silinen alan arşivlenir: değerleri kayıtlarda kalır, geri aldığınızda yeniden görünür.
+        @Texts.Get("admin.customFields.intro")
     </p>
 
     @if (message is not null)
@@ -25,7 +24,7 @@
     @if (entities is { Count: > 0 })
     {
         <div class="filters">
-            <div class="segmented" role="group" aria-label="Kayıt türü">
+            <div class="segmented" role="group" aria-label="@Texts.Get("admin.automation.entity")">
                 @foreach (var entity in entities)
                 {
                     <button type="button" class="chip @(entity.Key == entityKey ? "active" : null)" @onclick="() => SelectAsync(entity.Key)">@entity.Name</button>
@@ -36,63 +35,63 @@
         @if (form is not null)
         {
             <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-                <h2>@(form.Id is null ? "Yeni alan" : "Alanı düzenle")</h2>
-                <FormTabs Title="Alan bilgileri" Label="Özel alan formu bölümleri">
+                <h2>@(form.Id is null ? Texts.Get("admin.customFields.new") : Texts.Get("admin.customFields.edit"))</h2>
+                <FormTabs Title="@Texts.Get("admin.customFields.tab")" Label="@Texts.Get("admin.customFields.sections")">
                 <div class="form-grid">
                     <div>
-                        <label class="form-label" for="fieldLabel">Alan adı *</label>
-                        <input id="fieldLabel" class="form-control" maxlength="100" placeholder="ör. Araç tipi" @bind="form.Label" @bind:event="oninput" />
+                        <label class="form-label" for="fieldLabel">@Texts.Get("admin.subProfiles.fieldName")</label>
+                        <input id="fieldLabel" class="form-control" maxlength="100" placeholder="@Texts.Get("admin.customFields.labelPlaceholder")" @bind="form.Label" @bind:event="oninput" />
                         <FieldError Field="label" Errors="errors" />
                     </div>
                     <div>
-                        <label class="form-label" for="fieldType">Tip</label>
+                        <label class="form-label" for="fieldType">@Texts.Get("admin.customFields.type")</label>
                         @if (form.Id is null)
                         {
                             <select id="fieldType" class="form-select" @bind="form.Type">
                                 @foreach (var type in Enum.GetValues<CustomFieldType>())
                                 {
-                                    <option value="@type">@CustomFieldTypeLabels.Of(type)</option>
+                                    <option value="@type">@SettingsLabels.FieldType(type)</option>
                                 }
                             </select>
                         }
                         else
                         {
-                            <input id="fieldType" class="form-control" value="@CustomFieldTypeLabels.Of(form.Type)" disabled />
-                            <div class="form-text">Tip kaydedildikten sonra değişmez.</div>
+                            <input id="fieldType" class="form-control" value="@SettingsLabels.FieldType(form.Type)" disabled />
+                            <div class="form-text">@Texts.Get("admin.customFields.typeFixed")</div>
                         }
                     </div>
                     <div class="span-all check-list">
                         <label class="form-check">
                             <input class="form-check-input" type="checkbox" @bind="form.Required" />
-                            <span class="form-check-label">Zorunlu</span>
+                            <span class="form-check-label">@Texts.Get("admin.customFields.required")</span>
                         </label>
                         <label class="form-check">
                             <input class="form-check-input" type="checkbox" @bind="form.ShowInList" />
-                            <span class="form-check-label">Listede göster</span>
+                            <span class="form-check-label">@Texts.Get("admin.customFields.showInList")</span>
                         </label>
                     </div>
                     @if (CustomFieldTypeLabels.HasOptions(form.Type))
                     {
                         <fieldset class="span-all">
-                            <legend class="form-label">Seçenekler</legend>
+                            <legend class="form-label">@Texts.Get("admin.subProfiles.options")</legend>
                             @for (var i = 0; i < form.Options.Count; i++)
                             {
                                 var option = form.Options[i];
                                 var index = i;
                                 <div class="option-row">
-                                    <input class="form-control" maxlength="100" aria-label="Seçenek @(index + 1)" @bind="option.Label" />
+                                    <input class="form-control" maxlength="100" aria-label="@Texts.Get("admin.customFields.optionN", index + 1)" @bind="option.Label" />
                                     <label class="form-check">
                                         <input class="form-check-input" type="checkbox" @bind="option.Active" />
-                                        <span class="form-check-label">Etkin</span>
+                                        <span class="form-check-label">@Texts.Get("admin.customFields.active")</span>
                                     </label>
                                     @if (option.Key is null)
                                     {
-                                        <button type="button" class="btn btn-link btn-sm" @onclick="() => form.Options.RemoveAt(index)">Kaldır</button>
+                                        <button type="button" class="btn btn-link btn-sm" @onclick="() => form.Options.RemoveAt(index)">@Texts.Get("admin.subProfiles.remove")</button>
                                     }
                                 </div>
                             }
-                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form.Options.Add(new OptionForm())">Seçenek ekle</button>
-                            <div class="form-text">Kullanılmış bir seçenek silinmez; pasife alın. Pasif seçenek yeni kayıtta seçilemez.</div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => form.Options.Add(new OptionForm())">@Texts.Get("admin.subProfiles.addOption")</button>
+                            <div class="form-text">@Texts.Get("admin.customFields.optionsHint")</div>
                             <FieldError Field="options" Errors="errors" />
                         </fieldset>
                     }
@@ -100,16 +99,16 @@
                 </FormTabs>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(form.Label))">
-                        @(form.Id is null ? "Alanı ekle" : "Kaydet")
+                        @(form.Id is null ? Texts.Get("admin.customFields.add") : Texts.Get("common.save"))
                     </button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">Vazgeç</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
                 </div>
             </form>
         }
         else
         {
             <div class="form-actions">
-                <button type="button" class="btn btn-primary" @onclick="New">Yeni alan</button>
+                <button type="button" class="btn btn-primary" @onclick="New">@Texts.Get("admin.customFields.new")</button>
             </div>
         }
 
@@ -119,13 +118,13 @@
         }
         else if (fields.Count == 0)
         {
-            <EmptyState Title="Bu kayıt türünde özel alan yok." />
+            <EmptyState Title="@Texts.Get("admin.customFields.empty")" />
         }
         else
         {
             <table class="table record-table">
                 <thead>
-                    <tr><th>Alan</th><th>Tip</th><th>Zorunlu</th><th>Listede</th><th>Sıra</th><th></th></tr>
+                    <tr><th>@Texts.Get("admin.subProfiles.field")</th><th>@Texts.Get("admin.customFields.type")</th><th>@Texts.Get("admin.customFields.required")</th><th>@Texts.Get("admin.customFields.inList")</th><th>@Texts.Get("admin.automationRun.col.order")</th><th></th></tr>
                 </thead>
                 <tbody>
                     @foreach (var field in fields)
@@ -133,29 +132,29 @@
                         var active = Active.ToList();
                         var position = active.IndexOf(field);
                         <tr class="@(field.Archived ? "is-archived" : null)">
-                            <td data-label="Alan" class="primary">
+                            <td data-label="@Texts.Get("admin.subProfiles.field")" class="primary">
                                 @field.Label
-                                @if (field.Archived) { <span class="badge text-bg-secondary ms-1">Arşivde</span> }
+                                @if (field.Archived) { <span class="badge text-bg-secondary ms-1">@Texts.Get("admin.customFields.archived")</span> }
                             </td>
-                            <td data-label="Tip">@CustomFieldTypeLabels.Of(field.Type)@(field.Options.Count > 0 ? $" ({field.Options.Count(o => o.Active)} seçenek)" : null)</td>
-                            <td data-label="Zorunlu">@(field.Required ? "Evet" : "Hayır")</td>
-                            <td data-label="Listede">@(field.ShowInList ? "Evet" : "Hayır")</td>
-                            <td data-label="Sıra">
+                            <td data-label="@Texts.Get("admin.customFields.type")">@SettingsLabels.FieldType(field.Type)@(field.Options.Count > 0 ? " " + Texts.Get("admin.subProfiles.choiceCount", field.Options.Count(o => o.Active)) : null)</td>
+                            <td data-label="@Texts.Get("admin.customFields.required")">@(field.Required ? Texts.Get("common.yes") : Texts.Get("common.no"))</td>
+                            <td data-label="@Texts.Get("admin.customFields.inList")">@(field.ShowInList ? Texts.Get("common.yes") : Texts.Get("common.no"))</td>
+                            <td data-label="@Texts.Get("admin.automationRun.col.order")">
                                 @if (!field.Archived)
                                 {
-                                    <button type="button" class="btn btn-link btn-sm" aria-label="Yukarı" disabled="@(busy || position == 0)" @onclick="() => MoveAsync(field, -1)">↑</button>
-                                    <button type="button" class="btn btn-link btn-sm" aria-label="Aşağı" disabled="@(busy || position == active.Count - 1)" @onclick="() => MoveAsync(field, 1)">↓</button>
+                                    <button type="button" class="btn btn-link btn-sm" aria-label="@Texts.Get("admin.automationEditor.moveUp")" disabled="@(busy || position == 0)" @onclick="() => MoveAsync(field, -1)">↑</button>
+                                    <button type="button" class="btn btn-link btn-sm" aria-label="@Texts.Get("admin.automationEditor.moveDown")" disabled="@(busy || position == active.Count - 1)" @onclick="() => MoveAsync(field, 1)">↓</button>
                                 }
                             </td>
                             <td class="actions">
                                 @if (field.Archived)
                                 {
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => SetArchivedAsync(field, false)">Geri al</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => SetArchivedAsync(field, false)">@Texts.Get("admin.customFields.restore")</button>
                                 }
                                 else
                                 {
-                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(field)">Düzenle</button>
-                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => SetArchivedAsync(field, true)">Arşivle</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(field)">@Texts.Get("common.edit")</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => SetArchivedAsync(field, true)">@Texts.Get("marketing.archive")</button>
                                 }
                             </td>
                         </tr>
@@ -166,7 +165,7 @@
     }
     else if (entities is not null)
     {
-        <p class="text-muted">Özel alan eklenebilecek bir modül açık değil.</p>
+        <p class="text-muted">@Texts.Get("admin.customFields.noModule")</p>
     }
 </AuthGate>
 

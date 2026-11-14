@@ -2,19 +2,18 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Listeler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.lists") · Modulix</PageTitle>
 
 @* Seçim listeleri (Y9b): fırsat aşamaları, firma durumu, kaynak, aktivite tipi. Değer silinmez, pasife alınır; kod kategoriye bakar. *@
 <AuthGate Permission="@CoreAccess.ManageCustomization">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
     <div class="page-header">
-        <h1>Listeler</h1>
+        <h1>@Texts.Get("nav.app.admin.lists")</h1>
     </div>
 
     <p class="text-muted">
-        Seçim listelerini firmanıza göre düzenleyin: değerlerin adını ve sırasını değiştirin, yeni değer ekleyin. Kullanılan değer
-        silinmez, pasife alınır: yeni kayıtta seçilemez, onu taşıyan kayıtlar bozulmaz. Satış hunisinin sütunları aşama sırasıyla çizilir.
+        @Texts.Get("admin.choiceLists.intro")
     </p>
 
     @if (message is not null)
@@ -30,7 +29,7 @@
     @if (lists is { Count: > 0 })
     {
         <div class="filters">
-            <div class="segmented" role="group" aria-label="Liste">
+            <div class="segmented" role="group" aria-label="@Texts.Get("admin.subProfiles.list")">
                 @foreach (var list in lists)
                 {
                     <button type="button" class="chip @(list.Key == current?.Key ? "active" : null)" @onclick="() => Select(list)">@list.Name</button>
@@ -45,8 +44,7 @@
                 @if (current.Categories.Count > 0)
                 {
                     <p class="form-text">
-                        Her değer bir kategoriye bağlıdır (@string.Join(", ", current.Categories.Select(c => c.Name))); uygulama değere değil
-                        kategoriye bakar. Hazır değerlerin kategorisi değişmez; her kategoride en az bir etkin değer kalmalıdır.
+                        @Texts.Get("admin.choiceLists.categoriesHint", string.Join(", ", current.Categories.Select(c => c.Name)))
                     </p>
                 }
                 <div class="choice-rows">
@@ -55,13 +53,13 @@
                         var row = rows[i];
                         var index = i;
                         <div class="option-row choice-row @(row.Active ? null : "is-archived")">
-                            <input class="form-control" maxlength="60" aria-label="Değer @(index + 1)" @bind="row.Label" />
+                            <input class="form-control" maxlength="60" aria-label="@Texts.Get("admin.choiceLists.valueN", index + 1)" @bind="row.Label" />
                             @if (current.Categories.Count > 0)
                             {
                                 @if (row.Key is null || row.CanCategorize)
                                 {
-                                    <select class="form-select" aria-label="Kategori" @bind="row.Category">
-                                        <option value="">Kategori seçin</option>
+                                    <select class="form-select" aria-label="@Texts.Get("admin.subProfiles.category")" @bind="row.Category">
+                                        <option value="">@Texts.Get("admin.choiceLists.chooseCategory")</option>
                                         @foreach (var category in current.Categories)
                                         {
                                             <option value="@category.Key">@category.Name</option>
@@ -75,31 +73,31 @@
                             }
                             <label class="form-check">
                                 <input class="form-check-input" type="checkbox" @bind="row.Active" />
-                                <span class="form-check-label">Etkin</span>
+                                <span class="form-check-label">@Texts.Get("admin.customFields.active")</span>
                             </label>
                             <span class="order">
-                                <button type="button" class="btn btn-link btn-sm" aria-label="Yukarı" disabled="@(index == 0)" @onclick="() => Move(index, -1)">↑</button>
-                                <button type="button" class="btn btn-link btn-sm" aria-label="Aşağı" disabled="@(index == rows.Count - 1)" @onclick="() => Move(index, 1)">↓</button>
+                                <button type="button" class="btn btn-link btn-sm" aria-label="@Texts.Get("admin.automationEditor.moveUp")" disabled="@(index == 0)" @onclick="() => Move(index, -1)">↑</button>
+                                <button type="button" class="btn btn-link btn-sm" aria-label="@Texts.Get("admin.automationEditor.moveDown")" disabled="@(index == rows.Count - 1)" @onclick="() => Move(index, 1)">↓</button>
                             </span>
                             @if (row.Key is null)
                             {
-                                <button type="button" class="btn btn-link btn-sm" @onclick="() => rows.RemoveAt(index)">Kaldır</button>
+                                <button type="button" class="btn btn-link btn-sm" @onclick="() => rows.RemoveAt(index)">@Texts.Get("admin.subProfiles.remove")</button>
                             }
                         </div>
                     }
                 </div>
-                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Add">Değer ekle</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Add">@Texts.Get("admin.choiceLists.addValue")</button>
                 <FieldError Field="values" Errors="errors" />
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@busy">Kaydet</button>
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Select(current)">Vazgeç</button>
+                    <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Select(current)">@Texts.Get("common.dismiss")</button>
                 </div>
             </form>
         }
     }
     else if (lists is not null)
     {
-        <p class="text-muted">Düzenlenebilir listesi olan bir modül açık değil.</p>
+        <p class="text-muted">@Texts.Get("admin.choiceLists.noModule")</p>
     }
 </AuthGate>
 
@@ -164,7 +162,7 @@
         {
             lists![lists.FindIndex(l => l.Key == saved.Key)] = saved;
             Select(saved);
-            notice = "Liste kaydedildi.";
+            notice = Texts.Get("admin.choiceLists.saved");
         }
     }
 

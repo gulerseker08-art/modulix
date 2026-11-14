@@ -4,10 +4,9 @@
 @* Firma alt profilleri (ADR-0041): sektör profilinin altında firmanın kendi tanımladığı alan ve liste değeri paketleri. Tek seviyedir;
    etkinleştirince seçenekler firmaya yalnızca eklenir. Uygulanmış seçenek bu ekrandan değişmez (Özel alanlar ve Listeler sayfasından). *@
 <section class="settings-group" aria-labelledby="subProfilesTitle">
-    <h2 id="subProfilesTitle">Alt profiller</h2>
+    <h2 id="subProfilesTitle">@Texts.Get("admin.subProfiles.title")</h2>
     <p class="text-muted">
-        Firmanıza özgü alt profiller tanımlayın (ör. Kara taşımacılığı, Gümrüklü antrepo, Deniz taşımacılığı). Her alt profil istediğiniz kadar
-        alan ve liste değeri içerebilir; etkinleştirince firmaya eklenir. Pasife aldığınızda eklenen alanlar ve değerler kalır.
+        @Texts.Get("admin.subProfiles.intro")
     </p>
 
     @if (message is not null)
@@ -23,30 +22,29 @@
     {
         @if (starters.Count > 0)
         {
-            <h3>Hazır alt profiller</h3>
+            <h3>@Texts.Get("admin.subProfiles.starters")</h3>
             <p class="text-muted">
-                Hazır öneriler tek tıkla taslak alt profil olarak eklenir; seçeneklerini gözden geçirip siz etkinleştirirsiniz. İçerikleri öneridir,
-                eklendikten sonra istediğiniz gibi değiştirebilirsiniz.
+                @Texts.Get("admin.subProfiles.startersIntro")
             </p>
             <div class="profile-cards">
                 @foreach (var starter in starters)
                 {
                     <button type="button" class="profile-card" disabled="@(busy || starter.Added || starter.MissingModules.Count > 0)"
-                            aria-label="@(starter.Added ? $"{starter.Name} zaten eklenmiş" : $"{starter.Name} alt profilini ekle")" @onclick="() => AddStarterAsync(starter.Key)">
+                            aria-label="@(starter.Added ? Texts.Get("admin.subProfiles.starterAdded", starter.Name) : Texts.Get("admin.subProfiles.addStarter", starter.Name))" @onclick="() => AddStarterAsync(starter.Key)">
                         <strong>@starter.Name</strong>
                         <span>@starter.Description</span>
-                        <span class="text-muted">@starter.Options.Count seçenek: @string.Join(", ", starter.Options)</span>
+                        <span class="text-muted">@Texts.Get("admin.subProfiles.starterOptions", starter.Options.Count, string.Join(", ", starter.Options))</span>
                         @if (starter.Features.Count > 0)
                         {
-                            <span class="text-muted">Özellikler: @string.Join(" · ", starter.Features)</span>
+                            <span class="text-muted">@Texts.Get("admin.subProfiles.starterFeatures", string.Join(" · ", starter.Features))</span>
                         }
                         @if (starter.Added)
                         {
-                            <span class="badge category">Eklendi</span>
+                            <span class="badge category">@Texts.Get("admin.subProfiles.added")</span>
                         }
                         else if (starter.MissingModules.Count > 0)
                         {
-                            <span class="badge">@string.Join(", ", starter.MissingModules) modülü kapalı</span>
+                            <span class="badge">@Texts.Get("admin.subProfiles.moduleOff", string.Join(", ", starter.MissingModules))</span>
                         }
                     </button>
                 }
@@ -54,41 +52,41 @@
         }
 
         <div class="list-toolbar">
-            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="NewProfile">Yeni alt profil</button>
+            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="NewProfile">@Texts.Get("admin.subProfiles.new")</button>
         </div>
 
         @if (profileForm is not null)
         {
             <form class="record-form" novalidate @onsubmit="SaveProfileAsync" @onsubmit:preventDefault>
-                <h3>@(profileForm.Id is null ? "Yeni alt profil" : "Alt profili düzenle")</h3>
+                <h3>@(profileForm.Id is null ? Texts.Get("admin.subProfiles.new") : Texts.Get("admin.subProfiles.edit"))</h3>
                 <div class="form-grid">
                     <div>
-                        <label class="form-label" for="subProfileName">Ad *</label>
-                        <input id="subProfileName" class="form-control" maxlength="100" placeholder="ör. Kara taşımacılığı" @bind="profileForm.Name" @bind:event="oninput" />
+                        <label class="form-label" for="subProfileName">@Texts.Get("common.field.nameRequired")</label>
+                        <input id="subProfileName" class="form-control" maxlength="100" placeholder="@Texts.Get("admin.subProfiles.namePlaceholder")" @bind="profileForm.Name" @bind:event="oninput" />
                         <FieldError Field="name" Errors="errors" />
                     </div>
                     <div>
-                        <label class="form-label" for="subProfileActivity">Bağlı faaliyet</label>
+                        <label class="form-label" for="subProfileActivity">@Texts.Get("admin.subProfiles.activity")</label>
                         <select id="subProfileActivity" class="form-select" @bind="profileForm.ActivityCode">
-                            <option value="">Bağlı faaliyet yok</option>
+                            <option value="">@Texts.Get("admin.subProfiles.noActivity")</option>
                             @foreach (var activity in activities)
                             {
                                 <option value="@activity.Code">@activity.Name</option>
                             }
                         </select>
-                        <div class="form-text">İsteğe bağlı; yalnızca sınıflandırma içindir.</div>
+                        <div class="form-text">@Texts.Get("admin.subProfiles.activityHint")</div>
                         <FieldError Field="activityCode" Errors="errors" />
                     </div>
                     <div class="span-all">
-                        <label class="form-label" for="subProfileDescription">Açıklama</label>
+                        <label class="form-label" for="subProfileDescription">@Texts.Get("common.field.description")</label>
                         <input id="subProfileDescription" class="form-control" maxlength="500" @bind="profileForm.Description" />
                         <FieldError Field="description" Errors="errors" />
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelProfileForm">Vazgeç</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelProfileForm">@Texts.Get("common.dismiss")</button>
                     <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")" disabled="@(busy || string.IsNullOrWhiteSpace(profileForm.Name))">
-                        @(profileForm.Id is null ? "Alt profili ekle" : "Kaydet")
+                        @(profileForm.Id is null ? Texts.Get("admin.subProfiles.add") : Texts.Get("common.save"))
                     </button>
                 </div>
             </form>
@@ -96,16 +94,16 @@
 
         @if (profiles.Count == 0)
         {
-            <EmptyState Title="Henüz alt profil yok." />
+            <EmptyState Title="@Texts.Get("admin.subProfiles.empty")" />
         }
         else
         {
             @if (FeatureChoices.Count > 0)
             {
                 <div class="list-toolbar">
-                    <label class="form-label" for="featureFilter">Hizmet özelliği</label>
+                    <label class="form-label" for="featureFilter">@Texts.Get("admin.subProfiles.feature")</label>
                     <select id="featureFilter" class="form-select" @bind="featureFilter">
-                        <option value="">Tümü</option>
+                        <option value="">@Texts.Get("admin.subProfiles.all")</option>
                         @foreach (var choice in FeatureChoices)
                         {
                             <option value="@choice">@choice</option>
@@ -116,31 +114,31 @@
 
             @if (VisibleProfiles.Count == 0)
             {
-                <p class="text-muted">Bu özelliğe sahip alt profil yok.</p>
+                <p class="text-muted">@Texts.Get("admin.subProfiles.noneWithFeature")</p>
             }
 
             <table class="table record-table" hidden="@(VisibleProfiles.Count == 0)">
                 <thead>
-                    <tr><th>Alt profil</th><th>Bağlı faaliyet</th><th>Hizmet özellikleri</th><th>Seçenekler</th><th>Durum</th><th></th></tr>
+                    <tr><th>@Texts.Get("admin.subProfiles.col.profile")</th><th>@Texts.Get("admin.subProfiles.activity")</th><th>@Texts.Get("admin.subProfiles.features")</th><th>@Texts.Get("admin.subProfiles.options")</th><th>@Texts.Get("common.field.status")</th><th></th></tr>
                 </thead>
                 <tbody>
                     @foreach (var profile in VisibleProfiles)
                     {
                         <tr class="@(current?.Id == profile.Id ? "is-selected" : null)">
-                            <td data-label="Alt profil" class="primary">@profile.Name</td>
-                            <td data-label="Bağlı faaliyet">@(profile.ActivityName ?? "—")</td>
-                            <td data-label="Hizmet özellikleri">@(FeatureSummary(profile.Features) is { Length: > 0 } summary ? summary : "—")</td>
-                            <td data-label="Seçenekler">
+                            <td data-label="@Texts.Get("admin.subProfiles.col.profile")" class="primary">@profile.Name</td>
+                            <td data-label="@Texts.Get("admin.subProfiles.activity")">@(profile.ActivityName ?? "—")</td>
+                            <td data-label="@Texts.Get("admin.subProfiles.features")">@(FeatureSummary(profile.Features) is { Length: > 0 } summary ? summary : "—")</td>
+                            <td data-label="@Texts.Get("admin.subProfiles.options")">
                                 @profile.OptionCount
                                 @if (profile.PendingCount > 0)
                                 {
-                                    <span class="badge category">@profile.PendingCount bekliyor</span>
+                                    <span class="badge category">@Texts.Get("admin.subProfiles.pendingCount", profile.PendingCount)</span>
                                 }
                             </td>
-                            <td data-label="Durum"><span class="badge @StatusTone(profile.Status)">@SubProfileStatuses.Label(profile.Status)</span></td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge @StatusTone(profile.Status)">@SettingsLabels.SubProfileStatus(profile.Status)</span></td>
                             <td class="actions">
-                                <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick="() => OpenAsync(profile.Id)">Seçenekler</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => EditProfile(profile)">Düzenle</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick="() => OpenAsync(profile.Id)">@Texts.Get("admin.subProfiles.options")</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => EditProfile(profile)">@Texts.Get("common.edit")</button>
                             </td>
                         </tr>
                     }
@@ -151,21 +149,21 @@
         @if (current is not null)
         {
             <div class="record-form" aria-live="polite">
-                <h3>@current.Name <span class="badge @StatusTone(current.Status)">@SubProfileStatuses.Label(current.Status)</span></h3>
+                <h3>@current.Name <span class="badge @StatusTone(current.Status)">@SettingsLabels.SubProfileStatus(current.Status)</span></h3>
 
                 <div class="list-toolbar">
                     @if (current.Status == SubProfileStatuses.Active)
                     {
                         if (current.PendingCount > 0)
                         {
-                            <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="ApplyPendingAsync">Bekleyenleri uygula</button>
+                            <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="ApplyPendingAsync">@Texts.Get("admin.subProfiles.applyPending")</button>
                         }
-                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => SetStatusAsync(SubProfileStatuses.Inactive)">Pasife al</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => SetStatusAsync(SubProfileStatuses.Inactive)">@Texts.Get("admin.subProfiles.deactivate")</button>
                     }
                     else
                     {
                         <button type="button" class="btn btn-primary" disabled="@busy" @onclick="PreviewActivationAsync">
-                            @(current.Status == SubProfileStatuses.Inactive ? "Yeniden etkinleştir" : "Etkinleştir")
+                            @(current.Status == SubProfileStatuses.Inactive ? Texts.Get("admin.subProfiles.reactivate") : Texts.Get("admin.subProfiles.activate"))
                         </button>
                     }
                 </div>
@@ -173,17 +171,17 @@
                 @if (plan is not null)
                 {
                     <section class="settings-group">
-                        <h3>Etkinleştirince firmaya eklenecekler</h3>
+                        <h3>@Texts.Get("admin.subProfiles.planTitle")</h3>
                         <ProfilePreview Plan="plan" Applied="false" />
                         @if (rulePreview is { Rules.Count: > 0 })
                         {
-                            <p>Etkinleşince <strong>@rulePreview.Rules.Count kural</strong> kayıt formlarında geçerli olur.</p>
+                            <p>@Texts.Strong("admin.subProfiles.rulesActivate", Texts.Get("admin.subProfiles.ruleCount", rulePreview.Rules.Count))</p>
                         }
 
                         @if (rulePreview is { Conflicts.Count: > 0 })
                         {
                             <div class="alert alert-danger" role="alert">
-                                Kurallar etkin kurallarla çakışıyor; çakışma giderilmeden etkinleştirilemez.
+                                @Texts.Get("admin.subProfiles.conflict")
                                 <ul class="mb-0">
                                     @foreach (var conflict in rulePreview.Conflicts)
                                     {
@@ -194,34 +192,34 @@
                         }
 
                         <div class="form-actions">
-                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => { plan = null; rulePreview = null; }">Vazgeç</button>
-                            <button type="button" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")" disabled="@(busy || ActivationBlocked)" @onclick="() => SetStatusAsync(SubProfileStatuses.Active)">Etkinleştir ve uygula</button>
+                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => { plan = null; rulePreview = null; }">@Texts.Get("common.dismiss")</button>
+                            <button type="button" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")" disabled="@(busy || ActivationBlocked)" @onclick="() => SetStatusAsync(SubProfileStatuses.Active)">@Texts.Get("admin.subProfiles.activateApply")</button>
                         </div>
                     </section>
                 }
 
-                <h3>Hizmet özellikleri</h3>
+                <h3>@Texts.Get("admin.subProfiles.features")</h3>
                 <p class="text-muted">
-                    Bu alt profilin nasıl çalıştığını anlatan etiketler (ör. Taşıma türü: Komple, Parsiyel). Hiçbir şeyi uygulamaz; her durumda eklenip kaldırılır.
+                    @Texts.Get("admin.subProfiles.featuresIntro")
                 </p>
                 @if (current.Features.Count == 0)
                 {
-                    <p class="text-muted">Bu alt profilde henüz hizmet özelliği yok.</p>
+                    <p class="text-muted">@Texts.Get("admin.subProfiles.noFeatures")</p>
                 }
                 else
                 {
                     <table class="table record-table">
                         <thead>
-                            <tr><th>Özellik</th><th>Değer</th><th></th></tr>
+                            <tr><th>@Texts.Get("admin.subProfiles.featureGroup")</th><th>@Texts.Get("admin.subProfiles.value")</th><th></th></tr>
                         </thead>
                         <tbody>
                             @foreach (var feature in current.Features)
                             {
                                 <tr>
-                                    <td data-label="Özellik" class="primary">@feature.Group</td>
-                                    <td data-label="Değer">@feature.Value</td>
+                                    <td data-label="@Texts.Get("admin.subProfiles.featureGroup")" class="primary">@feature.Group</td>
+                                    <td data-label="@Texts.Get("admin.subProfiles.value")">@feature.Value</td>
                                     <td class="actions">
-                                        <ConfirmAction Disabled="@busy" AriaLabel="@($"{feature.Group}: {feature.Value} özelliğini kaldır")" OnConfirm="() => RemoveFeatureAsync(feature)">Kaldır</ConfirmAction>
+                                        <ConfirmAction Disabled="@busy" AriaLabel="@Texts.Get("admin.subProfiles.removeFeature", feature.Group, feature.Value)" OnConfirm="() => RemoveFeatureAsync(feature)">@Texts.Get("admin.subProfiles.remove")</ConfirmAction>
                                     </td>
                                 </tr>
                             }
@@ -232,8 +230,8 @@
                 <form novalidate @onsubmit="AddFeatureAsync" @onsubmit:preventDefault>
                     <div class="form-grid">
                         <div>
-                            <label class="form-label" for="featureGroup">Özellik</label>
-                            <input id="featureGroup" class="form-control" maxlength="60" list="featureGroups" placeholder="ör. Taşıma türü" @bind="featureGroup" @bind:event="oninput" />
+                            <label class="form-label" for="featureGroup">@Texts.Get("admin.subProfiles.featureGroup")</label>
+                            <input id="featureGroup" class="form-control" maxlength="60" list="featureGroups" placeholder="@Texts.Get("admin.subProfiles.featureGroupPlaceholder")" @bind="featureGroup" @bind:event="oninput" />
                             <datalist id="featureGroups">
                                 @foreach (var group in FeatureGroups)
                                 {
@@ -243,50 +241,50 @@
                             <FieldError Field="group" Errors="errors" />
                         </div>
                         <div>
-                            <label class="form-label" for="featureValue">Değer</label>
-                            <input id="featureValue" class="form-control" maxlength="100" placeholder="ör. Komple" @bind="featureValue" @bind:event="oninput" />
+                            <label class="form-label" for="featureValue">@Texts.Get("admin.subProfiles.value")</label>
+                            <input id="featureValue" class="form-control" maxlength="100" placeholder="@Texts.Get("admin.subProfiles.featureValuePlaceholder")" @bind="featureValue" @bind:event="oninput" />
                             <FieldError Field="value" Errors="errors" />
                         </div>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-tonal" aria-busy="@(busy ? "true" : "false")" disabled="@(busy || string.IsNullOrWhiteSpace(featureGroup) || string.IsNullOrWhiteSpace(featureValue))">Özellik ekle</button>
+                        <button type="submit" class="btn btn-tonal" aria-busy="@(busy ? "true" : "false")" disabled="@(busy || string.IsNullOrWhiteSpace(featureGroup) || string.IsNullOrWhiteSpace(featureValue))">@Texts.Get("admin.subProfiles.addFeature")</button>
                     </div>
                 </form>
 
-                <h3>Seçenekler</h3>
+                <h3>@Texts.Get("admin.subProfiles.options")</h3>
                 @if (current.Options.Count == 0)
                 {
-                    <EmptyState Title="Bu alt profilde henüz seçenek yok." />
+                    <EmptyState Title="@Texts.Get("admin.subProfiles.noOptions")" />
                 }
                 else
                 {
                     <table class="table record-table">
                         <thead>
-                            <tr><th>Seçenek</th><th>Tür</th><th>Hedef</th><th>Ayrıntı</th><th>Durum</th><th></th></tr>
+                            <tr><th>@Texts.Get("admin.subProfiles.option")</th><th>@Texts.Get("common.field.kind")</th><th>@Texts.Get("admin.subProfiles.target")</th><th>@Texts.Get("admin.subProfiles.detail")</th><th>@Texts.Get("common.field.status")</th><th></th></tr>
                         </thead>
                         <tbody>
                             @foreach (var option in current.Options)
                             {
                                 <tr>
-                                    <td data-label="Seçenek" class="primary">@option.Label</td>
-                                    <td data-label="Tür">@SubProfileOptionKinds.Label(option.Kind)</td>
-                                    <td data-label="Hedef">@option.TargetName</td>
-                                    <td data-label="Ayrıntı">@Detail(option)</td>
-                                    <td data-label="Durum">
+                                    <td data-label="@Texts.Get("admin.subProfiles.option")" class="primary">@option.Label</td>
+                                    <td data-label="@Texts.Get("common.field.kind")">@SettingsLabels.SubProfileOption(option.Kind)</td>
+                                    <td data-label="@Texts.Get("admin.subProfiles.target")">@option.TargetName</td>
+                                    <td data-label="@Texts.Get("admin.subProfiles.detail")">@Detail(option)</td>
+                                    <td data-label="@Texts.Get("common.field.status")">
                                         @if (option.AppliedAt is not null)
                                         {
-                                            <span class="badge category">Uygulandı</span>
+                                            <span class="badge category">@Texts.Get("admin.sectorProfile.applied")</span>
                                         }
                                         else
                                         {
-                                            <span class="badge">Bekliyor</span>
+                                            <span class="badge">@Texts.Get("admin.subProfiles.pending")</span>
                                         }
                                     </td>
                                     <td class="actions">
                                         @if (option.AppliedAt is null)
                                         {
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => EditOption(option)">Düzenle</button>
-                                            <ConfirmAction Disabled="@busy" OnConfirm="() => RemoveOptionAsync(option)">Kaldır</ConfirmAction>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => EditOption(option)">@Texts.Get("common.edit")</button>
+                                            <ConfirmAction Disabled="@busy" OnConfirm="() => RemoveOptionAsync(option)">@Texts.Get("admin.subProfiles.remove")</ConfirmAction>
                                         }
                                     </td>
                                 </tr>
@@ -298,23 +296,23 @@
                 @if (optionForm is null)
                 {
                     <div class="list-toolbar">
-                        <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="NewOption">Seçenek ekle</button>
+                        <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="NewOption">@Texts.Get("admin.subProfiles.addOption")</button>
                     </div>
                 }
                 else
                 {
                     <form novalidate @onsubmit="SaveOptionAsync" @onsubmit:preventDefault>
-                        <h3>@(optionForm.Id is null ? "Yeni seçenek" : "Seçeneği düzenle")</h3>
+                        <h3>@(optionForm.Id is null ? Texts.Get("admin.subProfiles.newOption") : Texts.Get("admin.subProfiles.editOption"))</h3>
                         <div class="form-grid">
                             <div>
-                                <label class="form-label" for="optionKind">Tür</label>
+                                <label class="form-label" for="optionKind">@Texts.Get("common.field.kind")</label>
                                 <select id="optionKind" class="form-select" value="@optionForm.Kind" @onchange="OnKindChanged" disabled="@(optionForm.Id is not null)">
-                                    <option value="@SubProfileOptionKinds.Field">Alan (kayda özel alan ekler)</option>
-                                    <option value="@SubProfileOptionKinds.ListValue">Liste değeri (listeye değer ekler)</option>
+                                    <option value="@SubProfileOptionKinds.Field">@Texts.Get("admin.subProfiles.kindField")</option>
+                                    <option value="@SubProfileOptionKinds.ListValue">@Texts.Get("admin.subProfiles.kindListValue")</option>
                                 </select>
                             </div>
                             <div>
-                                <label class="form-label" for="optionTarget">@(optionForm.Kind == SubProfileOptionKinds.Field ? "Kayıt türü" : "Liste")</label>
+                                <label class="form-label" for="optionTarget">@(optionForm.Kind == SubProfileOptionKinds.Field ? Texts.Get("admin.automation.entity") : Texts.Get("admin.subProfiles.list"))</label>
                                 <select id="optionTarget" class="form-select" @bind="optionForm.TargetKey">
                                     @if (optionForm.Kind == SubProfileOptionKinds.Field)
                                     {
@@ -334,18 +332,18 @@
                                 <FieldError Field="targetKey" Errors="errors" />
                             </div>
                             <div>
-                                <label class="form-label" for="optionLabel">@(optionForm.Kind == SubProfileOptionKinds.Field ? "Alan adı *" : "Değer adı *")</label>
+                                <label class="form-label" for="optionLabel">@(optionForm.Kind == SubProfileOptionKinds.Field ? Texts.Get("admin.subProfiles.fieldName") : Texts.Get("admin.subProfiles.valueName"))</label>
                                 <input id="optionLabel" class="form-control" maxlength="100" @bind="optionForm.Label" @bind:event="oninput" />
                                 <FieldError Field="label" Errors="errors" />
                             </div>
                             @if (optionForm.Kind == SubProfileOptionKinds.Field)
                             {
                                 <div>
-                                    <label class="form-label" for="optionType">Alan tipi</label>
+                                    <label class="form-label" for="optionType">@Texts.Get("admin.subProfiles.fieldType")</label>
                                     <select id="optionType" class="form-select" @bind="optionForm.Type">
                                         @foreach (var type in Enum.GetValues<CustomFieldType>())
                                         {
-                                            <option value="@type">@CustomFieldTypeLabels.Of(type)</option>
+                                            <option value="@type">@SettingsLabels.FieldType(type)</option>
                                         }
                                     </select>
                                     <FieldError Field="fieldType" Errors="errors" />
@@ -353,17 +351,17 @@
                                 <div class="span-all check-list">
                                     <label class="form-check">
                                         <input class="form-check-input" type="checkbox" @bind="optionForm.Required" />
-                                        <span class="form-check-label">Zorunlu</span>
+                                        <span class="form-check-label">@Texts.Get("admin.customFields.required")</span>
                                     </label>
                                     <label class="form-check">
                                         <input class="form-check-input" type="checkbox" @bind="optionForm.ShowInList" />
-                                        <span class="form-check-label">Listede göster</span>
+                                        <span class="form-check-label">@Texts.Get("admin.customFields.showInList")</span>
                                     </label>
                                 </div>
                                 @if (CustomFieldTypeLabels.HasOptions(optionForm.Type))
                                 {
                                     <div class="span-all">
-                                        <label class="form-label" for="optionChoices">Seçenekler (her satıra bir tane)</label>
+                                        <label class="form-label" for="optionChoices">@Texts.Get("admin.subProfiles.choices")</label>
                                         <textarea id="optionChoices" class="form-control" rows="4" @bind="optionForm.ChoicesText" @bind:event="oninput"></textarea>
                                         <FieldError Field="choices" Errors="errors" />
                                     </div>
@@ -372,7 +370,7 @@
                             else if (ListCategories.Count > 0)
                             {
                                 <div>
-                                    <label class="form-label" for="optionCategory">Kategori</label>
+                                    <label class="form-label" for="optionCategory">@Texts.Get("admin.subProfiles.category")</label>
                                     <select id="optionCategory" class="form-select" @bind="optionForm.Category">
                                         @foreach (var category in ListCategories)
                                         {
@@ -384,44 +382,43 @@
                             }
                         </div>
                         <div class="form-actions">
-                            <button type="button" class="btn btn-outline-secondary" @onclick="CancelOptionForm">Vazgeç</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CancelOptionForm">@Texts.Get("common.dismiss")</button>
                             <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")" disabled="@(busy || string.IsNullOrWhiteSpace(optionForm.Label))">
-                                @(optionForm.Id is null ? "Seçeneği ekle" : "Kaydet")
+                                @(optionForm.Id is null ? Texts.Get("admin.subProfiles.addOptionSubmit") : Texts.Get("common.save"))
                             </button>
                         </div>
                     </form>
                 }
 
-                <h3>Kurallar</h3>
+                <h3>@Texts.Get("admin.subProfiles.rules")</h3>
                 <p class="text-muted">
-                    Alt profil <strong>etkinken</strong> kayıt formunda geçerli olan alan kuralları (ör. Konteyner no zorunlu). Alan ve liste değeri gibi firmaya eklenmez:
-                    alt profil pasife alınınca kurallar devre dışı kalır, kural silinmez. Firma uyarlaması bir alt profil kuralını tek tek kapatabilir ya da değiştirebilir.
+                    @((MarkupString)Texts.Get("admin.subProfiles.rulesIntro", "<strong>", "</strong>"))
                 </p>
                 @if (current.Rules.Count == 0)
                 {
-                    <p class="text-muted">Bu alt profilde henüz kural yok.</p>
+                    <p class="text-muted">@Texts.Get("admin.subProfiles.noRules")</p>
                 }
                 else
                 {
                     <table class="table record-table">
                         <thead>
-                            <tr><th>Kural</th><th>Alan</th><th>Etki</th><th>Koşul</th><th>İleti / değer</th><th></th></tr>
+                            <tr><th>@Texts.Get("admin.automation.rule")</th><th>@Texts.Get("admin.subProfiles.field")</th><th>@Texts.Get("admin.subProfiles.effect")</th><th>@Texts.Get("admin.subProfiles.condition")</th><th>@Texts.Get("admin.subProfiles.messageValue")</th><th></th></tr>
                         </thead>
                         <tbody>
                             @foreach (var rule in current.Rules)
                             {
                                 <tr>
-                                    <td data-label="Kural" class="primary">@rule.Name</td>
-                                    <td data-label="Alan">@RuleFieldLabel(rule.Rule.Field)</td>
-                                    <td data-label="Etki">@RuleEffectLabel(rule.Rule.Effect)</td>
-                                    <td data-label="Koşul">@RuleConditionSummary(rule.Rule)</td>
-                                    <td data-label="İleti / değer">@((rule.Rule.Message ?? rule.Rule.Value) is { Length: > 0 } text ? text : "—")</td>
+                                    <td data-label="@Texts.Get("admin.automation.rule")" class="primary">@rule.Name</td>
+                                    <td data-label="@Texts.Get("admin.subProfiles.field")">@RuleFieldLabel(rule.Rule.Field)</td>
+                                    <td data-label="@Texts.Get("admin.subProfiles.effect")">@RuleEffectLabel(rule.Rule.Effect)</td>
+                                    <td data-label="@Texts.Get("admin.subProfiles.condition")">@RuleConditionSummary(rule.Rule)</td>
+                                    <td data-label="@Texts.Get("admin.subProfiles.messageValue")">@((rule.Rule.Message ?? rule.Rule.Value) is { Length: > 0 } text ? text : "—")</td>
                                     <td class="actions">
                                         @if (IsEditable(rule.Rule))
                                         {
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="@($"{rule.Name} kuralını düzenle")" @onclick="() => EditRule(rule)">Düzenle</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="@Texts.Get("admin.subProfiles.editRule", rule.Name)" @onclick="() => EditRule(rule)">@Texts.Get("common.edit")</button>
                                         }
-                                        <ConfirmAction Disabled="@busy" AriaLabel="@($"{rule.Name} kuralını kaldır")" OnConfirm="() => RemoveRuleAsync(rule)">Kaldır</ConfirmAction>
+                                        <ConfirmAction Disabled="@busy" AriaLabel="@Texts.Get("admin.subProfiles.removeRule", rule.Name)" OnConfirm="() => RemoveRuleAsync(rule)">@Texts.Get("admin.subProfiles.remove")</ConfirmAction>
                                     </td>
                                 </tr>
                             }
@@ -432,23 +429,23 @@
                 @if (ruleForm is null)
                 {
                     <div class="list-toolbar">
-                        <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="NewRule">Kural ekle</button>
+                        <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="NewRule">@Texts.Get("admin.subProfiles.addRule")</button>
                     </div>
                 }
                 else
                 {
                     <form novalidate @onsubmit="SaveRuleAsync" @onsubmit:preventDefault>
-                        <h3>@(ruleForm.Id is null ? "Yeni kural" : "Kuralı düzenle")</h3>
+                        <h3>@(ruleForm.Id is null ? Texts.Get("admin.subProfiles.newRule") : Texts.Get("admin.subProfiles.editRuleTitle"))</h3>
                         <div class="form-grid">
                             <div>
-                                <label class="form-label" for="ruleName">Kural adı *</label>
-                                <input id="ruleName" class="form-control" maxlength="100" placeholder="ör. Konteyner no zorunlu" @bind="ruleForm.Name" @bind:event="oninput" />
+                                <label class="form-label" for="ruleName">@Texts.Get("admin.subProfiles.ruleName")</label>
+                                <input id="ruleName" class="form-control" maxlength="100" placeholder="@Texts.Get("admin.subProfiles.ruleNamePlaceholder")" @bind="ruleForm.Name" @bind:event="oninput" />
                                 <FieldError Field="name" Errors="errors" />
                             </div>
                             <div>
-                                <label class="form-label" for="ruleField">Alan *</label>
+                                <label class="form-label" for="ruleField">@Texts.Get("admin.subProfiles.fieldRequired")</label>
                                 <select id="ruleField" class="form-select" value="@ruleForm.Field" @onchange="e => OnRuleFieldChanged(e.Value?.ToString())">
-                                    <option value="">Alan seçin</option>
+                                    <option value="">@Texts.Get("admin.subProfiles.chooseField")</option>
                                     @foreach (var entity in RuleEntities)
                                     {
                                         <optgroup label="@entity.DisplayName">
@@ -462,9 +459,9 @@
                                 <FieldError Field="field" Errors="errors" />
                             </div>
                             <div>
-                                <label class="form-label" for="ruleEffect">Etki *</label>
+                                <label class="form-label" for="ruleEffect">@Texts.Get("admin.subProfiles.effectRequired")</label>
                                 <select id="ruleEffect" class="form-select" @bind="ruleForm.Effect">
-                                    @foreach (var effect in RuleEffects)
+                                    @foreach (var effect in SettingsLabels.RuleEffects)
                                     {
                                         <option value="@effect.Key">@effect.Label</option>
                                     }
@@ -474,7 +471,7 @@
                             @if (ruleForm.Effect is "Validate" or "Warn" or "RequireApproval" or "Block")
                             {
                                 <div>
-                                    <label class="form-label" for="ruleMessage">İleti *</label>
+                                    <label class="form-label" for="ruleMessage">@Texts.Get("admin.subProfiles.messageRequired")</label>
                                     <input id="ruleMessage" class="form-control" maxlength="200" @bind="ruleForm.Message" @bind:event="oninput" />
                                     <FieldError Field="message" Errors="errors" />
                                 </div>
@@ -482,7 +479,7 @@
                             else if (ruleForm.Effect == "SuggestDefault")
                             {
                                 <div>
-                                    <label class="form-label" for="ruleValue">Önerilen değer *</label>
+                                    <label class="form-label" for="ruleValue">@Texts.Get("admin.subProfiles.suggestedValue")</label>
                                     <input id="ruleValue" class="form-control" @bind="ruleForm.Value" @bind:event="oninput" />
                                     <FieldError Field="value" Errors="errors" />
                                 </div>
@@ -490,15 +487,15 @@
                             <div class="span-all check-list">
                                 <label class="form-check">
                                     <input class="form-check-input" type="checkbox" @bind="ruleForm.Conditional" />
-                                    <span class="form-check-label">Yalnızca bir koşul sağlanınca geçerli olsun</span>
+                                    <span class="form-check-label">@Texts.Get("admin.subProfiles.conditional")</span>
                                 </label>
                             </div>
                             @if (ruleForm.Conditional)
                             {
                                 <div>
-                                    <label class="form-label" for="ruleCondField">Koşul alanı</label>
+                                    <label class="form-label" for="ruleCondField">@Texts.Get("admin.subProfiles.conditionField")</label>
                                     <select id="ruleCondField" class="form-select" value="@ruleForm.CondField" @onchange="e => OnConditionFieldChanged(e.Value?.ToString())">
-                                        <option value="">Alan seçin</option>
+                                        <option value="">@Texts.Get("admin.subProfiles.chooseField")</option>
                                         @foreach (var field in ConditionFields)
                                         {
                                             <option value="@field.Key">@field.Label</option>
@@ -507,7 +504,7 @@
                                     <FieldError Field="condition" Errors="errors" />
                                 </div>
                                 <div>
-                                    <label class="form-label" for="ruleCondOp">Koşul</label>
+                                    <label class="form-label" for="ruleCondOp">@Texts.Get("admin.subProfiles.condition")</label>
                                     <select id="ruleCondOp" class="form-select" @bind="ruleForm.CondOperator">
                                         @foreach (var op in ConditionOperators)
                                         {
@@ -518,12 +515,12 @@
                                 @if (EditorLeaf.ValueCount(ruleForm.CondOperator).Max > 0)
                                 {
                                     <div>
-                                        <label class="form-label" for="ruleCondValue">Değer</label>
+                                        <label class="form-label" for="ruleCondValue">@Texts.Get("admin.subProfiles.value")</label>
                                         @if (ConditionField is { Options.Count: > 0 } && EditorLeaf.ValueCount(ruleForm.CondOperator).Max == 1)
                                         {
                                             @* Seçim alanında değer listeden seçilir: serbest yazılan anahtar sunucuda reddedilirdi. *@
                                             <select id="ruleCondValue" class="form-select" @bind="ruleForm.CondValues">
-                                                <option value="">Değer seçin</option>
+                                                <option value="">@Texts.Get("admin.subProfiles.chooseValue")</option>
                                                 @foreach (var option in ConditionField.Options)
                                                 {
                                                     <option value="@option.Key">@option.Label</option>
@@ -532,7 +529,7 @@
                                         }
                                         else
                                         {
-                                            <input id="ruleCondValue" class="form-control" list="ruleCondOptions" placeholder="birden fazlaysa virgülle ayırın" @bind="ruleForm.CondValues" @bind:event="oninput" />
+                                            <input id="ruleCondValue" class="form-control" list="ruleCondOptions" placeholder="@Texts.Get("admin.subProfiles.valuesPlaceholder")" @bind="ruleForm.CondValues" @bind:event="oninput" />
                                             <datalist id="ruleCondOptions">
                                                 @foreach (var option in ConditionField?.Options ?? [])
                                                 {
@@ -546,10 +543,10 @@
                         </div>
                         <FieldError Field="rule" Errors="errors" />
                         <div class="form-actions">
-                            <button type="button" class="btn btn-outline-secondary" @onclick="CancelRuleForm">Vazgeç</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CancelRuleForm">@Texts.Get("common.dismiss")</button>
                             <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")"
                                     disabled="@(busy || string.IsNullOrWhiteSpace(ruleForm.Name) || string.IsNullOrWhiteSpace(ruleForm.Field))">
-                                @(ruleForm.Id is null ? "Kuralı ekle" : "Kaydet")
+                                @(ruleForm.Id is null ? Texts.Get("admin.subProfiles.addRuleSubmit") : Texts.Get("common.save"))
                             </button>
                         </div>
                     </form>
@@ -820,7 +817,7 @@
 
     private static string Detail(SubProfileOptionDto option) =>
         option.Kind == SubProfileOptionKinds.Field
-            ? $"{CustomFieldTypeLabels.Of(option.FieldType ?? CustomFieldType.Text)}{(option.Choices.Count > 0 ? $" ({option.Choices.Count} seçenek)" : null)}{(option.Required ? ", zorunlu" : null)}"
+            ? $"{SettingsLabels.FieldType(option.FieldType ?? CustomFieldType.Text)}{(option.Choices.Count > 0 ? " " + Texts.Get("admin.subProfiles.choiceCount", option.Choices.Count) : null)}{(option.Required ? Texts.Get("admin.subProfiles.requiredSuffix") : null)}"
             : option.Category ?? "—";
 
     private sealed class ProfileForm
@@ -840,20 +837,6 @@
     private AutomationCatalogDto? ruleCatalog;
     private RuleForm? ruleForm;
     private SubProfileRulePreviewDto? rulePreview;
-
-    private static readonly (string Key, string Label)[] RuleEffects =
-    [
-        ("Required", "Zorunlu yap"),
-        ("Hide", "Gizle"),
-        ("Show", "Yalnızca koşul sağlanınca göster"),
-        ("ReadOnly", "Salt okunur yap"),
-        ("SuggestDefault", "Varsayılan değer öner"),
-        ("Validate", "Kaydı reddet (hata iletisi)"),
-        ("Warn", "Uyar (kaydı engellemez)"),
-        ("RequireApproval", "Onay iste"),
-        ("Block", "İşlemi engelle"),
-    ];
-
     private IEnumerable<AutomationEntityDto> RuleEntities => ruleCatalog?.Entities ?? [];
 
     private AutomationEntityDto? RuleEntity => RuleEntities.FirstOrDefault(e => e.Fields.Any(f => f.Key == ruleForm?.Field));
@@ -888,7 +871,7 @@
     private string ConditionFieldLabel(string key) =>
         RuleEntities.SelectMany(e => e.Fields).FirstOrDefault(f => f.Key == key)?.Label ?? key;
 
-    private static string RuleEffectLabel(string effect) => RuleEffects.FirstOrDefault(e => e.Key == effect).Label ?? effect;
+    private static string RuleEffectLabel(string effect) => SettingsLabels.RuleEffect(effect);
 
     private static bool IsLeaf(System.Text.Json.JsonElement node) =>
         node.ValueKind == System.Text.Json.JsonValueKind.Object && node.TryGetProperty("type", out var type) && type.GetString() == "leaf";
@@ -900,12 +883,12 @@
     {
         if (rule.Condition is not { } node || node.ValueKind != System.Text.Json.JsonValueKind.Object)
         {
-            return "Her zaman";
+            return Texts.Get("admin.subProfiles.always");
         }
 
         if (!IsLeaf(node))
         {
-            return "Koşullu";
+            return Texts.Get("admin.subProfiles.conditionalShort");
         }
 
         var values = node.TryGetProperty("values", out var array) && array.ValueKind == System.Text.Json.JsonValueKind.Array
@@ -971,7 +954,7 @@
         {
             if (string.IsNullOrWhiteSpace(form.CondField))
             {
-                errors = new Dictionary<string, string[]> { ["condition"] = ["Koşul alanını seçin."] };
+                errors = new Dictionary<string, string[]> { ["condition"] = [Texts.Get("admin.subProfiles.chooseConditionField")] };
                 return;
             }
 

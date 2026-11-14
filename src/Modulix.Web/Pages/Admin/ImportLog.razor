@@ -2,56 +2,56 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>İşlem günlüğü · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.import-log") · Modulix</PageTitle>
 
 @* İşlem günlüğü (ADR-0033, Dilim 1): içe aktarmalar. Firmanın tamamını görme izni olmayan kullanıcı yalnızca kendi içe
    aktarmalarını görür (sunucu uygular). Satır hatalarında ham hücre değeri yoktur. *@
 <AuthGate AnyPermission="@(new[] { CoreAccess.ReadImports, CoreAccess.RunImports })">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
     <div class="page-header">
         <div>
-            <h1>İşlem günlüğü</h1>
+            <h1>@Texts.Get("nav.app.admin.import-log")</h1>
             <p class="text-muted mb-0">
-                İçe aktarmalar: hangi dosya, kim tarafından, kaç satırın alındığı ve hatalı satırların nedeni.
-                @if (!Session.Can(CoreAccess.ReadImports)) { <text>Yalnızca kendi içe aktarmalarınız görünür.</text> }
+                @Texts.Get("admin.importLog.intro")
+                @if (!Session.Can(CoreAccess.ReadImports)) { <text>@Texts.Get("admin.importLog.ownOnly")</text> }
             </p>
         </div>
     </div>
 
     @if (message is not null)
     {
-        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">@Texts.Get("admin.automation.retry")</button></div>
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="İşlem günlüğü görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("admin.importLog.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(CoreAccess.RunImports))
         {
-            <a class="btn btn-primary ms-auto" href="yonetim/gunluk/yeni">Yeni içe aktarma</a>
+            <a class="btn btn-primary ms-auto" href="yonetim/gunluk/yeni">@Texts.Get("admin.importNew.title")</a>
         }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <label class="visually-hidden" for="import-status">Durum</label>
+            <label class="visually-hidden" for="import-status">@Texts.Get("common.field.status")</label>
             <select id="import-status" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm durumlar</option>
-                @foreach (var s in ImportText.Statuses) { <option value="@s">@ImportText.Status(s)</option> }
+                <option value="">@Texts.Get("common.allStatuses")</option>
+                @foreach (var s in ImportText.Statuses) { <option value="@s">@SettingsLabels.ImportStatus(s)</option> }
             </select>
-            <label class="visually-hidden" for="import-mode">Mod</label>
+            <label class="visually-hidden" for="import-mode">@Texts.Get("admin.importLog.mode")</label>
             <select id="import-mode" class="form-select form-select-sm filter-select" @bind="mode" @bind:after="() => LoadAsync(1)">
-                <option value="">Kuru çalışma ve uygulama</option>
-                <option value="DryRun">@ImportText.Mode("DryRun")</option>
-                <option value="Apply">@ImportText.Mode("Apply")</option>
+                <option value="">@Texts.Get("admin.importLog.allModes")</option>
+                <option value="DryRun">@SettingsLabels.ImportMode("DryRun")</option>
+                <option value="Apply">@SettingsLabels.ImportMode("Apply")</option>
             </select>
-            <label class="visually-hidden" for="import-from">Başlangıç tarihi</label>
+            <label class="visually-hidden" for="import-from">@Texts.Get("admin.importLog.from")</label>
             <input id="import-from" class="form-control form-control-sm filter-select" type="date" @bind="from" @bind:after="() => LoadAsync(1)" />
-            <label class="visually-hidden" for="import-to">Bitiş tarihi</label>
+            <label class="visually-hidden" for="import-to">@Texts.Get("admin.importLog.to")</label>
             <input id="import-to" class="form-control form-control-sm filter-select" type="date" @bind="to" @bind:after="() => LoadAsync(1)" />
         </div>
     }
@@ -65,20 +65,20 @@
     }
     else if (list is not null && list.Items.Count == 0)
     {
-        <p class="text-muted" role="status">@(ActiveFilters > 0 ? "Bu süzgece uyan içe aktarma yok." : "Henüz içe aktarma yapılmadı.")</p>
+        <p class="text-muted" role="status">@(ActiveFilters > 0 ? Texts.Get("admin.importLog.emptyFiltered") : Texts.Get("admin.importLog.empty"))</p>
     }
     else if (list is not null)
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@list.TotalCount içe aktarma listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("admin.importLog.listed", list.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">İçe aktarma listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("admin.importLog.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -91,8 +91,8 @@
                             @Cell(column, run, open)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{run.FileName} eylemleri")">
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Toggle(run.Id)"><AppIcon Name="eye" Size="16" /> <span>@(open ? "Ayrıntıyı kapat" : "Ayrıntıyı aç")</span></button>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", run.FileName)">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Toggle(run.Id)"><AppIcon Name="eye" Size="16" /> <span>@(open ? Texts.Get("admin.importLog.closeDetail") : Texts.Get("admin.importLog.openDetail"))</span></button>
                             </RowMenu>
                         </td>
                     </tr>
@@ -116,18 +116,18 @@
 
     // Başlık tıklamasıyla sıralanan sütunlar sunucudaki sort anahtarlarıdır (ImportRunQuery.SortKeys). Kullanıcı adı sayfa dışında çözüldüğü için sıralanamaz.
     // Varsayılan sıra "en yeni önce" (-createdAt); SortHeader varsayılan azalan sütunda ilk tıklamada artana (en eski önce) geçer.
-    private static readonly GridColumnDef[] Columns =
+    private static GridColumnDef[] Columns =>
     [
-        new("date", "Tarih", "calendar", "createdAt", "-createdAt", Locked: true),
-        new("user", "Kullanıcı", "user"),
-        new("entity", "Kayıt türü", "tag", "entityKey", "-entityKey"),
-        new("file", "Dosya", "file-text", "fileName", "-fileName"),
-        new("status", "Durum", "check-circle", "status", "-status"),
-        new("total", "Satır", "hash", "totalRows", "-totalRows"),
-        new("created", "Oluşan", "hash", "createdCount", "-createdCount"),
-        new("updated", "Güncellenen", "hash", "updatedCount", "-updatedCount", DefaultVisible: false),
-        new("skipped", "Atlanan", "hash", "skippedCount", "-skippedCount", DefaultVisible: false),
-        new("failed", "Hatalı", "alert-circle", "failedCount", "-failedCount"),
+        new("date", Texts.Get("admin.audit.date"), "calendar", "createdAt", "-createdAt", Locked: true),
+        new("user", Texts.Get("admin.lookups.user"), "user"),
+        new("entity", Texts.Get("admin.automation.entity"), "tag", "entityKey", "-entityKey"),
+        new("file", Texts.Get("admin.importRun.file"), "file-text", "fileName", "-fileName"),
+        new("status", Texts.Get("common.field.status"), "check-circle", "status", "-status"),
+        new("total", Texts.Get("admin.importRun.row"), "hash", "totalRows", "-totalRows"),
+        new("created", Texts.Get("admin.importLog.col.created"), "hash", "createdCount", "-createdCount"),
+        new("updated", Texts.Get("admin.importLog.col.updated"), "hash", "updatedCount", "-updatedCount", DefaultVisible: false),
+        new("skipped", Texts.Get("admin.importLog.col.skipped"), "hash", "skippedCount", "-skippedCount", DefaultVisible: false),
+        new("failed", Texts.Get("admin.importLog.col.failed"), "alert-circle", "failedCount", "-failedCount"),
     ];
 
     private readonly GridViewState grid = new("admin.import-log", "-createdAt");
@@ -164,9 +164,9 @@
     // Görünümler yalnızca süzgeçtir (Tümü, Uygulananlar, Kuru çalışmalar, kişisel); kapsamı sunucu uygular.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm işlemler", Icon: "history"),
-        new(ApplyView, "Uygulananlar", Icon: "check-circle"),
-        new(DryRunView, "Kuru çalışmalar", Icon: "clipboard-list"),
+        new(AllViews, Texts.Get("admin.importLog.view.all"), Icon: "history"),
+        new(ApplyView, Texts.Get("admin.importLog.view.apply"), Icon: "check-circle"),
+        new(DryRunView, Texts.Get("admin.importLog.view.dryRun"), Icon: "clipboard-list"),
         .. views.Options,
     ];
 
@@ -262,8 +262,8 @@
         "date" => @<button type="button" class="link-button" aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(run.Id)">@CrmLabels.Time(run.CreatedAt)</button>,
         "user" => @<text>@run.UserName</text>,
         "entity" => @<text>@run.EntityName</text>,
-        "file" => @<text>@run.FileName<small class="text-muted d-block">@FileSize(run.FileSize) · @ImportText.Mode(run.Mode)</small></text>,
-        "status" => @<span class="badge stage-@ImportText.StatusBadge(run.Status)">@ImportText.Status(run.Status)</span>,
+        "file" => @<text>@run.FileName<small class="text-muted d-block">@FileSize(run.FileSize) · @SettingsLabels.ImportMode(run.Mode)</small></text>,
+        "status" => @<span class="badge stage-@ImportText.StatusBadge(run.Status)">@SettingsLabels.ImportStatus(run.Status)</span>,
         "total" => @<text>@run.TotalRows.ToString("N0")</text>,
         "created" => @<text>@run.CreatedCount.ToString("N0")</text>,
         "updated" => @<text>@run.UpdatedCount.ToString("N0")</text>,

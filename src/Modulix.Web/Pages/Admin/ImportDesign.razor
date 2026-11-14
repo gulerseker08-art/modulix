@@ -1,17 +1,17 @@
 @page "/yonetim/ice-aktarma-tasarimi"
 @inject ApiClient Api
 
-<PageTitle>İçe aktarma tasarımı · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.import-design") · Modulix</PageTitle>
 
 @* İçe aktarma tasarımı (ADR-0033): firma yöneticisi kayıt türlerini açıp kapatır, şablona girecek ve zorunlu olacak sütunları seçer.
    Kodun zorunlu tuttuğu sütunlar kapatılamaz; kural sunucuda da denetlenir. Ayar ekranıdır, sekmeli form kuralının dışındadır. *@
 <AuthGate Permission="@CoreAccess.ManageCustomization">
-    <a class="back-link" href="yonetim">← Yönetim</a>
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
-    <PageHeader Title="İçe aktarma tasarımı" Icon="clipboard-list" Subtitle="Hangi kayıtların içe aktarılabileceğini ve şablonun sütunlarını belirleyin.">
+    <PageHeader Title="@Texts.Get("nav.app.admin.import-design")" Icon="clipboard-list" Subtitle="@Texts.Get("admin.importDesign.subtitle")">
         @if (current is not null)
         {
-            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveAsync">Kaydet</button>
+            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveAsync">@Texts.Get("common.save")</button>
         }
     </PageHeader>
 
@@ -30,13 +30,13 @@
     }
     else if (current is null)
     {
-        <EmptyState Compact="true" Title="İçe aktarılabilen kayıt türü yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("admin.importDesign.empty")" />
     }
     else
     {
         <div class="card p-3 mb-3">
             <div class="mb-3">
-                <label class="form-label" for="design-entity">Kayıt türü</label>
+                <label class="form-label" for="design-entity">@Texts.Get("admin.automation.entity")</label>
                 <select id="design-entity" class="form-select" value="@current.EntityKey" @onchange="Choose">
                     @foreach (var design in designs)
                     {
@@ -46,40 +46,40 @@
             </div>
             <div class="form-check">
                 <input id="design-enabled" class="form-check-input" type="checkbox" @bind="enabled" />
-                <label class="form-check-label" for="design-enabled">Bu tür içe aktarılabilir</label>
+                <label class="form-check-label" for="design-enabled">@Texts.Get("admin.importDesign.enabled")</label>
             </div>
             <div class="form-check">
                 <input id="design-automation" class="form-check-input" type="checkbox" @bind="runAutomation" />
-                <label class="form-check-label" for="design-automation">Kurallar ve atama e-postaları çalışsın</label>
-                <div class="form-text">Kapalıyken içe aktarılan kayıtlar kural çalıştırmaz ve sorumlulara e-posta gitmez. Geçmiş veri taşırken kapalı bırakın.</div>
+                <label class="form-check-label" for="design-automation">@Texts.Get("admin.importDesign.runAutomation")</label>
+                <div class="form-text">@Texts.Get("admin.importDesign.runAutomationHint")</div>
             </div>
             <div class="form-check">
                 <input id="design-all-or-nothing" class="form-check-input" type="checkbox" @bind="allOrNothing" />
-                <label class="form-check-label" for="design-all-or-nothing">Hepsi ya da hiç</label>
-                <div class="form-text">Açıkken dosya önce hatasız bir kuru çalışmadan geçmeli (son 24 saat); uygulamada tek hatalı satır olursa hiçbir kayıt yazılmaz. Kapalıyken hatasız satırlar alınır, hatalılar rapora yazılır.</div>
+                <label class="form-check-label" for="design-all-or-nothing">@Texts.Get("admin.importDesign.allOrNothing")</label>
+                <div class="form-text">@Texts.Get("admin.importDesign.allOrNothingHint")</div>
             </div>
         </div>
 
         <table class="table record-table">
-            <caption class="visually-hidden">@current.DisplayName içe aktarma sütunları</caption>
+            <caption class="visually-hidden">@Texts.Get("admin.importDesign.caption", current.DisplayName)</caption>
             <thead>
-                <tr><th scope="col">Sütun</th><th scope="col">Şablonda</th><th scope="col">Zorunlu</th><th scope="col">Dosyadaki diğer adlar</th></tr>
+                <tr><th scope="col">@Texts.Get("admin.importDesign.column")</th><th scope="col">@Texts.Get("admin.importDesign.inTemplate")</th><th scope="col">@Texts.Get("admin.customFields.required")</th><th scope="col">@Texts.Get("admin.importDesign.aliases")</th></tr>
             </thead>
             <tbody>
                 @foreach (var field in rows)
                 {
                     <tr>
-                        <td data-label="Sütun" class="primary">@field.Label</td>
-                        <td data-label="Şablonda">
-                            <input class="form-check-input" type="checkbox" aria-label="@($"{field.Label} şablonda")" checked="@field.Included" disabled="@field.Locked"
+                        <td data-label="@Texts.Get("admin.importDesign.column")" class="primary">@field.Label</td>
+                        <td data-label="@Texts.Get("admin.importDesign.inTemplate")">
+                            <input class="form-check-input" type="checkbox" aria-label="@Texts.Get("admin.importDesign.inTemplateOf", field.Label)" checked="@field.Included" disabled="@field.Locked"
                                    @onchange="e => SetIncluded(field, e)" />
                         </td>
-                        <td data-label="Zorunlu">
-                            <input class="form-check-input" type="checkbox" aria-label="@($"{field.Label} zorunlu")" checked="@field.Required" disabled="@(field.Locked || !field.Included)"
+                        <td data-label="@Texts.Get("admin.customFields.required")">
+                            <input class="form-check-input" type="checkbox" aria-label="@Texts.Get("admin.formDesigner.requiredOf", field.Label)" checked="@field.Required" disabled="@(field.Locked || !field.Included)"
                                    @onchange="e => field.Required = e.Value is true" />
                         </td>
-                        <td data-label="Dosyadaki diğer adlar">
-                            <input class="form-control" aria-label="@($"{field.Label} için dosyadaki diğer adlar")" placeholder="ör. Müşteri adı, Unvan" maxlength="1100" disabled="@(!field.Included)" @bind="field.Aliases" />
+                        <td data-label="@Texts.Get("admin.importDesign.aliases")">
+                            <input class="form-control" aria-label="@Texts.Get("admin.importDesign.aliasesOf", field.Label)" placeholder="@Texts.Get("admin.importDesign.aliasesPlaceholder")" maxlength="1100" disabled="@(!field.Included)" @bind="field.Aliases" />
                         </td>
                     </tr>
                 }
@@ -171,6 +171,6 @@
 
         designs![designs.FindIndex(d => d.EntityKey == design.EntityKey)] = design;
         Show(design);
-        notice = "Tasarım kaydedildi.";
+        notice = Texts.Get("admin.importDesign.saved");
     }
 }
