@@ -1,0 +1,32 @@
+@implements IDisposable
+@inject ToastService Toasts
+
+@* Kısa süreli bildirimler (docs/design-system/component-catalog.md → Toast): kabukta bir kez çizilir. Bölge her zaman
+   DOM'dadır; ekran okuyucu yeni bildirimi kendiliğinden okur (hata "alert", diğerleri "status"). *@
+<div class="toast-stack" aria-live="polite">
+    @foreach (ToastItem toast in Toasts.Items)
+    {
+        <div class="app-toast app-toast-@toast.Kind.ToString().ToLowerInvariant()" role="@(toast.Kind == ToastKind.Error ? "alert" : "status")" @key="toast.Id">
+            <span class="app-toast-icon" aria-hidden="true"><AppIcon Name="@Icon(toast.Kind)" Size="18" /></span>
+            <span class="app-toast-text">@toast.Text</span>
+            <button type="button" class="btn btn-icon app-toast-close" aria-label="@Texts.Get("common.toast.close")" @onclick="() => Toasts.Dismiss(toast.Id)">
+                <AppIcon Name="x" Size="16" />
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => Toasts.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private static string Icon(ToastKind kind) => kind switch
+    {
+        ToastKind.Error => "alert-circle",
+        ToastKind.Info => "info",
+        _ => "check-circle",
+    };
+
+    public void Dispose() => Toasts.Changed -= OnChanged;
+}

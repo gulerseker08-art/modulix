@@ -25,6 +25,17 @@ public static class SubProfileEndpoints
 
         group.MapGet("/", async (ISubProfileService service, ModuleCatalog modules, CancellationToken ct) =>
             (await service.ListAsync(ct)).Select(p => ToDto(p, modules)).ToList());
+        group.MapGet("/starters", async (ISubProfileService service, CancellationToken ct) =>
+            (await service.ListStartersAsync(ct)).Select(s => new SubProfileStarterDto(s.Key, s.Name, s.Description, s.ActivityName, s.OptionLabels, s.MissingModules, s.Added)).ToList());
+        group.MapPost("/starters/{key}", (string key, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>
+        {
+            if (await service.CreateFromStarterAsync(key, ct) is not { } created)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Hazır alt profil bulunamadı.");
+            }
+
+            return Results.Created($"/api/customization/sub-profiles/{created.Id}", ToDto(created, modules));
+        }));
         group.MapGet("/{id:guid}", (Guid id, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>
             await service.GetAsync(id, ct) is { } view ? Results.Ok(ToDto(view, modules)) : NotFound()));
         group.MapPost("/", (SaveSubProfileRequest request, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>

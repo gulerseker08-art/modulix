@@ -17,6 +17,7 @@ public static class LogisticsLookupDefinitions
     public const string TripTrailer = "logistics.trip.trailer";
     public const string TripCarrier = "logistics.trip.carrier";
     public const string ExpenseSupplier = "logistics.trip-expense.supplier";
+    public const string ExpenseTrip = "logistics.trip-expense.trip";
 
     /// <summary>Filo'nun araç kayıt türü (sözleşme metni; Filo projesine başvurulmaz).</summary>
     public const string VehicleEntityKey = "fleet.vehicle";
@@ -99,6 +100,12 @@ public static class LogisticsLookupDefinitions
         },
         // Masraf tedarikçisi (yakıt istasyonu, otoyol işletmesi...): rol süzgeci yok; her firma tedarikçi olabilir.
         Party(ExpenseSupplier, LogisticsModule.Entities.TripExpense, "supplierPartyId", "Tedarikçi"),
+        // Masraf listesinde seferin numarasını göstermek için (çözümleme); seçici olarak kullanılmaz, okuma sefer okuma iznine bağlıdır.
+        new(ExpenseTrip, LogisticsModule.Entities.TripExpense, "tripId", "Sefer", LookupTargetKind.Record, LogisticsModule.Entities.Trip)
+        {
+            LabelFields = ["number"],
+            SearchDescription = "Sefer numarası",
+        },
         new(DriverVehicle, LogisticsModule.Entities.Driver, "defaultVehicleId", "Varsayılan araç", LookupTargetKind.Record, VehicleEntityKey)
         {
             LabelFields = VehicleLabel,

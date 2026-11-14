@@ -144,7 +144,7 @@
                             <div class="section-header"><h2 id="sa-q-owner">@Texts.Get("crm.sales.byOwner")</h2></div>
                             @if (q.ByOwner.Count == 0)
                             {
-                                <p class="text-muted">@Texts.Get("crm.salesAnalysis.noOwnerBreakdown")</p>
+                                <EmptyState Title="@Texts.Get("crm.salesAnalysis.noOwnerBreakdown")" />
                             }
                             else
                             {
@@ -219,7 +219,7 @@
                             <div class="section-header"><h2 id="sa-l-source">@Texts.Get("crm.salesAnalysis.l.bySource")</h2></div>
                             @if (l.BySource.Count == 0)
                             {
-                                <p class="text-muted">@Texts.Get("crm.salesAnalysis.l.noSourceBreakdown")</p>
+                                <EmptyState Title="@Texts.Get("crm.salesAnalysis.l.noSourceBreakdown")" />
                             }
                             else
                             {

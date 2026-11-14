@@ -87,11 +87,11 @@
 
     @if (rules is null)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (rules.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("crm.quoteRules.none")</p>
+        <EmptyState Title="@Texts.Get("crm.quoteRules.none")" />
     }
     else
     {

@@ -1,4 +1,4 @@
-using Modulix.Core.Contracts.Sales;
+using Modulix.Modules.Crm.Contracts.Sales;
 
 namespace Modulix.Modules.Orders.Lifecycle;
 

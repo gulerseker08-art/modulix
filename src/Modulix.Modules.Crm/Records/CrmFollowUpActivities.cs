@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
-using Modulix.Core.Contracts.Activities;
+using Modulix.Modules.Crm.Contracts.Activities;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;

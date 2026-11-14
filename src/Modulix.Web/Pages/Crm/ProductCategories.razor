@@ -62,11 +62,11 @@
 
     @if (!loaded)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (all.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("crm.productCategories.none")</p>
+        <EmptyState Title="@Texts.Get("crm.productCategories.none")" />
     }
     else
     {

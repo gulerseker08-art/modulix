@@ -3,59 +3,55 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Sözleşme onayları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.contracts.approvals.menu") · Modulix</PageTitle>
 
 <AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsApprove">
     <div class="page-header">
-        <h1>Sözleşme onayları</h1>
+        <h1>@Texts.Get("nav.app.contracts.approvals.menu")</h1>
     </div>
-    <p class="text-muted">
-        İç onay bekleyen sözleşmeler. Onay, onaya gönderilirken dondurulan sürüme bağlıdır; adımlar sırayla, aynı adımdaki adlı onaylayıcılar birlikte çalışır.
-        Kendi gönderdiğiniz sözleşmeyi ve önceki bir adımda karar verdiğiniz sözleşmenin sonraki adımını onaylayamazsınız. Hedef süre firma ayarlarındandır;
-        süre aşımı yalnızca işaretlenir, kararı engellemez.
-    </p>
+    <p class="text-muted">@Texts.Get("contracts.approvals.intro")</p>
 
     <Notice Text="@notice" Failed="@noticeFailed" />
 
     <div class="form-check mb-3">
         <input id="only-mine" class="form-check-input" type="checkbox" checked="@onlyMine" @onchange="ToggleAsync" />
-        <label class="form-check-label" for="only-mine">Yalnızca karar verebileceklerim</label>
+        <label class="form-check-label" for="only-mine">@Texts.Get("contracts.approvals.onlyMine")</label>
     </div>
 
     @if (items is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (items.Count == 0)
     {
-        <p class="text-muted">@(onlyMine ? "Karar vermenizi bekleyen sözleşme yok." : "Onay bekleyen sözleşme yok.")</p>
+        <p class="text-muted">@(onlyMine ? Texts.Get("contracts.approvals.emptyMine") : Texts.Get("contracts.approvals.empty"))</p>
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Onay bekleyen sözleşmeler</caption>
+            <caption class="visually-hidden">@Texts.Get("contracts.approvals.caption")</caption>
             <thead>
                 <tr>
-                    <th scope="col">Sözleşme</th><th scope="col">Gönderen</th><th scope="col">Hedef süre</th><th scope="col">Adım</th>
-                    <th scope="col">Bekleyenler</th><th scope="col">İşlem</th>
+                    <th scope="col">@Texts.Get("contracts.list.col.contract")</th><th scope="col">@Texts.Get("contracts.approvals.col.sender")</th><th scope="col">@Texts.Get("contracts.approvals.col.due")</th><th scope="col">@Texts.Get("crm.quoteRules.col.step")</th>
+                    <th scope="col">@Texts.Get("contracts.approvals.col.waiting")</th><th scope="col">@Texts.Get("crm.quoteApprovals.col.action")</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var item in items)
                 {
                     <tr>
-                        <td data-label="Sözleşme" class="primary">
-                            <a href="sozlesmeler/@item.ContractId">@item.Title</a> <small class="text-muted">@item.Number · V@(item.VersionNo)</small>
+                        <td data-label="@Texts.Get("contracts.list.col.contract")" class="primary">
+                            <a href="sozlesmeler/@item.ContractId">@item.Title</a> <small class="text-muted">@item.Number · @Texts.Get("contracts.versionNo", item.VersionNo)</small>
                             @if (item.Rules.Count > 0) { <div class="small text-muted">@string.Join(", ", item.Rules)</div> }
                         </td>
-                        <td data-label="Gönderen">@Lookups.MemberName(item.SubmittedBy)<br /><small class="text-muted">@(item.SubmittedAt is { } at ? CrmLabels.Time(at) : "—")</small></td>
-                        <td data-label="Hedef süre">
+                        <td data-label="@Texts.Get("contracts.approvals.col.sender")">@Lookups.MemberName(item.SubmittedBy)<br /><small class="text-muted">@(item.SubmittedAt is { } at ? CrmLabels.Time(at) : "—")</small></td>
+                        <td data-label="@Texts.Get("contracts.approvals.col.due")">
                             @(item.DueAt is { } due ? CrmLabels.Time(due) : "—")
-                            @if (item.IsOverdue) { <span class="badge stage-lost">Gecikti</span> }
+                            @if (item.IsOverdue) { <span class="badge stage-lost">@Texts.Get("crm.pending.overdue")</span> }
                         </td>
-                        <td data-label="Adım">@(item.CurrentStep == 0 ? "—" : $"{item.CurrentStep} / {item.StepCount}")</td>
-                        <td data-label="Bekleyenler">
-                            @if (item.WaitingFor.Count == 0) { <span class="text-muted">Onay izni olan biri</span> }
+                        <td data-label="@Texts.Get("crm.quoteRules.col.step")">@(item.CurrentStep == 0 ? "—" : $"{item.CurrentStep} / {item.StepCount}")</td>
+                        <td data-label="@Texts.Get("contracts.approvals.col.waiting")">
+                            @if (item.WaitingFor.Count == 0) { <span class="text-muted">@Texts.Get("contracts.approvals.anyApprover")</span> }
                             else { @string.Join(", ", item.WaitingFor.Select(w => Lookups.MemberName(w))) }
                         </td>
                         <td class="actions">
@@ -65,28 +61,28 @@
                                     @if (plan is not null)
                                     {
                                         <div class="small approval-reasons">
-                                            <strong>Onay gerekçesi:</strong>
+                                            <strong>@Texts.Get("crm.quoteApprovals.reasons")</strong>
                                             @if (plan.Steps.Count > 1)
                                             {
-                                                <div>Adımlar: @foreach (var step in plan.Steps) { <span class="badge stage-@(step.Completed ? "won" : step.IsCurrent ? "qualified" : "open")">@step.Step@(step.Completed ? " ✓" : string.Empty)</span> }</div>
+                                                <div>@Texts.Get("crm.quoteApprovals.steps") @foreach (var step in plan.Steps) { <span class="badge stage-@(step.Completed ? "won" : step.IsCurrent ? "qualified" : "open")">@step.Step@(step.Completed ? " ✓" : string.Empty)</span> }</div>
                                             }
-                                            @if (plan.ActingAsDelegate) { <div class="text-muted">Bu kararı vekâleten vereceksiniz.</div> }
+                                            @if (plan.ActingAsDelegate) { <div class="text-muted">@Texts.Get("contracts.approvals.asDelegate")</div> }
                                             @foreach (var match in plan.Rules) { <div>@match.Name — @match.Reason</div> }
                                             @if (plan.Rules.Count == 0 && plan.Note is not null) { <div>@plan.Note</div> }
                                             @if (plan.CannotDecideReason is not null) { <div class="text-danger">@plan.CannotDecideReason</div> }
                                         </div>
                                     }
-                                    <label class="visually-hidden" for="reason-@item.ContractId">Gerekçe</label>
-                                    <input id="reason-@item.ContractId" class="form-control form-control-sm" placeholder="Gerekçe (ret ve geri gönderme için zorunlu)" maxlength="500" @bind="reason" />
-                                    <button type="button" class="btn btn-primary btn-sm" disabled="@(busy || cannotDecide)" @onclick="() => DecideAsync(item, ContractActionNames.Approve)">Onayla</button>
-                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(busy || cannotDecide)" @onclick="() => DecideAsync(item, ContractActionNames.Reject)">Reddet</button>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(busy || cannotDecide)" @onclick="() => DecideAsync(item, ContractActionNames.Return)">Değişiklik iste</button>
-                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => active = null">Vazgeç</button>
+                                    <label class="visually-hidden" for="reason-@item.ContractId">@Texts.Get("crm.quoteApprovals.reasonLabel")</label>
+                                    <input id="reason-@item.ContractId" class="form-control form-control-sm" placeholder="@Texts.Get("contracts.approvals.reasonPlaceholder")" maxlength="500" @bind="reason" />
+                                    <button type="button" class="btn btn-primary btn-sm" disabled="@(busy || cannotDecide)" @onclick="() => DecideAsync(item, ContractActionNames.Approve)">@Texts.Get("crm.quoteApprovals.approve")</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(busy || cannotDecide)" @onclick="() => DecideAsync(item, ContractActionNames.Reject)">@Texts.Get("crm.quoteApprovals.reject")</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(busy || cannotDecide)" @onclick="() => DecideAsync(item, ContractActionNames.Return)">@Texts.Get("crm.quoteApprovals.requestChanges")</button>
+                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => active = null">@Texts.Get("common.dismiss")</button>
                                 </form>
                             }
                             else
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" disabled="@(!item.CanDecide && onlyMine)" @onclick="() => OpenAsync(item)">@(item.CanDecide ? "İncele ve karar ver" : "İncele")</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" disabled="@(!item.CanDecide && onlyMine)" @onclick="() => OpenAsync(item)">@(item.CanDecide ? Texts.Get("crm.approval.review") : Texts.Get("contracts.approvals.review"))</button>
                                 @if (!item.CanDecide && item.CannotDecideReason is not null) { <div class="small text-muted">@item.CannotDecideReason</div> }
                             }
                         </td>
@@ -145,7 +141,7 @@
         if (busy) { return; }
         if (action != ContractActionNames.Approve && string.IsNullOrWhiteSpace(reason))
         {
-            Notify("Ret ve değişiklik isteği için gerekçe zorunludur.", true);
+            Notify(Texts.Get("contracts.approvals.reasonRequired"), true);
             return;
         }
 
@@ -155,13 +151,13 @@
         if (current is null)
         {
             busy = false;
-            Notify("Sözleşme okunamadı.", true);
+            Notify(Texts.Get("contracts.approvals.readFailed"), true);
             return;
         }
 
         var result = await Api.PostAsync<ContractDto>($"/api/contracts/contracts/{item.ContractId}/{action}", new ContractTransitionRequest(current.Version, string.IsNullOrWhiteSpace(reason) ? null : reason.Trim()));
         busy = false;
-        Notify(result.IsSuccess ? $"{ContractActionLabels.Action(action)}: tamamlandı." : result.Error, !result.IsSuccess);
+        Notify(result.IsSuccess ? Texts.Get("crm.quoteApprovals.done", ContractActionLabels.Action(action)) : result.Error, !result.IsSuccess);
         active = null;
         await LoadAsync();
     }

@@ -38,7 +38,7 @@
 ## Yapılmadı / sınırlar
 
 - **Lead’in sektörü de katalogdandır:** `crm.Leads.IndustryCode` (katalog kodu, yabancı anahtar); kayıt alanı `industry` kod ya da etkin ad kabul eder, yanıt `industryName` ve `legacyIndustry` taşır; kural firma ile aynıdır (`IndustryResolution`). Mevcut Lead metinleri migration’da adına göre eşlenir, eşleşmeyen `legacyIndustry` olarak kalır. Lead firmaya dönüşünce kod firmaya aynen geçer. Dış form girişi (`LeadIntake`) sektör alanı taşımadığından etkilenmez.
-- **Platform ekranı yok:** katalog yönetimi yalnızca API'dir (`relationship-roles` ile aynı durum); Platform → Sektörler sayfasına sekme eklenmesi ayrı iş.
+- **Platform ekranı (dilim 2):** Platform → Firma sektörleri (`/platform/firma-sektorleri`): liste (etkin önde, ad/kod araması), "Yeni sektör" (adan kod önerisi, kod elle değiştirilebilir), pasife alma/etkinleştirme. Faaliyet ağacı sayfasından (Sektörler ve faaliyetler) ayrıdır. Yazma yetkisi API'deki gibi platform Operasyon rolündedir; ekran yalnızca API'yi çağırır.
 - Katalog öğesinin **yeniden adlandırılması** yok (kod ve ad değişmez; yanlış girişte pasife alıp yenisi eklenir). Ad değişimi eklenirse `Party` üzerinde kopya olmadığı için yayılım gerekmez.
 - Birleştirme sihirbazı (`MergeWizard`) sektör farkını kod olarak gösterebilir.
 - Sektöre göre alan kuralı/davranış (ör. sektör profili) bu katalogdan bağımsızdır (ADR-0029, Y9c).

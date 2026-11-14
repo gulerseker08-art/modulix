@@ -94,6 +94,24 @@ public class LogisticsExpenseModuleTests
     }
 
     [Fact]
+    public void Expense_list_resolves_trip_numbers_and_supplier_names_and_the_approval_link_opens_the_expense_list()
+    {
+        var trip = Assert.Single(Module.Lookups, l => l.Key == LogisticsLookupDefinitions.ExpenseTrip);
+        Assert.Equal(LogisticsModule.Entities.TripExpense, trip.SourceEntityKey);
+        Assert.Equal("tripId", trip.Field);
+        Assert.Equal(LogisticsModule.Entities.Trip, trip.TargetEntityKey);
+        Assert.Equal(["number"], trip.LabelFields);
+        Assert.Equal(LogisticsAccess.ExpenseTripLookup, trip.Key);
+
+        var supplier = Assert.Single(Module.Lookups, l => l.Key == LogisticsLookupDefinitions.ExpenseSupplier);
+        Assert.Equal("supplierPartyId", supplier.Field);
+        Assert.Equal(LogisticsAccess.ExpenseSupplierLookup, supplier.Key);
+
+        // Onay merkezi bağlantısı masraf listesine gider (masraf başına sayfa yoktur).
+        Assert.Equal("lojistik/masraflar", Assert.Single(Module.ApprovalTargets).LinkTemplate);
+    }
+
+    [Fact]
     public void Shared_access_constants_match_the_server_module()
     {
         Assert.Equal(LogisticsModule.Permissions.ExpensesRead, LogisticsAccess.ExpensesRead);
@@ -101,6 +119,8 @@ public class LogisticsExpenseModuleTests
         Assert.Equal(LogisticsModule.Permissions.ExpensesApprove, LogisticsAccess.ExpensesApprove);
         Assert.Equal(LogisticsModule.Entities.TripExpense, LogisticsAccess.TripExpenseEntityKey);
         Assert.Equal(LogisticsModule.Lists.ExpenseKind, LogisticsAccess.ExpenseKindList);
+        Assert.Equal(LogisticsLookupDefinitions.ExpenseTrip, LogisticsAccess.ExpenseTripLookup);
+        Assert.Equal(LogisticsLookupDefinitions.ExpenseSupplier, LogisticsAccess.ExpenseSupplierLookup);
         Assert.Equal(TripExpense.Statuses.All, LogisticsAccess.ExpenseStatuses.Select(s => s.Key));
     }
 }

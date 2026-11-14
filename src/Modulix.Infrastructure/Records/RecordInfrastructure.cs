@@ -300,6 +300,7 @@ public static class RecordsSetup
         services.AddScoped<IRecordStore, PartyRecordStore>();
         services.AddScoped<IRecordStore, PersonRecordStore>();
         services.AddScoped<IRecordStore, PartyRelationshipRecordStore>();
+        services.AddScoped<IRecordStore, PlaceRecordStore>();
         services.AddScoped<IRecordStore, CredentialRecordStore>();
         services.AddScoped<ICredentialDirectory, CredentialDirectory>();
         return services;

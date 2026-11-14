@@ -39,12 +39,12 @@
     {
         @if (message is null)
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">Firma yok.</p>
+        <EmptyState Title="Firma yok." />
     }
     else
     {

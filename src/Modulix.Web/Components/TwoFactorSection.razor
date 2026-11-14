@@ -8,7 +8,7 @@
 
     @if (status is null)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
     else if (codes is not null)
     {

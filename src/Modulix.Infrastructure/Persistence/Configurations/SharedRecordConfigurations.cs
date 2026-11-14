@@ -93,3 +93,25 @@ internal sealed class PersonConfiguration : IEntityTypeConfiguration<Person>
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class PlaceConfiguration : IEntityTypeConfiguration<Place>
+{
+    public void Configure(EntityTypeBuilder<Place> builder)
+    {
+        SharedRecordTables.ConfigureCommon(builder, "Places");
+        builder.Property(p => p.Name).HasMaxLength(Place.NameMaxLength).IsRequired();
+        builder.Property(p => p.NormalizedName).HasMaxLength(Place.NameMaxLength).IsRequired();
+        builder.Property(p => p.KindKey).HasMaxLength(Place.KindKeyMaxLength).IsUnicode(false).IsRequired();
+        builder.Property(p => p.CountryCode).HasMaxLength(Place.CountryLength).IsUnicode(false).IsFixedLength().IsRequired();
+        builder.Property(p => p.City).HasMaxLength(Place.CityMaxLength);
+        builder.Property(p => p.District).HasMaxLength(Place.CityMaxLength);
+        builder.Property(p => p.AddressLine).HasMaxLength(Place.AddressMaxLength);
+        builder.Property(p => p.PostalCode).HasMaxLength(Place.PostalCodeMaxLength);
+        builder.Property(p => p.Latitude).HasPrecision(9, 6);
+        builder.Property(p => p.Longitude).HasPrecision(9, 6);
+
+        // Ad ülke içinde tekildir (ADR-0045 K1).
+        builder.HasIndex(p => new { p.TenantId, p.NormalizedName, p.CountryCode }).IsUnique();
+        builder.HasIndex(p => new { p.TenantId, p.CountryCode, p.City });
+    }
+}

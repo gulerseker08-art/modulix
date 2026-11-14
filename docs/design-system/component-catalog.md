@@ -17,7 +17,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | ThemeToggle | Var | `Components/ThemeToggle.razor` |
 | PageHeader | Var | `Components/PageHeader.razor` — `Title`, `Icon`, `Subtitle`, aksiyonlar `ChildContent` |
 | Breadcrumb | Stil | `<ol class="breadcrumb-trail">`; bugün detay sayfaları `back-link` kullanır |
-| Global arama | Var | `Components/GlobalSearch.razor`: üst çubukta "Arama yapın..." kutusu; 2+ karakterde 300ms gecikmeyle firma, kişi, fırsat, lead ve teklif liste uç noktalarını (`?search=&pageSize=5`) yalnızca izin olan türler için paralel çağırır; sonuçlar gruplu açılır panelde (ok tuşları, Enter, Escape, dışarı tıklama). Ayrı genel arama uç noktası yoktur; tenant, yetki ve kapsam süzgeçleri sunucudaki liste uç noktalarındadır |
+| Global arama | Var | `Components/GlobalSearch.razor`: üst çubukta "Arama yapın..." kutusu; 2+ karakterde 300ms gecikmeyle firma, kişi, fırsat, lead ve teklif liste uç noktalarını (`?search=&pageSize=5`) yalnızca izin olan türler için paralel çağırır; sonuçlar gruplu açılır panelde (ok tuşları, Enter, Escape, dışarı tıklama). Ayrı genel arama uç noktası yoktur; tenant, yetki ve kapsam süzgeçleri sunucudaki liste uç noktalarındadır **Komut paleti (13.11.2026):** `Ctrl+K` (macOS `⌘K`) kutuya odaklanır (`shell.js`; kutu boşken sağda `global-search-kbd` ipucu). Sonuçların ilk grubu **Ekranlar**dır: kullanıcının menüsünde görünen ekranlar (`AppNavigation`) adına göre istemcide, beklemeden eşleşir (`ScreenSearch`; büyük/küçük harf ve Türkçe işaret duyarsız: "firsat" → "Fırsatlar"); kayıt sonuçları gelince altına eklenir. Menüde gizli ekran burada da çıkmaz; yetki yine route ve sunucuda denetlenir. |
 | NotificationCenter | Yok | Bildirim altyapısı yok |
 
 ## Temel
@@ -103,3 +103,24 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 ## Bildirim kutusu
 
 - `NotificationBell`: üst çubukta zil; `notification-count` okunmamış sayısı, `notification-panel` açılır liste, `notification-item.is-unread` okunmamış satır. Bildirim metni kaydın hassas ayrıntısını taşımaz; bağlantı kaydı açar ve yetki orada denetlenir.
+
+## Bekleme, boş durum ve geri bildirim (13.11.2026)
+
+Üçü de ortak bileşendir; sayfaya düz "Yükleniyor…" ya da gri "… yok." metni yazılmaz.
+
+| Bileşen | Kullanım |
+|---|---|
+| `LoadingState` | Veri gelene kadar içeriğin biçimini gösteren iskelet. `Kind`: `Lines` (ayrıntı, panel; varsayılan), `Table` (liste; `record-table` ile aynı çerçeve ve 44 px satır), `Cards` (özet kutuları); `Rows` satır sayısı. `role="status"` taşır, ekran okuyucuya yalnızca "Yükleniyor…" okunur. 150 ms gecikmeyle belirir (kısa yüklemede titremez); `prefers-reduced-motion` altında parıltı durur. Sınıflar: `loading-state`, `skeleton`, `skeleton-bar`, `skeleton-table`, `skeleton-row`, `skeleton-cards`. |
+| `EmptyState` | Boş listede tablo yerine çizilir: ikon (`Icon`, varsayılan `inbox`), başlık (`Title`, varsayılan "Kayıt yok."), isteğe bağlı tek cümle (`Text`) ve eylem (`ChildContent`; ör. "Yeni …" düğmesi, yalnızca yazma yetkisi olana). Kart ya da panel içindeki küçük listede `Compact` (çerçevesiz, tek satır). Sınıflar: `empty-state`, `empty-state-compact`. |
+| Toast (`ToastService` + `ToastHost`) | İşlem sonucu ("Kaydedildi.", "Silindi.") sağ altta kısa süreli bildirimle verilir; sayfa düzeni kaymaz. `Toasts.Success/Info/Error(metin)`; 4 sn (hata 8 sn) sonra kapanır, en çok dört bildirim durur. Kayıt editörleri `Saved`/`Deleted` geri çağrısından önce kendisi gösterir; sayfa ayrıca başarı kutusu çizmez. **Doğrulama hatası toast ile verilmez**: alanın yanında (`FieldError`) ve formun üstünde (`ErrorSummary`) kalır. `ToastHost` kabukta (`MainLayout`) bir kez çizilir; hata `role="alert"`, diğerleri `role="status"`. Sınıflar: `toast-stack`, `app-toast`, `app-toast-success/info/error` (Bootstrap `.toast` kullanılmaz). |
+
+## Kayıt kartında satır eylemleri ve alt bölümler (13.11.2026)
+
+- Kart içindeki liste satırlarında (`ul.item-list`: adres, telefon/e-posta) "Düzenle / Sil" metin bağlantısı yazılmaz; eylemler `RowMenu` ("⋯") içinde toplanır. Yıkıcı öğe `view-menu-item is-danger` (kırmızı metin + `trash` ikonu) ve menünün son öğesidir.
+- Bölüm kartının (`FormSection` → `section-card-body`) içindeki alt bölüm (`sub-section`) ikinci bir kart çizmez: çerçeve ve gölge ortak CSS'te kalkar, kardeş alt bölümler ince çizgiyle ayrılır. Kart içine kart konmaz.
+
+## Ana sayfa ve telefonda sekmeler (13.11.2026)
+
+- Ana sayfa (`Pages/Home.razor`): `PageHeader` ("Hoş geldiniz, {ad}"), ilgili listeye bağlanan özet kutuları (`stat-grid`), solda satış hunisi (`BarChart`), sağda kullanıcının bugünkü işleri (`TodayActivities`). Aynı veri iki grafikle yinelenmez; özet kutuları zaten bağlantı olduğu için ayrıca kısayol kartı (`tiles`) çizilmez.
+- `ViewTabs` çubuğu içerik panelini genişletmez (`contain: inline-size`): sekmeler sığmayınca çubuk kendi içinde yatay kayar. Telefonda sayfa yatay taşmamalıdır; yeni ekranın görsel denetiminde 390 px genişlikte `scrollWidth` kontrol edilir.
+

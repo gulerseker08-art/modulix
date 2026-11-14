@@ -30,11 +30,16 @@ public static class LogisticsAccess
     public const string ShipmentsRead = "logistics.shipments.read";
     public const string ShipmentsWrite = "logistics.shipments.write";
     public const string FreightRead = "logistics.freight.read";
+    public const string PlacesWrite = "logistics.places.write";
 
     public const string TransportRequestEntityKey = "logistics.transport-request";
     public const string ShipmentEntityKey = "logistics.shipment";
 
     public const string TransportModeList = "logistics.transport-mode";
+
+    /// <summary>Yer defteri (ADR-0045): Core ortak kaydı <c>core.place</c> ve tür listesi <c>core.place-kind</c>.</summary>
+    public const string PlaceEntityKey = "core.place";
+    public const string PlaceKindList = "core.place-kind";
 
     public const string RequestCustomerLookup = "logistics.transport-request.customer";
     public const string RequestSenderLookup = "logistics.transport-request.sender";
@@ -71,6 +76,9 @@ public static class LogisticsAccess
     /// <summary>Panoyu açmak için bunlardan biri yeter; her bölüm kendi okuma iznine bağlıdır.</summary>
     public static IReadOnlyList<string> DashboardAny { get; } = [RequestsRead, ShipmentsRead, TripsRead, DriversRead];
 
+    /// <summary>Yer defterini okuyan izinler (ADR-0045 K7): talep, sevkiyat ya da sefer okuma izni yeter; yazmak için <see cref="PlacesWrite"/>.</summary>
+    public static IReadOnlyList<string> PlacesReadAny { get; } = [RequestsRead, ShipmentsRead, TripsRead];
+
     public const string TripEntityKey = "logistics.trip";
     public const string TripStopEntityKey = "logistics.trip-stop";
     public const string DeliveryProofEntityKey = "logistics.delivery-proof";
@@ -82,6 +90,7 @@ public static class LogisticsAccess
     public const string TripExpenseEntityKey = "logistics.trip-expense";
     public const string ExpenseKindList = "logistics.expense-kind";
     public const string ExpenseSupplierLookup = "logistics.trip-expense.supplier";
+    public const string ExpenseTripLookup = "logistics.trip-expense.trip";
 
     /// <summary>Masraf durumları (sabit; sunucudaki <c>TripExpense.Statuses</c>).</summary>
     public static IReadOnlyList<(string Key, string Label)> ExpenseStatuses { get; } =

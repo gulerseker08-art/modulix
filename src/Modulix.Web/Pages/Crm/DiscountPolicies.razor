@@ -113,11 +113,11 @@
 
     @if (policies is null)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (policies.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("crm.discountPolicies.none")</p>
+        <EmptyState Title="@Texts.Get("crm.discountPolicies.none")" />
     }
     else
     {

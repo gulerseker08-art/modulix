@@ -8,7 +8,7 @@
 <AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.SegmentsRead">
     @if (segment is null && loadError is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (segment is null)
     {
@@ -195,7 +195,7 @@
                     }
                     else if (members is null)
                     {
-                        <p class="text-muted" role="status">Yükleniyor…</p>
+                        <LoadingState />
                     }
                     else if (members.RowsHidden)
                     {
@@ -203,7 +203,7 @@
                     }
                     else if (members.Rows.Count == 0)
                     {
-                        <p class="text-muted">Bu segmentte üye yok.</p>
+                        <EmptyState Title="Bu segmentte üye yok." />
                     }
                     else
                     {
@@ -231,7 +231,7 @@
                     <h2 id="exceptions-title" class="h5">@(IsDynamic ? "Dahil/hariç istisnalar" : "Elle eklenen üyeler")</h2>
                     @if (exceptions is null)
                     {
-                        <p class="text-muted" role="status">Yükleniyor…</p>
+                        <LoadingState Kind="LoadingKind.Table" />
                     }
                     else if (exceptions.Count == 0)
                     {
@@ -299,11 +299,11 @@
             <div id="tabpanel-surumler" role="tabpanel" aria-labelledby="tab-surumler" hidden="@tabState.Hidden("surumler")">
                 @if (versions is null)
                 {
-                    <p class="text-muted" role="status">Yükleniyor…</p>
+                    <LoadingState Kind="LoadingKind.Table" />
                 }
                 else if (versions.Count == 0)
                 {
-                    <p class="text-muted">Henüz yayımlanmış sürüm yok. Yayımlanan koşul değişmez; kampanyalar sürüm numarasına bağlanır.</p>
+                    <EmptyState Title="Henüz yayımlanmış sürüm yok. Yayımlanan koşul değişmez; kampanyalar sürüm numarasına bağlanır." />
                 }
                 else
                 {

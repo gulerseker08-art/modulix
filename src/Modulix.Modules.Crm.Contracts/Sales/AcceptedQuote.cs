@@ -1,7 +1,7 @@
-namespace Modulix.Core.Contracts.Sales;
+namespace Modulix.Modules.Crm.Contracts.Sales;
 
 // Kabul edilen teklifin sipariş/sözleşme gibi sonraki modüllere devri için entegrasyon sözleşmesi (ADR-0019, dilim 7). Sipariş ya da sözleşme
-// modülü henüz yoktur; bu sözleşme onların CRM'e bağlanmadan (yalnızca Core.Contracts üzerinden) kabul edilmiş teklifi okuyabilmesi içindir.
+// modülü henüz yoktur; bu sözleşme onların CRM'e bağlanmadan (yalnızca CRM sözleşme projesi üzerinden) kabul edilmiş teklifi okuyabilmesi içindir.
 
 /// <summary>Kabul edilen teklifin kalemi. Değerler teklifin sunulduğu andaki kopyadır (katalog değişse de aynı kalır).</summary>
 public sealed record AcceptedQuoteLine(

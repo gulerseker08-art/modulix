@@ -17,7 +17,7 @@
 
     @if (!loaded)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState />
     }
     else if (employee is null)
     {
@@ -44,7 +44,7 @@
 
         @if (claims is null || claims.Items.Count == 0)
         {
-            <p class="text-muted" role="status">Henüz masraf beyanınız yok.</p>
+            <EmptyState Icon="wallet" Title="Henüz masraf beyanınız yok." />
         }
         else
         {
@@ -52,9 +52,9 @@
                 <caption class="visually-hidden">Masraf beyanlarım</caption>
                 <thead>
                     <tr>
-                        <th scope="col"><AppIcon Name="type" Size="14" /> Başlık</th>
-                        <th scope="col" class="text-end"><AppIcon Name="coins" Size="14" /> Toplam</th>
-                        <th scope="col"><AppIcon Name="check-circle" Size="14" /> Durum</th>
+                        <th scope="col"><SortHeader Label="Başlık" ColumnIcon="type" Asc="title" Desc="-title" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col" class="text-end"><SortHeader Label="Toplam" ColumnIcon="coins" Asc="totalAmount" Desc="-totalAmount" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="Durum" ColumnIcon="check-circle" Asc="status" Desc="-status" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
                         <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
                     </tr>
                 </thead>
@@ -107,10 +107,21 @@
         loaded = true;
     }
 
+    // Sıralama sunucudadır (kayıt deposunun sort anahtarları); boş değer deponun varsayılan sırasıdır.
+    private string sort = "";
+
+    private string SortQuery => sort.Length == 0 ? "" : "&sort=" + Uri.EscapeDataString(sort);
+
+    private async Task SortAsync(string value)
+    {
+        sort = value;
+        await LoadAsync(1);
+    }
+
     private async Task LoadAsync(int pageNumber)
     {
         var result = await Api.GetAsync<RecordPageResponse>(
-            $"/api/records/{HrAccess.ExpenseClaimEntityKey}?employeeId={employee!.Id}&page={pageNumber}&pageSize={ListPaging.Size}");
+            $"/api/records/{HrAccess.ExpenseClaimEntityKey}?employeeId={employee!.Id}&page={pageNumber}&pageSize={ListPaging.Size}{SortQuery}");
         claims = result.Value;
         message = result.Error;
     }
