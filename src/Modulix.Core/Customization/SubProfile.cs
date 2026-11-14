@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.FieldRules;
 using Modulix.Core.Modules;
 
 namespace Modulix.Core.Customization;
@@ -233,6 +234,80 @@ public sealed class SubProfileFeature : ITenantEntity, ICompanyShared
     public DateTimeOffset CreatedAt { get; private set; }
 }
 
+/// <summary>
+/// Alt profilin alan kuralı (ADR-0041 dilim 2, K2/K4): tek <see cref="FieldRule"/>. Alan ve liste değeri gibi firmaya <b>uygulanmaz</b>; alt profil etkinken
+/// kural katmanına girer (<see cref="RuleLayerKind.SubProfile"/>), pasife alınınca ya da kural kaldırılınca katmandan çıkar. Bu yüzden her durumda
+/// eklenip düzenlenip kaldırılabilir. Kural anahtarı <c>sp.&lt;alt-profil-kodu&gt;.&lt;ad&gt;</c> biçimindedir ve değişmez (firma uyarlaması anahtarla
+/// kapatır). Tenant verisidir; RLS ile korunur.
+/// </summary>
+public sealed class SubProfileRule : ITenantEntity, ICompanyShared
+{
+    public const int NameMaxLength = 100;
+
+    private SubProfileRule()
+    {
+        // EF Core için
+    }
+
+    public SubProfileRule(Guid subProfileId, string name, FieldRule rule, int sortOrder)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        Id = Guid.CreateVersion7();
+        SubProfileId = subProfileId;
+        Key = rule.Key;
+        SortOrder = sortOrder;
+        CreatedAt = DateTimeOffset.UtcNow;
+        Replace(name, rule);
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid TenantId { get; set; }
+
+    public Guid SubProfileId { get; private set; }
+
+    /// <summary>Kural anahtarı (firma içinde benzersiz, değişmez).</summary>
+    public string Key { get; private set; } = string.Empty;
+
+    /// <summary>Ekranda görünen ad ("Deniz: konteyner no zorunlu").</summary>
+    public string Name { get; private set; } = string.Empty;
+
+    /// <summary>Kuralın JSON'u (<see cref="FieldRuleJson"/>; tek elemanlı liste).</summary>
+    public string RuleJson { get; private set; } = "[]";
+
+    public int SortOrder { get; private set; }
+
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    /// <summary>Saklanan kural. Biçim bozuksa <see cref="CorruptRulePackageException"/> (hangi alt profilin kuralı olduğu <paramref name="subProfileCode"/>'dan görünür).</summary>
+    public FieldRule ToRule(string subProfileCode) =>
+        FieldRuleJson.DeserializePackage($"alt-profil:{subProfileCode}", 0, RuleJson).SingleOrDefault()
+        ?? throw new CorruptRulePackageException($"alt-profil:{subProfileCode}", 0, new FormatException("Alt profil kuralı boş."));
+
+    /// <summary>Adı ve kuralı değiştirir; anahtar sabit kalır, kilitli kural olmaz.</summary>
+    public void Replace(string name, FieldRule rule)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        Name = name;
+        RuleJson = FieldRuleJson.Serialize([rule with { Key = Key.Length == 0 ? rule.Key : Key, Locked = false }]);
+    }
+}
+
+/// <summary>Alt profil kuralı girdisi. <see cref="Rule"/>'un anahtarı ve kilidi yok sayılır: anahtarı sunucu üretir, alt profil kuralı kilitli olamaz.</summary>
+public sealed record SubProfileRuleInput(string Name, FieldRule Rule);
+
+public sealed record SubProfileRuleView(Guid Id, string Name, FieldRule Rule);
+
+/// <summary>
+/// Alt profil kurallarının etkin kural kümesine etkisi (yazmadan): <see cref="Rules"/> alt profil etkin olunca katmana giren kurallar,
+/// <see cref="Conflicts"/> etkinleştirmeyi engelleyen çakışmalar, <see cref="Warnings"/> yalnızca bildirir.
+/// </summary>
+public sealed record SubProfileRulePreview(
+    IReadOnlyList<FieldRule> Rules, IReadOnlyList<RuleMergeIssue> Conflicts, IReadOnlyList<RuleMergeIssue> Warnings)
+{
+    public bool CanActivate => Conflicts.Count == 0;
+}
+
 /// <summary>Hizmet özelliği girdisi: grup ve değer.</summary>
 public sealed record SubProfileFeatureInput(string Group, string Value);
 
@@ -266,7 +341,7 @@ public sealed record SubProfileOptionView(
 
 /// <summary>
 /// Listede <see cref="Options"/> boştur (yalnızca <see cref="OptionCount"/>); tek alt profil okunurken dolar. <see cref="Features"/> her ikisinde de
-/// dolu gelir (liste süzgeci için).
+/// dolu gelir (liste süzgeci için); <see cref="Rules"/> de her ikisinde dolu gelir.
 /// </summary>
 public sealed record SubProfileView(
     Guid Id,
@@ -282,7 +357,8 @@ public sealed record SubProfileView(
     DateTimeOffset CreatedAt,
     DateTimeOffset? ActivatedAt,
     IReadOnlyList<SubProfileOptionView> Options,
-    IReadOnlyList<SubProfileFeatureView> Features);
+    IReadOnlyList<SubProfileFeatureView> Features,
+    IReadOnlyList<SubProfileRuleView> Rules);
 
 /// <summary>Bilinmeyen alt profil ya da seçenek (404).</summary>
 public sealed class SubProfileNotFoundException(string message) : Exception(message);
@@ -336,6 +412,22 @@ public interface ISubProfileService
 
     /// <summary>Hizmet özelliğini kaldırır. Alt profil ya da özellik yoksa null.</summary>
     Task<SubProfileView?> RemoveFeatureAsync(Guid id, Guid featureId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Alan kuralı ekler (<see cref="SubProfileRule"/>). Kural anahtarını sunucu üretir; alan ve koşul <c>FieldRuleChecker</c> ile firmanın alan kümesine
+    /// (özel alanlar dahil) karşı doğrulanır. Alt profil etkinse ve kural etkin kural kümesinde çakışma doğuruyorsa (ör. aynı alan başka alt profilde koşulsuz
+    /// gizli) kaydedilmez (<see cref="ArgumentException"/>). Alt profil yoksa null.
+    /// </summary>
+    Task<SubProfileView?> AddRuleAsync(Guid id, SubProfileRuleInput input, CancellationToken cancellationToken);
+
+    /// <summary>Kuralı değiştirir (anahtar sabit); ekleme ile aynı doğrulama. Alt profil ya da kural yoksa null.</summary>
+    Task<SubProfileView?> UpdateRuleAsync(Guid id, Guid ruleId, SubProfileRuleInput input, CancellationToken cancellationToken);
+
+    /// <summary>Kuralı kaldırır (etkinse katmandan da çıkar). Alt profil ya da kural yoksa null.</summary>
+    Task<SubProfileView?> RemoveRuleAsync(Guid id, Guid ruleId, CancellationToken cancellationToken);
+
+    /// <summary>Yazmadan: alt profil etkin sayılırsa kuralların etkin kural kümesinde çakışma doğurup doğurmadığı. Alt profil yoksa null.</summary>
+    Task<SubProfileRulePreview?> PreviewRulesAsync(Guid id, CancellationToken cancellationToken);
 
     /// <summary>Hazır alt profiller ve bu firma için durumları (eklenmiş mi, hangi modül kapalı).</summary>
     Task<IReadOnlyList<SubProfileStarterView>> ListStartersAsync(CancellationToken cancellationToken);

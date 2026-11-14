@@ -1,3 +1,4 @@
+using Modulix.Core.FieldRules;
 using Modulix.Core.Modules;
 
 namespace Modulix.Core.Customization;
@@ -110,6 +111,38 @@ public static class SubProfileRules
     /// <summary>Özellikleri grup adıyla, ilk görülme sırasıyla kümeler ("Taşıma türü: Komple, Parsiyel").</summary>
     public static IReadOnlyList<string> GroupLabels(IEnumerable<SubProfileFeatureInput> features) =>
         [.. features.GroupBy(f => f.Group, StringComparer.CurrentCultureIgnoreCase).Select(g => $"{g.First().Group}: {string.Join(", ", g.Select(f => f.Value))}")];
+
+    /// <summary>Kural girdisini kırpar ve doğrular (ad zorunlu, kural gerekli). Alan, etki ve koşul doğrulaması servisin işidir (firmanın alan kümesi gerekir). Hatalar <see cref="ArgumentException"/>.</summary>
+    public static SubProfileRuleInput NormalizeRule(SubProfileRuleInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        var name = input.Name?.Trim() ?? string.Empty;
+        if (name.Length == 0 || name.Length > SubProfileRule.NameMaxLength)
+        {
+            throw new ArgumentException($"Kural adı zorunludur ve en çok {SubProfileRule.NameMaxLength} karakter olabilir.", "name");
+        }
+
+        return new SubProfileRuleInput(name, input.Rule ?? throw new ArgumentException("Kural gerekli.", "rule"));
+    }
+
+    /// <summary>
+    /// Alt profil kuralının anahtarı: <c>sp.&lt;alt-profil-kodu&gt;.&lt;ad&gt;</c> (ADR-0041 K4). Alt çizgi kural anahtarında geçerli olmadığından kod ve ad
+    /// tire ile yazılır; <paramref name="taken"/> içindeyse sonuna sayı eklenir. Öneki sabit olduğundan alt profil kuralı ürün ya da sektör kuralının anahtarıyla çakışmaz.
+    /// </summary>
+    public static string RuleKey(string subProfileCode, string name, IReadOnlySet<string> taken)
+    {
+        var prefix = $"sp.{subProfileCode.Replace('_', '-')}.";
+        var slug = CustomFieldRules.KeyFrom(name, new HashSet<string>(), FieldRule.KeyMaxLength - prefix.Length - 4).Replace('_', '-');
+        var key = prefix + slug;
+        var candidate = key;
+        for (var i = 2; taken.Contains(candidate); i++)
+        {
+            candidate = $"{key}-{i.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+        }
+
+        return candidate;
+    }
+
 
     /// <summary>Aynı alt profilde aynı hedefte aynı ad iki kez olamaz (büyük/küçük harf fark etmez).</summary>
     public static bool IsDuplicate(SubProfileOptionInput input, IEnumerable<SubProfileOption> others) =>

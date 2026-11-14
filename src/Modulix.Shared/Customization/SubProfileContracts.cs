@@ -1,3 +1,5 @@
+using Modulix.Shared.Sectors;
+
 namespace Modulix.Shared.Customization;
 
 /// <summary>Alt profil durumları (ADR-0041): <c>Draft</c> hazırlanıyor, <c>Active</c> etkin, <c>Inactive</c> pasif.</summary>
@@ -52,6 +54,16 @@ public sealed record SubProfileFeatureDto(Guid Id, string Group, string Value);
 
 public sealed record SaveSubProfileFeatureRequest(string Group, string Value);
 
+/// <summary>
+/// Alt profilin alan kuralı (ADR-0041 dilim 2). <see cref="Rule"/>.Key sunucudan gelir (<c>sp.&lt;kod&gt;.&lt;ad&gt;</c>), değişmez; kayıtta gönderilen anahtar ve kilit yok sayılır.
+/// </summary>
+public sealed record SubProfileRuleDto(Guid Id, string Name, FieldRuleDto Rule);
+
+public sealed record SaveSubProfileRuleRequest(string Name, FieldRuleDto Rule);
+
+/// <summary>Alt profil kurallarının etkin kural kümesine etkisi (yazmaz): <c>CanActivate</c> false ise <c>Conflicts</c> etkinleştirmeyi engeller.</summary>
+public sealed record SubProfileRulePreviewDto(List<FieldRuleDto> Rules, List<RuleIssueDto> Conflicts, List<RuleIssueDto> Warnings, bool CanActivate);
+
 /// <summary>Alt profil. Listede <see cref="Options"/> boştur (yalnızca sayılar); tek alt profil okunurken dolar. <see cref="Features"/> ikisinde de dolu gelir.</summary>
 public sealed record SubProfileDto(
     Guid Id,
@@ -67,7 +79,8 @@ public sealed record SubProfileDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset? ActivatedAt,
     IReadOnlyList<SubProfileOptionDto> Options,
-    IReadOnlyList<SubProfileFeatureDto> Features);
+    IReadOnlyList<SubProfileFeatureDto> Features,
+    IReadOnlyList<SubProfileRuleDto> Rules);
 
 /// <summary>
 /// Hazır alt profil (öneri): tek tıkla firmanın taslak alt profili olarak eklenir. <see cref="MissingModules"/> kapalı olduğu için

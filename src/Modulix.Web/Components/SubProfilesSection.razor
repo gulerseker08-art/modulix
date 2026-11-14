@@ -1,3 +1,4 @@
+@using Modulix.Web.Services
 @inject ApiClient Api
 
 @* Firma alt profilleri (ADR-0041): sektör profilinin altında firmanın kendi tanımladığı alan ve liste değeri paketleri. Tek seviyedir;
@@ -174,9 +175,27 @@
                     <section class="settings-group">
                         <h3>Etkinleştirince firmaya eklenecekler</h3>
                         <ProfilePreview Plan="plan" Applied="false" />
+                        @if (rulePreview is { Rules.Count: > 0 })
+                        {
+                            <p>Etkinleşince <strong>@rulePreview.Rules.Count kural</strong> kayıt formlarında geçerli olur.</p>
+                        }
+
+                        @if (rulePreview is { Conflicts.Count: > 0 })
+                        {
+                            <div class="alert alert-danger" role="alert">
+                                Kurallar etkin kurallarla çakışıyor; çakışma giderilmeden etkinleştirilemez.
+                                <ul class="mb-0">
+                                    @foreach (var conflict in rulePreview.Conflicts)
+                                    {
+                                        <li>@conflict.Message</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+
                         <div class="form-actions">
-                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => plan = null">Vazgeç</button>
-                            <button type="button" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")" disabled="@busy" @onclick="() => SetStatusAsync(SubProfileStatuses.Active)">Etkinleştir ve uygula</button>
+                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => { plan = null; rulePreview = null; }">Vazgeç</button>
+                            <button type="button" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")" disabled="@(busy || ActivationBlocked)" @onclick="() => SetStatusAsync(SubProfileStatuses.Active)">Etkinleştir ve uygula</button>
                         </div>
                     </section>
                 }
@@ -373,6 +392,155 @@
                         </div>
                     </form>
                 }
+
+                <h3>Kurallar</h3>
+                <p class="text-muted">
+                    Alt profil <strong>etkinken</strong> kayıt formunda geçerli olan alan kuralları (ör. Konteyner no zorunlu). Alan ve liste değeri gibi firmaya eklenmez:
+                    alt profil pasife alınınca kurallar devre dışı kalır, kural silinmez. Firma uyarlaması bir alt profil kuralını tek tek kapatabilir ya da değiştirebilir.
+                </p>
+                @if (current.Rules.Count == 0)
+                {
+                    <p class="text-muted">Bu alt profilde henüz kural yok.</p>
+                }
+                else
+                {
+                    <table class="table record-table">
+                        <thead>
+                            <tr><th>Kural</th><th>Alan</th><th>Etki</th><th>Koşul</th><th>İleti / değer</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var rule in current.Rules)
+                            {
+                                <tr>
+                                    <td data-label="Kural" class="primary">@rule.Name</td>
+                                    <td data-label="Alan">@RuleFieldLabel(rule.Rule.Field)</td>
+                                    <td data-label="Etki">@RuleEffectLabel(rule.Rule.Effect)</td>
+                                    <td data-label="Koşul">@RuleConditionSummary(rule.Rule)</td>
+                                    <td data-label="İleti / değer">@((rule.Rule.Message ?? rule.Rule.Value) is { Length: > 0 } text ? text : "—")</td>
+                                    <td class="actions">
+                                        @if (IsEditable(rule.Rule))
+                                        {
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="@($"{rule.Name} kuralını düzenle")" @onclick="() => EditRule(rule)">Düzenle</button>
+                                        }
+                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="@($"{rule.Name} kuralını kaldır")" @onclick="() => RemoveRuleAsync(rule)">Kaldır</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+
+                @if (ruleForm is null)
+                {
+                    <div class="list-toolbar">
+                        <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="NewRule">Kural ekle</button>
+                    </div>
+                }
+                else
+                {
+                    <form novalidate @onsubmit="SaveRuleAsync" @onsubmit:preventDefault>
+                        <h3>@(ruleForm.Id is null ? "Yeni kural" : "Kuralı düzenle")</h3>
+                        <div class="form-grid">
+                            <div>
+                                <label class="form-label" for="ruleName">Kural adı *</label>
+                                <input id="ruleName" class="form-control" maxlength="100" placeholder="ör. Konteyner no zorunlu" @bind="ruleForm.Name" @bind:event="oninput" />
+                                <FieldError Field="name" Errors="errors" />
+                            </div>
+                            <div>
+                                <label class="form-label" for="ruleField">Alan *</label>
+                                <select id="ruleField" class="form-select" value="@ruleForm.Field" @onchange="e => OnRuleFieldChanged(e.Value?.ToString())">
+                                    <option value="">Alan seçin</option>
+                                    @foreach (var entity in RuleEntities)
+                                    {
+                                        <optgroup label="@entity.DisplayName">
+                                            @foreach (var field in entity.Fields)
+                                            {
+                                                <option value="@field.Key">@field.Label</option>
+                                            }
+                                        </optgroup>
+                                    }
+                                </select>
+                                <FieldError Field="field" Errors="errors" />
+                            </div>
+                            <div>
+                                <label class="form-label" for="ruleEffect">Etki *</label>
+                                <select id="ruleEffect" class="form-select" @bind="ruleForm.Effect">
+                                    @foreach (var effect in RuleEffects)
+                                    {
+                                        <option value="@effect.Key">@effect.Label</option>
+                                    }
+                                </select>
+                                <FieldError Field="effect" Errors="errors" />
+                            </div>
+                            @if (ruleForm.Effect is "Validate" or "Warn" or "RequireApproval" or "Block")
+                            {
+                                <div>
+                                    <label class="form-label" for="ruleMessage">İleti *</label>
+                                    <input id="ruleMessage" class="form-control" maxlength="200" @bind="ruleForm.Message" @bind:event="oninput" />
+                                    <FieldError Field="message" Errors="errors" />
+                                </div>
+                            }
+                            else if (ruleForm.Effect == "SuggestDefault")
+                            {
+                                <div>
+                                    <label class="form-label" for="ruleValue">Önerilen değer *</label>
+                                    <input id="ruleValue" class="form-control" @bind="ruleForm.Value" @bind:event="oninput" />
+                                    <FieldError Field="value" Errors="errors" />
+                                </div>
+                            }
+                            <div class="span-all check-list">
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" @bind="ruleForm.Conditional" />
+                                    <span class="form-check-label">Yalnızca bir koşul sağlanınca geçerli olsun</span>
+                                </label>
+                            </div>
+                            @if (ruleForm.Conditional)
+                            {
+                                <div>
+                                    <label class="form-label" for="ruleCondField">Koşul alanı</label>
+                                    <select id="ruleCondField" class="form-select" value="@ruleForm.CondField" @onchange="e => OnConditionFieldChanged(e.Value?.ToString())">
+                                        <option value="">Alan seçin</option>
+                                        @foreach (var field in ConditionFields)
+                                        {
+                                            <option value="@field.Key">@field.Label</option>
+                                        }
+                                    </select>
+                                    <FieldError Field="condition" Errors="errors" />
+                                </div>
+                                <div>
+                                    <label class="form-label" for="ruleCondOp">Koşul</label>
+                                    <select id="ruleCondOp" class="form-select" @bind="ruleForm.CondOperator">
+                                        @foreach (var op in ConditionOperators)
+                                        {
+                                            <option value="@EditorLeaf.OperatorKey(op)">@AutomationLabels.Operator(op)</option>
+                                        }
+                                    </select>
+                                </div>
+                                @if (EditorLeaf.ValueCount(ruleForm.CondOperator).Max > 0)
+                                {
+                                    <div>
+                                        <label class="form-label" for="ruleCondValue">Değer</label>
+                                        <input id="ruleCondValue" class="form-control" list="ruleCondOptions" placeholder="birden fazlaysa virgülle ayırın" @bind="ruleForm.CondValues" @bind:event="oninput" />
+                                        <datalist id="ruleCondOptions">
+                                            @foreach (var option in ConditionField?.Options ?? [])
+                                            {
+                                                <option value="@option.Key">@option.Label</option>
+                                            }
+                                        </datalist>
+                                    </div>
+                                }
+                            }
+                        </div>
+                        <FieldError Field="rule" Errors="errors" />
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CancelRuleForm">Vazgeç</button>
+                            <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")"
+                                    disabled="@(busy || string.IsNullOrWhiteSpace(ruleForm.Name) || string.IsNullOrWhiteSpace(ruleForm.Field))">
+                                @(ruleForm.Id is null ? "Kuralı ekle" : "Kaydet")
+                            </button>
+                        </div>
+                    </form>
+                }
             </div>
         }
     }
@@ -477,11 +645,17 @@
     private async Task OpenAsync(Guid id)
     {
         plan = null;
+        rulePreview = null;
         optionForm = null;
+        ruleForm = null;
         errors = null;
         var result = await Api.GetAsync<SubProfileDto>($"/api/customization/sub-profiles/{id}");
         current = result.Value;
         message = result.Error;
+        if (current is { Rules.Count: > 0 })
+        {
+            await EnsureRuleCatalogAsync();
+        }
     }
 
     private void NewProfile()
@@ -528,6 +702,7 @@
     {
         busy = true;
         var result = await Api.GetAsync<ProfilePlanDto>($"/api/customization/sub-profiles/{current!.Id}/apply/preview");
+        rulePreview = (await Api.GetAsync<SubProfileRulePreviewDto>($"/api/customization/sub-profiles/{current.Id}/rules/preview")).Value;
         busy = false;
         plan = result.Value;
         message = result.Error;
@@ -538,8 +713,11 @@
         busy = true;
         var result = await Api.PostAsync<SubProfileDto>($"/api/customization/sub-profiles/{current!.Id}/status", new SetSubProfileStatusRequest(status, current.Revision));
         busy = false;
-        message = result.Error;
+
+        // Etkinleştirme kural çakışmasıyla reddedilirse ileti alan hatası olarak gelir; kullanıcıya yine de gösterilir.
+        message = result.FieldErrors.Count > 0 ? string.Join(" ", result.FieldErrors.Values.SelectMany(v => v)) : result.Error;
         plan = null;
+        rulePreview = null;
         if (result.IsSuccess)
         {
             current = result.Value;
@@ -643,6 +821,209 @@
         public string ActivityCode { get; set; } = string.Empty;
 
         public long Revision { get; init; }
+    }
+
+    // Kurallar (ADR-0041 dilim 2): alan listesi firmanın otomasyon alan kümesidir (özel alanlar dahil); koşul tek satırdır, daha karmaşık koşullar API'dendir.
+    private AutomationCatalogDto? ruleCatalog;
+    private RuleForm? ruleForm;
+    private SubProfileRulePreviewDto? rulePreview;
+
+    private static readonly (string Key, string Label)[] RuleEffects =
+    [
+        ("Required", "Zorunlu yap"),
+        ("Hide", "Gizle"),
+        ("Show", "Yalnızca koşul sağlanınca göster"),
+        ("ReadOnly", "Salt okunur yap"),
+        ("SuggestDefault", "Varsayılan değer öner"),
+        ("Validate", "Kaydı reddet (hata iletisi)"),
+        ("Warn", "Uyar (kaydı engellemez)"),
+        ("RequireApproval", "Onay iste"),
+        ("Block", "İşlemi engelle"),
+    ];
+
+    private IEnumerable<AutomationEntityDto> RuleEntities => ruleCatalog?.Entities ?? [];
+
+    private AutomationEntityDto? RuleEntity => RuleEntities.FirstOrDefault(e => e.Fields.Any(f => f.Key == ruleForm?.Field));
+
+    // Koşul alanı kuralın kayıt türünden seçilir (sunucu da aynı alan kümesiyle doğrular); para alanı para birimi istediğinden dışarıda kalır.
+    private IEnumerable<AutomationFieldDto> ConditionFields => RuleEntity?.Fields.Where(f => f.Type != "Money") ?? [];
+
+    private AutomationFieldDto? ConditionField => ConditionFields.FirstOrDefault(f => f.Key == ruleForm?.CondField);
+
+    private IEnumerable<string> ConditionOperators => ConditionField?.Operators.Where(o => !string.Equals(o, "Changed", StringComparison.OrdinalIgnoreCase)) ?? [];
+
+    private bool ActivationBlocked => rulePreview is { CanActivate: false };
+
+    private async Task EnsureRuleCatalogAsync()
+    {
+        ruleCatalog ??= (await Api.GetAsync<AutomationCatalogDto>("/api/customization/sub-profiles/rule-catalog")).Value;
+    }
+
+    private string RuleFieldLabel(string key)
+    {
+        foreach (var entity in RuleEntities)
+        {
+            if (entity.Fields.FirstOrDefault(f => f.Key == key) is { } field)
+            {
+                return $"{entity.DisplayName} · {field.Label}";
+            }
+        }
+
+        return key;
+    }
+
+    private string ConditionFieldLabel(string key) =>
+        RuleEntities.SelectMany(e => e.Fields).FirstOrDefault(f => f.Key == key)?.Label ?? key;
+
+    private static string RuleEffectLabel(string effect) => RuleEffects.FirstOrDefault(e => e.Key == effect).Label ?? effect;
+
+    private static bool IsLeaf(System.Text.Json.JsonElement node) =>
+        node.ValueKind == System.Text.Json.JsonValueKind.Object && node.TryGetProperty("type", out var type) && type.GetString() == "leaf";
+
+    // Ekrandan yalnızca tek satırlık koşul düzenlenir; API'den gelen grup/ilişki koşullu kural bu ekranda bozulmasın diye yalnızca kaldırılabilir.
+    private static bool IsEditable(FieldRuleDto rule) => rule.Condition is not { } node || node.ValueKind == System.Text.Json.JsonValueKind.Null || IsLeaf(node);
+
+    private string RuleConditionSummary(FieldRuleDto rule)
+    {
+        if (rule.Condition is not { } node || node.ValueKind != System.Text.Json.JsonValueKind.Object)
+        {
+            return "Her zaman";
+        }
+
+        if (!IsLeaf(node))
+        {
+            return "Koşullu";
+        }
+
+        var values = node.TryGetProperty("values", out var array) && array.ValueKind == System.Text.Json.JsonValueKind.Array
+            ? string.Join(", ", array.EnumerateArray().Select(v => v.ToString()))
+            : string.Empty;
+        var field = node.TryGetProperty("field", out var f) ? f.GetString() ?? string.Empty : string.Empty;
+        var op = node.TryGetProperty("operator", out var o) ? o.GetString() ?? string.Empty : string.Empty;
+        return $"{ConditionFieldLabel(field)} {AutomationLabels.Operator(op)} {values}".Trim();
+    }
+
+    private async Task NewRule()
+    {
+        await EnsureRuleCatalogAsync();
+        ruleForm = new RuleForm();
+        errors = null;
+    }
+
+    private async Task EditRule(SubProfileRuleDto rule)
+    {
+        await EnsureRuleCatalogAsync();
+        var form = new RuleForm { Id = rule.Id, Name = rule.Name, Field = rule.Rule.Field, Effect = rule.Rule.Effect, Message = rule.Rule.Message ?? string.Empty, Value = rule.Rule.Value ?? string.Empty };
+        if (rule.Rule.Condition is { } node && IsLeaf(node))
+        {
+            form.Conditional = true;
+            form.CondField = node.TryGetProperty("field", out var f) ? f.GetString() ?? string.Empty : string.Empty;
+            form.CondOperator = node.TryGetProperty("operator", out var o) ? o.GetString() ?? "eq" : "eq";
+            form.CondValues = node.TryGetProperty("values", out var array) && array.ValueKind == System.Text.Json.JsonValueKind.Array
+                ? string.Join(", ", array.EnumerateArray().Select(v => v.ToString()))
+                : string.Empty;
+        }
+
+        ruleForm = form;
+        errors = null;
+    }
+
+    private void CancelRuleForm()
+    {
+        ruleForm = null;
+        errors = null;
+    }
+
+    private void OnRuleFieldChanged(string? key)
+    {
+        ruleForm!.Field = key ?? string.Empty;
+        if (ConditionField is null)
+        {
+            ruleForm.CondField = string.Empty;
+        }
+    }
+
+    private void OnConditionFieldChanged(string? key)
+    {
+        ruleForm!.CondField = key ?? string.Empty;
+        ruleForm.CondOperator = ConditionOperators.FirstOrDefault() is { } first ? EditorLeaf.OperatorKey(first) : "eq";
+        ruleForm.CondValues = string.Empty;
+    }
+
+    private async Task SaveRuleAsync()
+    {
+        var form = ruleForm!;
+        System.Text.Json.JsonElement? condition = null;
+        if (form.Conditional)
+        {
+            if (string.IsNullOrWhiteSpace(form.CondField))
+            {
+                errors = new Dictionary<string, string[]> { ["condition"] = ["Koşul alanını seçin."] };
+                return;
+            }
+
+            var leaf = new EditorLeaf
+            {
+                Field = form.CondField,
+                Operator = form.CondOperator,
+                Values = EditorLeaf.ValueCount(form.CondOperator).Max == 0
+                    ? []
+                    : [.. form.CondValues.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)],
+            };
+            condition = System.Text.Json.JsonDocument.Parse(leaf.Build().ToJsonString()).RootElement.Clone();
+        }
+
+        var needsMessage = form.Effect is "Validate" or "Warn" or "RequireApproval" or "Block";
+        var request = new SaveSubProfileRuleRequest(
+            form.Name,
+            new FieldRuleDto(string.Empty, form.Field, form.Effect, condition, needsMessage ? form.Message : null, form.Effect == "SuggestDefault" ? form.Value : null, false));
+        busy = true;
+        var url = $"/api/customization/sub-profiles/{current!.Id}/rules";
+        var result = form.Id is { } id
+            ? await Api.PutAsync<SubProfileDto>($"{url}/{id}", request)
+            : await Api.PostAsync<SubProfileDto>(url, request);
+        busy = false;
+        errors = result.FieldErrors;
+        message = result.FieldErrors.Count > 0 ? null : result.Error;
+        if (result.IsSuccess)
+        {
+            current = result.Value;
+            ruleForm = null;
+            await ReloadAsync();
+        }
+    }
+
+    private async Task RemoveRuleAsync(SubProfileRuleDto rule)
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"/api/customization/sub-profiles/{current!.Id}/rules/{rule.Id}");
+        busy = false;
+        message = result.Error;
+        await OpenAsync(current.Id);
+        await ReloadAsync();
+    }
+
+    private sealed class RuleForm
+    {
+        public Guid? Id { get; init; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string Field { get; set; } = string.Empty;
+
+        public string Effect { get; set; } = "Required";
+
+        public string Message { get; set; } = string.Empty;
+
+        public string Value { get; set; } = string.Empty;
+
+        public bool Conditional { get; set; }
+
+        public string CondField { get; set; } = string.Empty;
+
+        public string CondOperator { get; set; } = "eq";
+
+        public string CondValues { get; set; } = string.Empty;
     }
 
     private sealed class OptionForm

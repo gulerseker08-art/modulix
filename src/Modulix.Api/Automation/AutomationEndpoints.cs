@@ -260,7 +260,7 @@ public static class AutomationEndpoints
         field.LookupKey,
         field.Hint);
 
-    private static AutomationCatalogDto ToDto(AutomationCatalogView catalog) => new(
+    internal static AutomationCatalogDto ToDto(AutomationCatalogView catalog) => new(
         [.. catalog.Entities.Select(e => new AutomationEntityDto(
             e.ModuleKey,
             e.EntityKey,

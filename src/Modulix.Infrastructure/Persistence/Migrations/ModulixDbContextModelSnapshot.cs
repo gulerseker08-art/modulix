@@ -1608,6 +1608,49 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("SubProfileOptions", "meta");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Customization.SubProfileRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RuleJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("SubProfileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "Key")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "SubProfileId");
+
+                    b.ToTable("SubProfileRules", "meta");
+                });
+
             modelBuilder.Entity("Modulix.Core.Customization.TenantChoiceList", b =>
                 {
                     b.Property<Guid>("Id")
@@ -15899,6 +15942,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Modulix.Core.Customization.SubProfileOption", b =>
+                {
+                    b.HasOne("Modulix.Core.Customization.SubProfile", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "SubProfileId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Customization.SubProfileRule", b =>
                 {
                     b.HasOne("Modulix.Core.Customization.SubProfile", null)
                         .WithMany()
