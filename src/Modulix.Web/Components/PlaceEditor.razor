@@ -7,7 +7,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Place is null ? "Yeni yer" : "Yer")</h2>
+            <h2>@(Place is null ? Texts.Get("logistics.place-form.new") : Texts.Get("logistics.place-form.record"))</h2>
             @if (Place is not null)
             {
                 <p>@form.Name</p>
@@ -15,8 +15,8 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
-            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">Kaydet</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
         </div>
     </div>
 
@@ -25,16 +25,16 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <FormTabs Title="Yer bilgileri" Label="Yer formu bölümleri">
+    <FormTabs Title="@Texts.Get("logistics.place-form.section")" Label="@Texts.Get("logistics.place-form.tabs")">
         <div class="form-grid">
             <div>
-                <label class="form-label" for="place-name">Ad *</label>
+                <label class="form-label" for="place-name">@Texts.Get("common.field.nameRequired")</label>
                 <input id="place-name" class="form-control" maxlength="200" required aria-required="true" @bind="form.Name" />
                 <FieldError Field="name" Errors="errors" />
-                <small class="text-muted">Ad ülke içinde tekildir.</small>
+                <small class="text-muted">@Texts.Get("logistics.place-form.name-hint")</small>
             </div>
             <div>
-                <label class="form-label" for="place-kind">Tür</label>
+                <label class="form-label" for="place-kind">@Texts.Get("common.field.kind")</label>
                 <select id="place-kind" class="form-select" @bind="form.KindKey">
                     @foreach (var kind in Lookups.Choices(LogisticsAccess.PlaceKindList, form.KindKey))
                     {
@@ -44,7 +44,7 @@
                 <FieldError Field="kindKey" Errors="errors" />
             </div>
             <div>
-                <label class="form-label" for="place-country">Ülke *</label>
+                <label class="form-label" for="place-country">@Texts.Get("logistics.place-form.country")</label>
                 <select id="place-country" class="form-select" required aria-required="true" @bind="form.CountryCode">
                     @foreach (var country in CountryCatalog.All)
                     {
@@ -54,40 +54,40 @@
                 <FieldError Field="countryCode" Errors="errors" />
             </div>
             <div>
-                <label class="form-label" for="place-city">Şehir</label>
+                <label class="form-label" for="place-city">@Texts.Get("common.field.city")</label>
                 <input id="place-city" class="form-control" maxlength="100" @bind="form.City" />
                 <FieldError Field="city" Errors="errors" />
             </div>
             <div>
-                <label class="form-label" for="place-district">İlçe</label>
+                <label class="form-label" for="place-district">@Texts.Get("logistics.place-form.district")</label>
                 <input id="place-district" class="form-control" maxlength="100" @bind="form.District" />
                 <FieldError Field="district" Errors="errors" />
             </div>
             <div>
-                <label class="form-label" for="place-postal">Posta kodu</label>
+                <label class="form-label" for="place-postal">@Texts.Get("logistics.place-form.postal")</label>
                 <input id="place-postal" class="form-control" maxlength="20" @bind="form.PostalCode" />
                 <FieldError Field="postalCode" Errors="errors" />
             </div>
             <div class="span-all">
-                <label class="form-label" for="place-address">Adres</label>
+                <label class="form-label" for="place-address">@Texts.Get("logistics.place-form.address")</label>
                 <textarea id="place-address" class="form-control" rows="2" maxlength="250" @bind="form.AddressLine"></textarea>
                 <FieldError Field="addressLine" Errors="errors" />
             </div>
             <div>
-                <label class="form-label" for="place-lat">Enlem</label>
+                <label class="form-label" for="place-lat">@Texts.Get("logistics.place-form.latitude")</label>
                 <input id="place-lat" class="form-control" type="number" step="0.000001" min="-90" max="90" placeholder="41.0082" @bind="form.Latitude" />
                 <FieldError Field="latitude" Errors="errors" />
             </div>
             <div>
-                <label class="form-label" for="place-lon">Boylam</label>
+                <label class="form-label" for="place-lon">@Texts.Get("logistics.place-form.longitude")</label>
                 <input id="place-lon" class="form-control" type="number" step="0.000001" min="-180" max="180" placeholder="28.9784" @bind="form.Longitude" />
                 <FieldError Field="longitude" Errors="errors" />
-                <small class="text-muted">Koordinat isteğe bağlıdır; ikisi birlikte girilir. Girilmezse haritada konum şehir ve ülkeden bulunur.</small>
+                <small class="text-muted">@Texts.Get("logistics.place-form.coordinates-hint")</small>
             </div>
             <div>
-                <SegmentedChoice Id="place-active" Label="Durum" Options="SegmentOptions.Active" @bind-Value="form.IsActive" />
+                <SegmentedChoice Id="place-active" Label="@Texts.Get("common.field.status")" Options="SegmentOptions.Active" @bind-Value="form.IsActive" />
                 <FieldError Field="isActive" Errors="errors" />
-                <small class="text-muted">Pasif yer yeni kayıtta seçilemez; eski kayıtlar korunur.</small>
+                <small class="text-muted">@Texts.Get("logistics.place-form.active-hint")</small>
             </div>
         </div>
     </FormTabs>
@@ -95,10 +95,10 @@
     <div class="form-actions">
         @if (form.Id is not null)
         {
-            <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="DeleteAsync">Sil</button>
+            <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
         }
-        <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
-        <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">Kaydet</button>
+        <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+        <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
     </div>
 </form>
 

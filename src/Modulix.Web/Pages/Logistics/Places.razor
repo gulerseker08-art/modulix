@@ -3,12 +3,12 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Yerler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.logistics.places") · Modulix</PageTitle>
 
 @* Yer defteri (ADR-0045): depo, fabrika, liman, sınır kapısı gibi taşıma yerleri. Yer Core ortak kaydıdır (core.place); bu ekran Lojistik'in ona bakışıdır.
    Okumak için talep, sevkiyat ya da sefer okuma izni yeter; yazmak için "Yer defterine yer ekler" izni gerekir. Yetki sunucuda uygulanır. *@
 <AuthGate Module="@LogisticsAccess.ModuleKey" AnyPermission="@LogisticsAccess.PlacesReadAny">
-    <PageHeader Title="Yerler" Icon="map-pin" Subtitle="@(page is null ? "Depo, fabrika, liman ve sınır kapıları: sevkiyat ve seferlerde seçilen yerler" : $"{page.TotalCount} yer")" />
+    <PageHeader Title="@Texts.Get("nav.app.logistics.places")" Icon="map-pin" Subtitle="@(page is null ? Texts.Get("logistics.places.intro") : Texts.Get("logistics.places.count", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -20,14 +20,14 @@
         <PlaceEditor Place="selected" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="Close" />
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Yer görünümleri" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("logistics.places.views")" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Yer ara" placeholder="Ad, şehir veya adres ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("logistics.places.search-label")" placeholder="@Texts.Get("logistics.places.search-placeholder")" @bind="search" />
         </form>
-        <select class="form-select" aria-label="Ülke" @bind="country" @bind:after="() => LoadAsync(1)">
-            <option value="">Tüm ülkeler</option>
+        <select class="form-select" aria-label="@Texts.Get("logistics.places.country-filter")" @bind="country" @bind:after="() => LoadAsync(1)">
+            <option value="">@Texts.Get("logistics.places.all-countries")</option>
             @foreach (var c in CountryCatalog.All)
             {
                 <option value="@c.Code">@c.NameTr (@c.Code)</option>
@@ -36,7 +36,7 @@
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(LogisticsAccess.PlacesWrite) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni yer</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("logistics.places.new")</button>
         }
     </div>
 
@@ -46,20 +46,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan yer yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("logistics.places.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) yer listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("logistics.places.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Yerler</caption>
+            <caption class="visually-hidden">@Texts.Get("nav.app.logistics.places")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -73,8 +73,8 @@
                         <td class="row-menu-cell">
                             @if (Session.Can(LogisticsAccess.PlacesWrite))
                             {
-                                <RowMenu Label="@($"{WarehouseLabels.Text(place, "name")} eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(place)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <RowMenu Label="@Texts.Get("common.rowActionsOf", WarehouseLabels.Text(place, "name"))">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(place)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 </RowMenu>
                             }
                         </td>
@@ -96,13 +96,13 @@
     // Yer kaydı genel sıralama anahtarı sunmaz (ad ve ülkeye göre sabit sıra); sütunlar sıralanabilir değildir.
     private static readonly GridColumnDef[] Columns =
     [
-        new("name", "Ad", "map-pin", Locked: true),
-        new("kind", "Tür", "tag"),
-        new("country", "Ülke", "globe"),
-        new("city", "Şehir", "building"),
-        new("address", "Adres", "file-text", DefaultVisible: false),
-        new("location", "Koordinat", "map-pin", DefaultVisible: false),
-        new("state", "Durum", "check-circle"),
+        new("name", Texts.Get("common.field.name"), "map-pin", Locked: true),
+        new("kind", Texts.Get("common.field.kind"), "tag"),
+        new("country", Texts.Get("logistics.places.col.country"), "globe"),
+        new("city", Texts.Get("common.field.city"), "building"),
+        new("address", Texts.Get("logistics.places.col.address"), "file-text", DefaultVisible: false),
+        new("location", Texts.Get("logistics.places.col.coordinates"), "map-pin", DefaultVisible: false),
+        new("state", Texts.Get("common.field.status"), "check-circle"),
     ];
 
     private readonly GridViewState grid = new("core.place", "name");
@@ -127,9 +127,9 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(ActiveView, "Etkin yerler", Icon: "check-circle"),
-        new(PassiveView, "Pasif", Icon: "clock"),
-        new(AllViews, "Tüm yerler", Icon: "map-pin"),
+        new(ActiveView, Texts.Get("logistics.places.view.active"), Icon: "check-circle"),
+        new(PassiveView, Texts.Get("logistics.places.view.passive"), Icon: "clock"),
+        new(AllViews, Texts.Get("logistics.places.view.all"), Icon: "map-pin"),
     ];
 
     private async Task ChooseViewAsync(string key)
@@ -191,7 +191,7 @@
     private static RenderFragment State(RecordResponse place)
     {
         var active = WarehouseLabels.Flag(place, "isActive", true);
-        return @<span class="badge @(active ? "status-customer" : "status-inactive")">@(active ? "Etkin" : "Pasif")</span>;
+        return @<span class="badge @(active ? "status-customer" : "status-inactive")">@(active ? Texts.Get("logistics.places.state-active") : Texts.Get("common.inactive"))</span>;
     }
 
     private void Open(RecordResponse? place)
