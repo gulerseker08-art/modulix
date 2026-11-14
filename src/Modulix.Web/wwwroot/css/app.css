@@ -286,3 +286,28 @@
     flex: 1;
     margin: 0;
 }
+
+/* ---- Özet kutusunda dönem karşılaştırması (ana sayfa; docs/design-system/component-catalog.md) ---- */
+/* Rozet dash-delta'dır; .stat-card span kuralı rengini ezmesin diye tonlar burada yinelenir. */
+.stat-trend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-1) var(--mx-space-2);
+    margin-top: var(--mx-space-1);
+    font-size: var(--mx-fs-helper);
+}
+
+.stat-card .stat-trend .dash-delta {
+    margin-bottom: 0;
+    font-size: var(--mx-fs-helper);
+    color: var(--mx-tone-success-fg);
+}
+
+    .stat-card .stat-trend .dash-delta.is-down {
+        color: var(--mx-tone-danger-fg);
+    }
+
+    .stat-card .stat-trend .dash-delta.is-flat {
+        color: var(--mx-tone-neutral-fg);
+    }

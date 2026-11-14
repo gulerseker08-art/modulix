@@ -89,6 +89,9 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
 
     protected override IReadOnlyDictionary<string, RecordFilter<Opportunity>> Filters { get; } = new Dictionary<string, RecordFilter<Opportunity>>
     {
+        // Oluşturulma anı aralığı (ana sayfa dönem karşılaştırması): alt sınır dahil, üst sınır hariç.
+        ["createdSince"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(o => o.CreatedAt >= time) : null,
+        ["createdBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(o => o.CreatedAt < time) : null,
         // Hizmet kapsamı (ADR-0029 Dilim F): tam kod eşleşir.
         ["serviceScope"] = (q, v, _) => CodeListFilter.Code(v) is { } code ? q.Where(o => ("," + o.ServiceScope + ",").Contains("," + code + ",")) : null,
         ["companyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(o => o.CompanyId == id) : null,

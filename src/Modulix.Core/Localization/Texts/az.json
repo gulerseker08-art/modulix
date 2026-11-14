@@ -103,6 +103,8 @@
 
   "home.title": "Xoş gəlmisiniz",
   "home.greeting": "Xoş gəlmisiniz, {0}",
+  "home.trend.label": "son 30 gündə yeni",
+  "home.trend.detail": "Son 30 gündə {0} yeni qeyd; əvvəlki 30 gündə {1}.",
   "home.noModule": "Qurumunuz üçün aktiv modul yoxdur.",
   "home.funnel.title": "Satış qıfı",
   "home.funnel.chart": "Mərhələlərdəki fürsət sayları",

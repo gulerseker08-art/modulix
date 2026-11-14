@@ -103,6 +103,8 @@
 
   "home.title": "Hoş geldiniz",
   "home.greeting": "Hoş geldiniz, {0}",
+  "home.trend.label": "son 30 günde yeni",
+  "home.trend.detail": "Son 30 günde {0} yeni kayıt; önceki 30 günde {1}.",
   "home.noModule": "Kuruluşunuz için açık bir modül yok.",
   "home.funnel.title": "Satış hunisi",
   "home.funnel.chart": "Aşamalardaki fırsat sayıları",

@@ -135,3 +135,8 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 - `ConfirmBox`: yıkıcı eylem ayrı adımda onaylanır. `Text` (soru), isteğe bağlı `ConfirmLabel` (varsayılan "Sil"), `Busy`, `Confirm`, `Cancel`. Kutu `alert alert-warning confirm` + `role="alertdialog"`; onay düğmesi `btn-danger`, yanında "Vazgeç". Açılınca odak "Vazgeç"tedir, Escape kapatır.
 - Liste satırında (`ul.item-list`) menüdeki "Sil" satırın yerinde `ConfirmBox` açar; silme başarılıysa toast ("Silindi.") gösterilir. Onaysız tek tıkla silme yazılmaz. Örnek: `AddressesSection`, `ContactPointsSection`.
 
+## Özet kutusunda dönem karşılaştırması (14.11.2026)
+
+- Ana sayfa özet kutuları toplamın altında son 30 günde eklenen kayıt sayısını gösterir: `small.stat-trend` içinde `dash-delta` rozeti (işaretli sayı + ok ikonu; önceki 30 güne göre azaldıysa `is-down`, aynıysa `is-flat`) ve "son 30 günde yeni" etiketi. Yön yalnızca renkle anlatılmaz; ekran okuyucuya iki dönemin sayıları tam cümleyle okunur (`visually-hidden`).
+- Sayılar liste uçlarının `createdSince` (dahil) ve `createdBefore` (hariç) süzgeçleriyle alınır (ISO 8601 an; firma, kişi, fırsat, aktivite). Kapsam ve yetki sunucudadır; yüklenemeyen kutuda karşılaştırma çizilmez. Hesap `PeriodChange` ile yapılır.
+
