@@ -4,18 +4,14 @@
 @inject SessionState Session
 @inject IJSRuntime Js
 
-<PageTitle>Rapor dışa aktarımları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("reports.exports.pageTitle") · Modulix</PageTitle>
 
 <AuthGate Permission="@ReportAccess.Export">
-    <a class="back-link" href="raporlar"><AppIcon Name="arrow-left" Size="16" /> Raporlar</a>
+    <a class="back-link" href="raporlar"><AppIcon Name="arrow-left" Size="16" /> @Texts.Get("nav.app.reports")</a>
 
-    <PageHeader Title="Dışa aktarımlar" Icon="file-text"
-                Subtitle="Hazırladığınız ve zamanlamalarınızın size teslim ettiği CSV dosyaları. Dosyalar yalnızca size aittir, 24 saat saklanır ve en çok 20 dosya tutulur." />
+    <PageHeader Title="@Texts.Get("reports.exports.title")" Icon="file-text" Subtitle="@Texts.Get("reports.exports.subtitle")" />
 
-    <div class="alert alert-info" role="note">
-        Dosya, raporun ekrandaki sonucuyla aynı hesaptan ve sizin yetkinizle üretilir. İndirme sırasında yetkiniz yeniden denetlenir;
-        dosya hazırlandıktan sonra yetkiniz değiştiyse dosya verilmez, raporu yeniden dışa aktarmanız gerekir.
-    </div>
+    <div class="alert alert-info" role="note">@Texts.Get("reports.exports.note")</div>
 
     @if (message is not null)
     {
@@ -28,27 +24,25 @@
     {
         @if (items.Count == 0)
         {
-            <p class="text-muted" role="status">
-                Henüz dışa aktarılmış dosyanız yok. Bir raporu açıp "CSV olarak dışa aktar" düğmesini kullanın ya da raporu zamanlayın.
-            </p>
+            <p class="text-muted" role="status">@Texts.Get("reports.exports.empty")</p>
         }
         else
         {
-            <p class="visually-hidden" role="status" aria-live="polite">@items.Count dosya listelendi.</p>
-            <div class="table-responsive report-table-wrap" tabindex="0" role="region" aria-label="Dışa aktarılan dosyalar">
+            <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("reports.exports.listed", items.Count)</p>
+            <div class="table-responsive report-table-wrap" tabindex="0" role="region" aria-label="@Texts.Get("reports.exports.region")">
                 <table class="table report-table">
-                    <caption class="visually-hidden">Dışa aktarılan CSV dosyaları</caption>
+                    <caption class="visually-hidden">@Texts.Get("reports.exports.caption")</caption>
                     <thead>
                         <tr>
-                            <th scope="col">Rapor</th>
-                            <th scope="col">Dosya</th>
-                            <th scope="col" class="text-end">Satır</th>
-                            <th scope="col" class="text-end">Boyut</th>
-                            <th scope="col">Kaynak</th>
-                            <th scope="col">Oluşturulma</th>
-                            <th scope="col">Geçerlilik sonu</th>
-                            <th scope="col" class="text-end">İndirme</th>
-                            <th scope="col"><span class="visually-hidden">İşlemler</span></th>
+                            <th scope="col">@Texts.Get("reports.run.pageTitle")</th>
+                            <th scope="col">@Texts.Get("reports.exports.col.file")</th>
+                            <th scope="col" class="text-end">@Texts.Get("reports.exports.col.rows")</th>
+                            <th scope="col" class="text-end">@Texts.Get("reports.exports.col.size")</th>
+                            <th scope="col">@Texts.Get("reports.exports.col.source")</th>
+                            <th scope="col">@Texts.Get("reports.exports.col.created")</th>
+                            <th scope="col">@Texts.Get("reports.exports.col.expires")</th>
+                            <th scope="col" class="text-end">@Texts.Get("reports.exports.col.downloads")</th>
+                            <th scope="col"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -66,11 +60,11 @@
                                     }
                                     @if (item.Truncated)
                                     {
-                                        <span class="badge status-prospect ms-1" title="Okuma sınırı aşıldığı için dosyada tüm kayıtlar olmayabilir">Eksik olabilir</span>
+                                        <span class="badge status-prospect ms-1" title="@Texts.Get("reports.exports.truncatedTitle")">@Texts.Get("reports.exports.truncated")</span>
                                     }
                                     @if (item.Expired)
                                     {
-                                        <span class="badge status-inactive ms-1">Süresi doldu</span>
+                                        <span class="badge status-inactive ms-1">@Texts.Get("reports.exports.expired")</span>
                                     }
                                 </td>
                                 <td>@item.FileName</td>
@@ -83,23 +77,23 @@
                                 <td class="text-end">
                                     @if (item.Expired)
                                     {
-                                        <span class="small text-muted me-2">Yeniden dışa aktarın</span>
+                                        <span class="small text-muted me-2">@Texts.Get("reports.exports.exportAgain")</span>
                                     }
                                     else
                                     {
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="İndir: @item.FileName" @onclick="() => DownloadAsync(item)">İndir</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="@Texts.Get("reports.exports.downloadAria", item.FileName)" @onclick="() => DownloadAsync(item)">@Texts.Get("crm.sales.export.download")</button>
                                     }
                                     @if (confirmDeleteId == item.Id)
                                     {
                                         <span class="confirm" role="alert">
-                                            <span>Dosya silinsin mi?</span>
-                                            <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">Evet, sil</button>
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirmDeleteId = null">Vazgeç</button>
+                                            <span>@Texts.Get("reports.exports.deleteConfirm")</span>
+                                            <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(item)">@Texts.Get("common.view.deleteYes")</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => confirmDeleteId = null">@Texts.Get("common.dismiss")</button>
                                         </span>
                                     }
                                     else
                                     {
-                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="Sil: @item.FileName" @onclick="() => confirmDeleteId = item.Id">Sil</button>
+                                        <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" aria-label="@Texts.Get("reports.exports.deleteAria", item.FileName)" @onclick="() => confirmDeleteId = item.Id">@Texts.Get("common.delete")</button>
                                     }
                                 </td>
                             </tr>
@@ -155,7 +149,7 @@
         var failure = await ReportExportDownloads.DownloadAsync(Api, Js, item);
         busy = false;
         messageFailed = failure is not null;
-        message = failure ?? $"\"{item.FileName}\" indirildi.";
+        message = failure ?? Texts.Get("reports.exports.downloaded", item.FileName);
         if (failure is null)
         {
             await LoadAsync();
@@ -170,7 +164,7 @@
         busy = false;
         confirmDeleteId = null;
         messageFailed = !result.IsSuccess;
-        message = result.IsSuccess ? $"\"{item.FileName}\" silindi." : result.Error;
+        message = result.IsSuccess ? Texts.Get("reports.center.deleted", item.FileName) : result.Error;
         if (result.IsSuccess || result.Status == HttpStatusCode.NotFound)
         {
             await LoadAsync();

@@ -5,7 +5,7 @@
 
 @if (Loading)
 {
-    <p class="text-muted" role="status">Rapor çalıştırılıyor…</p>
+    <p class="text-muted" role="status">@Texts.Get("reports.result.running")</p>
 }
 
 @if (Result is { } result)
@@ -13,45 +13,43 @@
     @if (result.Status == "forbidden")
     {
         <div class="alert alert-warning" role="alert">
-            <strong>Yetkiniz yok.</strong> Bu raporu çalıştırmak için gereken okuma izniniz (ya da raporda kullanılan hassas sütunlardan birinin izni) yok; veri okunmadı.
-            Paylaşım veri erişimi vermez: rapor herkes için kendi yetkisiyle çalışır.
+            <strong>@Texts.Get("reports.result.forbiddenTitle")</strong> @Texts.Get("reports.result.forbidden")
             <ReportIssueList Issues="result.Issues" />
         </div>
     }
     else if (result.Status == "moduleDisabled")
     {
         <div class="alert alert-warning" role="alert">
-            <strong>Modül etkin değil.</strong> Raporun veri kümesinin modülü bu firmada kapalı; veri okunmadı. Yöneticinizle konuşun.
+            <strong>@Texts.Get("reports.result.moduleDisabledTitle")</strong> @Texts.Get("reports.result.moduleDisabled")
             <ReportIssueList Issues="result.Issues" />
         </div>
     }
     else if (result.Status == "unknownDataset")
     {
         <div class="alert alert-danger" role="alert">
-            <strong>Veri kümesi bulunamadı.</strong> Rapor, artık var olmayan bir veri kümesine bağlı; veri okunmadı.
+            <strong>@Texts.Get("reports.result.unknownDatasetTitle")</strong> @Texts.Get("reports.result.unknownDataset")
             <ReportIssueList Issues="result.Issues" />
         </div>
     }
     else if (result.Status != "ok")
     {
         <div class="alert alert-danger" role="alert">
-            <strong>Rapor tanımı geçersiz.</strong> Tanım düzeltilmeden rapor çalışmaz; veri okunmadı.
+            <strong>@Texts.Get("reports.result.invalidTitle")</strong> @Texts.Get("reports.result.invalid")
             <ReportIssueList Issues="result.Issues" />
         </div>
     }
     else
     {
-        <section class="report-result" aria-label="Rapor sonucu">
+        <section class="report-result" aria-label="@Texts.Get("reports.table.caption")">
             <p class="small text-muted" role="status">
-                Son güncelleme: <strong>@CrmLabels.Time(result.GeneratedAt)</strong> ·
-                @result.RowsRead.ToString("N0", Regional.Numbers) kayıt okundu ·
-                @result.RowsMatched.ToString("N0", Regional.Numbers) kayıt süzgeçlere uydu
+                @Texts.Get("reports.result.updated") <strong>@CrmLabels.Time(result.GeneratedAt)</strong> ·
+                @Texts.Get("reports.result.counts", result.RowsRead.ToString("N0", Regional.Numbers), result.RowsMatched.ToString("N0", Regional.Numbers))
             </p>
 
             @if (PartialMessages(result) is { Count: > 0 } partial)
             {
                 <div class="alert alert-warning" role="status">
-                    <strong>Kısmi veri.</strong> Aşağıdaki sonuç eksik ya da dışlanmış kayıtlar içerebilir:
+                    <strong>@Texts.Get("reports.result.partialTitle")</strong> @Texts.Get("reports.result.partial")
                     <ul class="mb-0">
                         @foreach (var message in partial)
                         {
@@ -62,20 +60,20 @@
             }
             @foreach (var drift in result.Issues.Where(i => i.Code == "versionDrift"))
             {
-                <div class="alert alert-info" role="status"><strong>Veri kümesi sürümü değişmiş.</strong> @drift.Message</div>
+                <div class="alert alert-info" role="status"><strong>@Texts.Get("reports.result.versionDrift")</strong> @drift.Message</div>
             }
 
             @if (result.RowsMatched == 0)
             {
                 <div class="alert alert-secondary" role="status">
-                    <strong>Veri yok.</strong>
+                    <strong>@Texts.Get("reports.result.noData")</strong>
                     @if (result.RowsRead == 0)
                     {
-                        <text>Bu veri kümesinde, yetkiniz ve veri kapsamınızla görebildiğiniz kayıt bulunmuyor.</text>
+                        <text>@Texts.Get("reports.result.noRows")</text>
                     }
                     else
                     {
-                        <text>@result.RowsRead.ToString("N0", Regional.Numbers) kayıt okundu, hiçbiri rapor süzgeçlerine uymadı. Bu bir "sıfır" değeri değil, eşleşen kayıt olmamasıdır.</text>
+                        <text>@Texts.Get("reports.result.noMatch", result.RowsRead.ToString("N0", Regional.Numbers))</text>
                     }
                 </div>
             }
@@ -84,14 +82,14 @@
                 @if (BuildChart(result) is { } chart)
                 {
                     <section class="detail-section" aria-labelledby="rv-chart-title">
-                        <div class="section-header"><h2 id="rv-chart-title">Grafik</h2></div>
+                        <div class="section-header"><h2 id="rv-chart-title">@Texts.Get("reports.result.chart")</h2></div>
                         @if (Currencies.Count > 1 || MeasureColumns(result).Count > 1)
                         {
-                            <div class="filters" role="group" aria-label="Grafik seçenekleri">
+                            <div class="filters" role="group" aria-label="@Texts.Get("reports.result.chartOptions")">
                                 @if (MeasureColumns(result).Count > 1)
                                 {
                                     <div>
-                                        <label class="form-label" for="rv-chart-measure">Grafikteki ölçü</label>
+                                        <label class="form-label" for="rv-chart-measure">@Texts.Get("reports.result.chartMeasure")</label>
                                         <select id="rv-chart-measure" class="form-select" @bind="chartMeasure">
                                             @for (var m = 0; m < MeasureColumns(result).Count; m++)
                                             {
@@ -103,7 +101,7 @@
                                 @if (Currencies.Count > 1)
                                 {
                                     <div>
-                                        <label class="form-label" for="rv-chart-currency">Grafikteki para birimi</label>
+                                        <label class="form-label" for="rv-chart-currency">@Texts.Get("reports.result.chartCurrency")</label>
                                         <select id="rv-chart-currency" class="form-select" @bind="chartCurrency">
                                             @foreach (var iso in Currencies)
                                             {
@@ -115,7 +113,7 @@
                             </div>
                             @if (Currencies.Count > 1)
                             {
-                                <p class="small text-muted">Tutarlar para birimine göre ayrı toplanır, birbirine çevrilmez; grafik yalnızca seçili para birimini gösterir. Tablo tüm para birimlerini içerir.</p>
+                                <p class="small text-muted">@Texts.Get("reports.result.currencyNote")</p>
                             }
                         }
 
@@ -135,18 +133,18 @@
                             }
                         </div>
                         <p class="small text-muted mt-2">
-                            @chart.Note Grafik tablodaki değerlerin görsel özetidir; bütün değerler aşağıdaki tablodadır.
+                            @chart.Note @Texts.Get("reports.result.chartNote")
                         </p>
                     </section>
                 }
 
                 <section class="detail-section" aria-labelledby="rv-table-title">
-                    <div class="section-header"><h2 id="rv-table-title">Özet tablo</h2></div>
-                    <ReportTable Result="result" Caption="@($"{result.DatasetName} özet raporu")" Drillable="@(DrillRunner is not null)"
+                    <div class="section-header"><h2 id="rv-table-title">@Texts.Get("reports.result.summaryTable")</h2></div>
+                    <ReportTable Result="result" Caption="@Texts.Get("reports.result.summaryCaption", result.DatasetName)" Drillable="@(DrillRunner is not null)"
                                  Selected="drillRow" OnDrill="DrillAsync" />
                     @if (DrillRunner is not null)
                     {
-                        <p class="small text-muted mt-2">Bir satırın ayrıntısını görmek için satıra tıklayın ya da satırdaki "Ayrıntı" düğmesini kullanın.</p>
+                        <p class="small text-muted mt-2">@Texts.Get("reports.result.drillHint")</p>
                     }
                 </section>
 
@@ -154,25 +152,25 @@
                 {
                     <section class="detail-section report-drill" aria-labelledby="rv-drill-title" tabindex="-1" @ref="drillPanel">
                         <div class="section-header">
-                            <h2 id="rv-drill-title">Ayrıntı: @drillTitle</h2>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CloseDrill">Ayrıntıyı kapat</button>
+                            <h2 id="rv-drill-title">@Texts.Get("reports.result.drillTitle", drillTitle)</h2>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CloseDrill">@Texts.Get("reports.result.closeDrill")</button>
                         </div>
                         <div aria-live="polite">
                             @if (drillLoading)
                             {
-                                <p class="text-muted" role="status">Ayrıntı yükleniyor…</p>
+                                <p class="text-muted" role="status">@Texts.Get("reports.result.drillLoading")</p>
                             }
                             else if (drillError is not null)
                             {
                                 <div class="alert alert-danger" role="alert">
                                     @drillError
-                                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadDrillAsync">Tekrar dene</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadDrillAsync">@Texts.Get("crm.sales.retry")</button>
                                 </div>
                             }
                             else if (drillResult is { Status: not "ok" } failed)
                             {
                                 <div class="alert alert-warning" role="alert">
-                                    <strong>Ayrıntı alınamadı.</strong> Rapor durumu: @failed.Status.
+                                    <strong>@Texts.Get("reports.result.drillFailedTitle")</strong> @Texts.Get("reports.result.drillFailedStatus", failed.Status)
                                     <ReportIssueList Issues="failed.Issues" />
                                 </div>
                             }
@@ -181,13 +179,13 @@
                                 @if (Comparison(result, detail) is { Count: > 0 } lines)
                                 {
                                     <table class="table report-compare">
-                                        <caption>Özet satırı ile ayrıntı toplamının karşılaştırması</caption>
+                                        <caption>@Texts.Get("reports.result.compareCaption")</caption>
                                         <thead>
                                             <tr>
-                                                <th scope="col">Ölçü</th>
-                                                <th scope="col" class="text-end">Özet satırı</th>
-                                                <th scope="col" class="text-end">Ayrıntı toplamı</th>
-                                                <th scope="col">Durum</th>
+                                                <th scope="col">@Texts.Get("reports.result.col.measure")</th>
+                                                <th scope="col" class="text-end">@Texts.Get("reports.result.col.summaryRow")</th>
+                                                <th scope="col" class="text-end">@Texts.Get("reports.result.col.drillTotal")</th>
+                                                <th scope="col">@Texts.Get("common.field.status")</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -197,7 +195,7 @@
                                                     <th scope="row">@line.Label</th>
                                                     <td class="text-end">@line.Summary</td>
                                                     <td class="text-end">@line.Detail</td>
-                                                    <td>@(line.Matches ? "Eşleşiyor" : "Fark var: veri bu arada değişmiş olabilir, raporu yenileyin")</td>
+                                                    <td>@(line.Matches ? Texts.Get("reports.result.matches") : Texts.Get("reports.result.differs"))</td>
                                                 </tr>
                                             }
                                         </tbody>
@@ -206,11 +204,11 @@
 
                                 @if (detail.RowsMatched == 0)
                                 {
-                                    <div class="alert alert-secondary" role="status"><strong>Veri yok.</strong> Bu grup için ayrıntı kaydı bulunamadı.</div>
+                                    <div class="alert alert-secondary" role="status"><strong>@Texts.Get("reports.result.noData")</strong> @Texts.Get("reports.result.noDrillRows")</div>
                                 }
                                 else
                                 {
-                                    <ReportTable Result="detail" Caption="@($"{drillTitle} ayrıntı kayıtları")" />
+                                    <ReportTable Result="detail" Caption="@Texts.Get("reports.result.drillCaption", drillTitle)" />
                                     <Pager Page="detail.Page" PageSize="detail.PageSize" TotalCount="detail.RowsMatched" PageChanged="DrillPageAsync" />
                                 }
                             }
@@ -221,8 +219,8 @@
             else
             {
                 <section class="detail-section" aria-labelledby="rv-table-title">
-                    <div class="section-header"><h2 id="rv-table-title">Kayıtlar</h2></div>
-                    <ReportTable Result="result" Caption="@($"{result.DatasetName} kayıt tablosu")" />
+                    <div class="section-header"><h2 id="rv-table-title">@Texts.Get("reports.result.records")</h2></div>
+                    <ReportTable Result="result" Caption="@Texts.Get("reports.result.recordsCaption", result.DatasetName)" />
                     <Pager Page="result.Page" PageSize="result.PageSize" TotalCount="result.RowsMatched" PageChanged="PageChanged" />
                 </section>
             }
@@ -307,12 +305,12 @@
         var hasTruncatedIssue = result.Issues.Any(i => i.Code == "truncated");
         if (result.Truncated && !hasTruncatedIssue)
         {
-            messages.Add("Okuma sınırına ulaşıldı; sonuç eksik olabilir. Süzgeçlerle daraltın.");
+            messages.Add(Texts.Get("reports.result.truncated"));
         }
 
         if (result.RowsLimited && !hasTruncatedIssue)
         {
-            messages.Add("Yalnızca ilk gruplar gösteriliyor; süzgeçlerle daraltın.");
+            messages.Add(Texts.Get("reports.result.rowsLimited"));
         }
 
         return messages;
@@ -377,18 +375,18 @@
             }
 
             return new ChartModel("line", title, format, measure.Label, [], [.. categories.Select(c => c.Label)], series,
-                groups.Count > 1 ? "Her çizgi ikinci gruplamanın bir değerini gösterir." : "Çizgi, tarih dilimlerine göre değişimi gösterir.");
+                groups.Count > 1 ? Texts.Get("reports.result.lineMulti") : Texts.Get("reports.result.lineSingle"));
         }
 
         if (result.Chart == "pie")
         {
             var pie = rows.Select(r => new ChartSlice(Key(r), Value(r) ?? 0)).Where(s => s.Value > 0).Take(MaxChartSlices).ToList();
-            return new ChartModel("pie", title, format, measure.Label, pie, [], [], "Pasta, yalnızca sıfırdan büyük değerleri gösterir.");
+            return new ChartModel("pie", title, format, measure.Label, pie, [], [], Texts.Get("reports.result.pieNote"));
         }
 
         var all = rows.Select(r => new ChartSlice(Key(r), Value(r) ?? 0)).ToList();
         return new ChartModel("bar", title, format, measure.Label, [.. all.Take(MaxChartSlices)], [], [],
-            all.Count > MaxChartSlices ? $"Grafikte ilk {MaxChartSlices} grup var." : "Çubuklar en büyük değere göre ölçeklenir.");
+            all.Count > MaxChartSlices ? Texts.Get("reports.result.barTop", MaxChartSlices) : Texts.Get("reports.result.barNote"));
     }
 
     // ---- Ayrıntı
