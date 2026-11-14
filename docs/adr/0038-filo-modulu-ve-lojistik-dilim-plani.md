@@ -587,6 +587,8 @@ Lojistik, kural altyapısına (ADR-0027) kayıt türlerini ve alanlarını dilim
 
 ## 24. Kayıt düzeyinde dosya izni: masraf belgesi ve teslim kanıtı (14 Kasım 2026)
 
+Karar (kullanıcı, 14 Kasım 2026): reddedilmiş masrafın belgesi açık kalır; teslim kanıtının dosyaları sefer kapanınca donar.
+
 **Bulunan açık:** ADR-0040 K2'de dosya ekleme ve silme kaydı okuyabilmeye ve kayıt **türünün** güncelleme iznine bağlıdır; kayıt düzeyinde kural ancak depo `IRecordWriteGuard` uygularsa sorulur (İK masraf satırı için aynı açık ADR-0042 bölüm 25'te kapatıldı). Lojistik depoları bunu uygulamıyordu:
 - **Sefer masrafı:** onaylanmış masraf değişmez, iptal edilen sefere masraf açılmaz; ama makbuz ve fiş, onaydan sonra da masraf yazma izni olan herkesçe eklenip silinebiliyordu (onaylanan belge sessizce değişebiliyordu).
 - **Teslim kanıtı:** kayıt değişmez (güncellenmez, silinmez); ama fotoğraf ve imza herhangi bir zamanda, sevkiyat yazma izni olan herkesçe eklenip silinebiliyordu (kanıt sonradan değiştirilebiliyordu).
