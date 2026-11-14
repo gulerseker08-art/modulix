@@ -210,6 +210,8 @@ Harici kullanım ücreti yoktur ama maliyet sıfır değildir: kural değerlendi
 
 ## AI'a açık bırakılan noktalar (kod yazılmadan)
 
+> Bu noktaların nasıl kullanılacağı ve ajan kuralları [ADR-0047](0047-yapay-zeka-ajan-kurallari.md) taslağındadır.
+
 1. `AutomationCallContext.Kind = Agent`: aksiyon sözleşmesi çağıran kimliği dışarıdan alır; AI ajanı aynı kaydı kullanır, yetkisi kullanıcının yetkisiyle sınırlıdır (CLAUDE.md: AI yalnızca tenant ve kullanıcı yetkisi içinde, modül servisleri üzerinden).
 2. `AutomationSideEffect` ve `SupportsDryRun`: AI aracı "önce planla, sonra onayla" akışını bu alanlardan kurar; `Write` aksiyonları insan onayına bağlanabilir.
 3. `ExecutionSource.AiTool` zaten denetim kaydında vardır; AI çağrısı yapılırsa aynı denetim yolu kullanılır.
