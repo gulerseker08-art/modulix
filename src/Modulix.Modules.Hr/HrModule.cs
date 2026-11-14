@@ -66,6 +66,10 @@ public sealed class HrModule : IModule
         public const string ChecklistTask = "hr.checklist-task";
         public const string Announcement = "hr.announcement";
         public const string AnnouncementRead = "hr.announcement-read";
+        public const string AnnouncementComment = "hr.announcement-comment";
+        public const string AnnouncementLike = "hr.announcement-like";
+        public const string BlogComment = "hr.blog-comment";
+        public const string BlogLike = "hr.blog-like";
         public const string Survey = "hr.survey";
         public const string SurveyQuestion = "hr.survey-question";
         public const string SurveyResponse = "hr.survey-response";
@@ -267,7 +271,7 @@ public sealed class HrModule : IModule
         },
         new(Entities.Announcement, "Duyuru", Permissions.AnnouncementsRead, new Dictionary<string, string>
         {
-            ["title"] = "Başlık", ["body"] = "Metin", ["audienceName"] = "Hedef departman", ["audienceDepartmentKey"] = "Eski hedef departman", ["isPinned"] = "Sabitlenmiş",
+            ["title"] = "Başlık", ["body"] = "Metin", ["audienceName"] = "Hedef kitle", ["audienceDepartmentKey"] = "Eski hedef departman", ["isPinned"] = "Sabitlenmiş",
             ["isPublished"] = "Yayında", ["publishOn"] = "Başlangıç", ["expiresOn"] = "Bitiş",
         }, "title")
         {
@@ -275,7 +279,7 @@ public sealed class HrModule : IModule
         },
         new(Entities.Survey, "Anket", Permissions.SurveysManage, new Dictionary<string, string>
         {
-            ["title"] = "Başlık", ["description"] = "Açıklama", ["isAnonymous"] = "Kimliği gizli", ["audienceName"] = "Hedef departman", ["audienceDepartmentKey"] = "Eski hedef departman",
+            ["title"] = "Başlık", ["description"] = "Açıklama", ["isAnonymous"] = "Kimliği gizli", ["audienceName"] = "Hedef kitle", ["audienceDepartmentKey"] = "Eski hedef departman",
             ["closesOn"] = "Kapanış", ["status"] = "Durum",
         }, "title")
         {
@@ -300,6 +304,22 @@ public sealed class HrModule : IModule
         }, "title")
         {
             UserFields = ["authorUserId"],
+        },
+        new(Entities.AnnouncementComment, "Duyuru yorumu", Permissions.AnnouncementsManage, new Dictionary<string, string>
+        {
+            ["contentId"] = "Duyuru", ["body"] = "Yorum", ["isHidden"] = "Gizli",
+        }, "body")
+        {
+            References = new Dictionary<string, string> { ["contentId"] = Entities.Announcement },
+            UserFields = ["authorUserId", "hiddenByUserId"],
+        },
+        new(Entities.BlogComment, "Blog yorumu", Permissions.BlogManage, new Dictionary<string, string>
+        {
+            ["contentId"] = "Blog yazısı", ["body"] = "Yorum", ["isHidden"] = "Gizli",
+        }, "body")
+        {
+            References = new Dictionary<string, string> { ["contentId"] = Entities.BlogPost },
+            UserFields = ["authorUserId", "hiddenByUserId"],
         },
         new(Entities.PhotoAlbum, "Fotoğraf albümü", Permissions.GalleryRead, new Dictionary<string, string>
         {
@@ -554,6 +574,11 @@ public sealed class HrModule : IModule
         services.AddScoped<IRecordStore, PhotoAlbumRecordStore>();
         services.AddScoped<IRecordStore, EmployeePositionRecordStore>();
         services.AddScoped<IDepartmentMapping, DepartmentMapping>();
+        services.AddScoped<IRecordStore, AnnouncementCommentRecordStore>();
+        services.AddScoped<IRecordStore, BlogCommentRecordStore>();
+        services.AddScoped<IRecordStore, AnnouncementLikeRecordStore>();
+        services.AddScoped<IRecordStore, BlogLikeRecordStore>();
+        services.AddScoped<IContentInteractions, ContentInteractions>();
         services.AddScoped<HrAutomationRecordSource>();
         services.AddScoped<Automation.StartChecklistAction>();
     }

@@ -413,3 +413,48 @@ Karar (kullanıcı, 14 Kasım 2026: "Core'a bağla"): İK'nın departmanı ayrı
 | `dotnet ef migrations has-pending-model-changes` | Bekleyen model değişikliği yok |
 | `HrDepartmentTests` (entegrasyon, 4 test: seçici, hesabı olmayan/bağlı kart, kullanıcı taşınınca kart ve görev geçmişi, süzgeç; eski değerlerin adla eşlenmesi ve eşlenmemiş eski duyurunun görünmeye devam etmesi; bulunmayan/kapalı/çakışan departman; tenant izolasyonu ve yetki); ayrıca `HrAnnouncementTests` ve `HrSurveyTests` güncellendi (hedef Core departmanı, üst departman kapsamı, bulunmayan ve kapalı departman), `HrImportTests` (departman adı/ağaç yolu, bulunmayan departman) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web` derlemesi | Yeni bileşenler ve ekran değişiklikleri hatasız derleniyor (bilinen 210 hatalık taban dışında hata yok); ekran görüntüsü alınamadı (yerelde uygulama çalışmıyor) |
+
+## 23. Sonraya kalanlar, öncelik 3: iletişim ek özellikleri (14 Kasım 2026)
+
+Kullanıcı kararı (14 Kasım 2026): dört ek özelliğin hepsi, ayrı ve küçük adımlarla: (a) duyuru kutucuğu ve ekler, (b) ankette çoklu seçim ve sonuçların dışa aktarımı, (c) çoklu hedefleme, (d) yorum ve beğeni.
+
+### 23a. Ana sayfa duyuru kutucuğu ve duyuru ekleri
+
+- **Ekler:** duyuruya görsel ve belge eklenir (ADR-0040 `/api/files`, `entityKey=hr.announcement`). Sunucu değişikliği gerekmedi: dosyanın görünürlüğü duyurunun görünürlüğüdür (hedef departman, yayın aralığı; göremeyene 404), eklemek ve silmek duyuru güncelleme iznini (`hr.announcements.manage`) ister. Duyuru yönetiminde ekler düzenlenir, duyuru akışında açılan duyurunun ekleri listelenir.
+- **Okunmamış süzgeci:** `unread=true` kullanıcının okumadığı duyurular (kullanıcı başına; başka kullanıcının okuması etkilemez).
+- **Ana sayfa kutucuğu** (`AnnouncementsTile`): duyuru okuma izni olan herkese, CRM açık olmasa da; son 5 yayındaki duyuru (sabitlenmişler üstte), "Sabitlenmiş"/"Yeni" rozeti ve okunmamış sayısı; akışa bağlantı. Metinler çeviri sözlüğündedir (`home.announcements.*`, tr/en/az; ADR-0034). Yeni CSS sınıfı yok (aktivite ajandasının `today-panel` sınıfları).
+- **Bilerek yapılmadı:** silinen duyurunun dosyalarının temizliği (öncelik 4, ADR-0040 dilim 3); duyuru metninde satır içi görsel (ekler ayrı listelenir).
+
+### 23b. Ankette çoklu seçim ve sonuçların dışa aktarımı
+
+- **Çoklu seçim** (`multiChoice`): seçenekler tek seçimle aynı kuralla girilir (2–20 farklı seçenek). Yanıtta `choices` listesi gönderilir; seçenekler soruda olmalı, bir seçenek bir kez seçilir, zorunlu soruda en az biri seçilir. Seçilen her seçenek **ayrı bir cevap satırıdır** (`SurveyAnswer.Choice`): kolon genişlemedi, migration yok, sonuçta seçenek başına sayım doğal olarak çalışır. Sorunun "cevaplayan" sayısı artık yanıt (kişi) sayısıdır; oran, cevaplayanların o seçeneği işaretleyen payıdır (çoklu seçimde toplamı %100'ü geçebilir).
+- **Dışa aktarma:** `GET /api/hr/surveys/{id}/results/export` sonuç ekranıyla **aynı özeti** CSV verir (soru, tür, cevaplayan, ortalama, seçenek/puan dağılımı, metin cevapları). İzin ve kimliği gizli ankette eşik sonuçla aynıdır (eşik altında 409). Yanıtlayan bilgisi ve ham yanıt satırı **yoktur**: ham satırlar kimliği gizli ankette cevap kombinasyonuyla kişiyi açığa çıkarabilirdi. Excel'in Türkçe ayarına göre UTF-8 BOM, ";" ayraç, virgüllü ondalık; "=", "+", "-", "@" ile başlayan hücre kesme işaretiyle başlar (formül enjeksiyonu; denetim kaydı dışa aktarımıyla aynı kural).
+- **Bilerek yapılmadı:** departman kırılımı (kimliği gizli ankette küçük grupları açığa çıkarır; eşik kuralıyla ayrıca tasarlanmalı), matris ve koşullu soru, Excel (.xlsx) biçimi.
+
+### 23c. Birden çok departmana ve kişiye hedefleme
+
+- **Model:** yeni tenant tablosu `hr.AudienceTargets` (içerik kimliği; ya Core departmanı ya kullanıcı, CHECK kısıtıyla yalnızca biri; RLS `TenantIsolationSql.AddTable`, migration `HrAudienceTargets`). Satırları duyuru ve anket kayıt depoları içerikle aynı işlemde yazar (görev geçmişi kalıbı); içerik silinince hedefleri de silinir. Duyuru ve anket aynı kodu kullanır (`IAudienceContent`, `AudienceFields<T>`, `HrAudience.Visible`).
+- **Kural (birleşim):** hedefi olmayan içerik herkese yöneliktir; hedefi olan içeriği, hedeflerden birine uyan okur görür: departman hedefi okurun departmanı ya da üst departmanıysa (alt departmanlar dahil), kişi hedefi okurun kendisiyse. Bölüm 22'den kalan tek departman kolonu ve eşlenmemiş eski İK departmanı birer hedef sayılmaya devam eder.
+- **Alanlar:** `audienceBusinessUnitIds` (en çok 50) ve `audienceUserIds` (en çok 200) kimlik listesidir; gönderilen tür tamamen değiştirilir, gönderilmeyen tür kalır. Yeni seçilen departman ağaçta olmalı ve etkin olmalı (kapalı departmanda kalan eski hedef korunur), yeni seçilen kişi kuruluşun etkin üyesi olmalı (başka firmanın kullanıcısı reddedilir); tekrar ve biçimsiz değer alan hatasıdır. Tek departman `audienceBusinessUnitId` uyumluluk için tek elemanlı liste gibi yazılır; okunurken yalnızca hedef tam olarak tek departmansa doludur. Departmanlar seçilince eski İK departmanı ve tek departman kolonu temizlenir (kolondaki hedef satıra taşınır).
+- **Arayüz:** duyuru ve anket formunda "Hedef departmanlar" ve "Hedef kişiler" alanları (`HrAudiencePicker`: seçilenler listelenir, tek tek kaldırılır). Yeni CSS sınıfı yok.
+- **Bilerek yapılmadı:** çalışma yerine göre hedefleme (çalışma yeri serbest metindir), hedef kitle önizlemesi (kaç kişiye ulaşır), hariç tutma ("şu departman hariç").
+
+### 23d. Duyuru ve blog yazısına yorum ve beğeni
+
+- **Model:** iki yeni tenant tablosu: `hr.ContentComments` (içerik, yazar, metin ≤ 2000, gizli mi, gizleyen) ve `hr.ContentLikes` (içerik, kullanıcı; içerik başına kullanıcı tekil). RLS `TenantIsolationSql.AddTable`, migration `HrContentComments`.
+- **Kayıt türleri:** kayıt boru hattı işlem başına tek izin denetlediği için içerik türü başına ayrı kayıt türü vardır: `hr.announcement-comment` / `hr.announcement-like` (duyuru okuma izni) ve `hr.blog-comment` / `hr.blog-like` (blog okuma izni). Tablolar ve depo kodu ortaktır (`ContentCommentRecordStore<T>`, `ContentLikeRecordStore<T>`).
+- **Görünürlük:** yorum ve beğeni, içeriğin görünürlüğünü izler. İçerik deposunun okur kuralı kullanılır (`ForReaderAsync`: duyuruda yayın aralığı ve hedef kitle, blogda yayın). Görülmeyen içeriğe yorum ve beğeni 404'tür, yorumları da listede yoktur.
+- **Yazma:** yalnızca `IContentInteractions` ile ve kayıt boru hattından yapılır (yetki, denetim kaydı, olay); genel uçtan yazma, değiştirme ve silme 409'dur.
+  - Yorumu ve beğeniyi içeriği görebilen kullanıcı yazar.
+  - Yorumunu yazarı siler.
+  - İçeriği yöneten (`hr.announcements.manage` / `hr.blog.manage`) yorumu gizler, yeniden gösterir ya da siler. Gizli yorumun metni okura gönderilmez ve gizli yorum sayılmaz.
+  - Yorum metni değiştirilmez.
+  - İçerik silinince yorumları ve beğenileri de silinir.
+- **Arayüz:** duyuru akışında ve blogda açılan içerikte `ContentDiscussion` bileşeni yer alır: beğen düğmesi (`btn-tonal`, `aria-pressed`) ve sayı, yorum listesi (`LoadingState`/`EmptyState`), yorum formu, yazar ve yönetici eylemleri, toast. Yeni CSS sınıfı yoktur.
+- **Bilerek yapılmadı:**
+  - yoruma yanıt (iç içe yorum)
+  - yorumu düzenleme
+  - yorum ve beğeni bildirimi (yazara)
+  - beğenenlerin adlarının listesi (arayüzde)
+  - galeri albümüne yorum
+  - içeriğin yorumlara kapatılması

@@ -1,5 +1,6 @@
 @* Anket sonucu (ADR-0042 dilim 7): soru başına cevap sayısı, puan ortalaması ve dağılımı, seçenek dağılımı, metin cevapları. Yanıtlayan bilgisi yoktur;
-   kimliği gizli ankette yanıt azsa sunucu sonucu göstermez ve nedenini söyler. *@
+   kimliği gizli ankette yanıt azsa sunucu sonucu göstermez ve nedenini söyler. Aynı özet CSV olarak indirilir (bölüm 23b). Çoklu seçimde oran,
+   soruyu cevaplayanların seçeneği işaretleyen payıdır (toplamı %100'ü geçebilir). *@
 @using System.Globalization
 @inject ApiClient Api
 
@@ -23,7 +24,10 @@
     }
     else
     {
-        <p class="text-muted">@results.ResponseCount yanıt</p>
+        <div class="list-toolbar">
+            <p class="text-muted mb-0 me-auto">@results.ResponseCount yanıt</p>
+            <a class="btn btn-tonal" href="@($"api/hr/surveys/{SurveyId}/results/export")" download><AppIcon Name="file-text" Size="16" /> CSV olarak indir</a>
+        </div>
         @foreach (var question in results.Questions)
         {
             <div class="summary-card mb-3">

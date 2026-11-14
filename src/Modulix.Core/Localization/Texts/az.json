@@ -110,6 +110,12 @@
   "home.noModule": "Qurumunuz üçün aktiv modul yoxdur.",
   "home.funnel.title": "Satış qıfı",
   "home.funnel.chart": "Mərhələlərdəki fürsət sayları",
+  "home.announcements.title": "Elanlar",
+  "home.announcements.unread": "{0} oxunmamış elan",
+  "home.announcements.empty": "Hazırda sizə yönəlik elan yoxdur.",
+  "home.announcements.all": "Bütün elanlar",
+  "home.announcements.new": "Yeni",
+  "home.announcements.pinned": "Bərkidilmiş",
 
   "nav.app.crm": "CRM",
   "nav.app.crm.activities": "Fəaliyyətlər",

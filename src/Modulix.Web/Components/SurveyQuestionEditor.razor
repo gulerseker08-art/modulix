@@ -58,7 +58,7 @@
                     break;
                 case "options":
                     <label class="@f.LabelClass()" for="question-options">@f.Label</label>
-                    <textarea id="question-options" class="form-control" rows="5" maxlength="2000" disabled="@(form.QuestionType != "choice")"
+                    <textarea id="question-options" class="form-control" rows="5" maxlength="2000" disabled="@(form.QuestionType is not ("choice" or "multiChoice"))"
                               placeholder="@("Evet\nKısmen\nHayır")" @bind="form.Options"></textarea>
                     <FieldError Field="options" Errors="errors" />
                     <small class="text-muted">Yalnızca tek seçim sorusunda kullanılır.</small>
@@ -115,7 +115,7 @@
             ["text"] = string.IsNullOrWhiteSpace(form.Text) ? null : form.Text.Trim(),
             ["sequence"] = form.Sequence,
             ["questionType"] = form.QuestionType,
-            ["options"] = form.QuestionType == "choice" && !string.IsNullOrWhiteSpace(form.Options) ? form.Options.Trim() : null,
+            ["options"] = form.QuestionType is "choice" or "multiChoice" && !string.IsNullOrWhiteSpace(form.Options) ? form.Options.Trim() : null,
             ["isRequired"] = form.IsRequired,
             ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
         };

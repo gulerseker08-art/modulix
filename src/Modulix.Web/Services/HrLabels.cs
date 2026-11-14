@@ -21,6 +21,16 @@ public static class HrLabels
     /// <summary>"yyyy-AA-gg" tarihini gg.AA.yyyy gösterir; boşsa "—".</summary>
     public const string Everyone = "Herkes";
 
+    /// <summary>Kayıttaki kimlik listesi alanı (ör. hedef departmanlar); boşsa boş liste.</summary>
+    public static IReadOnlyList<Guid> Ids(RecordResponse record, string field) =>
+        record.Values[field] is System.Text.Json.Nodes.JsonArray array
+            ? [.. array.Select(n => Guid.TryParse(n?.ToString(), out var id) ? id : Guid.Empty).Where(id => id != Guid.Empty)]
+            : [];
+
+    /// <summary>Kimlik listesinin JSON'u (kayıt yazarken).</summary>
+    public static System.Text.Json.Nodes.JsonArray IdArray(IEnumerable<Guid> ids) =>
+        [.. ids.Select(id => (System.Text.Json.Nodes.JsonNode?)System.Text.Json.Nodes.JsonValue.Create(id.ToString()))];
+
     /// <summary>
     /// Duyuru/anket hedefi: Core departmanının ağaç yolu (bölüm 22), Core'a eşlenmemiş eski kayıtta eski İK departmanının adı, hedef yoksa "Herkes".
     /// </summary>

@@ -1,11 +1,14 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Authorization;
 using Modulix.Infrastructure.Identity;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Files;
 using Modulix.Shared.Records;
 using static Modulix.Modules.Hr.HrModule.Permissions;
 using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
@@ -159,7 +162,147 @@ public class HrAnnouncementTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.Equal(1, Number(await GetAsync(hrA, $"{Announcements}/{announcement.Id}"), "readCount"));
     }
 
+    /// <summary>
+    /// Bölüm 23a: duyuru ekleri (ADR-0040 dosyaları) ve ana sayfa kutucuğunun okunmamış sayısı. Ek, duyuruyu görebilen okura açılır; başka departmana
+    /// hedeflenmiş duyurunun eki okura yoktur; okur ek yükleyemez; başka tenant göremez. Okunmamış süzgeci kullanıcı başınadır.
+    /// </summary>
+    [Fact]
+    public async Task Attachments_follow_announcement_visibility_and_unread_counts_are_per_user()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var hr = await LoginAsync(a.Hr);
+        using var staff = await LoginAsync(a.Staff);
+        using var outsider = await LoginAsync(a.Outsider);
+        using var hrB = await LoginAsync(b.Hr);
+
+        var mine = await PostAsync(hr, Announcements, Department(Announcement("Finans", "Metin", published: true, publishOn: "2026-01-02"), a.Finance));
+        var other = await PostAsync(hr, Announcements, Department(Announcement("Yönetim", "Metin", published: true, publishOn: "2026-01-03"), a.Management));
+        await PostAsync(hr, Announcements, Announcement("Herkese", "Metin", published: true, publishOn: "2026-01-01"));
+        var plan = await UploadAsync(hr, mine.Id, "plan.pdf", Pdf);
+        var hidden = await UploadAsync(hr, other.Id, "gizli.pdf", Pdf);
+
+        // Okur kendisine yönelik duyurunun ekini listeler ve indirir; başka departmanınkini göremez.
+        Assert.Single((await staff.GetFromJsonAsync<List<StoredFileDto>>($"{Files}?entityKey=hr.announcement&recordId={mine.Id}"))!);
+        Assert.Equal(Pdf, await staff.GetByteArrayAsync($"{Files}/{plan.Id}/content"));
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.GetAsync($"{Files}?entityKey=hr.announcement&recordId={other.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.GetAsync($"{Files}/{hidden.Id}/content")).StatusCode);
+
+        // Okur ek yükleyemez ve silemez; izinsiz kullanıcı ve başka tenant eke ulaşamaz.
+        using (var form = Form(mine.Id, "benim.pdf", Pdf))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsync(Files, form)).StatusCode);
+        }
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.DeleteAsync($"{Files}/{plan.Id}?version={plan.Version}")).StatusCode);
+        Assert.NotEqual(HttpStatusCode.OK, (await outsider.GetAsync($"{Files}/{plan.Id}/content")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await hrB.GetAsync($"{Files}/{plan.Id}/content")).StatusCode);
+
+        // Okunmamış süzgeci: okur iki duyuru görür, birini okuyunca bir kalır; yöneticinin okuması okurunkini etkilemez.
+        Assert.Equal(2, (await ListAsync(staff, Announcements, "active=true&unread=true")).Count);
+        await MarkReadAsync(staff, mine.Id);
+        Assert.Equal(1, (await ListAsync(staff, Announcements, "active=true&unread=true")).Count);
+        Assert.Equal(3, (await ListAsync(hr, Announcements, "active=true&unread=true")).Count);
+        Assert.Empty(await ListAsync(hrB, Announcements, "unread=true"));
+    }
+
+    /// <summary>
+    /// Bölüm 23c: birden çok departmana ve kişiye hedefleme. Okur hedeflerden birine uyuyorsa görür (departmanı, üst departmanı ya da kendisi); yalnızca
+    /// kişi hedefi güncellenince departman hedefleri kalır; başka tenant'ın kullanıcısı, kapalı departman, tekrarlı ve biçimsiz liste reddedilir.
+    /// </summary>
+    [Fact]
+    public async Task Announcements_can_target_several_departments_and_people()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var hr = await LoginAsync(a.Hr);
+        using var staff = await LoginAsync(a.Staff);
+
+        var both = await PostAsync(hr, Announcements, Targets(Announcement("İki departman", "Metin", published: true, publishOn: "2026-01-01"),
+            [a.Finance, a.Management], []));
+        var person = await PostAsync(hr, Announcements, Targets(Announcement("Yönetim ve Sinan", "Metin", published: true, publishOn: "2026-01-02"),
+            [a.Management], [a.Staff.Id]));
+        var others = await PostAsync(hr, Announcements, Targets(Announcement("Yalnız yönetim", "Metin", published: true, publishOn: "2026-01-03"),
+            [a.Management], [a.Hr.Id]));
+
+        Assert.Equal(new[] { a.Finance, a.Management }.Order(), Ids(both, "audienceBusinessUnitIds").Order());
+        Assert.Null(Text(both, "audienceBusinessUnitId"));
+        Assert.EndsWith("· 1 kişi", Text(person, "audienceName"));
+        Assert.Equal([person.Id, both.Id], (await ListAsync(staff, Announcements, null)).Select(x => x.Id));
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.GetAsync($"{Announcements}/{others.Id}")).StatusCode);
+
+        // Yalnızca kişi hedefi değişince departman hedefleri kalır; kişi kaldırılınca okur artık göremez.
+        var updated = await PutAsync(hr, $"{Announcements}/{person.Id}", new JsonObject { ["audienceUserIds"] = new JsonArray() });
+        Assert.Equal([a.Management], Ids(updated, "audienceBusinessUnitIds"));
+        Assert.Empty(Ids(updated, "audienceUserIds"));
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.GetAsync($"{Announcements}/{person.Id}")).StatusCode);
+
+        // Doğrulama: başka tenant'ın kullanıcısı, kapalı departman, tekrar ve dizi olmayan değer.
+        var closed = await HrDepartments.CreateAsync(hr, "Kapanacak");
+        await HrDepartments.DeactivateAsync(hr, closed);
+        foreach (var (values, field) in new (JsonObject, string)[]
+        {
+            (Targets(Announcement("x", "y", true, "2026-01-01"), [], [b.Staff.Id]), "audienceUserIds"),
+            (Targets(Announcement("x", "y", true, "2026-01-01"), [closed], []), "audienceBusinessUnitIds"),
+            (Targets(Announcement("x", "y", true, "2026-01-01"), [a.Finance, a.Finance], []), "audienceBusinessUnitIds"),
+            (new JsonObject { ["title"] = "x", ["body"] = "y", ["audienceUserIds"] = a.Staff.Id.ToString() }, "audienceUserIds"),
+        })
+        {
+            var rejected = await hr.PostAsJsonAsync(Announcements, new RecordWriteRequest(values));
+            Assert.True((await ValidationProblemAsync(rejected)).Errors.ContainsKey(field), field);
+        }
+
+        // Okur hedef değiştiremez; B tenant'ı A'nın duyurusunu görmez.
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.PutAsJsonAsync($"{Announcements}/{both.Id}",
+            new RecordWriteRequest(new JsonObject { ["audienceUserIds"] = new JsonArray() }, both.Version))).StatusCode);
+        using var hrB = await LoginAsync(b.Hr);
+        Assert.Equal(HttpStatusCode.NotFound, (await hrB.GetAsync($"{Announcements}/{both.Id}")).StatusCode);
+    }
+
     // --- yardımcılar ---
+
+    private static JsonObject Targets(JsonObject values, Guid[] units, Guid[] users)
+    {
+        values["audienceBusinessUnitIds"] = new JsonArray([.. units.Select(u => (JsonNode?)JsonValue.Create(u.ToString()))]);
+        values["audienceUserIds"] = new JsonArray([.. users.Select(u => (JsonNode?)JsonValue.Create(u.ToString()))]);
+        return values;
+    }
+
+    private static async Task<RecordResponse> PutAsync(HttpClient client, string url, JsonObject values)
+    {
+        var current = (await client.GetFromJsonAsync<RecordResponse>(url))!;
+        var response = await client.PutAsJsonAsync(url, new RecordWriteRequest(values, current.Version));
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        return (await response.Content.ReadFromJsonAsync<RecordResponse>())!;
+    }
+
+    private static IReadOnlyList<Guid> Ids(RecordResponse record, string field) =>
+        [.. record.Values[field]!.AsArray().Select(n => Guid.Parse(n!.GetValue<string>()))];
+
+    private const string Files = "/api/files";
+
+    private static readonly byte[] Pdf = Encoding.ASCII.GetBytes("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n");
+
+    private static MultipartFormDataContent Form(Guid announcementId, string fileName, byte[] content)
+    {
+        var file = new ByteArrayContent(content);
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        return new MultipartFormDataContent
+        {
+            { new StringContent("hr.announcement"), "entityKey" },
+            { new StringContent(announcementId.ToString()), "recordId" },
+            { file, "file", fileName },
+        };
+    }
+
+    private static async Task<StoredFileDto> UploadAsync(HttpClient client, Guid announcementId, string fileName, byte[] content)
+    {
+        using var form = Form(announcementId, fileName, content);
+        var response = await client.PostAsync(Files, form);
+        Assert.True(response.StatusCode == HttpStatusCode.Created, $"{(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        return (await response.Content.ReadFromJsonAsync<StoredFileDto>())!;
+    }
+
 
     private sealed record Setup(Guid TenantId, ModulixUser Hr, ModulixUser Staff, ModulixUser Outsider, Guid Center, Guid Finance, Guid Management);
 
