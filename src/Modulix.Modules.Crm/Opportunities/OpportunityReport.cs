@@ -4,6 +4,7 @@ using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Records;
+using Modulix.Modules.Crm.Reporting;
 
 namespace Modulix.Modules.Crm.Opportunities;
 
@@ -62,7 +63,8 @@ public interface IOpportunityReport
 /// bugünkü kayıt değerlerinden hesaplanır; geçmiş tarihli tahmin anlık görüntüsü (snapshot) yoktur.
 /// </summary>
 internal sealed class OpportunityReport(
-    IRecordPipeline pipeline, OpportunityHistoryReader historyReader, ICurrentAccess access, TimeProvider time, IOpportunityPolicyProvider? policyProvider = null)
+    IRecordPipeline pipeline, OpportunityHistoryReader historyReader, ICurrentAccess access, TimeProvider time, IOpportunityPolicyProvider? policyProvider = null,
+    ISalesReportingPolicyProvider? reportingPolicy = null)
     : IOpportunityReport
 {
     /// <summary>Bir istekte okunan en fazla fırsat (iki sorgu için ayrı ayrı).</summary>
@@ -78,7 +80,7 @@ internal sealed class OpportunityReport(
         "Tahmin (aylık): açık fırsatların tahmini kapanış tarihinin ayına göre; tahmini kapanışı olmayanlar \"tarihsiz\" kovasındadır. Tahmin bugünkü kayıt değerlerindendir, geçmiş dönem tahmini değildir.",
         "Kapanış metrikleri: gerçek kapanış tarihi [Başlangıç, Bitiş] içinde olan fırsatlar; her fırsat yalnızca güncel kapanışıyla sayılır (yeniden açılıp kapanan fırsat bir kez).",
         "Kazanma oranı = Kazanılan / (Kazanılan + Kaybedilen). İptal edilen, beklemedeki ve açık fırsatlar paydaya girmez. Payda sıfırsa oran tanımsızdır.",
-        "Ortalama satış döngüsü = kazanılan fırsatlarda (gerçek kapanış tarihi − fırsatın ilk oluşturulma günü), gün olarak.",
+        "Ortalama satış döngüsü = kazanılan fırsatlarda (gerçek kapanış tarihi − fırsatın ilk oluşturulma günü), gün olarak. Günler firmanın saat dilimindedir; aynı gün kazanılan fırsat 0 gündür.",
         "Aşamada kalma süresi: tarihçedeki aşama girişlerinden; yalnızca fırsat Açık durumdayken geçen süre sayılır (bekleme ve kapanış hariç).",
         "Gecikmiş: durumu Açık ve tahmini kapanış tarihi bugünden önce. Sonraki aksiyonu olmayan: Açık ve \"sonraki aksiyon tarihi\" boş. Hareketsiz: Açık ve son müşteri etkileşimi (yoksa oluşturulma) eşikten eski.",
         "Son müşteri etkileşimi gerçekleşen temastan gelir (tamamlanmış toplantı, ulaşılan arama, gönderilen e-posta); \"son güncelleme\" değildir.",
@@ -106,8 +108,10 @@ internal sealed class OpportunityReport(
             return RecordResult<OpportunityReportResult>.Fail(error.Code, error.Message, error.FieldErrors);
         }
 
-        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        // Günler firmanın saat diliminde (kapanış tarihi de öyle damgalanır; satış analizleriyle aynı politika).
+        var zone = (reportingPolicy is null ? SalesReportingPolicy.Default : await reportingPolicy.GetAsync(cancellationToken)).TimeZone;
         var now = time.GetUtcNow();
+        var today = ReportPeriods.Today(now, zone);
         var open = live.Rows.Where(r => r.Status == OpportunityStatus.Open).ToList();
         var onHold = live.Rows.Count(r => r.Status == OpportunityStatus.OnHold);
         var won = closed.Rows.Where(r => r.Status == OpportunityStatus.Won).ToList();
@@ -132,7 +136,8 @@ internal sealed class OpportunityReport(
         var cycleDays = won
             .Select(r => (Close: r.ActualCloseDate, Start: CreatedAt(r)))
             .Where(x => x.Close is not null && x.Start is not null)
-            .Select(x => (double)(x.Close!.Value.DayNumber - DateOnly.FromDateTime(x.Start!.Value.UtcDateTime).DayNumber))
+            // Eski kayıtlarda kapanış UTC gününe göre damgalanmış olabilir (yerel günden bir gün geride): süre eksi sayılmaz.
+            .Select(x => (double)Math.Max(0, x.Close!.Value.DayNumber - ReportPeriods.Today(x.Start!.Value, zone).DayNumber))
             .ToList();
 
         var decided = won.Count + lost.Count;
@@ -161,7 +166,7 @@ internal sealed class OpportunityReport(
             [.. open.Where(r => r.NextActionDate is null).OrderBy(r => r.Number).Take(ListLimit).Select(r => Item(r, null))],
             [.. open.Where(r => (r.LastInteractionAt ?? CreatedAt(r) ?? now) < staleBefore)
                 .OrderBy(r => r.LastInteractionAt ?? CreatedAt(r)).Take(ListLimit)
-                .Select(r => Item(r, (r.LastInteractionAt ?? CreatedAt(r)) is { } at ? DateOnly.FromDateTime(at.UtcDateTime) : null))],
+                .Select(r => Item(r, (r.LastInteractionAt ?? CreatedAt(r)) is { } at ? ReportPeriods.Today(at, zone) : null))],
             [.. open.Where(r => r.CloseDateChangeCount > 0).OrderByDescending(r => r.CloseDateChangeCount).Take(ListLimit)
                 .Select(r => new ReportPostponed(r.Id, r.Title, r.CloseDateChangeCount, r.ExpectedCloseDate))],
             Definitions);

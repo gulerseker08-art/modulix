@@ -125,7 +125,8 @@ if ($apiXml -notmatch '<UserSecretsId>') {
     Write-Host "UserSecretsId '$UserSecretsId' olarak ayarlandi."
 }
 
-$server = "localhost,$port"
+# 127.0.0.1: "localhost" bazi makinelerde once IPv6 (::1) adresine cozulur; Docker portu yalnizca 127.0.0.1e bagli oldugundan baglanti zaman asimina duser.
+$server = "127.0.0.1,$port"
 $appConnection = "Server=$server;Database=Modulix;User Id=modulix_app;Password=$($envValues['MODULIX_APP_PASSWORD']);TrustServerCertificate=True"
 $migratorConnection = "Server=$server;Database=Modulix;User Id=modulix_migrator;Password=$($envValues['MODULIX_MIGRATOR_PASSWORD']);TrustServerCertificate=True"
 

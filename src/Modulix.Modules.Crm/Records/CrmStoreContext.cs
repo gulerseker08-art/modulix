@@ -14,7 +14,7 @@ internal sealed class CrmStoreContext(
     ICurrentAccess permissions, IEnumerable<IActivityLinkTarget> linkTargets, LeadWorkflowGate? leadGate = null,
     ActivityWorkflowGate? activityGate = null, IRecordCommandContext? command = null, OpportunityWorkflowGate? opportunityGate = null,
     IOpportunityPolicyProvider? policy = null, IActivityCodeCatalog? activityCodes = null, IIndustryCatalog? industries = null,
-    IServiceProvider? services = null, CampaignLinkTrust? campaignTrust = null)
+    IServiceProvider? services = null, CampaignLinkTrust? campaignTrust = null, TimeProvider? time = null)
 {
     /// <summary>
     /// Kampanya bağının (müşteri adayı/fırsat <c>campaignId</c>) sunucu doğrulaması: kampanya Pazarlama modülünün kaydıdır, CRM onun tablosunu görmez;
@@ -39,6 +39,9 @@ internal sealed class CrmStoreContext(
 
     /// <summary>Faaliyet kataloğunu okuma sınırı (hizmet kapsamı doğrulaması); yoksa (ör. birim testi) katalog denetimi atlanır.</summary>
     public IActivityCodeCatalog? ActivityCodes { get; } = activityCodes;
+
+    /// <summary>Şimdiki an (UTC). İş akışıyla aynı saatten okunur ki tarihçe anı ile kapanış günü birbirini tutsun; sağlayıcı yoksa sistem saati.</summary>
+    public DateTimeOffset Now => (time ?? TimeProvider.System).GetUtcNow();
 
     /// <summary>Fırsat iş akışı kapısı (<see cref="OpportunityWorkflowGate"/>).</summary>
     public OpportunityWorkflowGate OpportunityGate { get; } = opportunityGate ?? new OpportunityWorkflowGate();
