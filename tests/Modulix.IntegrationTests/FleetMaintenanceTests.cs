@@ -30,8 +30,7 @@ public class FleetMaintenanceTests(CrmAutomationFixture fixture) : IClassFixture
     private const string Vehicles = "/api/records/fleet.vehicle";
     private const string Maintenance = "/api/records/fleet.maintenance";
 
-    // Sunucu günü şirket saat diliminde (varsayılan Europe/Istanbul) hesaplar; UTC günü 21:00–24:00 arasında bir gün geride kalır.
-    private DateOnly Today => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(fixture.Time.GetUtcNow(), TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul")).DateTime);
+    private DateOnly Today => TenantToday.At(fixture.Time.GetUtcNow());
 
     private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

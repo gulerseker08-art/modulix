@@ -3,16 +3,16 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Sözleşmeler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.contracts") · Modulix</PageTitle>
 
 <AuthGate Module="@ContractsAccess.ModuleKey" Permission="@ContractsAccess.ContractsRead">
     <div class="page-header">
-        <h1>Sözleşmeler</h1>
+        <h1>@Texts.Get("nav.app.contracts")</h1>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="sozlesmeler/ozet">Pano</a>
+            <a class="btn btn-outline-secondary" href="sozlesmeler/ozet">@Texts.Get("nav.app.contracts.dashboard")</a>
             @if (Session.Can(ContractsAccess.ContractsExport))
             {
-                <a class="btn btn-outline-secondary" href="@ExportUrl()" download="sozlesmeler.csv">CSV indir</a>
+                <a class="btn btn-outline-secondary" href="@ExportUrl()" download="sozlesmeler.csv">@Texts.Get("crm.leads.csv")</a>
             }
         </div>
     </div>
@@ -22,35 +22,35 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="ChooseViewAsync" Label="Sözleşme görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="ChooseViewAsync" Label="@Texts.Get("contracts.list.viewsLabel")" NewView="StartNaming" NewViewText="@Texts.Get("common.view.add")" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <label class="visually-hidden" for="contract-search">Sözleşme ara</label>
-            <input id="contract-search" class="form-control" type="search" placeholder="Başlık veya sözleşme no ara" @bind="search" />
+            <label class="visually-hidden" for="contract-search">@Texts.Get("contracts.list.searchLabel")</label>
+            <input id="contract-search" class="form-control" type="search" placeholder="@Texts.Get("contracts.list.searchPlaceholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(ContractsAccess.ContractsWrite))
         {
-            <a class="btn btn-primary" href="sozlesmeler/sihirbaz"><AppIcon Name="plus" Size="16" /> Yeni sözleşme</a>
+            <a class="btn btn-primary" href="sozlesmeler/sihirbaz"><AppIcon Name="plus" Size="16" /> @Texts.Get("contracts.list.new")</a>
         }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <label class="visually-hidden" for="effective-filter">Yürürlük durumu</label>
+            <label class="visually-hidden" for="effective-filter">@Texts.Get("contracts.list.effectiveFilter")</label>
             <select id="effective-filter" class="form-select form-select-sm filter-select" @bind="effective" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm yürürlük durumları</option>
+                <option value="">@Texts.Get("contracts.list.allEffective")</option>
                 @foreach (var s in ContractLabels.Effectives)
                 {
                     <option value="@s.Key">@s.Label</option>
                 }
             </select>
-            <label class="visually-hidden" for="type-filter">Tür</label>
+            <label class="visually-hidden" for="type-filter">@Texts.Get("common.field.kind")</label>
             <select id="type-filter" class="form-select form-select-sm filter-select" @bind="type" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm türler</option>
+                <option value="">@Texts.Get("crm.act.allTypes")</option>
                 @foreach (var t in Lookups.Choices(ContractsAccess.ContractTypeList))
                 {
                     <option value="@t.Key">@t.Label</option>
@@ -61,14 +61,14 @@
 
     @if (approval is not null || preparation is not null)
     {
-        <div class="filters" role="group" aria-label="Uygulanan ek süzgeçler">
+        <div class="filters" role="group" aria-label="@Texts.Get("contracts.list.extraFilters")">
             @if (approval is not null)
             {
-                <button type="button" class="chip active" @onclick="() => ClearExtraAsync(true)" aria-label="Süzgeci kaldır: Onay durumu @ContractLabels.Label(ContractLabels.Approvals, approval)">Onay: @ContractLabels.Label(ContractLabels.Approvals, approval) ×</button>
+                <button type="button" class="chip active" @onclick="() => ClearExtraAsync(true)" aria-label="@Texts.Get("contracts.list.removeApproval", ContractLabels.Label(ContractLabels.Approvals, approval))">@Texts.Get("contracts.list.chipApproval", ContractLabels.Label(ContractLabels.Approvals, approval)) ×</button>
             }
             @if (preparation is not null)
             {
-                <button type="button" class="chip active" @onclick="() => ClearExtraAsync(false)" aria-label="Süzgeci kaldır: Hazırlık durumu @ContractLabels.Label(ContractLabels.Preparations, preparation)">Hazırlık: @ContractLabels.Label(ContractLabels.Preparations, preparation) ×</button>
+                <button type="button" class="chip active" @onclick="() => ClearExtraAsync(false)" aria-label="@Texts.Get("contracts.list.removePreparation", ContractLabels.Label(ContractLabels.Preparations, preparation))">@Texts.Get("contracts.list.chipPreparation", ContractLabels.Label(ContractLabels.Preparations, preparation)) ×</button>
             }
         </div>
     }
@@ -78,24 +78,24 @@
 
     @if (page is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu süzgece uyan sözleşme yok.</p>
+        <p class="text-muted" role="status">@Texts.Get("contracts.list.empty")</p>
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) sözleşme listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("contracts.list.count", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Sözleşme listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("contracts.list.caption")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" Class="@(column.Key == "total" ? "text-end" : null)" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -107,8 +107,8 @@
                             @Cell(column, c)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{c.Number} eylemleri")">
-                                <a class="view-menu-item" role="menuitem" href="sozlesmeler/@c.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", c.Number)">
+                                <a class="view-menu-item" role="menuitem" href="sozlesmeler/@c.Id"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></a>
                             </RowMenu>
                         </td>
                     </tr>
@@ -130,19 +130,20 @@
     private const string PresetPrefix = "preset:";
 
     // Sıralama sunucudaki sort anahtarlarıdır (ContractSort); varsayılan sıra en yeni önce.
-    private static readonly GridColumnDef[] Columns =
+    // Özellik olarak tanımlıdır: başlıklar sayfa açılırken etkin dilden çözülür (ADR-0034).
+    private static GridColumnDef[] Columns =>
     [
-        new("contract", "Sözleşme", "file-text", "title", "-title", Locked: true),
-        new("customer", "Müşteri", "building"),
-        new("type", "Tür", "tag"),
-        new("statuses", "Durumlar", "activity"),
-        new("dates", "Başlangıç / Bitiş", "calendar", "endDate", "-endDate"),
-        new("critical", "Kritik tarih", "clock", "noticeDeadline", "-noticeDeadline"),
-        new("total", "Toplam", "coins"),
-        new("owner", "Sorumlu", "user"),
-        new("number", "Numara", "hash", "number", "-number", DefaultVisible: false),
-        new("start", "Başlangıç", "calendar", "startDate", "-startDate", DefaultVisible: false),
-        new("payment", "Ödeme koşulları", "wallet", DefaultVisible: false),
+        new("contract", Texts.Get("contracts.list.col.contract"), "file-text", "title", "-title", Locked: true),
+        new("customer", Texts.Get("contracts.list.col.customer"), "building"),
+        new("type", Texts.Get("common.field.kind"), "tag"),
+        new("statuses", Texts.Get("contracts.list.col.statuses"), "activity"),
+        new("dates", Texts.Get("contracts.list.col.dates"), "calendar", "endDate", "-endDate"),
+        new("critical", Texts.Get("contracts.list.col.critical"), "clock", "noticeDeadline", "-noticeDeadline"),
+        new("total", Texts.Get("contracts.list.col.total"), "coins"),
+        new("owner", Texts.Get("common.field.owner"), "user"),
+        new("number", Texts.Get("contracts.list.col.number"), "hash", "number", "-number", DefaultVisible: false),
+        new("start", Texts.Get("contracts.list.col.start"), "calendar", "startDate", "-startDate", DefaultVisible: false),
+        new("payment", Texts.Get("contracts.list.col.payment"), "wallet", DefaultVisible: false),
     ];
 
     private readonly GridViewState grid = new("contracts.contracts", DefaultSort);
@@ -177,7 +178,7 @@
     // Görünümler yalnızca süzgeçtir: "Tüm sözleşmeler", hızlı görünümler ve kişisel görünümler (kapsamı sunucu uygular).
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm sözleşmeler", Icon: "file-text"),
+        new(AllViews, Texts.Get("contracts.list.view.all"), Icon: "file-text"),
         .. ViewLabels.Presets.Select(p => new ViewOption(PresetPrefix + p.Key, p.Label, Icon: PresetIcon(p.Key))),
         .. views.Options,
     ];
@@ -359,7 +360,7 @@
     {
         "contract" => @<text>
             <a href="sozlesmeler/@c.Id">@c.Title</a>
-            <small class="text-muted">@c.Number · V@(c.CurrentVersionNo)</small>
+            <small class="text-muted">@c.Number · @Texts.Get("contracts.versionNo", c.CurrentVersionNo)</small>
         </text>,
         "customer" => @<text>@PartyName(c.PartyId)</text>,
         "type" => @<text>@Lookups.Label(ContractsAccess.ContractTypeList, c.Type)</text>,
@@ -368,7 +369,7 @@
             @if (c.ApprovalStatus != "NotRequired") { <span class="badge stage-@ContractLabels.ApprovalBadge(c.ApprovalStatus)">@ContractLabels.Label(ContractLabels.Approvals, c.ApprovalStatus)</span> }
             @if (c.SignatureStatus != "NotSent") { <span class="badge stage-@ContractLabels.SignatureBadge(c.SignatureStatus)">@ContractLabels.Label(ContractLabels.Signatures, c.SignatureStatus)</span> }
         </text>,
-        "dates" => @<text>@ContractLabels.Date(c.StartDate) – @(c.IsIndefinite ? "Belirsiz süreli" : ContractLabels.Date(c.EndDate))</text>,
+        "dates" => @<text>@ContractLabels.Date(c.StartDate) – @(c.IsIndefinite ? Texts.Get("contracts.indefinite") : ContractLabels.Date(c.EndDate))</text>,
         "critical" => @<text>@Critical(c)</text>,
         "total" => @<text>@ContractLabels.Money(c.GrossTotal, c.Currency)</text>,
         "owner" => @<OwnerCell Name="@Lookups.MemberName(c.OwnerId)" />,
@@ -382,12 +383,12 @@
     {
         if (c.NoticeDeadline is { } notice && ContractLabels.DaysUntil(notice) is { } nd && nd >= 0)
         {
-            return $"Son bildirim: {ContractLabels.Date(notice)} ({nd} gün)";
+            return Texts.Get("contracts.list.critical.notice", ContractLabels.Date(notice), nd);
         }
 
         if (!c.IsIndefinite && c.EndDate is { } end && ContractLabels.DaysUntil(end) is { } ed)
         {
-            return ed < 0 ? $"Bitti: {ContractLabels.Date(end)}" : $"Bitiş: {ContractLabels.Date(end)} ({ed} gün)";
+            return ed < 0 ? Texts.Get("contracts.list.critical.ended", ContractLabels.Date(end)) : Texts.Get("contracts.list.critical.end", ContractLabels.Date(end), ed);
         }
 
         return "—";
