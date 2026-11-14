@@ -13,6 +13,7 @@ public class ProjectReferenceRulesTests
     private const string ModulePrefix = "Modulix.Modules.";
     private const string FleetContracts = "Modulix.Modules.Fleet.Contracts";
     private const string CrmContracts = "Modulix.Modules.Crm.Contracts";
+    private const string MarketingContracts = "Modulix.Modules.Marketing.Contracts";
 
     /// <summary>Her src projesinin referans verebileceği projeler.</summary>
     private static readonly Dictionary<string, string[]> AllowedReferences = new()
@@ -21,12 +22,12 @@ public class ProjectReferenceRulesTests
         ["Modulix.Shared"] = [],
         ["Modulix.Core"] = [CoreContracts],
         ["Modulix.Infrastructure"] = ["Modulix.Core", CoreContracts],
-        ["Modulix.Modules.Crm"] = [CoreContracts, CrmContracts],
+        ["Modulix.Modules.Crm"] = [CoreContracts, CrmContracts, MarketingContracts],
         ["Modulix.Modules.Logistics"] = [CoreContracts, FleetContracts],
         ["Modulix.Modules.Contracts"] = [CoreContracts, CrmContracts],
         ["Modulix.Modules.Orders"] = [CoreContracts, CrmContracts],
         ["Modulix.Modules.Support"] = [CoreContracts],
-        ["Modulix.Modules.Marketing"] = [CoreContracts, CrmContracts],
+        ["Modulix.Modules.Marketing"] = [CoreContracts, CrmContracts, MarketingContracts],
         ["Modulix.Modules.Warehouse"] = [CoreContracts],
         ["Modulix.Modules.Fleet"] = [CoreContracts, FleetContracts],
         ["Modulix.Modules.Hr"] = [CoreContracts],
@@ -34,6 +35,7 @@ public class ProjectReferenceRulesTests
         // Modül sözleşme projeleri (ADR-0044): yalnızca arayüz ve veri tipleri; başka modüle ya da sözleşmeye bağlanmaz.
         [CrmContracts] = [CoreContracts],
         [FleetContracts] = [CoreContracts],
+        [MarketingContracts] = [CoreContracts],
 
         ["Modulix.AI"] = [CoreContracts],
         ["Modulix.Web"] = ["Modulix.Shared"],

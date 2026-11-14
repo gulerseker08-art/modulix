@@ -1,6 +1,6 @@
 using Modulix.Core.Contracts.Communication;
 
-namespace Modulix.Core.Contracts.Marketing;
+namespace Modulix.Modules.Marketing.Contracts;
 
 // Gönderim sözleşmeleri (ADR-0025, dilim 5). Pazarlama modülü kanal sağlayıcısını bilmez: iletiyi bu sözleşmeyle teslim eder. Gerçek bir sağlayıcı
 // (SMTP, SMS, WhatsApp) yalnızca yapılandırıldığında ve açıkça seçildiğinde kullanılır; bu sürümde yalnızca iletiyi hiçbir yere göndermeyen test

@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Linq.Expressions;
-using Modulix.Core.Contracts.Marketing;
+using Modulix.Modules.Marketing.Contracts;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Modules.Crm.Domain;
 
