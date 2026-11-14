@@ -12,15 +12,14 @@ else if (Session.IsSignedIn)
 {
     @if (!Session.IsPlatformAdministrator)
     {
-        <div class="alert alert-warning">Bu alan platform yöneticilerine açıktır.</div>
+        <div class="alert alert-warning">@Texts.Get("platform.gate.denied")</div>
     }
     else
     {
         @if (Session.PlatformNeedsTwoFactor)
         {
             <div class="alert alert-warning" role="alert">
-                Platform işlemleri için iki adımlı doğrulama zorunludur; açana kadar sunucu bu alandaki istekleri reddeder.
-                <a href="hesabim">Hesabım</a> sayfasından açın.
+                @((MarkupString)Texts.Get("platform.gate.twoFactor", "<a href=\"hesabim\">", "</a>"))
             </div>
         }
 

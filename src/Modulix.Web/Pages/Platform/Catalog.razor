@@ -1,13 +1,13 @@
 @page "/platform/katalog"
 @inject ApiClient Api
 
-<PageTitle>Modül kataloğu · Platform · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.platform.catalog") · @Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
 @* Kayıtlı modüller, izinleri, hazır rolleri ve kaç firmada açık oldukları (Y4b). Salt okunur: modül eklemek kodla olur. *@
 <PlatformGate>
-    <a class="back-link" href="platform">← Platform</a>
-    <h1>Modül kataloğu</h1>
-    <p class="text-muted">Uygulamaya kayıtlı modüller. Yeni modül kodla eklenir; burada yalnızca görüntülenir.</p>
+    <a class="back-link" href="platform">← @Texts.Get("nav.app.platform")</a>
+    <h1>@Texts.Get("nav.app.platform.catalog")</h1>
+    <p class="text-muted">@Texts.Get("platform.catalog.intro")</p>
 
     @if (message is not null)
     {
@@ -29,19 +29,19 @@
                 <div class="section-header">
                     <h2>@module.DisplayName <code>@module.Key</code></h2>
                     <span class="badge tag">
-                        @(module.IsAlwaysEnabled ? "Her firmada açık" : $"{module.EnabledTenantCount} firmada açık")
+                        @(module.IsAlwaysEnabled ? Texts.Get("platform.catalog.always") : Texts.Get("platform.catalog.enabledIn", module.EnabledTenantCount))
                     </span>
                 </div>
 
                 <table class="table record-table">
-                    <thead><tr><th>Kaynak</th><th>İzin</th><th>Anahtar</th></tr></thead>
+                    <thead><tr><th>@Texts.Get("platform.catalog.resource")</th><th>@Texts.Get("platform.catalog.permission")</th><th>@Texts.Get("platform.plans.key")</th></tr></thead>
                     <tbody>
                         @foreach (var permission in module.Permissions)
                         {
                             <tr>
-                                <td data-label="Kaynak">@permission.ResourceName</td>
-                                <td data-label="İzin" class="primary">@permission.DisplayName</td>
-                                <td data-label="Anahtar"><code>@permission.Key</code></td>
+                                <td data-label="@Texts.Get("platform.catalog.resource")">@permission.ResourceName</td>
+                                <td data-label="@Texts.Get("platform.catalog.permission")" class="primary">@permission.DisplayName</td>
+                                <td data-label="@Texts.Get("platform.plans.key")"><code>@permission.Key</code></td>
                             </tr>
                         }
                     </tbody>
@@ -49,20 +49,20 @@
 
                 @if (module.Templates.Count > 0)
                 {
-                    <h3 class="h6">Hazır roller</h3>
+                    <h3 class="h6">@Texts.Get("platform.templates")</h3>
                     <ul>
                         @foreach (var template in module.Templates)
                         {
                             <li>
                                 <strong>@template.Name</strong> <span class="text-muted">@template.Description</span>
-                                <small class="text-muted">(@template.Permissions.Count izin)</small>
+                                <small class="text-muted">@Texts.Get("platform.catalog.permissionCount", template.Permissions.Count)</small>
                             </li>
                         }
                     </ul>
                 }
                 else if (module.IsAlwaysEnabled)
                 {
-                    <p class="text-muted">"Salt okur" hazır rolü her firmada açık modüllerin görüntüleme izinlerinden oluşur.</p>
+                    <p class="text-muted">@Texts.Get("platform.catalog.readOnlyRole")</p>
                 }
             </section>
         }

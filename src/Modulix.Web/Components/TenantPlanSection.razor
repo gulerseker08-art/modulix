@@ -3,7 +3,7 @@
 @* Firmanın planı, limitleri ve kullanımı (ADR-0028 Dilim 4). Plan atamak ve limit istisnası gerekçe ister; hiçbir şey silinmez,
    plan değişince önceki plandan gelen modüller kapanır ama veri yerinde kalır. *@
 <section class="detail-section">
-    <div class="section-header"><h2>Plan ve limitler</h2></div>
+    <div class="section-header"><h2>@Texts.Get("platform.plan.title")</h2></div>
     <Notice Text="@notice" Failed="failed" />
 
     @if (overview is null)
@@ -16,11 +16,11 @@
             @if (overview.Subscription is { } subscription)
             {
                 <strong>@subscription.PlanName</strong>
-                <span class="text-muted"> · @CrmLabels.Time(subscription.StartsAt) tarihinden beri@(subscription.ValidUntil is { } until ? $" · {CrmLabels.Time(until)} tarihine kadar" : " · süresiz")</span>
+                <span class="text-muted"> · @Texts.Get("platform.plan.since", CrmLabels.Time(subscription.StartsAt)) · @(subscription.ValidUntil is { } until ? Texts.Get("platform.untilDate", CrmLabels.Time(until)) : Texts.Get("platform.plan.noEnd"))</span>
             }
             else
             {
-                <span class="text-muted">Bu firmaya plan atanmamış; modüller elle yönetiliyor ve limit yok.</span>
+                <span class="text-muted">@Texts.Get("platform.plan.none")</span>
             }
         </p>
 
@@ -30,14 +30,14 @@
                 <div>
                     <strong>@limit.Name</strong>
                     <span class="text-muted">
-                        @limit.Usage / @(limit.Limit?.ToString() ?? "sınırsız")
+                        @limit.Usage / @(limit.Limit?.ToString() ?? Texts.Get("platform.plan.unlimited"))
                         @switch (limit.Source)
                         {
                             case LimitSourceDto.Override:
-                                <text> · istisna, @CrmLabels.Time(limit.OverrideUntil!.Value) tarihine kadar</text>
+                                <text> · @Texts.Get("platform.plan.overrideUntil", CrmLabels.Time(limit.OverrideUntil!.Value))</text>
                                 break;
                             case LimitSourceDto.Plan:
-                                <text> · plandan</text>
+                                <text> · @Texts.Get("platform.plan.fromPlan")</text>
                                 break;
                         }
                     </span>
@@ -45,26 +45,26 @@
                 @if (limit.Limit is { } max)
                 {
                     <progress class="w-100" max="@Math.Max(max, 1)" value="@Math.Min(limit.Usage, Math.Max(max, 1))"
-                              aria-label="@($"{limit.Name} kullanımı")"></progress>
+                              aria-label="@Texts.Get("platform.plan.usageOf", limit.Name)"></progress>
                     @if (limit.Usage >= max)
                     {
-                        <small class="text-muted d-block">Sınıra ulaşıldı: yeni davet ve yeniden etkinleştirme durur; mevcut kullanıcılar etkilenmez.</small>
+                        <small class="text-muted d-block">@Texts.Get("platform.plan.limitReached")</small>
                     }
                 }
                 @if (limit.Source == LimitSourceDto.Override)
                 {
-                    <button type="button" class="btn btn-outline-secondary btn-sm mt-1" disabled="@busy" @onclick="() => RevokeAsync(limit.Key)">İstisnayı geri al</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm mt-1" disabled="@busy" @onclick="() => RevokeAsync(limit.Key)">@Texts.Get("platform.plan.revoke")</button>
                 }
             </div>
         }
 
         <form class="inline-form" novalidate @onsubmit="AssignAsync" @onsubmit:preventDefault>
-            <h3>Plan ata</h3>
+            <h3>@Texts.Get("platform.plan.assign")</h3>
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="assignPlan">Plan</label>
+                    <label class="form-label" for="assignPlan">@Texts.Get("platform.plan.plan")</label>
                     <select id="assignPlan" class="form-select" @bind="planKey">
-                        <option value="">Seçin</option>
+                        <option value="">@Texts.Get("support.choose")</option>
                         @foreach (var plan in plans.Where(p => p.IsActive))
                         {
                             <option value="@plan.Key">@plan.Name</option>
@@ -73,43 +73,43 @@
                     <FieldError Field="planKey" Errors="assignErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="assignUntil">Bitiş (boş: süresiz)</label>
+                    <label class="form-label" for="assignUntil">@Texts.Get("platform.untilOptional")</label>
                     <input id="assignUntil" class="form-control" type="date" @bind="planUntil" />
                     <FieldError Field="validUntil" Errors="assignErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="assignReason">Gerekçe *</label>
+                    <label class="form-label" for="assignReason">@Texts.Get("platform.reasonRequired")</label>
                     <input id="assignReason" class="form-control" maxlength="500" @bind="planReason" @bind:event="oninput" />
                     <FieldError Field="reason" Errors="assignErrors" />
                 </div>
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(planKey) || string.IsNullOrWhiteSpace(planReason))">Planı ata</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(planKey) || string.IsNullOrWhiteSpace(planReason))">@Texts.Get("platform.plan.assignSubmit")</button>
             </div>
         </form>
 
         <form class="inline-form" novalidate @onsubmit="OverrideAsync" @onsubmit:preventDefault>
-            <h3>Koltuk istisnası</h3>
-            <p class="text-muted">Planın koltuk limitini geçici olarak değiştirir; gerekçe ve bitiş zorunludur.</p>
+            <h3>@Texts.Get("platform.plan.override")</h3>
+            <p class="text-muted">@Texts.Get("platform.plan.overrideIntro")</p>
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="ovValue">Koltuk sayısı</label>
+                    <label class="form-label" for="ovValue">@Texts.Get("platform.plan.seatCount")</label>
                     <input id="ovValue" class="form-control" type="number" min="0" @bind="overrideValue" />
                     <FieldError Field="value" Errors="overrideErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="ovUntil">Bitiş *</label>
+                    <label class="form-label" for="ovUntil">@Texts.Get("platform.untilRequired")</label>
                     <input id="ovUntil" class="form-control" type="date" @bind="overrideUntil" />
                     <FieldError Field="validUntil" Errors="overrideErrors" />
                 </div>
                 <div>
-                    <label class="form-label" for="ovReason">Gerekçe *</label>
+                    <label class="form-label" for="ovReason">@Texts.Get("platform.reasonRequired")</label>
                     <input id="ovReason" class="form-control" maxlength="500" @bind="overrideReason" @bind:event="oninput" />
                     <FieldError Field="reason" Errors="overrideErrors" />
                 </div>
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-outline-primary" disabled="@(busy || overrideValue is null || overrideUntil is null || string.IsNullOrWhiteSpace(overrideReason))">İstisna ekle</button>
+                <button type="submit" class="btn btn-outline-primary" disabled="@(busy || overrideValue is null || overrideUntil is null || string.IsNullOrWhiteSpace(overrideReason))">@Texts.Get("platform.plan.addOverride")</button>
             </div>
         </form>
     }
@@ -167,7 +167,7 @@
             return;
         }
 
-        (notice, failed, planKey, planReason, planUntil) = ("Plan atandı. Önceki plandan gelen modüller kapatıldı, veri silinmedi.", false, string.Empty, string.Empty, null);
+        (notice, failed, planKey, planReason, planUntil) = (Texts.Get("platform.plan.assigned"), false, string.Empty, string.Empty, null);
         await LoadAsync();
         await Changed.InvokeAsync();
     }
@@ -185,7 +185,7 @@
             return;
         }
 
-        (notice, failed, overrideValue, overrideUntil, overrideReason) = ("Koltuk istisnası eklendi.", false, null, null, string.Empty);
+        (notice, failed, overrideValue, overrideUntil, overrideReason) = (Texts.Get("platform.plan.overrideAdded"), false, null, null, string.Empty);
         await LoadAsync();
     }
 
@@ -194,7 +194,7 @@
         busy = true;
         var result = await Api.PostAsync<bool>($"/api/platform/tenants/{TenantId}/limits/{key}/revoke", new RevokeLimitOverrideRequest("Platform yöneticisi geri aldı"));
         busy = false;
-        (notice, failed) = result.IsSuccess ? ("İstisna geri alındı.", false) : (result.Error, true);
+        (notice, failed) = result.IsSuccess ? (Texts.Get("platform.plan.revoked"), false) : (result.Error, true);
         await LoadAsync();
     }
 }

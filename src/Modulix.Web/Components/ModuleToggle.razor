@@ -5,21 +5,20 @@
 <div class="module-toggle">
     <div class="form-check form-switch">
         <input id="@Id" class="form-check-input" type="checkbox" role="switch" checked="@(shown ?? Enabled)" disabled="@(busy || confirming)"
-               aria-label="@($"{TenantName}: {ModuleName}")" @onchange="OnChange" />
-        <label class="form-check-label" for="@Id">@(ShowLabel ? ModuleName : (shown ?? Enabled) ? "Açık" : "Kapalı")</label>
+               aria-label="@Texts.Get("platform.moduleToggle.label", TenantName, ModuleName)" @onchange="OnChange" />
+        <label class="form-check-label" for="@Id">@(ShowLabel ? ModuleName : (shown ?? Enabled) ? Texts.Get("two-factor.on") : Texts.Get("two-factor.off"))</label>
     </div>
     @if (confirming)
     {
         <div class="alert alert-warning confirm" role="alertdialog">
             <p>
-                <strong>@TenantName için @ModuleName kapatılsın mı?</strong>
-                Veri silinmez. Modülün menüsü ve uç noktaları bu firmada kapanır; rollerdeki izinler korunur ve modül
-                yeniden açılınca geçerli olur.
+                <strong>@Texts.Get("platform.moduleToggle.confirm", TenantName, ModuleName)</strong>
+                @Texts.Get("platform.moduleToggle.confirmText")
             </p>
-            <label class="form-label" for="@(Id)-reason">Gerekçe *</label>
+            <label class="form-label" for="@(Id)-reason">@Texts.Get("platform.reasonRequired")</label>
             <input id="@(Id)-reason" class="form-control" maxlength="500" @bind="reason" @bind:event="oninput" />
-            <button type="button" class="btn btn-danger btn-sm" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" @onclick="() => SetAsync(false)">Kapat</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Cancel">Vazgeç</button>
+            <button type="button" class="btn btn-danger btn-sm" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" @onclick="() => SetAsync(false)">@Texts.Get("common.close")</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Cancel">@Texts.Get("common.dismiss")</button>
         </div>
     }
 </div>

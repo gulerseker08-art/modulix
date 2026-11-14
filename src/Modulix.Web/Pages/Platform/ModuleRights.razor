@@ -1,16 +1,13 @@
 @page "/platform/moduller"
 @inject ApiClient Api
 
-<PageTitle>Modül hakları · Platform · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.platform.modules") · @Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
 @* Firma × modül (Y4b). Açma ve kapama firmanın bir sonraki isteğinde geçerli olur ve firmanın denetim kaydına yazılır. *@
 <PlatformGate>
-    <a class="back-link" href="platform">← Platform</a>
-    <h1>Modül hakları</h1>
-    <p class="text-muted">
-        Firmalarda hangi modüllerin açık olduğu. Kapatmak veri silmez; modül yeniden açılınca rollerdeki izinler
-        yeniden geçerli olur. Çekirdek (Yönetim) her firmada açıktır.
-    </p>
+    <a class="back-link" href="platform">← @Texts.Get("nav.app.platform")</a>
+    <h1>@Texts.Get("nav.app.platform.modules")</h1>
+    <p class="text-muted">@Texts.Get("platform.moduleRights.intro")</p>
 
     @if (notice is not null)
     {
@@ -22,17 +19,17 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <div class="filters" role="group" aria-label="Durum">
-        <button type="button" class="chip @(status is null ? "active" : null)" @onclick="() => FilterAsync(null)">Tümü</button>
+    <div class="filters" role="group" aria-label="@Texts.Get("common.field.status")">
+        <button type="button" class="chip @(status is null ? "active" : null)" @onclick="() => FilterAsync(null)">@Texts.Get("support.all")</button>
         @foreach (var value in Enum.GetValues<TenantState>())
         {
-            <button type="button" class="chip @(status == value ? "active" : null)" @onclick="() => FilterAsync(value)">@TenantStateText.Of(value)</button>
+            <button type="button" class="chip @(status == value ? "active" : null)" @onclick="() => FilterAsync(value)">@PlatformLabels.TenantStateOf(value)</button>
         }
     </div>
 
     <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <input class="form-control" type="search" placeholder="Firma ara" @bind="search" />
-        <button type="submit" class="btn btn-outline-secondary">Ara</button>
+        <input class="form-control" type="search" aria-label="@Texts.Get("platform.tenants.search")" placeholder="@Texts.Get("platform.tenants.search")" @bind="search" />
+        <button type="submit" class="btn btn-outline-secondary">@Texts.Get("common.search")</button>
     </form>
 
     @if (page is null || modules is null)
@@ -44,14 +41,14 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Title="Firma yok." />
+        <EmptyState Title="@Texts.Get("platform.tenants.empty")" />
     }
     else
     {
         <table class="table record-table">
             <thead>
                 <tr>
-                    <th scope="col"><SortHeader Label="Firma" ColumnIcon="building" Asc="name" Desc="-name" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("platform.tenant")" ColumnIcon="building" Asc="name" Desc="-name" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
                     @foreach (var module in modules.Modules)
                     {
                         <th>@module.DisplayName</th>
@@ -62,7 +59,7 @@
                 @foreach (var tenant in page.Items)
                 {
                     <tr>
-                        <td data-label="Firma" class="primary">
+                        <td data-label="@Texts.Get("platform.tenant")" class="primary">
                             <a href="platform/firmalar/@tenant.Id">@tenant.Name</a>
                             @if (tenant.Status != TenantState.Active)
                             {
@@ -143,7 +140,7 @@
         await LoadAsync(page?.Page ?? 1);
         message = error;
         notice = error is null
-            ? $"{tenant.Name}: {module.DisplayName} {(wasEnabled ? "kapatıldı. Veri silinmedi." : "açıldı.")}"
+            ? Texts.Get(wasEnabled ? "platform.moduleRights.disabled" : "platform.moduleRights.enabled", tenant.Name, module.DisplayName)
             : null;
     }
 }

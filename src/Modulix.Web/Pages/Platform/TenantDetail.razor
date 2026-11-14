@@ -1,10 +1,10 @@
 @page "/platform/firmalar/{TenantId:guid}"
 @inject ApiClient Api
 
-<PageTitle>@(detail?.Tenant.Name ?? "Firma") · Platform · Modulix</PageTitle>
+<PageTitle>@(detail?.Tenant.Name ?? Texts.Get("platform.tenant")) · @Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
 <PlatformGate>
-    <a class="back-link" href="platform/firmalar">← Firmalar</a>
+    <a class="back-link" href="platform/firmalar">← @Texts.Get("nav.app.platform.tenants")</a>
 
     @if (notice is not null)
     {
@@ -34,18 +34,18 @@
         </div>
 
         <dl class="detail-grid">
-            <div><dt>Kısa ad</dt><dd>@tenant.Slug</dd></div>
-            <div><dt>Açılış</dt><dd>@CrmLabels.Time(tenant.CreatedAt)</dd></div>
-            <div><dt>Etkin üye</dt><dd>@tenant.ActiveMemberCount</dd></div>
-            <div><dt>Açık modüller</dt><dd>@ModuleNames(tenant.EnabledModules)</dd></div>
-            <div><dt>Sektör profili</dt><dd>@ProfileName(tenant.ProfileKey)</dd></div>
+            <div><dt>@Texts.Get("platform.slug")</dt><dd>@tenant.Slug</dd></div>
+            <div><dt>@Texts.Get("platform.openedAt")</dt><dd>@CrmLabels.Time(tenant.CreatedAt)</dd></div>
+            <div><dt>@Texts.Get("platform.activeMembers")</dt><dd>@tenant.ActiveMemberCount</dd></div>
+            <div><dt>@Texts.Get("platform.tenantDetail.enabledModules")</dt><dd>@ModuleNames(tenant.EnabledModules)</dd></div>
+            <div><dt>@Texts.Get("platform.profile")</dt><dd>@ProfileName(tenant.ProfileKey)</dd></div>
         </dl>
 
         @if (modules is not null)
         {
             <section class="detail-section">
-                <div class="section-header"><h2>Modüller</h2></div>
-                <p class="text-muted">Değişiklik firmanın bir sonraki isteğinde geçerli olur ve firmanın denetim kaydına yazılır.</p>
+                <div class="section-header"><h2>@Texts.Get("platform.modules")</h2></div>
+                <p class="text-muted">@Texts.Get("platform.tenantDetail.modulesIntro")</p>
                 @foreach (var module in modules.Modules)
                 {
                     <ModuleToggle TenantId="tenant.Id" TenantName="@tenant.Name" ModuleKey="@module.Key" ModuleName="@module.DisplayName"
@@ -53,8 +53,8 @@
                                   Changed="error => ModuleChangedAsync(module, error)" />
                 }
 
-                <h3>Hak koşulları</h3>
-                <p class="text-muted">Bitişten sonra modül ek sürede çalışır, ek süre de bitince salt okunur olur (veri silinmez). Süreyi uzatmak veya kaldırmak gerekçe ister.</p>
+                <h3>@Texts.Get("platform.tenantDetail.terms")</h3>
+                <p class="text-muted">@Texts.Get("platform.tenantDetail.termsIntro")</p>
                 @if (Conditions().Count > 0)
                 {
                     <ul>
@@ -66,18 +66,18 @@
                 }
                 else
                 {
-                    <p class="text-muted">Açık modüllerin hepsi elle ve süresiz.</p>
+                    <p class="text-muted">@Texts.Get("platform.tenantDetail.noTerms")</p>
                 }
 
                 @if (tenant.EnabledModules.Count > 0)
                 {
                     <form class="inline-form" novalidate @onsubmit="SaveTermsAsync" @onsubmit:preventDefault>
-                        <h3>Koşulları düzenle</h3>
+                        <h3>@Texts.Get("platform.tenantDetail.editTerms")</h3>
                         <div class="form-grid">
                             <div>
-                                <label class="form-label" for="termsModule">Modül</label>
+                                <label class="form-label" for="termsModule">@Texts.Get("platform.module")</label>
                                 <select id="termsModule" class="form-select" value="@termsModule" @onchange="e => ChooseTermsModule((string?)e.Value)">
-                                    <option value="">Seçin</option>
+                                    <option value="">@Texts.Get("support.choose")</option>
                                     @foreach (var key in tenant.EnabledModules)
                                     {
                                         <option value="@key">@ModuleNames([key])</option>
@@ -85,33 +85,33 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="form-label" for="termsSource">Kaynak</label>
+                                <label class="form-label" for="termsSource">@Texts.Get("platform.source")</label>
                                 <select id="termsSource" class="form-select" @bind="termsSource">
                                     @foreach (var source in Enum.GetValues<LicenseSource>())
                                     {
-                                        <option value="@source">@LicenseSourceText.Of(source)</option>
+                                        <option value="@source">@PlatformLabels.LicenseSourceOf(source)</option>
                                     }
                                 </select>
                                 <FieldError Field="source" Errors="termsErrors" />
                             </div>
                             <div>
-                                <label class="form-label" for="termsUntil">Bitiş (boş: süresiz)</label>
+                                <label class="form-label" for="termsUntil">@Texts.Get("platform.untilOptional")</label>
                                 <input id="termsUntil" class="form-control" type="date" @bind="termsUntil" />
                                 <FieldError Field="validUntil" Errors="termsErrors" />
                             </div>
                             <div>
-                                <label class="form-label" for="termsNote">Not @(termsSource == LicenseSource.Exception ? "*" : null)</label>
+                                <label class="form-label" for="termsNote">@Texts.Get("platform.note") @(termsSource == LicenseSource.Exception ? "*" : null)</label>
                                 <input id="termsNote" class="form-control" maxlength="500" @bind="termsNote" @bind:event="oninput" />
                                 <FieldError Field="note" Errors="termsErrors" />
                             </div>
                             <div>
-                                <label class="form-label" for="termsReason">Gerekçe (süre uzatırken zorunlu)</label>
+                                <label class="form-label" for="termsReason">@Texts.Get("platform.tenantDetail.termsReason")</label>
                                 <input id="termsReason" class="form-control" maxlength="500" @bind="termsReason" @bind:event="oninput" />
                                 <FieldError Field="reason" Errors="termsErrors" />
                             </div>
                         </div>
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(termsModule))">Koşulları kaydet</button>
+                            <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(termsModule))">@Texts.Get("platform.tenantDetail.saveTerms")</button>
                         </div>
                     </form>
                 }
@@ -129,17 +129,14 @@
         @if (profiles.Count > 0)
         {
             <section class="detail-section">
-                <div class="section-header"><h2>Sektör profili</h2></div>
-                <p class="text-muted">
-                    Profil yalnızca ekler: eksik modülleri açar, eksik alanları ve liste değerlerini ekler. Firmanın mevcut alanları ve
-                    değerleri değişmez. Uygulama firmanın denetim kaydına yazılır.
-                </p>
+                <div class="section-header"><h2>@Texts.Get("platform.profile")</h2></div>
+                <p class="text-muted">@Texts.Get("platform.tenantDetail.profileIntro")</p>
                 <div class="inline-form">
                     <div class="form-grid">
                         <div>
-                            <label class="form-label" for="profileKey">Profil</label>
+                            <label class="form-label" for="profileKey">@Texts.Get("platform.tenantDetail.profileLabel")</label>
                             <select id="profileKey" class="form-select" value="@profileKey" @onchange="e => PreviewProfileAsync((string?)e.Value)">
-                                <option value="">Seçin</option>
+                                <option value="">@Texts.Get("support.choose")</option>
                                 @foreach (var profile in profiles)
                                 {
                                     <option value="@profile.Key">@profile.Name</option>
@@ -151,7 +148,7 @@
                     {
                         <ProfilePreview Plan="plan" />
                         <div class="form-actions">
-                            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="ApplyProfileAsync">Profili uygula</button>
+                            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="ApplyProfileAsync">@Texts.Get("admin.sectorProfile.apply")</button>
                         </div>
                     }
                 </div>
@@ -159,23 +156,23 @@
         }
 
         <section class="detail-section">
-            <div class="section-header"><h2>Yöneticiler</h2></div>
+            <div class="section-header"><h2>@Texts.Get("platform.tenantDetail.administrators")</h2></div>
             @if (detail.Administrators.Count == 0)
             {
-                <div class="alert alert-warning">Bu firmada yönetici yok. Firmayı yönetecek kişiyi davet edin.</div>
+                <div class="alert alert-warning">@Texts.Get("platform.tenantDetail.noAdministrators")</div>
             }
             else
             {
                 <table class="table record-table">
-                    <thead><tr><th>Ad</th><th>E-posta</th><th>Durum</th></tr></thead>
+                    <thead><tr><th>@Texts.Get("common.field.name")</th><th>@Texts.Get("common.field.email")</th><th>@Texts.Get("common.field.status")</th></tr></thead>
                     <tbody>
                         @foreach (var administrator in detail.Administrators)
                         {
                             <tr>
-                                <td data-label="Ad" class="primary">@administrator.DisplayName</td>
-                                <td data-label="E-posta">@administrator.Email</td>
-                                <td data-label="Durum">
-                                    <span class="badge user-@administrator.Status.ToString().ToLowerInvariant()">@UserLabels.Of(administrator.Status)</span>
+                                <td data-label="@Texts.Get("common.field.name")" class="primary">@administrator.DisplayName</td>
+                                <td data-label="@Texts.Get("common.field.email")">@administrator.Email</td>
+                                <td data-label="@Texts.Get("common.field.status")">
+                                    <span class="badge user-@administrator.Status.ToString().ToLowerInvariant()">@AdminLabels.Status(administrator.Status)</span>
                                 </td>
                             </tr>
                         }
@@ -186,55 +183,52 @@
             @if (IsOperational(tenant.Status))
             {
                 <form class="inline-form" novalidate @onsubmit="InviteAsync" @onsubmit:preventDefault>
-                    <h3>Yönetici davet et</h3>
+                    <h3>@Texts.Get("platform.tenantDetail.invite")</h3>
                     <div class="form-grid">
                         <div>
-                            <label class="form-label" for="inviteEmail">E-posta *</label>
+                            <label class="form-label" for="inviteEmail">@Texts.Get("admin.invite.email")</label>
                             <input id="inviteEmail" class="form-control" type="email" autocomplete="off" @bind="inviteEmail" />
                             <FieldError Field="email" Errors="inviteErrors" />
                         </div>
                         <div>
-                            <label class="form-label" for="inviteName">Ad soyad *</label>
+                            <label class="form-label" for="inviteName">@Texts.Get("admin.invite.name")</label>
                             <input id="inviteName" class="form-control" maxlength="200" @bind="inviteName" />
                             <FieldError Field="displayName" Errors="inviteErrors" />
                         </div>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@busy">Davet gönder</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("admin.invite.send")</button>
                     </div>
                 </form>
             }
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Firma adı</h2></div>
+            <div class="section-header"><h2>@Texts.Get("platform.tenantDetail.name")</h2></div>
             <form class="inline-form" novalidate @onsubmit="RenameAsync" @onsubmit:preventDefault>
                 <div class="form-grid">
                     <div>
-                        <label class="form-label" for="tenantName">Ad</label>
+                        <label class="form-label" for="tenantName">@Texts.Get("common.field.name")</label>
                         <input id="tenantName" class="form-control" maxlength="200" @bind="newName" />
                         <FieldError Field="name" Errors="renameErrors" />
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-outline-primary" disabled="@(busy || newName == tenant.Name)">Adı kaydet</button>
+                    <button type="submit" class="btn btn-outline-primary" disabled="@(busy || newName == tenant.Name)">@Texts.Get("platform.tenantDetail.saveName")</button>
                 </div>
             </form>
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Durum</h2></div>
+            <div class="section-header"><h2>@Texts.Get("common.field.status")</h2></div>
             @if (confirmingClose)
             {
                 <div class="alert alert-warning confirm" role="alertdialog">
-                    <p>
-                        Firmanın @tenant.ActiveMemberCount kullanıcısı bir sonraki isteğinde erişimini kaybeder ve bekleyen
-                        davetler çalışmaz. Veri silinmez; firmayı sonra yeniden açabilirsiniz.
-                    </p>
-                    <label class="form-label" for="closeReason">Gerekçe *</label>
+                    <p>@Texts.Get("platform.tenantDetail.closeConfirm", tenant.ActiveMemberCount)</p>
+                    <label class="form-label" for="closeReason">@Texts.Get("platform.reasonRequired")</label>
                     <input id="closeReason" class="form-control" maxlength="500" @bind="closeReason" @bind:event="oninput" />
-                    <button type="button" class="btn btn-danger" disabled="@(busy || string.IsNullOrWhiteSpace(closeReason))" @onclick="CloseAsync">Firmayı kapat</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => confirmingClose = false">Vazgeç</button>
+                    <button type="button" class="btn btn-danger" disabled="@(busy || string.IsNullOrWhiteSpace(closeReason))" @onclick="CloseAsync">@Texts.Get("platform.tenantDetail.close")</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => confirmingClose = false">@Texts.Get("common.dismiss")</button>
                 </div>
             }
             else if (IsOperational(tenant.Status))
@@ -243,27 +237,27 @@
                     @if (tenant.Status == TenantState.Trial)
                     {
                         <div>
-                            <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="ActivateAsync">Denemeyi etkinleştir</button>
-                            <small class="text-muted">Firma deneme durumundan açık duruma geçer. Deneme modüllerinin süresi, modül hakkının bitişiyle uygulanır.</small>
+                            <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="ActivateAsync">@Texts.Get("platform.tenantDetail.activate")</button>
+                            <small class="text-muted">@Texts.Get("platform.tenantDetail.activateHint")</small>
                         </div>
                     }
                     <div>
-                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => confirmingClose = true">Firmayı kapat</button>
-                        <small class="text-muted">Kullanıcılar giriş yapamaz; veri silinmez.</small>
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => confirmingClose = true">@Texts.Get("platform.tenantDetail.close")</button>
+                        <small class="text-muted">@Texts.Get("platform.tenantDetail.closeHint")</small>
                     </div>
                 </div>
                 <form class="inline-form" novalidate @onsubmit="SuspendAsync" @onsubmit:preventDefault>
-                    <h3>Askıya al</h3>
-                    <p class="text-muted">Erişim geçici olarak durur; veri silinmez. Gerekçe platform denetim kaydına yazılır.</p>
+                    <h3>@Texts.Get("platform.tenantDetail.suspend")</h3>
+                    <p class="text-muted">@Texts.Get("platform.tenantDetail.suspendIntro")</p>
                     <div class="form-grid">
                         <div>
-                            <label class="form-label" for="suspendReason">Gerekçe *</label>
+                            <label class="form-label" for="suspendReason">@Texts.Get("platform.reasonRequired")</label>
                             <input id="suspendReason" class="form-control" maxlength="500" @bind="suspendReason" @bind:event="oninput" />
                             <FieldError Field="reason" Errors="suspendErrors" />
                         </div>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-outline-danger" disabled="@(busy || string.IsNullOrWhiteSpace(suspendReason))">Askıya al</button>
+                        <button type="submit" class="btn btn-outline-danger" disabled="@(busy || string.IsNullOrWhiteSpace(suspendReason))">@Texts.Get("platform.tenantDetail.suspend")</button>
                     </div>
                 </form>
             }
@@ -272,17 +266,17 @@
                 <div class="account-actions">
                     <div>
                         <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="ReopenAsync">
-                            @(tenant.Status == TenantState.Suspended ? "Askıyı kaldır" : "Firmayı yeniden aç")
+                            @(tenant.Status == TenantState.Suspended ? Texts.Get("platform.tenantDetail.unsuspend") : Texts.Get("platform.tenantDetail.reopen"))
                         </button>
-                        <small class="text-muted">Üyeler ve bekleyen davetler yeniden çalışır.</small>
+                        <small class="text-muted">@Texts.Get("platform.tenantDetail.reopenHint")</small>
                     </div>
                 </div>
             }
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Lisans ve işlem geçmişi</h2></div>
-            <p class="text-muted">Bu firmada platform yöneticilerinin yaptığı işlemler; en yeni üstte. Kayıt değiştirilemez.</p>
+            <div class="section-header"><h2>@Texts.Get("platform.tenantDetail.history")</h2></div>
+            <p class="text-muted">@Texts.Get("platform.tenantDetail.historyIntro")</p>
             <PlatformAuditList TenantId="TenantId" Version="auditVersion" />
         </section>
     }
@@ -349,8 +343,8 @@
         inviteEmail = inviteName = string.Empty;
         await LoadAsync();
         Show(success: invited.ExistingAccount
-            ? $"{invited.Administrator.DisplayName} zaten Modulix kullanıyordu; yönetici olarak eklendi ve bilgilendirildi."
-            : $"{invited.Administrator.Email} adresine yönetici daveti gönderildi.");
+            ? Texts.Get("platform.tenantDetail.existingAdded", invited.Administrator.DisplayName)
+            : Texts.Get("platform.tenantDetail.invited", invited.Administrator.Email));
     }
 
     private async Task RenameAsync()
@@ -366,22 +360,22 @@
         }
 
         await LoadAsync();
-        Show(success: "Firma adı kaydedildi.");
+        Show(success: Texts.Get("platform.tenantDetail.renamed"));
     }
 
     private async Task CloseAsync()
     {
-        await ChangeStateAsync("close", "Firma kapatıldı. Veri silinmedi.", closeReason);
+        await ChangeStateAsync("close", Texts.Get("platform.tenantDetail.closed"), closeReason);
         closeReason = string.Empty;
     }
 
-    private Task ReopenAsync() => ChangeStateAsync("reopen", "Firma yeniden açıldı.");
+    private Task ReopenAsync() => ChangeStateAsync("reopen", Texts.Get("platform.tenantDetail.reopened"));
 
-    private Task ActivateAsync() => ChangeStateAsync("activate", "Deneme etkinleştirildi.");
+    private Task ActivateAsync() => ChangeStateAsync("activate", Texts.Get("platform.tenantDetail.activated"));
 
     private async Task SuspendAsync()
     {
-        await ChangeStateAsync("suspend", "Firma askıya alındı. Veri silinmedi.", suspendReason);
+        await ChangeStateAsync("suspend", Texts.Get("platform.tenantDetail.suspended"), suspendReason);
         if (suspendErrors is null || suspendErrors.Count == 0)
         {
             suspendReason = string.Empty;
@@ -411,7 +405,7 @@
     {
         var wasEnabled = detail?.Tenant.EnabledModules.Contains(module.Key) == true;
         await LoadAsync();
-        Show(success: error is null ? $"{module.DisplayName} {(wasEnabled ? "kapatıldı. Veri silinmedi." : "açıldı.")}" : null, error: error);
+        Show(success: error is null ? Texts.Get(wasEnabled ? "platform.tenantDetail.moduleDisabled" : "platform.tenantDetail.moduleEnabled", module.DisplayName) : null, error: error);
     }
 
     private async Task PreviewProfileAsync(string? key)
@@ -442,15 +436,15 @@
         plan = null;
         await LoadAsync();
         Show(success: applied.IsEmpty
-            ? $"{applied.ProfileName} profili kaydedildi; eklenecek bir şey yoktu."
-            : $"{applied.ProfileName} profili uygulandı: {Summary(applied)}.");
+            ? Texts.Get("platform.tenantDetail.profileEmpty", applied.ProfileName)
+            : Texts.Get("platform.tenantDetail.profileApplied", applied.ProfileName, Summary(applied)));
     }
 
     private static string Summary(ProfilePlanDto plan) => string.Join(", ", new[]
     {
-        plan.ModulesToEnable.Count > 0 ? $"{plan.ModulesToEnable.Count} modül" : null,
-        plan.Fields.Count > 0 ? $"{plan.Fields.Count} alan" : null,
-        plan.ListValues.Count > 0 ? $"{plan.ListValues.Count} liste değeri" : null,
+        plan.ModulesToEnable.Count > 0 ? Texts.Get("platform.tenantDetail.summary.modules", plan.ModulesToEnable.Count) : null,
+        plan.Fields.Count > 0 ? Texts.Get("platform.tenantDetail.summary.fields", plan.Fields.Count) : null,
+        plan.ListValues.Count > 0 ? Texts.Get("platform.tenantDetail.summary.listValues", plan.ListValues.Count) : null,
     }.Where(p => p is not null));
 
     // Yalnızca açık ve varsayılandan farklı koşullar (elle ve süresiz olmayanlar) listelenir.
@@ -460,8 +454,8 @@
             .Select(e => string.Join(" · ", new[]
             {
                 modules?.Modules.FirstOrDefault(m => m.Key == e.ModuleKey)?.DisplayName ?? e.ModuleKey,
-                LicenseSourceText.Of(e.Source),
-                e.ValidUntil is { } until ? $"{CrmLabels.Time(until)} tarihine kadar" : null,
+                PlatformLabels.LicenseSourceOf(e.Source),
+                e.ValidUntil is { } until ? Texts.Get("platform.untilDate", CrmLabels.Time(until)) : null,
                 e.Note,
             }.Where(p => !string.IsNullOrWhiteSpace(p))))
             .ToList();
@@ -497,7 +491,7 @@
         termsModule = null;
         termsReason = termsNote = string.Empty;
         await LoadAsync();
-        Show(success: "Hak koşulları kaydedildi.");
+        Show(success: Texts.Get("platform.tenantDetail.termsSaved"));
     }
 
     private string ProfileName(

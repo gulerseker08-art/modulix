@@ -1,13 +1,13 @@
 @page "/platform/firmalar"
 @inject ApiClient Api
 
-<PageTitle>Firmalar · Platform · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.platform.tenants") · @Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
 <PlatformGate>
-    <a class="back-link" href="platform">← Platform</a>
+    <a class="back-link" href="platform">← @Texts.Get("nav.app.platform")</a>
 
     <div class="page-header">
-        <h1>Firmalar</h1>
+        <h1>@Texts.Get("nav.app.platform.tenants")</h1>
     </div>
 
     @if (notice is not null)
@@ -26,16 +26,16 @@
     }
 
     @* Platform yöneticisi bir firma bağlamı olmadan çalışır; kişisel görünüm kaydı firma bağlamı ister (ADR-0036), bu yüzden yalnızca sistem görünümleri vardır. *@
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Firma görünümleri" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("platform.tenants.views")" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Firma ara" placeholder="Ad veya kısa ad ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("platform.tenants.search")" placeholder="@Texts.Get("platform.tenants.searchPlaceholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (!creating && modules is not null)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => creating = true"><AppIcon Name="plus" Size="16" /> Firma aç</button>
+            <button type="button" class="btn btn-primary" @onclick="() => creating = true"><AppIcon Name="plus" Size="16" /> @Texts.Get("platform.tenants.create")</button>
         }
     </div>
 
@@ -48,7 +48,7 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Title="Firma yok." />
+        <EmptyState Title="@Texts.Get("platform.tenants.empty")" />
     }
     else
     {
@@ -59,7 +59,7 @@
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -71,8 +71,8 @@
                             @Cell(column, tenant)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{tenant.Name} eylemleri")">
-                                <a class="view-menu-item" role="menuitem" href="platform/firmalar/@tenant.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", tenant.Name)">
+                                <a class="view-menu-item" role="menuitem" href="platform/firmalar/@tenant.Id"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></a>
                             </RowMenu>
                         </td>
                     </tr>
@@ -87,14 +87,15 @@
     private const string AllViews = "all";
 
     // Başlık tıklamasıyla sıralanan sütunlar sunucudaki sort anahtarlarıdır (PlatformTenantQuery.SortKeys). Etkin üye ve modüller sayfa dışında hesaplandığı için sıralanamaz.
-    private static readonly GridColumnDef[] Columns =
+    // Özellik olarak tanımlıdır: metinler her okunuşta etkin dilden çözülür (ADR-0034).
+    private static GridColumnDef[] Columns =>
     [
-        new("name", "Ad", "type", "name", "-name", Locked: true),
-        new("slug", "Kısa ad", "hash", "slug", "-slug"),
-        new("status", "Durum", "tag", "status", "-status"),
-        new("members", "Etkin üye", "users"),
-        new("modules", "Modüller", "layers"),
-        new("created", "Açılış", "calendar", "createdAt", "-createdAt"),
+        new("name", Texts.Get("common.field.name"), "type", "name", "-name", Locked: true),
+        new("slug", Texts.Get("platform.slug"), "hash", "slug", "-slug"),
+        new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
+        new("members", Texts.Get("platform.activeMembers"), "users"),
+        new("modules", Texts.Get("platform.modules"), "layers"),
+        new("created", Texts.Get("platform.openedAt"), "calendar", "createdAt", "-createdAt"),
     ];
 
     private readonly GridViewState grid = new("platform.tenants", "name");
@@ -121,7 +122,7 @@
     }
 
     private IReadOnlyList<ViewOption> ViewOptions =>
-        [new(AllViews, "Tüm firmalar", Icon: "building"), .. Enum.GetValues<TenantState>().Select(v => new ViewOption(v.ToString(), TenantStateText.Of(v), Icon: "tag"))];
+        [new(AllViews, Texts.Get("platform.tenants.all"), Icon: "building"), .. Enum.GetValues<TenantState>().Select(v => new ViewOption(v.ToString(), PlatformLabels.TenantStateOf(v), Icon: "tag"))];
 
     private async Task ChooseViewAsync(string key)
     {
@@ -160,8 +161,8 @@
         var tenant = response.Tenant.Tenant;
         var administrator = response.Tenant.Administrators.FirstOrDefault();
         notice = response.ExistingAccount
-            ? $"{tenant.Name} açıldı. {administrator?.DisplayName} zaten Modulix kullanıyordu; yönetici olarak eklendi ve bilgilendirildi."
-            : $"{tenant.Name} açıldı. {administrator?.Email} adresine yönetici daveti gönderildi.";
+            ? Texts.Get("platform.tenants.createdExisting", tenant.Name, administrator?.DisplayName)
+            : Texts.Get("platform.tenants.createdInvited", tenant.Name, administrator?.Email);
         await LoadAsync(1);
     }
 

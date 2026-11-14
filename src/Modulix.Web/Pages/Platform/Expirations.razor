@@ -1,22 +1,19 @@
 @page "/platform/sure-takvimi"
 @inject ApiClient Api
 
-<PageTitle>Süre takvimi · Platform · Modulix</PageTitle>
+<PageTitle>@Texts.Get("platform.expirations.title") · @Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
 @* Bitiş tarihi olan açık modül hakları (ADR-0028). Bitişten sonra ek süre başlar (yazma açık), ek süre de bitince modül salt okunur
    olur; veri silinmez. Geçmiş tarihliler en üstte görünür. *@
 <PlatformGate>
-    <a class="back-link" href="platform">← Platform</a>
-    <h1>Süre takvimi</h1>
-    <p class="text-muted">
-        Bitiş tarihi olan açık modül hakları. Bitişten sonra modül ek sürede çalışmaya devam eder; ek süre de bitince salt okunur olur
-        (kayıtlar görüntülenir, yazılamaz; veri silinmez). Süre uzatmak için firma detayındaki hak koşullarını kullanın.
-    </p>
+    <a class="back-link" href="platform">← @Texts.Get("nav.app.platform")</a>
+    <h1>@Texts.Get("platform.expirations.title")</h1>
+    <p class="text-muted">@Texts.Get("platform.expirations.intro")</p>
 
-    <div class="filters" role="group" aria-label="Pencere">
+    <div class="filters" role="group" aria-label="@Texts.Get("platform.expirations.window")">
         @foreach (var choice in Windows)
         {
-            <button type="button" class="chip @(days == choice ? "active" : null)" @onclick="() => LoadAsync(choice)">@choice gün</button>
+            <button type="button" class="chip @(days == choice ? "active" : null)" @onclick="() => LoadAsync(choice)">@Texts.Get("platform.expirations.days", choice)</button>
         }
     </div>
 
@@ -34,42 +31,42 @@
     }
     else if (items.Count == 0)
     {
-        <EmptyState Title="Bu pencerede bitişi gelen hak yok." />
+        <EmptyState Title="@Texts.Get("platform.expirations.empty")" />
     }
     else
     {
         <table class="table record-table">
-            <thead><tr><th>Firma</th><th>Modül</th><th>Kaynak</th><th>Bitiş</th><th>Durum</th><th>Not</th></tr></thead>
+            <thead><tr><th>@Texts.Get("platform.tenant")</th><th>@Texts.Get("platform.module")</th><th>@Texts.Get("platform.source")</th><th>@Texts.Get("platform.until")</th><th>@Texts.Get("common.field.status")</th><th>@Texts.Get("platform.note")</th></tr></thead>
             <tbody>
                 @foreach (var item in items)
                 {
                     <tr>
-                        <td data-label="Firma" class="primary">
+                        <td data-label="@Texts.Get("platform.tenant")" class="primary">
                             <a href="platform/firmalar/@item.TenantId">@item.TenantName</a>
                             @if (item.TenantStatus != TenantState.Active)
                             {
                                 <TenantStateBadge State="item.TenantStatus" />
                             }
                         </td>
-                        <td data-label="Modül">@ModuleName(item.ModuleKey)</td>
-                        <td data-label="Kaynak">@LicenseSourceText.Of(item.Source)</td>
-                        <td data-label="Bitiş">@CrmLabels.Time(item.ValidUntil)</td>
-                        <td data-label="Durum">
+                        <td data-label="@Texts.Get("platform.module")">@ModuleName(item.ModuleKey)</td>
+                        <td data-label="@Texts.Get("platform.source")">@PlatformLabels.LicenseSourceOf(item.Source)</td>
+                        <td data-label="@Texts.Get("platform.until")">@CrmLabels.Time(item.ValidUntil)</td>
+                        <td data-label="@Texts.Get("common.field.status")">
                             @switch (item.Phase)
                             {
                                 case LicensePhase.ReadOnly:
-                                    <span class="badge user-locked">Salt okunur</span>
+                                    <span class="badge user-locked">@Texts.Get("platform.expirations.readOnly")</span>
                                     break;
                                 case LicensePhase.Grace:
-                                    <span class="badge user-locked">Ek sürede</span>
-                                    <small class="text-muted d-block">@CrmLabels.Time(item.GraceEndsAt) tarihinde salt okunur olur</small>
+                                    <span class="badge user-locked">@Texts.Get("platform.expirations.grace")</span>
+                                    <small class="text-muted d-block">@Texts.Get("platform.expirations.graceEnds", CrmLabels.Time(item.GraceEndsAt))</small>
                                     break;
                                 default:
-                                    @($"{Math.Ceiling((item.ValidUntil - DateTimeOffset.UtcNow).TotalDays):0} gün kaldı")
+                                    @Texts.Get("platform.expirations.daysLeft", Math.Ceiling((item.ValidUntil - DateTimeOffset.UtcNow).TotalDays).ToString("0", System.Globalization.CultureInfo.InvariantCulture))
                                     break;
                             }
                         </td>
-                        <td data-label="Not">@(item.Note ?? "—")</td>
+                        <td data-label="@Texts.Get("platform.note")">@(item.Note ?? "—")</td>
                     </tr>
                 }
             </tbody>
