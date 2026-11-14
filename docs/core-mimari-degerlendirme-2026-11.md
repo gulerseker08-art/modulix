@@ -2,7 +2,7 @@
 
 Soru: Modulix birden fazla sektöre modül barındıracaksa Core'da hatalı ya da eksik ne var, ne değişmeli, ne eklenmeli?
 
-Salt okunur inceleme. `main` @ `6a3e51ac` (PR #377 sonrası) üzerinde, `docs/adr/` altındaki 46 kararın durum satırları ve kod taranarak yapıldı. Kod değiştirilmedi, derleme ve test çalıştırılmadı. Bu belge tek başına hiçbir şeyi uygulamaz; her madde kendi ADR'siyle ya da diliminde karara bağlanır. Genel (işletim, güvenlik, istemci, test) bulgular için [mimari değerlendirme](mimari-degerlendirme-2026-11.md) belgesine bakın; bu belge yalnızca Core'un çok sektörlü hedefe uygunluğunu ele alır.
+Salt okunur inceleme. `main` @ `6a3e51ac` (PR #377 sonrası) üzerinde, `docs/adr/` altındaki 46 kararın durum satırları ve kod taranarak yapıldı. Kod değiştirilmedi, derleme ve test çalıştırılmadı. Bu belge tek başına hiçbir şeyi uygulamaz; her madde kendi ADR'siyle ya da diliminde karara bağlanır. Genel (işletim, güvenlik, istemci, test) bulgular 14 Kasım 2026 tarihli genel mimari raporundadır (`main`'de değil, aşağıda "ADR'lerde bulunan tutarsızlıklar" bölümüne bakın); bu belge yalnızca Core'un çok sektörlü hedefe uygunluğunu ele alır.
 
 ## Özet hüküm
 
@@ -48,7 +48,7 @@ Core'un temeli doğru kurulmuş. Çok sektörlü hedef için üç yapısal sorun
 - **0043 numarası iki ADR'de** kullanılmış (firma sektör kataloğu, sevkiyatta ülke); 0041 de "numara geçicidir" diyor.
 - **Durum satırları kodun gerisinde:** 0027, 0028, 0029, 0032, 0033, 0034 "Taslak" yazıyor, ama kodları `main`'de ve `CLAUDE.md` kuralları bunlara dayanıyor.
 - **ADR-0046 "Taslak, karar bekliyor"** yazıyor; kabul edildiyse belgeye işlenmemiş.
-- **Önceki mimari raporu `main`'e girmemişti:** PR #369 başka bir taban dala birleşmişti; bu PR ile birlikte alındı.
+- **Önceki genel mimari raporu `main`'de değil:** `docs/mimari-degerlendirme-2026-11.md` yalnızca `gseker/modulix-crm-architecture-476e6e` dalında (commit `96d777ef`); PR #369 başka bir taban dala birleşmişti.
 
 ## Önerilen sıra
 
@@ -63,5 +63,5 @@ Core'un temeli doğru kurulmuş. Çok sektörlü hedef için üç yapısal sorun
 - Vergi oranının ve ürün/hizmet kataloğunun CRM dışındaki kullanımları tek tek izlenmedi; H4'teki kanıt döviz kuru için kesin, vergi ve katalog için ADR-0018'e ve dosya sayımına dayanıyor.
 - Sipariş (`SalesOrder.Number`) ve sözleşme numarasının hangi üreticiden geldiğine bakılmadı; H6'daki dört üretici doğrulananlardır.
 - Modül bağımlılığının lisans atama ekranında ayrıca denetlenip denetlenmediği incelenmedi (H7).
-- `IModuleData.Set<T>()` tablonun sahibini denetlemiyor bulgusu önceki rapordan (B4) alındı, yeniden doğrulanmadı.
+- `IModuleData.Set<T>()` tablonun sahibini denetlemiyor bulgusu önceki genel rapordan (B4) alındı, yeniden doğrulanmadı.
 - Sınır ölçümü (kullanım sayacı) ve plan sınırlarının modüllerde nasıl uygulandığı incelenmedi.
