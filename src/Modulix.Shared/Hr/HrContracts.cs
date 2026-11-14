@@ -182,6 +182,7 @@ public static class HrAccess
     [
         ("rating", "1–5 puan"),
         ("choice", "Tek seçim"),
+        ("multiChoice", "Çoklu seçim"),
         ("text", "Serbest metin"),
     ];
 
@@ -208,7 +209,8 @@ public sealed record StartChecklistRequest(Guid EmployeeId, Guid TemplateId, Dat
 /// <summary>Anket yanıtı: soru başına bir cevap (puan, seçenek ya da metin; sorunun türüne göre biri dolu).</summary>
 public sealed record SubmitSurveyRequest(IReadOnlyList<SurveyAnswerItem>? Answers);
 
-public sealed record SurveyAnswerItem(Guid QuestionId, int? Rating, string? Choice, string? Text);
+/// <summary>Bir sorunun cevabı; çoklu seçim sorusunda seçilenler <see cref="Choices"/>'tadır.</summary>
+public sealed record SurveyAnswerItem(Guid QuestionId, int? Rating, string? Choice, string? Text, IReadOnlyList<string>? Choices = null);
 
 /// <summary>Anket sonucu; <see cref="HiddenReason"/> doluysa (kimliği gizli ankette yanıt az) sorular boştur.</summary>
 public sealed record SurveyResultsDto(Guid SurveyId, int ResponseCount, string? HiddenReason, IReadOnlyList<SurveyQuestionResultDto> Questions);

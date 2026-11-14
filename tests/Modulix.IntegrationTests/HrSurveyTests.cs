@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -209,6 +210,87 @@ public class HrSurveyTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         Assert.Equal(HttpStatusCode.NotFound, (await hrB.GetAsync($"/api/hr/surveys/{finance.Id}/results")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await PostResponseAsync(hrB, finance.Id, new SurveyAnswerItem(financeQuestion.Id, 3, null, null))).StatusCode);
         Assert.Equal(1, Number(await GetAsync(hrA, $"{Surveys}/{finance.Id}"), "responseCount"));
+    }
+
+    /// <summary>Bölüm 23b: çoklu seçim sorusu seçenek başına sayılır; sonuç CSV olarak (formül enjeksiyonuna karşı korumalı) indirilir.</summary>
+    [Fact]
+    public async Task Multi_choice_answers_are_counted_per_option_and_results_export_as_csv()
+    {
+        var s = await SetUpAsync();
+        using var hr = await LoginAsync(s.Hr);
+        using var staff = await LoginAsync(s.Staff);
+        using var colleague = await LoginAsync(s.Colleague);
+
+        var survey = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "İkram" });
+        var drinks = await QuestionAsync(hr, survey.Id, "Hangi içecekler olsun?", "multiChoice", "Kahve\nÇay\nSu", required: true);
+        var note = await QuestionAsync(hr, survey.Id, "Notunuz", "text", null, required: false);
+        await ActAsync(hr, survey.Id, "open");
+
+        await SubmitAsync(staff, survey.Id, new SurveyAnswerItem(drinks.Id, null, null, null, ["Kahve", "Çay"]));
+        await SubmitAsync(colleague, survey.Id,
+            new SurveyAnswerItem(drinks.Id, null, null, null, ["Çay"]), new SurveyAnswerItem(note.Id, null, null, "=1+1 çay demli olsun"));
+
+        var results = (await hr.GetFromJsonAsync<SurveyResultsDto>($"/api/hr/surveys/{survey.Id}/results"))!;
+        var counted = Assert.Single(results.Questions, q => q.QuestionId == drinks.Id);
+        Assert.Equal(2, counted.AnswerCount);
+        Assert.Equal([("Kahve", 1), ("Çay", 2), ("Su", 0)], counted.Counts.Select(c => (c.Option, c.Count)));
+
+        var export = await hr.GetAsync($"/api/hr/surveys/{survey.Id}/results/export");
+        Assert.Equal(HttpStatusCode.OK, export.StatusCode);
+        Assert.Equal("text/csv", export.Content.Headers.ContentType!.MediaType);
+        var bytes = await export.Content.ReadAsByteArrayAsync();
+        Assert.Equal(Encoding.UTF8.GetPreamble(), bytes[..3]);
+        var csv = Encoding.UTF8.GetString(bytes[3..]);
+        Assert.StartsWith("Sıra;Soru;Tür;Cevaplayan;Ortalama;Seçenek / puan;Sayı;Metin cevabı", csv);
+        Assert.Contains("1;Hangi içecekler olsun?;Çoklu seçim;2;;Çay;2;", csv);
+        Assert.Contains(";'=1+1 çay demli olsun", csv);
+        Assert.DoesNotContain(s.Staff.Email!, csv);
+    }
+
+    [Fact]
+    public async Task Multi_choice_answers_and_questions_are_validated()
+    {
+        var s = await SetUpAsync();
+        using var hr = await LoginAsync(s.Hr);
+        using var staff = await LoginAsync(s.Staff);
+
+        var survey = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "Doğrulama" });
+        var oneOption = await hr.PostAsJsonAsync(Questions, new RecordWriteRequest(Question(survey.Id, "Tek seçenek", "multiChoice", "Yalnız", required: true)));
+        Assert.True((await ValidationProblemAsync(oneOption)).Errors.ContainsKey("options"));
+        var question = await QuestionAsync(hr, survey.Id, "Hangileri?", "multiChoice", "A\nB\nC", required: true);
+        await ActAsync(hr, survey.Id, "open");
+
+        foreach (string[] choices in new[] { new[] { "A", "Z" }, ["A", "A"], [] })
+        {
+            var rejected = await PostResponseAsync(staff, survey.Id, new SurveyAnswerItem(question.Id, null, null, null, choices));
+            Assert.True((await ValidationProblemAsync(rejected)).Errors.ContainsKey($"answers.{question.Id}"));
+        }
+
+        Assert.Equal(0, Number(await GetAsync(hr, $"{Surveys}/{survey.Id}"), "responseCount"));
+    }
+
+    [Fact]
+    public async Task Result_export_needs_survey_management_stays_in_the_tenant_and_respects_the_anonymous_threshold()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var hr = await LoginAsync(a.Hr);
+        using var hrB = await LoginAsync(b.Hr);
+        using var staff = await LoginAsync(a.Staff);
+        using var colleague = await LoginAsync(a.Colleague);
+        using var outsider = await LoginAsync(a.Outsider);
+
+        var survey = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "Gizli nabız", ["isAnonymous"] = true });
+        var question = await QuestionAsync(hr, survey.Id, "Puanınız", "rating", null, required: true);
+        await ActAsync(hr, survey.Id, "open");
+        await SubmitAsync(staff, survey.Id, new SurveyAnswerItem(question.Id, 4, null, null));
+        await SubmitAsync(colleague, survey.Id, new SurveyAnswerItem(question.Id, 2, null, null));
+
+        var url = $"/api/hr/surveys/{survey.Id}/results/export";
+        Assert.Equal(HttpStatusCode.Conflict, (await hr.GetAsync(url)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(url)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await outsider.GetAsync(url)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await hrB.GetAsync(url)).StatusCode);
     }
 
     // --- yardımcılar ---

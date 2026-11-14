@@ -746,9 +746,14 @@ public sealed class SurveyQuestion : HrEntity
     {
         public const string Rating = "rating";
         public const string Choice = "choice";
+
+        /// <summary>Çoklu seçim (ADR-0042 bölüm 23b): seçilen her seçenek ayrı bir cevap satırıdır.</summary>
+        public const string MultiChoice = "multiChoice";
         public const string Text = "text";
 
-        public static IReadOnlyList<string> All { get; } = [Rating, Choice, Text];
+        public static IReadOnlyList<string> All { get; } = [Rating, Choice, MultiChoice, Text];
+
+        public static bool HasOptions(string type) => type is Choice or MultiChoice;
     }
 
     public Guid SurveyId { get; internal set; }
@@ -759,7 +764,7 @@ public sealed class SurveyQuestion : HrEntity
 
     public string QuestionType { get; internal set; } = Types.Rating;
 
-    /// <summary>Tek seçim sorusunun seçenekleri, satır başına bir tane; diğer türlerde boş.</summary>
+    /// <summary>Tek ya da çoklu seçim sorusunun seçenekleri, satır başına bir tane; diğer türlerde boş.</summary>
     public string? Options { get; internal set; }
 
     public bool IsRequired { get; internal set; } = true;
