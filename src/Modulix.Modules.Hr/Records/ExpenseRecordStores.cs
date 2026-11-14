@@ -103,6 +103,9 @@ internal sealed partial class ExpenseClaimRecordStore(HrStoreContext context) : 
     protected override Task PrepareAsync(IReadOnlyCollection<ExpenseClaim> entities, CancellationToken cancellationToken) =>
         EmployeeNames.LoadAsync(Context, entities.Select(c => c.EmployeeId), names, cancellationToken);
 
+    protected override Task<string?> FileWriteDeniedAsync(ExpenseClaim entity, CancellationToken cancellationToken) =>
+        ExpenseAccess.CannotChangeFilesAsync(Context, entity.Id, cancellationToken);
+
     protected override Task BeforeDeleteAsync(ExpenseClaim entity, CancellationToken cancellationToken) =>
         throw new RecordConflictException("Masraf beyanları silinmez; beyanı iptal edin.");
 
@@ -202,6 +205,19 @@ internal static class ExpenseAccess
         owner is not null && owner == context.CurrentUserId || await context.Access.HasPermissionAsync(HrModule.Permissions.ExpensesManage, cancellationToken)
             ? null
             : "Yalnızca kendi masraf beyanınızı düzenleyebilirsiniz.";
+
+    /// <summary>
+    /// Fiş ve fatura (dosya) kuralı satırın kuralıyla aynıdır (ADR-0042 bölüm 25): yalnızca taslak beyanda ve beyanın sahibi ya da İK. Gönderilmiş,
+    /// onaylanmış ya da ödenmiş beyanın belgesi kimse tarafından eklenemez ya da silinemez (onaylanan belge değişmez).
+    /// </summary>
+    public static async Task<string?> CannotChangeFilesAsync(HrStoreContext context, Guid claimId, CancellationToken cancellationToken)
+    {
+        var claim = await context.Data.Set<ExpenseClaim>().AsNoTracking().Where(c => c.Id == claimId)
+            .Select(c => new { c.Status, c.OwnerId }).SingleOrDefaultAsync(cancellationToken);
+        return claim is null ? null
+            : claim.Status != ExpenseClaim.Statuses.Draft ? "Fiş ve fatura yalnızca taslak beyanda eklenir ya da silinir."
+            : await CannotEditAsync(context, claim.OwnerId, cancellationToken);
+    }
 }
 
 /// <summary>
@@ -318,6 +334,9 @@ internal sealed class ExpenseLineRecordStore(HrStoreContext context) : HrRecordS
         var claim = await EditableClaimAsync(entity.ClaimId, cancellationToken);
         await RecalculateAsync(claim, entity.Id, amount: null, cancellationToken);
     }
+
+    protected override Task<string?> FileWriteDeniedAsync(ExpenseLine entity, CancellationToken cancellationToken) =>
+        ExpenseAccess.CannotChangeFilesAsync(Context, entity.ClaimId, cancellationToken);
 
     /// <summary>Beyan (izlenen) taslak olmalı ve kullanıcı beyanın sahibi ya da İK olmalı; değilse 409.</summary>
     private async Task<ExpenseClaim> EditableClaimAsync(Guid claimId, CancellationToken cancellationToken)

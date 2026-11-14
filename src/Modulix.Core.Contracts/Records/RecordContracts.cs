@@ -322,8 +322,9 @@ public interface IRecordLabelProvider
 }
 
 /// <summary>
-/// Kayıt türü iznine ek olarak kayıt düzeyinde yazma kuralı olan depolar (ör. süreli belge: sahip kaydın güncelleme izni ve modül lisansı) bunu uygular.
-/// Kayda bağlı yan yazmalar (dosya ekleme ve silme, ADR-0040) tür izninden sonra bunu da sorar; dönen ileti doluysa işlem yetkisizdir.
+/// Kayıt türü iznine ek olarak kayıt düzeyinde yazma kuralı olan depolar (ör. süreli belge: sahip kaydın güncelleme izni ve modül lisansı; İK masraf
+/// satırı: taslak beyan, sahibi ya da İK) bunu uygular. Kayda bağlı yan yazmalar (dosya ekleme ve silme, ADR-0040) tür izninden sonra bunu da sorar;
+/// dönen ileti doluysa işlem yetkisizdir. Kaydın güncellemesini durum ya da kişiyle sınırlayan depo bu kuralı vermezse dosya, kaydın kuralını atlatır.
 /// </summary>
 public interface IRecordWriteGuard
 {

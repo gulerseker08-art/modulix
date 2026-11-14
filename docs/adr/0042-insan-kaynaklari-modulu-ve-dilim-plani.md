@@ -494,3 +494,32 @@ Bölüm 15'teki sınır üç bağdan geliyordu; üçü de koparıldı:
 | `dotnet test tests/Modulix.ArchitectureTests`, `tests/Modulix.Modules.Hr.Tests` | 91/91 ve 57/57 geçti |
 | `dotnet ef migrations has-pending-model-changes` | Değişiklik yok |
 | `HrSurveyTests` (+1 entegrasyon testi) | Veritabanında cevapta katılım yok, pusula başka yerde yok, kimlik v4, zaman açılış günü. Cevabın denetim satırı anonim; cevap kimliği, pusula ve metin denetim kaydının hiçbir yerinde yok; olay yok. Katılım tutulur, tekrar yanıt 409. Kimliği açık ankette bağ ve kişisel denetim sürer. Derleniyor; yerelde SQL Server olmadığı için **CI çalıştırır**. |
+
+## 25. Kayıt düzeyinde dosya izni (öncelik 4b, 14 Kasım 2026)
+
+Karar (kullanıcı, 14 Kasım 2026: "Core + masraf düzeltmesi"; blog yazar modeli sonraya).
+
+**Bulunan açık:** ADR-0040'ta dosya ekleme ve silme kaydı okuyabilmeye ve kayıt **türünün** güncelleme iznine bağlıydı. Masraf satırının kendisi ise yalnızca taslak beyanda ve beyanın sahibi ya da İK tarafından değişir. Fiş ve fatura bu kuralı atlatıyordu:
+- talep izni de olan onaylayan yönetici, başkasının gönderilmiş beyanından fiş silebiliyor ya da ekleyebiliyordu;
+- çalışan, onaylanmış hatta ödenmiş beyanının belgesini değiştirebiliyordu.
+
+**Çözüm:**
+- **Core:** kayıt düzeyinde yan yazma kuralı zaten vardı (`IRecordWriteGuard`, süreli belge için) ve dosya deposu tür izninden sonra ona soruyordu; yeni kod gerekmedi. Kuralın anlamı belgelendi (ADR-0040 K2, sözleşme yorumu): kaydın güncellemesini durum ya da kişiyle sınırlayan her depo dosya kuralını da vermelidir.
+- **İK:**
+  - `HrRecordStore` bu kancayı her İK deposu için uygular (`FileWriteDeniedAsync`; varsayılan kural yok, davranış değişmez).
+  - Masraf beyanı ve satırı satırın kuralını verir: yalnızca taslak beyanda, sahibi ya da İK. Gönderilmiş, onaylanmış ya da ödenmiş beyanın belgesi kimse tarafından eklenemez ya da silinemez (403).
+  - Okuma ve indirme kaydın görünürlüğünü izlemeye devam eder; onaylayan fişleri görür.
+  - Arayüz zaten yalnızca taslakta ve sahibine yükleme gösteriyordu.
+- **Diğer İK ekleri** (duyuru, blog, albüm, özlük belgesi): yazma zaten yönetim iznine bağlı ya da Core süreli belge kuralıyla korunuyor; değişiklik yok.
+
+**Kapsam dışı (bilerek):**
+- Blog yazar modeli (çalışanın kendi yazısını yazıp dosya eklemesi). Ayrı izin ve yayın akışı gerektiren bir ürün kararıdır.
+- Lojistik sefer masrafı ve teslim kanıtında aynı açık (onaylı masrafın belgesi değişebiliyor); ayrı iş olarak önerildi.
+
+### Test sonuçları (bölüm 25)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.ArchitectureTests` | 94/94 geçti |
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 57/57 geçti |
+| `HrExpenseTests` (+1 entegrasyon testi) | Kapsadıkları: taslakta sahibi ve İK ekler; gönderimden sonra sahibi, İK ve onaylayan ekleyemez ve silemez (403); onaylayan okur ve indirir; izinsiz kullanıcı ve başka tenant ulaşamaz. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |

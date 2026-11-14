@@ -1,5 +1,7 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +9,7 @@ using Modulix.Core.Authorization;
 using Modulix.Infrastructure.Identity;
 using Modulix.Shared.Audit;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Files;
 using Modulix.Shared.Hr;
 using Modulix.Shared.Records;
 using static Modulix.Modules.Hr.HrModule.Permissions;
@@ -201,6 +204,72 @@ public class HrExpenseTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
     }
 
     // --- yardımcılar ---
+
+    /// <summary>
+    /// Bölüm 25: kayıt düzeyinde dosya izni. Fiş ve fatura satırın kuralına uyar: yalnızca taslak beyanda ve beyanın sahibi ya da İK. Onaylayan (talep
+    /// izni de olan yönetici) çalışanın beyanına fiş ekleyemez ve silemez; beyan gönderildikten sonra sahibi ve İK da ekleyemez, silemez; okuma ve
+    /// indirme sürer. Başka tenant ve izinsiz kullanıcı fişe ulaşamaz.
+    /// </summary>
+    [Fact]
+    public async Task Receipts_follow_the_line_rule_draft_only_and_only_the_owner_or_hr()
+    {
+        var s = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var hr = await LoginAsync(s.Hr);
+        using var staff = await LoginAsync(s.Staff);
+        using var manager = await LoginAsync(s.Manager);
+        using var outsider = await LoginAsync(s.Outsider);
+        using var hrB = await LoginAsync(b.Hr);
+
+        var claim = await PostAsync(staff, Claims, new JsonObject { ["employeeId"] = s.StaffEmployee.ToString(), ["title"] = "Fişli", ["currency"] = "TRY" });
+        var line = await PostAsync(staff, Lines, Line(claim.Id, "2026-11-10", "Taxi", 80m));
+
+        // Taslakta sahibi ve İK ekler; yönetici henüz onaylayan değildir, taslağı görmez (404).
+        var receipt = await UploadAsync(staff, line.Id, "taksi.pdf");
+        var hrReceipt = await UploadAsync(hr, line.Id, "ek.pdf");
+        Assert.Equal(HttpStatusCode.NotFound, (await PostFileAsync(manager, line.Id, "yonetici.pdf")).StatusCode);
+
+        // Gönderildikten sonra kimse ekleyemez, silemez; onaylayan da (beyanı görür, talep izni vardır).
+        await ActAsync(staff, claim.Id, "submit", null);
+        foreach (var client in new[] { staff, hr, manager })
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, (await PostFileAsync(client, line.Id, "sonradan.pdf")).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.DeleteAsync($"{Files}/{receipt.Id}?version={receipt.Version}")).StatusCode);
+        }
+
+        // Okuma ve indirme sürer: sahibi ve onaylayan fişleri görür.
+        Assert.Equal(2, (await manager.GetFromJsonAsync<List<StoredFileDto>>($"{Files}?entityKey=hr.expense-line&recordId={line.Id}"))!.Count);
+        Assert.Equal(Pdf, await manager.GetByteArrayAsync($"{Files}/{hrReceipt.Id}/content"));
+
+        // İzinsiz kullanıcı ve başka tenant fişe ulaşamaz.
+        Assert.NotEqual(HttpStatusCode.OK, (await outsider.GetAsync($"{Files}/{receipt.Id}/content")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await hrB.GetAsync($"{Files}/{receipt.Id}/content")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostFileAsync(hrB, line.Id, "baska.pdf")).StatusCode);
+    }
+
+    private const string Files = "/api/files";
+
+    private static readonly byte[] Pdf = Encoding.ASCII.GetBytes("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n");
+
+    private static Task<HttpResponseMessage> PostFileAsync(HttpClient client, Guid lineId, string fileName)
+    {
+        var file = new ByteArrayContent([.. Pdf, .. Encoding.ASCII.GetBytes(fileName)]);
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        var form = new MultipartFormDataContent
+        {
+            { new StringContent("hr.expense-line"), "entityKey" },
+            { new StringContent(lineId.ToString()), "recordId" },
+            { file, "file", fileName },
+        };
+        return client.PostAsync(Files, form);
+    }
+
+    private static async Task<StoredFileDto> UploadAsync(HttpClient client, Guid lineId, string fileName)
+    {
+        var response = await PostFileAsync(client, lineId, fileName);
+        Assert.True(response.StatusCode == HttpStatusCode.Created, $"{(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        return (await response.Content.ReadFromJsonAsync<StoredFileDto>())!;
+    }
 
     private sealed record Setup(
         Guid TenantId, ModulixUser Hr, ModulixUser Manager, ModulixUser Staff, ModulixUser Finance, ModulixUser Outsider, Guid ManagerEmployee, Guid StaffEmployee);

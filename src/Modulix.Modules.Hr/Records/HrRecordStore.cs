@@ -12,7 +12,7 @@ namespace Modulix.Modules.Hr.Records;
 /// alan listesini, filtreleri, sıralamayı ve aramayı verir. Kaydetmez: boru hattı kaydı, audit'i ve olayı tek seferde yazar.
 /// Tenant filtresi ve RLS <see cref="IModuleData"/> üzerinden uygulanır.
 /// </summary>
-internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecordStore
+internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecordStore, IRecordWriteGuard
     where TEntity : HrEntity, new()
 {
     private static readonly IReadOnlyDictionary<string, RecordFilter<TEntity>> NoFilters = new Dictionary<string, RecordFilter<TEntity>>();
@@ -23,6 +23,21 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
 
     /// <summary>Anonim oluşturmayı kabul eder mi (<see cref="RecordCommand.Anonymous"/>; yalnızca tam anonim anket cevabı).</summary>
     public virtual bool AllowsAnonymousWrites => false;
+
+    /// <summary>
+    /// Kayıt düzeyinde yan yazma kuralı (ADR-0040 K2, ADR-0042 bölüm 25): kayda dosya eklemek ve silmek, tür izninden sonra kaydın kendi kuralına da
+    /// uymalıdır. Kural <see cref="FileWriteDeniedAsync"/>'tedir; kayıt bulunamazsa karar okuma denetimine kalır.
+    /// </summary>
+    public async Task<string?> WriteDeniedAsync(Guid id, CancellationToken cancellationToken) =>
+        await Data.Set<TEntity>().AsNoTracking().SingleOrDefaultAsync(e => e.Id == id, cancellationToken) is { } entity
+            ? await FileWriteDeniedAsync(entity, cancellationToken)
+            : null;
+
+    /// <summary>
+    /// Bu kayda dosya eklenemez/silinemezse nedeni. Varsayılan: kural yok (tür güncelleme izni yeter). Kaydı yalnızca belirli durumda ya da belirli
+    /// kişi değiştirebiliyorsa (ör. masraf satırı: taslak beyan, sahibi ya da İK) aynı kural burada da verilir; yoksa dosya kaydın kuralını atlatır.
+    /// </summary>
+    protected virtual Task<string?> FileWriteDeniedAsync(TEntity entity, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
 
     /// <summary>Lisans kontrolü modül düzeyindedir: modül tenant için açıksa tüm kayıtları kullanılabilir.</summary>
     public string FeatureKey => EntityKey;
