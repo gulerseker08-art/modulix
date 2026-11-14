@@ -16,7 +16,10 @@ public static class SharedEntities
     /// <summary>Firmanın bir ilişki rolündeki durumu (ADR-0029 K9): firma + rol başına en çok bir kayıt.</summary>
     public const string PartyRelationship = "core.partyrelationship";
 
-    public static IReadOnlyList<string> All { get; } = [Party, Person, PartyRelationship];
+    /// <summary>Yer defteri (ADR-0045 K1): depo, fabrika, liman, sınır kapısı gibi taşıma ve işletme yerleri; Core ortak kaydıdır.</summary>
+    public const string Place = "core.place";
+
+    public static IReadOnlyList<string> All { get; } = [Party, Person, PartyRelationship, Place];
 }
 
 /// <summary>Ortak kayıtların ortak alanları. TenantId kaydederken aktif tenant'tan atanır.</summary>
@@ -217,4 +220,88 @@ public interface ISharedRecordVisibility
     /// </summary>
     Task<IQueryable<Guid>?> HiddenAsync(string sharedEntityKey, CancellationToken cancellationToken) =>
         Task.FromResult<IQueryable<Guid>?>(null);
+}
+
+/// <summary>
+/// Yer (ADR-0045 K1): depo, fabrika, liman, sınır kapısı, gümrük gibi taşıma ve işletme yeri. Firmanın adresi değildir (CRM adresi firmaya aittir,
+/// ADR-0012); tenant'ın yer defteridir. Ortak kayıt olduğu için bir kez girilir, modüller (Lojistik, Antrepo...) kendi izinleriyle kullanır.
+/// Ad ülke içinde tekildir (<see cref="NormalizedName"/>, <see cref="CountryCode"/>); yer silinmez, pasife alınır, kullanımdaki yer silinemez.
+/// Koordinat isteğe bağlıdır (ikisi birlikte verilir ya da hiçbiri); koordinat yoksa konum şehir ve ülkeden çözülür.
+/// </summary>
+public sealed class Place : SharedEntity
+{
+    public const int NameMaxLength = 200;
+    public const int KindKeyMaxLength = 40;
+    public const int CountryLength = 2;
+    public const int CityMaxLength = 100;
+    public const int AddressMaxLength = 250;
+    public const int PostalCodeMaxLength = 20;
+
+    /// <summary>Tür listesi (Y9b): <c>core.place-kind</c>; kod türün adına değil kategorisine bakar.</summary>
+    public const string KindList = "core.place-kind";
+
+    /// <summary>Tür verilmediğinde kullanılan değer (hazır listede "Diğer").</summary>
+    public const string DefaultKind = "Other";
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Ad tekilliği için küçük harfe ve aksansız biçime çevrilmiş ad (<see cref="PlaceRules.NormalizeName"/>); istemciden gelmez.</summary>
+    public string NormalizedName { get; set; } = string.Empty;
+
+    public string KindKey { get; set; } = DefaultKind;
+
+    /// <summary>ISO 3166-1 alfa-2 ülke kodu (büyük harf).</summary>
+    public string CountryCode { get; set; } = "TR";
+
+    public string? City { get; set; }
+
+    public string? District { get; set; }
+
+    public string? AddressLine { get; set; }
+
+    public string? PostalCode { get; set; }
+
+    /// <summary>Enlem (-90..90); boylamla birlikte verilir.</summary>
+    public decimal? Latitude { get; set; }
+
+    /// <summary>Boylam (-180..180); enlemle birlikte verilir.</summary>
+    public decimal? Longitude { get; set; }
+
+    /// <summary>Pasif yer yeni kayıtta seçilemez; eski kayıtlar korunur.</summary>
+    public bool IsActive { get; set; } = true;
+}
+
+/// <summary>Yer kuralları: ad normalleştirme ve koordinat sınırları (ADR-0045).</summary>
+public static class PlaceRules
+{
+    /// <summary>Ad tekilliği anahtarı: kırpılır, boşluklar tek boşluğa iner, küçük harfe ve Türkçe karakterleri aksansız biçime çevrilir.</summary>
+    public static string NormalizeName(string name)
+    {
+        var folded = new System.Text.StringBuilder(name.Length);
+        foreach (var c in name.Trim().Replace('İ', 'I').ToLowerInvariant().Normalize(System.Text.NormalizationForm.FormD))
+        {
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.NonSpacingMark)
+            {
+                continue;
+            }
+
+            folded.Append(c switch { 'ı' => 'i', 'ğ' => 'g', 'ş' => 's', 'ç' => 'c', 'ö' => 'o', 'ü' => 'u', _ => c });
+        }
+
+        return string.Join(' ', folded.ToString().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    public static bool IsLatitude(decimal value) => value is >= -90m and <= 90m;
+
+    public static bool IsLongitude(decimal value) => value is >= -180m and <= 180m;
+}
+
+/// <summary>Yer türü kategorileri (<c>core.place-kind</c>): kod türün adına değil kategorisine bakar (ADR-0045 K1).</summary>
+public static class PlaceKindCategories
+{
+    public const string Site = "site";
+    public const string Port = "port";
+    public const string Border = "border";
+    public const string Customs = "customs";
+    public const string Other = "other";
 }

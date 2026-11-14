@@ -33,6 +33,7 @@ public sealed class LogisticsModule : IModule
         public const string TripsRead = "logistics.trips.read";
         public const string TripsWrite = "logistics.trips.write";
         public const string FreightRead = "logistics.freight.read";
+        public const string PlacesWrite = "logistics.places.write";
         public const string ExpensesRead = "logistics.expenses.read";
         public const string ExpensesWrite = "logistics.expenses.write";
         public const string ExpensesApprove = "logistics.expenses.approve";
@@ -90,6 +91,7 @@ public sealed class LogisticsModule : IModule
         new(Permissions.RequestsApprove, "Taşıma talebini onaylar (sevkiyat açılır) ya da reddeder", "Taşıma talepleri"),
         new(Permissions.TripsRead, "Seferleri ve duraklarını görüntüler", "Seferler"),
         new(Permissions.TripsWrite, "Sefer planlar, araç ve sürücü atar, sevkiyat ekler, seferi yürütür ve iptal eder", "Seferler"),
+        new(Permissions.PlacesWrite, "Yer defterine yer ekler, düzenler ve pasife alır (okumak için talep, sevkiyat ya da sefer okuma izni yeter)", "Yerler"),
         new(Permissions.FreightRead, "Navlun ve taşıyıcı hakedişi tutarlarını görür ve girer (sevkiyat ve sefer yazma izniyle birlikte)", "Navlun ve hakediş"),
         new(Permissions.ExpensesRead, "Sefer masraflarını görüntüler", "Sefer masrafları"),
         new(Permissions.ExpensesWrite, "Sefer masrafı girer, beklemedeki ya da reddedilen masrafı düzenler ve yeniden onaya gönderir; makbuz ekler", "Sefer masrafları"),
@@ -293,6 +295,7 @@ public sealed class LogisticsModule : IModule
                 Permissions.CostsRead,
                 Permissions.ExpensesRead, Permissions.ExpensesWrite,
                 Permissions.DriversRead, Permissions.DriversWrite,
+                Permissions.PlacesWrite,
             ]),
         new(
             "logistics.manager",
@@ -307,6 +310,7 @@ public sealed class LogisticsModule : IModule
                 Permissions.DriversRead, Permissions.DriversWrite,
                 Permissions.FreightRead,
                 Permissions.ExpensesRead, Permissions.ExpensesWrite, Permissions.ExpensesApprove,
+                Permissions.PlacesWrite,
             ]),
     ];
 
@@ -527,6 +531,9 @@ public sealed class LogisticsModule : IModule
     IReadOnlyList<SharedRecordAccess> IModule.SharedRecordAccess { get; } =
     [
         new(SharedEntities.Person, Permissions.DriversRead, Permissions.DriversWrite),
+        new(SharedEntities.Place, Permissions.RequestsRead),
+        new(SharedEntities.Place, Permissions.TripsRead),
+        new(SharedEntities.Place, Permissions.ShipmentsRead, Permissions.PlacesWrite),
         new(SharedEntities.Party, Permissions.DriversRead),
         new(SharedEntities.Party, Permissions.CarriersRead),
         new(SharedEntities.Party, Permissions.RequestsRead),
