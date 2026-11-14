@@ -6,7 +6,7 @@
 
 <section class="detail-section" aria-labelledby="signature-title">
     <div class="section-header">
-        <h2 id="signature-title">İmza</h2>
+        <h2 id="signature-title">@Texts.Get("contracts.signatures.col.signature")</h2>
         @if (overview is not null)
         {
             <span class="badge stage-@ContractLabels.SignatureBadge(overview.SignatureStatus)">@ContractLabels.Label(ContractLabels.Signatures, overview.SignatureStatus)</span>
@@ -17,82 +17,79 @@
 
     @if (overview is null)
     {
-        <p class="text-muted" role="status">@(error ?? "Yükleniyor…")</p>
+        <p class="text-muted" role="status">@(error ?? Texts.Get("common.loading"))</p>
     }
     else
     {
         @if (overview.ProviderIsSimulation)
         {
-            <div class="alert alert-danger" role="status"><strong>SİMÜLASYON SAĞLAYICISI ETKİN</strong> — gerçek bir entegrasyon değildir; kimseye imza isteği ya da e-posta gitmez ve simülasyonla alınan imzaların hiçbir hukuki değeri yoktur.</div>
+            <div class="alert alert-danger" role="status">@Texts.Strong("contracts.signaturePanel.simulationActive", Texts.Get("contracts.signaturePanel.simulationActiveMark"))</div>
         }
 
-        <p class="text-muted">
-            İmza isteği, onaylı sürümün <strong>kesin belgesine</strong> (SHA-256 özetiyle sabitlenir) bağlıdır. <strong>Manuel</strong> yöntemde imzalı belge taraması yüklenir ve yetkili kişi doğrular
-            (güvence: ıslak imza taraması; kimlik ve yetki doğrulaması Modulix dışındadır). <strong>Sağlayıcı</strong> yönteminde imza sağlayıcıdan gelen olayla kaydedilir. Bu düzeyler birbirine eşdeğer sayılmaz.
-        </p>
+        <p class="text-muted">@Texts.Strong("contracts.signaturePanel.intro", Texts.Get("contracts.signaturePanel.introFinal"), Texts.Get("contracts.signaturePanel.introManual"), Texts.Get("contracts.signaturePanel.introProvider"))</p>
 
         @if (CanStart)
         {
             @if (startForm is null)
             {
-                <button type="button" class="btn btn-primary mb-3" @onclick="BeginStartAsync">İmzaya gönder</button>
+                <button type="button" class="btn btn-primary mb-3" @onclick="BeginStartAsync">@Texts.Get("contracts.signaturePanel.sendToSignature")</button>
             }
             else
             {
                 <form class="record-form" novalidate @onsubmit="StartAsync" @onsubmit:preventDefault>
-                    <h3>İmza isteği</h3>
+                    <h3>@Texts.Get("contracts.signaturePanel.requestTitle")</h3>
                     @if (errors is { Count: > 0 })
                     {
                         <div class="alert alert-danger" role="alert"><ul class="mb-0">@foreach (var (_, messages) in errors) { foreach (var message in messages) { <li>@message</li> } }</ul></div>
                     }
                     <div class="form-grid">
                         <div>
-                            <label class="form-label" for="sig-doc">Belge *</label>
+                            <label class="form-label" for="sig-doc">@Texts.Get("contracts.signaturePanel.documentRequired")</label>
                             <select id="sig-doc" class="form-select" @bind="startForm.DocumentId">
-                                <option value="">Seçin…</option>
+                                <option value="">@Texts.Get("common.choose")</option>
                                 @foreach (var d in eligibleDocuments) { <option value="@d.Id">@($"{d.FileName} · {CrmLabels.Time(d.CreatedAt)}")</option> }
                             </select>
-                            @if (eligibleDocuments.Count == 0) { <div class="form-text text-danger">Güncel sürümün örnek olmayan kesin belgesi yok; önce Belgeler sekmesinden üretin.</div> }
+                            @if (eligibleDocuments.Count == 0) { <div class="form-text text-danger">@Texts.Get("contracts.signaturePanel.noDocument")</div> }
                         </div>
                         <div>
-                            <label class="form-label" for="sig-method">Yöntem</label>
+                            <label class="form-label" for="sig-method">@Texts.Get("contracts.renewals.col.mode")</label>
                             <select id="sig-method" class="form-select" @bind="startForm.Method">
-                                <option value="Manual">Manuel (imzalı belge yüklenir, yetkili doğrular)</option>
-                                @if (overview.ProviderEnabled) { <option value="Provider">Sağlayıcı: @(overview.ProviderName)@(overview.ProviderIsSimulation ? " (simülasyon)" : string.Empty)</option> }
+                                <option value="Manual">@Texts.Get("contracts.signaturePanel.methodManual")</option>
+                                @if (overview.ProviderEnabled) { <option value="Provider">@Texts.Get(overview.ProviderIsSimulation ? "contracts.signaturePanel.methodProviderSimulation" : "contracts.signaturePanel.methodProvider", overview.ProviderName)</option> }
                             </select>
                         </div>
                         <div>
-                            <label class="form-label" for="sig-mode">Sıra</label>
+                            <label class="form-label" for="sig-mode">@Texts.Get("contracts.signaturePanel.order")</label>
                             <select id="sig-mode" class="form-select" @bind="startForm.Mode">
-                                <option value="Sequential">Sıralı (sırayla imzalanır)</option>
-                                <option value="Parallel">Paralel (hepsi aynı anda)</option>
+                                <option value="Sequential">@Texts.Get("contracts.signaturePanel.sequential")</option>
+                                <option value="Parallel">@Texts.Get("contracts.signaturePanel.parallel")</option>
                             </select>
                         </div>
                         <div>
-                            <label class="form-label" for="sig-days">Geçerlilik (gün)</label>
+                            <label class="form-label" for="sig-days">@Texts.Get("contracts.signaturePanel.validityDays")</label>
                             <input id="sig-days" class="form-control" type="number" min="1" max="90" @bind="startForm.ValidityDays" />
                         </div>
                     </div>
 
-                    <h4>İmzacılar (imza sırasıyla)</h4>
+                    <h4>@Texts.Get("contracts.signaturePanel.signatoriesTitle")</h4>
                     @for (var i = 0; i < startForm.Signatories.Count; i++)
                     {
                         var index = i;
                         var s = startForm.Signatories[index];
                         <div class="form-grid signatory-row">
                             <div>
-                                <label class="form-label" for="sg-kind-@index">@(index + 1). imzacı türü</label>
+                                <label class="form-label" for="sg-kind-@index">@Texts.Get("contracts.signaturePanel.signatoryKind", index + 1)</label>
                                 <select id="sg-kind-@index" class="form-select" @bind="s.Kind">
-                                    <option value="External">Dış (müşteri tarafı)</option>
-                                    <option value="Internal">İç (firma üyesi)</option>
+                                    <option value="External">@Texts.Get("contracts.signaturePanel.external")</option>
+                                    <option value="Internal">@Texts.Get("contracts.signaturePanel.internal")</option>
                                 </select>
                             </div>
                             @if (s.Kind == "Internal")
                             {
                                 <div>
-                                    <label class="form-label" for="sg-user-@index">Üye *</label>
+                                    <label class="form-label" for="sg-user-@index">@Texts.Get("contracts.signaturePanel.memberRequired")</label>
                                     <select id="sg-user-@index" class="form-select" @bind="s.UserId">
-                                        <option value="">Seçin…</option>
+                                        <option value="">@Texts.Get("common.choose")</option>
                                         @foreach (var m in Lookups.Members) { <option value="@m.UserId">@m.DisplayName</option> }
                                     </select>
                                 </div>
@@ -100,92 +97,92 @@
                             else
                             {
                                 <div>
-                                    <label class="form-label" for="sg-name-@index">Ad soyad *</label>
+                                    <label class="form-label" for="sg-name-@index">@Texts.Get("contracts.signaturePanel.fullNameRequired")</label>
                                     <input id="sg-name-@index" class="form-control" maxlength="150" @bind="s.Name" />
                                 </div>
                                 <div>
-                                    <label class="form-label" for="sg-email-@index">E-posta @(startForm.Method == "Provider" ? "*" : "(isteğe bağlı)")</label>
+                                    <label class="form-label" for="sg-email-@index">@Texts.Get(startForm.Method == "Provider" ? "contracts.signaturePanel.emailRequired" : "contracts.signaturePanel.emailOptional")</label>
                                     <input id="sg-email-@index" class="form-control" type="email" maxlength="254" @bind="s.Email" />
                                 </div>
                             }
                             <div>
-                                <label class="form-label" for="sg-cap-@index">Sıfat</label>
-                                <input id="sg-cap-@index" class="form-control" maxlength="100" placeholder="Ör. Genel müdür" @bind="s.Capacity" />
+                                <label class="form-label" for="sg-cap-@index">@Texts.Get("contracts.signaturePanel.capacity")</label>
+                                <input id="sg-cap-@index" class="form-control" maxlength="100" placeholder="@Texts.Get("contracts.signaturePanel.capacityPlaceholder")" @bind="s.Capacity" />
                             </div>
                             <div class="form-check">
                                 <input id="sg-req-@index" class="form-check-input" type="checkbox" @bind="s.IsRequired" />
-                                <label class="form-check-label" for="sg-req-@index">Zorunlu</label>
+                                <label class="form-check-label" for="sg-req-@index">@Texts.Get("contracts.signaturePanel.required")</label>
                             </div>
                             <div>
-                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(startForm.Signatories.Count == 1)" @onclick="() => startForm.Signatories.RemoveAt(index)">Kaldır</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(startForm.Signatories.Count == 1)" @onclick="() => startForm.Signatories.RemoveAt(index)">@Texts.Get("contracts.signaturePanel.remove")</button>
                             </div>
                         </div>
                     }
                     <div class="form-actions">
-                        <button type="button" class="btn btn-outline-secondary" @onclick="() => startForm.Signatories.Add(new SignatoryForm())">İmzacı ekle</button>
-                        <button type="submit" class="btn btn-primary" disabled="@busy">İmza isteğini başlat</button>
-                        <button type="button" class="btn btn-link" @onclick="() => startForm = null">Vazgeç</button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="() => startForm.Signatories.Add(new SignatoryForm())">@Texts.Get("contracts.signaturePanel.addSignatory")</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("contracts.signaturePanel.start")</button>
+                        <button type="button" class="btn btn-link" @onclick="() => startForm = null">@Texts.Get("common.dismiss")</button>
                     </div>
                 </form>
             }
         }
         else if (overview.Requests.Count == 0)
         {
-            <p class="text-muted">İmza isteği yok. İmzaya göndermek için sözleşme onaylı ve yayıma hazır olmalı, güncel sürümün kesin belgesi üretilmiş olmalıdır ve <code>contracts.signatures.manage</code> izniniz olmalıdır.</p>
+            <p class="text-muted">@((MarkupString)Texts.Get("contracts.signaturePanel.empty", $"<code>{ContractsAccess.SignaturesManage}</code>"))</p>
         }
 
         @foreach (var request in overview.Requests)
         {
-            <article class="signature-request" aria-label="İmza isteği @(CrmLabels.Time(request.CreatedAt))">
+            <article class="signature-request" aria-label="@Texts.Get("contracts.signaturePanel.requestLabel", CrmLabels.Time(request.CreatedAt))">
                 <h3>
                     <span class="badge stage-@SignatureLabels.Badge(request.Status)">@SignatureLabels.Label(SignatureLabels.RequestStatuses, request.Status)</span>
-                    V@(request.VersionNo) · @(request.Method == "Manual" ? "Manuel" : "Sağlayıcı") · @(request.Mode == "Sequential" ? "sıralı" : "paralel")
-                    @if (request.IsSimulation) { <span class="badge stage-lost">Simülasyon</span> }
-                    @if (request.IsExpired && SignatureOpen(request)) { <span class="badge stage-lost">Süresi doldu</span> }
+                    @Texts.Get("contracts.versionNo", request.VersionNo) · @Texts.Get(request.Method == "Manual" ? "contracts.signaturePanel.manual" : "contracts.signaturePanel.provider") · @Texts.Get(request.Mode == "Sequential" ? "contracts.signaturePanel.sequentialShort" : "contracts.signaturePanel.parallelShort")
+                    @if (request.IsSimulation) { <span class="badge stage-lost">@Texts.Get("contracts.signaturePanel.simulation")</span> }
+                    @if (request.IsExpired && SignatureOpen(request)) { <span class="badge stage-lost">@Texts.Get("contracts.signature-request.expired")</span> }
                 </h3>
                 <p class="small text-muted">
-                    Açan: @Lookups.MemberName(request.CreatedBy) · @CrmLabels.Time(request.CreatedAt) · son tarih @CrmLabels.Time(request.ExpiresAt)
-                    · belge özeti <code>@request.DocumentSha256[..16]…</code>
+                    @Texts.Get("contracts.signaturePanel.openedBy", Lookups.MemberName(request.CreatedBy), CrmLabels.Time(request.CreatedAt), CrmLabels.Time(request.ExpiresAt))
+                    · @Texts.Get("contracts.signaturePanel.documentHash") <code>@request.DocumentSha256[..16]…</code>
                     @if (request.CloseReason is not null) { <span> · @request.CloseReason</span> }
                 </p>
 
                 <table class="table record-table">
-                    <caption class="visually-hidden">İmzacılar</caption>
-                    <thead><tr><th scope="col">Sıra</th><th scope="col">İmzacı</th><th scope="col">Durum</th><th scope="col">Güvence</th><th scope="col">İşlem</th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("contracts.signaturePanel.signatories")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("contracts.signaturePanel.order")</th><th scope="col">@Texts.Get("contracts.signaturePanel.col.signatory")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("contracts.signaturePanel.col.assurance")</th><th scope="col">@Texts.Get("crm.quoteApprovals.col.action")</th></tr></thead>
                     <tbody>
                         @foreach (var s in request.Signatories)
                         {
                             <tr>
-                                <td data-label="Sıra">@s.Position</td>
-                                <td data-label="İmzacı" class="primary">
-                                    @s.Name @if (!s.IsRequired) { <small class="text-muted">(isteğe bağlı)</small> }
-                                    <div class="small text-muted">@(s.Kind == "Internal" ? "İç" : "Dış")@(s.Capacity is null ? string.Empty : " · " + s.Capacity)@(s.Email is null ? string.Empty : " · " + s.Email)</div>
-                                    @if (s.DeclineReason is not null) { <div class="small text-danger">Ret gerekçesi: @s.DeclineReason</div> }
-                                    @if (s.ReminderCount > 0) { <div class="small text-muted">@s.ReminderCount hatırlatma kaydı @(s.LastReminderAt is { } last ? "· son " + CrmLabels.Time(last) : string.Empty)</div> }
+                                <td data-label="@Texts.Get("contracts.signaturePanel.order")">@s.Position</td>
+                                <td data-label="@Texts.Get("contracts.signaturePanel.col.signatory")" class="primary">
+                                    @s.Name @if (!s.IsRequired) { <small class="text-muted">@Texts.Get("contracts.signaturePanel.optional")</small> }
+                                    <div class="small text-muted">@Texts.Get(s.Kind == "Internal" ? "contracts.signaturePanel.internalShort" : "contracts.signaturePanel.externalShort")@(s.Capacity is null ? string.Empty : " · " + s.Capacity)@(s.Email is null ? string.Empty : " · " + s.Email)</div>
+                                    @if (s.DeclineReason is not null) { <div class="small text-danger">@Texts.Get("contracts.signaturePanel.declineReasonSummary", s.DeclineReason)</div> }
+                                    @if (s.ReminderCount > 0) { <div class="small text-muted">@(s.LastReminderAt is { } last ? Texts.Get("contracts.signaturePanel.remindersLast", s.ReminderCount, CrmLabels.Time(last)) : Texts.Get("contracts.signaturePanel.reminders", s.ReminderCount))</div> }
                                 </td>
-                                <td data-label="Durum"><span class="badge stage-@SignatureLabels.Badge(s.Status)">@SignatureLabels.Label(SignatureLabels.SignatoryStatuses, s.Status)</span>@if (s.SignedAt is { } at) { <div class="small">@CrmLabels.Time(at)</div> }</td>
-                                <td data-label="Güvence">
+                                <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@SignatureLabels.Badge(s.Status)">@SignatureLabels.Label(SignatureLabels.SignatoryStatuses, s.Status)</span>@if (s.SignedAt is { } at) { <div class="small">@CrmLabels.Time(at)</div> }</td>
+                                <td data-label="@Texts.Get("contracts.signaturePanel.col.assurance")">
                                     @(s.Assurance is null ? "—" : SignatureLabels.Label(SignatureLabels.Assurances, s.Assurance))
-                                    @if (s.VerifiedBy is not null) { <div class="small text-muted">Doğrulayan: @Lookups.MemberName(s.VerifiedBy) · @(s.VerifiedAt is { } v ? CrmLabels.Time(v) : "—")</div> }
-                                    @if (s.EvidenceFileId is { } fileId && CanDownload) { <div class="small"><a href="api/contracts/contracts/@ContractId/signature/files/@fileId" download>@(s.EvidenceFileName ?? "İmzalı belge")</a></div> }
+                                    @if (s.VerifiedBy is not null) { <div class="small text-muted">@Texts.Get("contracts.signaturePanel.verifiedBy", Lookups.MemberName(s.VerifiedBy), s.VerifiedAt is { } v ? CrmLabels.Time(v) : "—")</div> }
+                                    @if (s.EvidenceFileId is { } fileId && CanDownload) { <div class="small"><a href="api/contracts/contracts/@ContractId/signature/files/@fileId" download>@(s.EvidenceFileName ?? Texts.Get("contracts.signaturePanel.signedDocument"))</a></div> }
                                 </td>
                                 <td class="actions">
                                     @if (SignatureOpen(request) && !request.IsExpired && s.CanSignNow)
                                     {
                                         @if (request.Method == "Manual" && CanVerify)
                                         {
-                                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => OpenManual(s)">İmzayı kaydet</button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => OpenManual(s)">@Texts.Get("contracts.signaturePanel.recordSignature")</button>
                                         }
                                         @if (request.IsSimulation && CanManage)
                                         {
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => SimulateAsync(s, "Viewed")'>Simüle: görüntüle</button>
-                                            <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick='() => SimulateAsync(s, "Signed")'>Simüle: imzala</button>
-                                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick='() => SimulateAsync(s, "Declined")'>Simüle: reddet</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick='() => SimulateAsync(s, "Viewed")'>@Texts.Get("contracts.signaturePanel.simulateViewed")</button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick='() => SimulateAsync(s, "Signed")'>@Texts.Get("contracts.signaturePanel.simulateSigned")</button>
+                                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick='() => SimulateAsync(s, "Declined")'>@Texts.Get("contracts.signaturePanel.simulateDeclined")</button>
                                         }
                                         @if (CanManage)
                                         {
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => RemindAsync(s)">Hatırlatmayı kaydet</button>
-                                            @if (request.Method == "Manual") { <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => OpenDecline(s)">Reddi kaydet</button> }
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => RemindAsync(s)">@Texts.Get("contracts.signaturePanel.recordReminder")</button>
+                                            @if (request.Method == "Manual") { <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => OpenDecline(s)">@Texts.Get("contracts.signaturePanel.recordDecline")</button> }
                                         }
                                     }
                                 </td>
@@ -195,30 +192,30 @@
                                 <tr>
                                     <td colspan="5">
                                         <form class="record-form" novalidate @onsubmit="RecordManualAsync" @onsubmit:preventDefault>
-                                            <h4>@s.Name için imzalı belgeyi kaydet</h4>
+                                            <h4>@Texts.Get("contracts.signaturePanel.manualTitle", s.Name)</h4>
                                             @if (errors is { Count: > 0 })
                                             {
                                                 <div class="alert alert-danger" role="alert"><ul class="mb-0">@foreach (var (_, messages) in errors) { foreach (var message in messages) { <li>@message</li> } }</ul></div>
                                             }
                                             <div class="form-grid">
                                                 <div>
-                                                    <label class="form-label" for="m-date">İmza tarihi *</label>
+                                                    <label class="form-label" for="m-date">@Texts.Get("contracts.signaturePanel.signedOnRequired")</label>
                                                     <input id="m-date" class="form-control" type="date" @bind="manualDate" />
                                                 </div>
                                                 <div>
-                                                    <label class="form-label" for="m-file">İmzalı belge (PDF, PNG, JPEG; en fazla 10 MB) *</label>
+                                                    <label class="form-label" for="m-file">@Texts.Get("contracts.signaturePanel.signedFileRequired")</label>
                                                     <InputFile id="m-file" class="form-control" accept="application/pdf,image/png,image/jpeg" OnChange="PickFileAsync" />
                                                     @if (manualFileName is not null) { <div class="form-text">@manualFileName</div> }
                                                 </div>
                                                 <div class="wide">
-                                                    <label class="form-label" for="m-note">Not</label>
+                                                    <label class="form-label" for="m-note">@Texts.Get("contracts.field.notes")</label>
                                                     <input id="m-note" class="form-control" maxlength="400" @bind="manualNote" />
                                                 </div>
                                             </div>
-                                            <p class="small text-muted">Kaydı siz doğrulamış sayılırsınız (doğrulayan olarak yazılır). Kendi imzanızı doğrulayamazsınız.</p>
+                                            <p class="small text-muted">@Texts.Get("contracts.signaturePanel.manualNote")</p>
                                             <div class="form-actions">
-                                                <button type="submit" class="btn btn-primary" disabled="@(busy || manualContent is null)">Kaydet ve doğrula</button>
-                                                <button type="button" class="btn btn-link" @onclick="CloseForms">Vazgeç</button>
+                                                <button type="submit" class="btn btn-primary" disabled="@(busy || manualContent is null)">@Texts.Get("contracts.signaturePanel.saveAndVerify")</button>
+                                                <button type="button" class="btn btn-link" @onclick="CloseForms">@Texts.Get("common.dismiss")</button>
                                             </div>
                                         </form>
                                     </td>
@@ -229,11 +226,11 @@
                                 <tr>
                                     <td colspan="5">
                                         <form class="record-form" novalidate @onsubmit="DeclineAsync" @onsubmit:preventDefault>
-                                            <label class="form-label" for="d-reason">@s.Name için ret gerekçesi *</label>
+                                            <label class="form-label" for="d-reason">@Texts.Get("contracts.signaturePanel.declineReasonRequired", s.Name)</label>
                                             <input id="d-reason" class="form-control" maxlength="500" @bind="reasonText" />
                                             <div class="form-actions">
-                                                <button type="submit" class="btn btn-danger" disabled="@busy">Reddi kaydet</button>
-                                                <button type="button" class="btn btn-link" @onclick="CloseForms">Vazgeç</button>
+                                                <button type="submit" class="btn btn-danger" disabled="@busy">@Texts.Get("contracts.signaturePanel.recordDecline")</button>
+                                                <button type="button" class="btn btn-link" @onclick="CloseForms">@Texts.Get("common.dismiss")</button>
                                             </div>
                                         </form>
                                     </td>
@@ -248,30 +245,30 @@
                     <div class="header-actions">
                         @if (request.IsExpired)
                         {
-                            <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick="ExpireAsync">Süre dolumunu işle</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" @onclick="ExpireAsync">@Texts.Get("contracts.signaturePanel.processExpiry")</button>
                         }
-                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => cancelOpen = true">İsteği iptal et</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => cancelOpen = true">@Texts.Get("contracts.signaturePanel.cancelRequest")</button>
                     </div>
                     @if (cancelOpen)
                     {
                         <form class="record-form" novalidate @onsubmit="CancelAsync" @onsubmit:preventDefault>
-                            <label class="form-label" for="c-reason">İptal gerekçesi *</label>
+                            <label class="form-label" for="c-reason">@Texts.Get("contracts.commitmentsPanel.cancelReasonRequired")</label>
                             <input id="c-reason" class="form-control" maxlength="500" @bind="reasonText" />
                             <div class="form-actions">
-                                <button type="submit" class="btn btn-danger" disabled="@busy">İptal et</button>
-                                <button type="button" class="btn btn-link" @onclick="CloseForms">Vazgeç</button>
+                                <button type="submit" class="btn btn-danger" disabled="@busy">@Texts.Get("contracts.commitmentsPanel.cancelConfirm")</button>
+                                <button type="button" class="btn btn-link" @onclick="CloseForms">@Texts.Get("common.dismiss")</button>
                             </div>
                         </form>
                     }
                 }
 
                 <details>
-                    <summary>Olay günlüğü (@request.Events.Count)</summary>
+                    <summary>@Texts.Get("contracts.signaturePanel.eventLog", request.Events.Count)</summary>
                     <ul class="timeline">
                         @foreach (var e in request.Events)
                         {
                             <li>
-                                <strong>@SignatureLabels.Label(SignatureLabels.EventTypes, e.EventType)</strong> · @CrmLabels.Time(e.At) · @(e.Source == "Provider" ? "sağlayıcı" : e.Source == "System" ? "sistem" : Lookups.MemberName(e.ActorId))
+                                <strong>@SignatureLabels.Label(SignatureLabels.EventTypes, e.EventType)</strong> · @CrmLabels.Time(e.At) · @(e.Source == "Provider" ? Texts.Get("contracts.signaturePanel.sourceProvider") : e.Source == "System" ? Texts.Get("contracts.signaturePanel.sourceSystem") : Lookups.MemberName(e.ActorId))
                                 @if (e.Outcome != "Applied") { <span class="badge stage-@(e.Outcome == "Duplicate" ? "open" : "lost")">@SignatureLabels.Label(SignatureLabels.Outcomes, e.Outcome)</span> }
                                 @if (e.Note is not null) { <div class="small text-muted">@e.Note</div> }
                             </li>
@@ -359,7 +356,7 @@
             f.ValidityDays);
         var result = await Api.PostAsync<ContractSignatureDto>($"/api/contracts/contracts/{ContractId}/signature", request);
         busy = false;
-        await Finish(result, "İmza isteği başlatıldı.", () => startForm = null);
+        await Finish(result, Texts.Get("contracts.signaturePanel.started"), () => startForm = null);
     }
 
     private void OpenManual(SignatoryDto s)
@@ -380,7 +377,7 @@
         var file = e.File;
         if (file.Size > MaxBytes)
         {
-            errors = new Dictionary<string, string[]> { ["file"] = ["Dosya en fazla 10 MB olabilir."] };
+            errors = new Dictionary<string, string[]> { ["file"] = [Texts.Get("contracts.commitmentsPanel.fileTooLarge")] };
             return;
         }
 
@@ -400,7 +397,7 @@
         var request = new RecordManualSignatureRequest(DateOnly.FromDateTime(manualDate ?? DateTime.Today), name, Convert.ToBase64String(manualContent), Blank(manualNote));
         var result = await Api.PostAsync<ContractSignatureDto>($"/api/contracts/contracts/{ContractId}/signature/signatories/{id}/manual", request);
         busy = false;
-        await Finish(result, "İmza kaydedildi ve doğrulandı.", CloseForms);
+        await Finish(result, Texts.Get("contracts.signaturePanel.recorded"), CloseForms);
     }
 
     private void OpenDecline(SignatoryDto s)
@@ -416,7 +413,7 @@
         busy = true;
         var result = await Api.PostAsync<ContractSignatureDto>($"/api/contracts/contracts/{ContractId}/signature/signatories/{id}/decline", new SignatureReasonRequest(reasonText));
         busy = false;
-        await Finish(result, "Ret kaydedildi.", CloseForms);
+        await Finish(result, Texts.Get("contracts.signaturePanel.declineRecorded"), CloseForms);
     }
 
     private async Task RemindAsync(SignatoryDto s)
@@ -425,7 +422,7 @@
         busy = true;
         var result = await Api.PostAsync<ContractSignatureDto>($"/api/contracts/contracts/{ContractId}/signature/signatories/{s.Id}/remind", new { });
         busy = false;
-        await Finish(result, "Hatırlatma kaydedildi (bildirim gönderilmedi).", null);
+        await Finish(result, Texts.Get("contracts.signaturePanel.reminderRecorded"), null);
     }
 
     private async Task SimulateAsync(SignatoryDto s, string type)
@@ -434,7 +431,7 @@
         busy = true;
         var result = await Api.PostAsync<ContractSignatureDto>($"/api/contracts/contracts/{ContractId}/signature/simulate", new SimulateSignatureRequest(s.Position, type, type == "Declined" ? "Simülasyon: reddedildi" : null));
         busy = false;
-        await Finish(result, "Simülasyon olayı uygulandı (hukuki değeri yoktur).", null);
+        await Finish(result, Texts.Get("contracts.signaturePanel.simulated"), null);
     }
 
     private async Task CancelAsync()
@@ -443,7 +440,7 @@
         busy = true;
         var result = await Api.PostAsync<ContractSignatureDto>($"/api/contracts/contracts/{ContractId}/signature/cancel", new SignatureReasonRequest(reasonText));
         busy = false;
-        await Finish(result, "İmza isteği iptal edildi.", CloseForms);
+        await Finish(result, Texts.Get("contracts.signaturePanel.cancelled"), CloseForms);
     }
 
     private async Task ExpireAsync()
@@ -452,7 +449,7 @@
         busy = true;
         var result = await Api.PostAsync<ContractSignatureDto>($"/api/contracts/contracts/{ContractId}/signature/expire", new { });
         busy = false;
-        await Finish(result, "Süre dolumu işlendi.", null);
+        await Finish(result, Texts.Get("contracts.signaturePanel.expiryProcessed"), null);
     }
 
     private async Task Finish(ApiResult<ContractSignatureDto> result, string success, Action? onSuccess)

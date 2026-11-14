@@ -7,7 +7,7 @@
 {
     <section class="detail-section" aria-labelledby="related-contracts-title">
         <div class="section-header">
-            <h2 id="related-contracts-title">@Title</h2>
+            <h2 id="related-contracts-title">@Heading</h2>
         </div>
         @if (error is not null)
         {
@@ -15,30 +15,30 @@
         }
         else if (items is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <p class="text-muted" role="status">@Texts.Get("common.loading")</p>
         }
         else if (items.Count == 0)
         {
-            <p class="text-muted">İlişkili sözleşme yok.</p>
+            <p class="text-muted">@Texts.Get("contracts.related.empty")</p>
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">@Title</caption>
+                <caption class="visually-hidden">@Heading</caption>
                 <thead>
-                    <tr><th scope="col">Sözleşme</th><th scope="col">Durum</th><th scope="col">Başlangıç / Bitiş</th><th scope="col">Son bildirim</th></tr>
+                    <tr><th scope="col">@Texts.Get("contracts.list.col.contract")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("contracts.list.col.dates")</th><th scope="col">@Texts.Get("contracts.renewals.col.notice")</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var c in items)
                     {
                         <tr>
-                            <td data-label="Sözleşme" class="primary"><a href="sozlesmeler/@c.Id">@c.Title</a> <small class="text-muted">@c.Number</small></td>
-                            <td data-label="Durum">
+                            <td data-label="@Texts.Get("contracts.list.col.contract")" class="primary"><a href="sozlesmeler/@c.Id">@c.Title</a> <small class="text-muted">@c.Number</small></td>
+                            <td data-label="@Texts.Get("common.field.status")">
                                 <span class="badge stage-@ContractLabels.EffectiveBadge(c.EffectiveStatus)">@ContractLabels.Label(ContractLabels.Effectives, c.EffectiveStatus)</span>
                                 @if (c.SignatureStatus != "NotSent") { <span class="badge stage-@ContractLabels.SignatureBadge(c.SignatureStatus)">@ContractLabels.Label(ContractLabels.Signatures, c.SignatureStatus)</span> }
                             </td>
-                            <td data-label="Başlangıç / Bitiş">@ContractLabels.Date(c.StartDate) – @(c.IsIndefinite ? "Belirsiz süreli" : ContractLabels.Date(c.EndDate))</td>
-                            <td data-label="Son bildirim">@ContractLabels.Date(c.NoticeDeadline)</td>
+                            <td data-label="@Texts.Get("contracts.list.col.dates")">@ContractLabels.Date(c.StartDate) – @(c.IsIndefinite ? Texts.Get("contracts.indefinite") : ContractLabels.Date(c.EndDate))</td>
+                            <td data-label="@Texts.Get("contracts.renewals.col.notice")">@ContractLabels.Date(c.NoticeDeadline)</td>
                         </tr>
                     }
                 </tbody>
@@ -50,19 +50,19 @@
     {
         <section class="detail-section" aria-labelledby="related-commitments-title">
             <div class="section-header">
-                <h2 id="related-commitments-title">Aktif taahhütler ve yaklaşan tarihler</h2>
+                <h2 id="related-commitments-title">@Texts.Get("contracts.related.commitmentsTitle")</h2>
             </div>
             <table class="table record-table">
-                <caption class="visually-hidden">Yaklaşan ve geciken taahhütler</caption>
-                <thead><tr><th scope="col">Taahhüt</th><th scope="col">Sözleşme</th><th scope="col">Son tarih</th><th scope="col">Durum</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("contracts.related.commitmentsCaption")</caption>
+                <thead><tr><th scope="col">@Texts.Get("contracts.commitments.col.commitment")</th><th scope="col">@Texts.Get("contracts.list.col.contract")</th><th scope="col">@Texts.Get("contracts.commitments.col.due")</th><th scope="col">@Texts.Get("common.field.status")</th></tr></thead>
                 <tbody>
                     @foreach (var o in upcoming)
                     {
                         <tr>
-                            <td data-label="Taahhüt" class="primary">@o.CommitmentTitle</td>
-                            <td data-label="Sözleşme"><a href="sozlesmeler/@o.ContractId">@o.ContractTitle</a> <small class="text-muted">@o.ContractNumber</small></td>
-                            <td data-label="Son tarih">@ContractLabels.Date(o.DueDate)@if (o.IsOverdue) { <div class="small text-danger">@o.DaysOverdue gün gecikti</div> }</td>
-                            <td data-label="Durum"><span class="badge stage-@CommitmentLabels.Badge(o.Status, o.IsOverdue)">@CommitmentLabels.Label(CommitmentLabels.OccurrenceStatuses, o.Status)</span></td>
+                            <td data-label="@Texts.Get("contracts.commitments.col.commitment")" class="primary">@o.CommitmentTitle</td>
+                            <td data-label="@Texts.Get("contracts.list.col.contract")"><a href="sozlesmeler/@o.ContractId">@o.ContractTitle</a> <small class="text-muted">@o.ContractNumber</small></td>
+                            <td data-label="@Texts.Get("contracts.commitments.col.due")">@ContractLabels.Date(o.DueDate)@if (o.IsOverdue) { <div class="small text-danger">@Texts.Get("contracts.commitments.daysOverdue", o.DaysOverdue)</div> }</td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@CommitmentLabels.Badge(o.Status, o.IsOverdue)">@CommitmentLabels.Label(CommitmentLabels.OccurrenceStatuses, o.Status)</span></td>
                         </tr>
                     }
                 </tbody>
@@ -77,7 +77,10 @@
     private string? error;
     private string? loadedFor;
 
-    [Parameter] public string Title { get; set; } = "Sözleşmeler";
+    /// <summary>Bölüm başlığı; verilmezse "Sözleşmeler" (sözlükten).</summary>
+    [Parameter] public string? Title { get; set; }
+
+    private string Heading => Title ?? Texts.Get("crm.company.contracts");
 
     /// <summary>Ortak müşteri (taraf) kaydı; firma kartında firmanın <c>PartyId</c> değeri.</summary>
     [Parameter] public Guid? PartyId { get; set; }
