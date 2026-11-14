@@ -183,12 +183,12 @@ public static class AppCatalog
         new("crm.sales-forecasts", Crm, "Satış tahmini", "trending-up", "crm/satis-tahmini", 30, CrmAccess.ModuleKey, SalesAccess.ForecastsRead, Group: CrmReportsGroup),
         new("crm.sales-analysis", Crm, "Satış analizi", "percent", "crm/satis-analizi", 40, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmReportsGroup),
         new("crm.sales-team", Crm, "Ekip performansı", "users", "crm/ekip-performansi", 50, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmReportsGroup),
+        new("crm.sales-data-quality", Crm, "Veri kalitesi", "shield", "crm/veri-kalitesi", 55, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmReportsGroup),
 
-        // CRM Ayarları: CRM'e özgü kurallar ve tanımlar, veri kalitesi.
+        // CRM Ayarları: CRM'e özgü kurallar ve tanımlar (yönetici işi; raporlar ve günlük kullanılan ekranlar burada değil).
         new("crm.settings", Crm, "Genel CRM ayarları", "wrench", ModuleSettingsRoute(CrmAccess.ModuleKey), 5, CrmAccess.ModuleKey, CoreAccess.ManageSettings, Group: CrmSettingsGroup),
         new("crm.quote-rules", Crm, "Teklif kuralları", "shield", "crm/teklif-kurallari", 10, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmSettingsGroup),
         new("crm.quote-delegations", Crm, "Onay vekâletleri", "users", "crm/onay-vekaletleri", 20, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmSettingsGroup),
-        new("crm.sales-data-quality", Crm, "Veri kalitesi", "shield", "crm/veri-kalitesi", 30, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmSettingsGroup),
         new("crm.product-categories", Crm, "Ürün kategorileri", "layers", "crm/urun-kategorileri", 40, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmSettingsGroup),
         new("crm.units", Crm, "Ölçü birimleri", "sliders", "crm/birimler", 50, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmSettingsGroup),
         new("crm.tax-rates", Crm, "Vergi ve kur", "landmark", "crm/vergi-kur", 60, CrmAccess.ModuleKey, CrmAccess.PricesRead, Group: CrmSettingsGroup),
@@ -198,7 +198,7 @@ public static class AppCatalog
         new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal, Group: SalesGroup, HostId: Crm),
         new("contracts.dashboard", Contracts, "Pano", "dashboard", "sozlesmeler/ozet", 5, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, ExactMatch: true, Hosted: new(CrmReportsGroup, "Sözleşme panosu", 60)),
         new("contracts.list", Contracts, "Sözleşmeler", "file-text", "sozlesmeler", 10, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmSalesGroup, "Satış sözleşmeleri", 40, Route: "sozlesmeler?gorunum=sales")),
-        new("contracts.templates", Contracts, "Şablonlar", "layers", "sozlesmeler/sablonlar", 20, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmSettingsGroup, "Sözleşme şablonları", 70)),
+        new("contracts.templates", Contracts, "Şablonlar", "layers", "sozlesmeler/sablonlar", 20, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmSalesGroup, "Sözleşme şablonları", 45)),
         new("contracts.approvals", Contracts, "Onaylar", "check-circle", "sozlesmeler/onaylar", 30, ContractsAccess.ModuleKey, ContractsAccess.ContractsApprove, Tone: AppTone.Teal, Hosted: new(CrmWorkspaceGroup, "Sözleşme onayları", 30, ParentEntryId: "crm.approvals")),
         new("contracts.signatures", Contracts, "İmzalar", "check-circle", "sozlesmeler/imzalar", 35, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmAfterSalesGroup, "Sözleşme imzaları", 30)),
         new("contracts.commitments", Contracts, "Taahhütler", "clipboard-list", "sozlesmeler/taahhutler", 36, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Tone: AppTone.Teal, Hosted: new(CrmAfterSalesGroup, null, 20)),
