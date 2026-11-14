@@ -3,30 +3,30 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Öncelik ve yönlendirme · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.support.routing") · Modulix</PageTitle>
 
 <AuthGate Module="@SupportAccess.ModuleKey" Permission="@SupportAccess.SettingsManage">
     <div class="page-header">
         <div>
-            <h1>Öncelik matrisi ve yönlendirme</h1>
-            <p class="text-muted mb-0">Yeni talebin önceliği etki × aciliyetten, kuyruğu ve sorumlusu yönlendirme kurallarından belirlenir. Matris ve kurallar yalnızca <strong>sonradan açılan</strong> talepleri etkiler; mevcut talepler yeniden yönlendirilmez.</p>
+            <h1>@Texts.Get("support.routing.title")</h1>
+            <p class="text-muted mb-0">@Texts.Strong("support.routing.intro", Texts.Get("support.routing.introLater"))</p>
         </div>
-        <div class="header-actions"><a class="btn btn-outline-secondary" href="destek/ayarlar">Kuyruklar ve kategoriler</a></div>
+        <div class="header-actions"><a class="btn btn-outline-secondary" href="destek/ayarlar">@Texts.Get("nav.app.support.settings")</a></div>
     </div>
 
     <Notice Text="@message" Failed="@failed" />
 
     <section aria-labelledby="matrix-title">
-        <h2 id="matrix-title">Öncelik matrisi</h2>
+        <h2 id="matrix-title">@Texts.Get("support.routing.matrix")</h2>
         @if (cells is null) { <LoadingState Kind="LoadingKind.Table" /> }
         else
         {
             <form class="record-form" novalidate @onsubmit="SaveMatrixAsync" @onsubmit:preventDefault>
                 <fieldset disabled="@busy">
-                    <legend class="visually-hidden">Etki ve aciliyete göre öncelik</legend>
+                    <legend class="visually-hidden">@Texts.Get("support.routing.matrixLegend")</legend>
                     <table class="table record-table">
-                        <caption class="visually-hidden">Öncelik matrisi (satır: etki, sütun: aciliyet)</caption>
-                        <thead><tr><th scope="col">Etki \ Aciliyet</th>@foreach (var (u, label) in SupportLabels.Levels) { <th scope="col">@label</th> }</tr></thead>
+                        <caption class="visually-hidden">@Texts.Get("support.routing.matrixCaption")</caption>
+                        <thead><tr><th scope="col">@Texts.Get("support.routing.matrixCorner")</th>@foreach (var (u, label) in SupportLabels.Levels) { <th scope="col">@label</th> }</tr></thead>
                         <tbody>
                             @foreach (var (i, iLabel) in SupportLabels.Levels)
                             {
@@ -36,7 +36,7 @@
                                     {
                                         var cell = cells.First(c => c.Impact == i && c.Urgency == u);
                                         <td data-label="@(iLabel + " / " + uLabel)">
-                                            <label class="visually-hidden" for="cell-@i-@u">Etki @iLabel, aciliyet @uLabel için öncelik</label>
+                                            <label class="visually-hidden" for="cell-@i-@u">@Texts.Get("support.routing.cellLabel", iLabel, uLabel)</label>
                                             <select id="cell-@i-@u" class="form-select form-select-sm" @bind="cell.Priority">
                                                 @foreach (var (key, label) in SupportLabels.Priorities) { <option value="@key">@label</option> }
                                             </select>
@@ -47,31 +47,31 @@
                         </tbody>
                     </table>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Matrisi kaydet</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("support.routing.saveMatrix")</button></div>
             </form>
         }
     </section>
 
     <section aria-labelledby="rules-title">
-        <h2 id="rules-title">Yönlendirme kuralları</h2>
-        <p class="small text-muted">Etkin kurallardan sırası küçük olan, eşit sırada daha çok kısıtı olan <strong>ilk eşleşen</strong> uygulanır; yalnızca talep açılırken bir kez değerlendirilir. Yetkiyle açıkça kuyruk/sorumlu verilen talepte kural uygulanmaz. Hiçbiri uymazsa kategori, sonra varsayılan kuyruk kullanılır.</p>
+        <h2 id="rules-title">@Texts.Get("support.routing.rules")</h2>
+        <p class="small text-muted">@Texts.Strong("support.routing.rulesHelp", Texts.Get("support.routing.firstMatch"))</p>
         @if (rules is null) { <LoadingState Kind="LoadingKind.Table" /> }
-        else if (rules.Count == 0) { <p class="text-muted">Kural yok.</p> }
+        else if (rules.Count == 0) { <p class="text-muted">@Texts.Get("support.routing.noRules")</p> }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">Yönlendirme kuralları</caption>
-                <thead><tr><th scope="col">Sıra</th><th scope="col">Kural</th><th scope="col">Kısıtlar</th><th scope="col">Eylem</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("support.routing.rules")</caption>
+                <thead><tr><th scope="col">@Texts.Get("contracts.signaturePanel.order")</th><th scope="col">@Texts.Get("support.routing.col.rule")</th><th scope="col">@Texts.Get("support.routing.col.constraints")</th><th scope="col">@Texts.Get("support.routing.col.action")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("crm.quoteApprovals.col.action")</th></tr></thead>
                 <tbody>
                     @foreach (var r in rules)
                     {
                         <tr>
-                            <td data-label="Sıra">@r.Order</td>
-                            <td data-label="Kural" class="primary">@r.Name</td>
-                            <td data-label="Kısıtlar">@Constraints(r)</td>
-                            <td data-label="Eylem">@Actions(r)</td>
-                            <td data-label="Durum"><span class="badge stage-@(r.IsActive ? "won" : "cancelled")">@(r.IsActive ? "Etkin" : "Pasif")</span></td>
-                            <td data-label="İşlem"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => EditRule(r)" disabled="@busy">Düzenle</button></td>
+                            <td data-label="@Texts.Get("contracts.signaturePanel.order")">@r.Order</td>
+                            <td data-label="@Texts.Get("support.routing.col.rule")" class="primary">@r.Name</td>
+                            <td data-label="@Texts.Get("support.routing.col.constraints")">@Constraints(r)</td>
+                            <td data-label="@Texts.Get("support.routing.col.action")">@Actions(r)</td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@(r.IsActive ? "won" : "cancelled")">@(r.IsActive ? Texts.Get("support.settings.enabled") : Texts.Get("common.inactive"))</span></td>
+                            <td data-label="@Texts.Get("crm.quoteApprovals.col.action")"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => EditRule(r)" disabled="@busy">@Texts.Get("common.edit")</button></td>
                         </tr>
                     }
                 </tbody>
@@ -80,114 +80,114 @@
 
         <form class="record-form" novalidate @onsubmit="SaveRuleAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
-                <legend class="h6">@(rule.Id is null ? "Yeni kural" : "Kuralı düzenle")</legend>
-                <FormTabs Title="Kural bilgileri" Label="Yönlendirme kuralı formu bölümleri">
+                <legend class="h6">@(rule.Id is null ? Texts.Get("support.routing.newRule") : Texts.Get("support.routing.editRule"))</legend>
+                <FormTabs Title="@Texts.Get("support.routing.ruleInfo")" Label="@Texts.Get("support.routing.ruleSections")">
                 <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label" for="rule-name">Ad</label>
+                        <label class="form-label" for="rule-name">@Texts.Get("common.field.name")</label>
                         <input id="rule-name" class="form-control" maxlength="100" @bind="rule.Name" />
                         <FieldError Field="name" Errors="ruleErrors" />
                     </div>
                     <div class="span-3">
-                        <label class="form-label" for="rule-order">Sıra (küçük önce)</label>
+                        <label class="form-label" for="rule-order">@Texts.Get("support.routing.orderHelp")</label>
                         <input id="rule-order" type="number" min="0" max="1000" class="form-control" @bind="rule.Order" />
                     </div>
                     <div class="span-3 form-check align-self-end">
                         <input id="rule-active" class="form-check-input" type="checkbox" @bind="rule.IsActive" />
-                        <label class="form-check-label" for="rule-active">Etkin</label>
+                        <label class="form-check-label" for="rule-active">@Texts.Get("support.settings.enabled")</label>
                     </div>
                     <div class="span-3">
-                        <label class="form-label" for="rule-channel">Kanal</label>
+                        <label class="form-label" for="rule-channel">@Texts.Get("crm.contactPoint.channel")</label>
                         <select id="rule-channel" class="form-select" @bind="rule.Channel">
-                            <option value="">Tümü</option>
+                            <option value="">@Texts.Get("support.all")</option>
                             @foreach (var (key, label) in SupportLabels.Channels) { <option value="@key">@label</option> }
                         </select>
                     </div>
                     <div class="span-3">
-                        <label class="form-label" for="rule-type">Tür</label>
+                        <label class="form-label" for="rule-type">@Texts.Get("common.field.kind")</label>
                         <select id="rule-type" class="form-select" @bind="rule.TypeKey">
-                            <option value="">Tümü</option>
+                            <option value="">@Texts.Get("support.all")</option>
                             @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList)) { <option value="@t.Key">@t.Label</option> }
                         </select>
                     </div>
                     <div class="span-3">
-                        <label class="form-label" for="rule-priority">Öncelik</label>
+                        <label class="form-label" for="rule-priority">@Texts.Get("crm.leads.col.priority")</label>
                         <select id="rule-priority" class="form-select" @bind="rule.Priority">
-                            <option value="">Tümü</option>
+                            <option value="">@Texts.Get("support.all")</option>
                             @foreach (var (key, label) in SupportLabels.Priorities) { <option value="@key">@label</option> }
                         </select>
                     </div>
                     <div class="span-3">
-                        <label class="form-label" for="rule-category">Kategori</label>
-                        <LookupPicker Id="rule-category" LookupKey="support.routing-rule.category" @bind-Value="rule.CategoryId" Placeholder="Tümü" />
+                        <label class="form-label" for="rule-category">@Texts.Get("crm.products.field.category")</label>
+                        <LookupPicker Id="rule-category" LookupKey="support.routing-rule.category" @bind-Value="rule.CategoryId" Placeholder="@Texts.Get("support.all")" />
                         <FieldError Field="categoryId" Errors="ruleErrors" />
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="rule-party">Müşteri</label>
-                        <LookupPicker Id="rule-party" LookupKey="support.routing-rule.party" @bind-Value="rule.PartyId" Placeholder="Tümü" />
+                        <label class="form-label" for="rule-party">@Texts.Get("support.tickets.col.customer")</label>
+                        <LookupPicker Id="rule-party" LookupKey="support.routing-rule.party" @bind-Value="rule.PartyId" Placeholder="@Texts.Get("support.all")" />
                         <FieldError Field="partyId" Errors="ruleErrors" />
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="rule-queue">Kuyruğa yönlendir</label>
-                        <LookupPicker Id="rule-queue" LookupKey="support.routing-rule.queue" @bind-Value="rule.QueueId" Placeholder="Kuyruk seçin…" />
+                        <label class="form-label" for="rule-queue">@Texts.Get("support.routing.routeToQueue")</label>
+                        <LookupPicker Id="rule-queue" LookupKey="support.routing-rule.queue" @bind-Value="rule.QueueId" Placeholder="@Texts.Get("support.actionsPanel.chooseQueue")" />
                         <FieldError Field="queueId" Errors="ruleErrors" />
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="rule-owner">Sorumlu ata</label>
-                        <LookupPicker Id="rule-owner" LookupKey="support.routing-rule.owner" @bind-Value="rule.OwnerId" Placeholder="Atama yok" />
+                        <label class="form-label" for="rule-owner">@Texts.Get("support.tickets.bulkAssign")</label>
+                        <LookupPicker Id="rule-owner" LookupKey="support.routing-rule.owner" @bind-Value="rule.OwnerId" Placeholder="@Texts.Get("support.routing.noAssignment")" />
                         <FieldError Field="ownerId" Errors="ruleErrors" />
                     </div>
                 </div>
                 </FormTabs>
             </fieldset>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">@(rule.Id is null ? "Kural ekle" : "Kaydet")</button>
-                @if (rule.Id is not null) { <button type="button" class="btn btn-outline-secondary" @onclick="NewRule">Vazgeç</button> }
+                <button type="submit" class="btn btn-primary" disabled="@busy">@(rule.Id is null ? Texts.Get("support.routing.addRule") : Texts.Get("common.save"))</button>
+                @if (rule.Id is not null) { <button type="button" class="btn btn-outline-secondary" @onclick="NewRule">@Texts.Get("common.dismiss")</button> }
             </div>
         </form>
     </section>
 
     <section aria-labelledby="try-title">
-        <h2 id="try-title">Kural denemesi</h2>
-        <p class="small text-muted">Örnek bir talep için hangi kural eşleşir, hangi kuyruk ve sorumlu çıkar? Hiçbir şey yazılmaz.</p>
+        <h2 id="try-title">@Texts.Get("support.routing.try")</h2>
+        <p class="small text-muted">@Texts.Get("support.routing.tryHelp")</p>
         <form class="record-form" novalidate @onsubmit="PreviewAsync" @onsubmit:preventDefault>
             <div class="form-grid">
                 <div class="span-3">
-                    <label class="form-label" for="pv-channel">Kanal</label>
+                    <label class="form-label" for="pv-channel">@Texts.Get("crm.contactPoint.channel")</label>
                     <select id="pv-channel" class="form-select" @bind="pv.Channel">
                         @foreach (var (key, label) in SupportLabels.Channels) { <option value="@key">@label</option> }
                     </select>
                 </div>
                 <div class="span-3">
-                    <label class="form-label" for="pv-type">Tür</label>
+                    <label class="form-label" for="pv-type">@Texts.Get("common.field.kind")</label>
                     <select id="pv-type" class="form-select" @bind="pv.TypeKey">
                         @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList)) { <option value="@t.Key">@t.Label</option> }
                     </select>
                 </div>
                 <div class="span-3">
-                    <label class="form-label" for="pv-priority">Öncelik</label>
+                    <label class="form-label" for="pv-priority">@Texts.Get("crm.leads.col.priority")</label>
                     <select id="pv-priority" class="form-select" @bind="pv.Priority">
                         @foreach (var (key, label) in SupportLabels.Priorities) { <option value="@key">@label</option> }
                     </select>
                 </div>
                 <div class="span-3">
-                    <label class="form-label" for="pv-category">Kategori</label>
-                    <LookupPicker Id="pv-category" LookupKey="support.routing-rule.category" @bind-Value="pv.CategoryId" Placeholder="Kategorisiz" />
+                    <label class="form-label" for="pv-category">@Texts.Get("crm.products.field.category")</label>
+                    <LookupPicker Id="pv-category" LookupKey="support.routing-rule.category" @bind-Value="pv.CategoryId" Placeholder="@Texts.Get("support.routing.noCategory")" />
                 </div>
                 <div class="span-6">
-                    <label class="form-label" for="pv-party">Müşteri</label>
-                    <LookupPicker Id="pv-party" LookupKey="support.routing-rule.party" @bind-Value="pv.PartyId" Placeholder="Müşterisiz" />
+                    <label class="form-label" for="pv-party">@Texts.Get("support.tickets.col.customer")</label>
+                    <LookupPicker Id="pv-party" LookupKey="support.routing-rule.party" @bind-Value="pv.PartyId" Placeholder="@Texts.Get("support.routing.noCustomer")" />
                 </div>
             </div>
-            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Dene</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">@Texts.Get("support.routing.tryButton")</button></div>
         </form>
         @if (preview is not null)
         {
             <div class="alert @(preview.RuleMatched ? "alert-info" : "alert-warning")" role="status">
-                @if (preview.RuleMatched) { <span>Eşleşen kural: <strong>@preview.RuleName</strong> (sıra @preview.RuleOrder).</span> }
-                else { <span>Hiçbir kural eşleşmedi.</span> }
-                Kuyruk: <strong>@(preview.QueueId is { } q ? queues.FirstOrDefault(x => x.Id == q)?.Name ?? "—" : "kuyruksuz (atanmamış)")</strong> (@preview.Source);
-                sorumlu: <strong>@(preview.OwnerId is { } o ? Lookups.MemberName(o) : "atanmaz")</strong>.
+                @if (preview.RuleMatched) { <span>@Texts.Strong("support.routing.matched", preview.RuleName, preview.RuleOrder.ToString())</span> }
+                else { <span>@Texts.Get("support.routing.noMatch")</span> }
+                @Texts.Strong("support.routing.previewQueue", preview.QueueId is { } q ? queues.FirstOrDefault(x => x.Id == q)?.Name ?? "—" : Texts.Get("support.routing.noQueue")) (@preview.Source);
+                @Texts.Strong("support.routing.previewOwner", preview.OwnerId is { } o ? Lookups.MemberName(o) : Texts.Get("support.routing.notAssigned"))
             </div>
         }
     </section>
@@ -227,7 +227,7 @@
         var result = await Api.PutAsync<List<PriorityCellDto>>("/api/support/priority-matrix", new SavePriorityMatrixRequest([.. cells!.Select(c => new PriorityCellDto(c.Impact, c.Urgency, c.Priority))]));
         busy = false;
         failed = !result.IsSuccess;
-        message = result.IsSuccess ? "Öncelik matrisi kaydedildi; yalnızca sonradan açılan talepleri etkiler." : result.Error;
+        message = result.IsSuccess ? Texts.Get("support.routing.matrixSaved") : result.Error;
         if (result.IsSuccess) { cells = result.Value!.Select(c => new CellEdit(c.Impact, c.Urgency, c.Priority)).ToList(); }
     }
 
@@ -256,7 +256,7 @@
             : await Api.PutAsync<RoutingRuleDto>($"/api/support/routing-rules/{rule.Id}", request);
         busy = false;
         failed = !result.IsSuccess;
-        message = result.IsSuccess ? "Kural kaydedildi." : result.Error;
+        message = result.IsSuccess ? Texts.Get("support.routing.ruleSaved") : result.Error;
         ruleErrors = result.FieldErrors;
         if (result.IsSuccess)
         {
@@ -278,16 +278,16 @@
     private string Constraints(RoutingRuleDto r)
     {
         var parts = new List<string>();
-        if (r.Channel is not null) { parts.Add("kanal: " + SupportLabels.Label(SupportLabels.Channels, r.Channel)); }
-        if (r.TypeKey is not null) { parts.Add("tür: " + Lookups.Label(SupportLabels.TicketTypeList, r.TypeKey)); }
-        if (r.Priority is not null) { parts.Add("öncelik: " + SupportLabels.Label(SupportLabels.Priorities, r.Priority)); }
-        if (r.CategoryId is not null) { parts.Add("kategori"); }
-        if (r.PartyId is not null) { parts.Add("müşteri"); }
-        return parts.Count == 0 ? "kısıtsız (hepsi)" : string.Join(", ", parts);
+        if (r.Channel is not null) { parts.Add(Texts.Get("support.routing.cond.channel", SupportLabels.Label(SupportLabels.Channels, r.Channel))); }
+        if (r.TypeKey is not null) { parts.Add(Texts.Get("support.routing.cond.type", Lookups.Label(SupportLabels.TicketTypeList, r.TypeKey))); }
+        if (r.Priority is not null) { parts.Add(Texts.Get("support.routing.cond.priority", SupportLabels.Label(SupportLabels.Priorities, r.Priority))); }
+        if (r.CategoryId is not null) { parts.Add(Texts.Get("support.routing.cond.category")); }
+        if (r.PartyId is not null) { parts.Add(Texts.Get("support.routing.cond.customer")); }
+        return parts.Count == 0 ? Texts.Get("support.routing.cond.none") : string.Join(", ", parts);
     }
 
     private string Actions(RoutingRuleDto r) =>
-        string.Join(" · ", new[] { r.QueueId is { } q ? "kuyruk: " + (queues.FirstOrDefault(x => x.Id == q)?.Name ?? "—") : null, r.OwnerId is { } o ? "sorumlu: " + Lookups.MemberName(o) : null }.Where(x => x is not null));
+        string.Join(" · ", new[] { r.QueueId is { } q ? Texts.Get("support.routing.act.queue", queues.FirstOrDefault(x => x.Id == q)?.Name ?? "—") : null, r.OwnerId is { } o ? Texts.Get("support.routing.act.owner", Lookups.MemberName(o)) : null }.Where(x => x is not null));
 
     private sealed class CellEdit(string impact, string urgency, string priority)
     {

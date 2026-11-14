@@ -3,7 +3,7 @@
 @inject CrmLookups Lookups
 
 <section aria-labelledby="ticket-actions-title">
-    <h2 id="ticket-actions-title">İşlemler</h2>
+    <h2 id="ticket-actions-title">@Texts.Get("support.actionsPanel.title")</h2>
     <Notice Text="@message" Failed="@failed" />
     @if (actions is null)
     {
@@ -11,11 +11,11 @@
     }
     else if (actions.Count == 0)
     {
-        <p class="text-muted">Bu talep için yapabileceğiniz işlem yok.</p>
+        <p class="text-muted">@Texts.Get("support.actionsPanel.none")</p>
     }
     else
     {
-        <div class="header-actions" role="group" aria-label="Talep işlemleri">
+        <div class="header-actions" role="group" aria-label="@Texts.Get("support.actionsPanel.group")">
             @foreach (var action in actions)
             {
                 <button type="button" class="btn @(SupportLabels.IsDanger(action.Action) ? "btn-outline-danger" : SupportLabels.IsPrimary(action.Action) ? "btn-primary" : "btn-outline-secondary")"
@@ -37,58 +37,58 @@
                 @switch (current.Action)
                 {
                     case "assign":
-                        <label class="form-label" for="act-owner">Sorumlu</label>
-                        <LookupPicker Id="act-owner" LookupKey="support.ticket.owner" @bind-Value="ownerId" Placeholder="Sorumlu seçin…" />
-                        <label class="form-label mt-2" for="act-queue">Kuyruk (isteğe bağlı)</label>
-                        <LookupPicker Id="act-queue" LookupKey="support.ticket.queue" @bind-Value="queueId" Placeholder="Kuyruk seçin…" />
+                        <label class="form-label" for="act-owner">@Texts.Get("common.field.owner")</label>
+                        <LookupPicker Id="act-owner" LookupKey="support.ticket.owner" @bind-Value="ownerId" Placeholder="@Texts.Get("support.actionsPanel.chooseOwner")" />
+                        <label class="form-label mt-2" for="act-queue">@Texts.Get("support.actionsPanel.queueOptional")</label>
+                        <LookupPicker Id="act-queue" LookupKey="support.ticket.queue" @bind-Value="queueId" Placeholder="@Texts.Get("support.actionsPanel.chooseQueue")" />
                         <FieldError Field="ownerId" Errors="fieldErrors" />
                         break;
                     case "transfer":
-                        <label class="form-label" for="act-queue">Devredilecek kuyruk</label>
-                        <LookupPicker Id="act-queue" LookupKey="support.ticket.queue" @bind-Value="queueId" Required="true" Placeholder="Kuyruk seçin…" />
+                        <label class="form-label" for="act-queue">@Texts.Get("support.actionsPanel.transferQueue")</label>
+                        <LookupPicker Id="act-queue" LookupKey="support.ticket.queue" @bind-Value="queueId" Required="true" Placeholder="@Texts.Get("support.actionsPanel.chooseQueue")" />
                         <FieldError Field="queueId" Errors="fieldErrors" />
-                        <label class="form-label mt-2" for="act-owner">Yeni sorumlu (isteğe bağlı)</label>
-                        <LookupPicker Id="act-owner" LookupKey="support.ticket.owner" @bind-Value="ownerId" Placeholder="Boş bırakılırsa sorumlu sıfırlanır" />
+                        <label class="form-label mt-2" for="act-owner">@Texts.Get("support.actionsPanel.newOwnerOptional")</label>
+                        <LookupPicker Id="act-owner" LookupKey="support.ticket.owner" @bind-Value="ownerId" Placeholder="@Texts.Get("support.actionsPanel.ownerResets")" />
                         break;
                     case "resolve":
-                        <label class="form-label" for="act-code">Çözüm kodu (zorunlu)</label>
+                        <label class="form-label" for="act-code">@Texts.Get("support.actionsPanel.resolutionCode")</label>
                         <select id="act-code" class="form-select" @bind="resolutionCode">
-                            <option value="">Seçin…</option>
+                            <option value="">@Texts.Get("common.choose")</option>
                             @foreach (var c in Lookups.Choices(SupportLabels.ResolutionCodeList)) { <option value="@c.Key">@c.Label</option> }
                         </select>
                         <FieldError Field="resolutionCode" Errors="fieldErrors" />
-                        <label class="form-label mt-2" for="act-note">Çözüm açıklaması (zorunlu)</label>
+                        <label class="form-label mt-2" for="act-note">@Texts.Get("support.actionsPanel.resolutionNote")</label>
                         <textarea id="act-note" class="form-control" rows="3" maxlength="4000" @bind="resolutionNote"></textarea>
                         <FieldError Field="resolutionNote" Errors="fieldErrors" />
                         @if (IsComplaint)
                         {
-                            <label class="form-label mt-2" for="act-root">Kök neden (şikâyet için zorunlu)</label>
+                            <label class="form-label mt-2" for="act-root">@Texts.Get("support.actionsPanel.rootCause")</label>
                             <textarea id="act-root" class="form-control" rows="2" maxlength="4000" @bind="rootCause"></textarea>
                             <FieldError Field="rootCause" Errors="fieldErrors" />
-                            <label class="form-label mt-2" for="act-corrective">Düzeltici aksiyon (şikâyet için zorunlu)</label>
+                            <label class="form-label mt-2" for="act-corrective">@Texts.Get("support.actionsPanel.corrective")</label>
                             <textarea id="act-corrective" class="form-control" rows="2" maxlength="4000" @bind="correctiveAction"></textarea>
                             <FieldError Field="correctiveAction" Errors="fieldErrors" />
                         }
                         break;
                     case "set-priority":
-                        <label class="form-label" for="act-priority">Yeni öncelik</label>
+                        <label class="form-label" for="act-priority">@Texts.Get("support.actionsPanel.newPriority")</label>
                         <select id="act-priority" class="form-select" @bind="priority">
-                            <option value="">Seçin…</option>
+                            <option value="">@Texts.Get("common.choose")</option>
                             @foreach (var (key, label) in SupportLabels.Priorities) { <option value="@key">@label</option> }
                         </select>
                         <FieldError Field="priority" Errors="fieldErrors" />
-                        <p class="small text-muted mt-1">Elle değiştirilen öncelik sonraki etki/aciliyet düzenlemeleriyle otomatik değişmez.</p>
+                        <p class="small text-muted mt-1">@Texts.Get("support.actionsPanel.priorityHelp")</p>
                         break;
                 }
                 @if (current.RequiresReason)
                 {
-                    <label class="form-label mt-2" for="act-reason">Gerekçe (zorunlu)</label>
+                    <label class="form-label mt-2" for="act-reason">@Texts.Get("orders.change.reason")</label>
                     <textarea id="act-reason" class="form-control" rows="2" maxlength="500" @bind="reason" aria-invalid="@(reasonError is not null ? "true" : null)"></textarea>
                     @if (reasonError is not null) { <div class="invalid-feedback d-block" role="alert">@reasonError</div> }
                 }
                 <div class="form-actions">
-                    <button type="submit" class="btn @(SupportLabels.IsDanger(current.Action) ? "btn-danger" : "btn-primary")" disabled="@busy">Onayla: @SupportLabels.Action(current.Action)</button>
-                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">Vazgeç</button>
+                    <button type="submit" class="btn @(SupportLabels.IsDanger(current.Action) ? "btn-danger" : "btn-primary")" disabled="@busy">@Texts.Get("support.actionsPanel.confirm", SupportLabels.Action(current.Action))</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">@Texts.Get("common.dismiss")</button>
                 </div>
             </form>
         }
@@ -176,7 +176,7 @@
         if (busy || selectedAction is not { } action) { return; }
         if (action.RequiresReason && string.IsNullOrWhiteSpace(reason))
         {
-            reasonError = "Gerekçe zorunludur.";
+            reasonError = Texts.Get("crm.quoteDetail.reasonRequired");
             return;
         }
 
@@ -197,7 +197,7 @@
         }
 
         failed = false;
-        message = $"{SupportLabels.Action(action.Action)}: işlem tamamlandı.";
+        message = Texts.Get("support.actionsPanel.done", SupportLabels.Action(action.Action));
         selected = null;
         reason = string.Empty;
         await Changed.InvokeAsync(result.Value!);

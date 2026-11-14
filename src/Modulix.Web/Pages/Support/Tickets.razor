@@ -3,69 +3,69 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Destek talepleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("support.tickets.pageTitle") · Modulix</PageTitle>
 
 <AuthGate Module="@SupportAccess.ModuleKey" Permission="@SupportAccess.TicketsRead">
     <div class="page-header">
         <div>
-            <h1>Destek çalışma alanı</h1>
-            <p class="text-muted mb-0">Benim taleplerim, atanmamış talepler ve bekleyenler. Sayılar yetkiniz ve veri kapsamınızla sınırlıdır ve altındaki listeyle aynı süzgeci kullanır.</p>
+            <h1>@Texts.Get("support.tickets.title")</h1>
+            <p class="text-muted mb-0">@Texts.Get("support.tickets.intro")</p>
         </div>
         <div class="header-actions">
             @if (Session.Can(SupportAccess.TicketsExport))
             {
-                <a class="btn btn-outline-secondary" href="api/support/tickets/export?@Query(1)" download="talepler.csv">CSV dışa aktar</a>
+                <a class="btn btn-outline-secondary" href="api/support/tickets/export?@Query(1)" download="talepler.csv">@Texts.Get("crm.opportunityReport.csv")</a>
             }
         </div>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(RawFilter))
     {
-        <div class="alert alert-info" role="status">Rapor süzgeci uygulandı. <a href="destek/talepler">Süzgeci temizle</a> · <a href="destek/raporlar">Rapora dön</a></div>
+        <div class="alert alert-info" role="status">@Texts.Get("support.tickets.reportFilter") <a href="destek/talepler">@Texts.Get("support.tickets.clearFilter")</a> · <a href="destek/raporlar">@Texts.Get("support.tickets.backToReport")</a></div>
     }
 
     @if (message is not null)
     {
-        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">Tekrar dene</button></div>
+        <div class="alert alert-danger" role="alert">@message <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">@Texts.Get("crm.sales.retry")</button></div>
     }
 
-    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="ChooseViewAsync" Label="Talep görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@viewKey" ValueChanged="ChooseViewAsync" Label="@Texts.Get("support.tickets.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <label class="visually-hidden" for="ticket-search">Talep ara</label>
-            <input id="ticket-search" class="form-control" type="search" placeholder="Konu, talep numarası veya başvuran ara" @bind="search" />
+            <label class="visually-hidden" for="ticket-search">@Texts.Get("support.tickets.searchLabel")</label>
+            <input id="ticket-search" class="form-control" type="search" placeholder="@Texts.Get("support.tickets.searchPlaceholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="ActiveFilters" />
         <GridColumnPicker State="grid" Changed="@(() => Task.CompletedTask)" />
         @if (Session.Can(SupportAccess.TicketsCreate))
         {
-            <a class="btn btn-primary" href="destek/talepler/yeni"><AppIcon Name="plus" Size="16" /> Yeni talep</a>
+            <a class="btn btn-primary" href="destek/talepler/yeni"><AppIcon Name="plus" Size="16" /> @Texts.Get("nav.app.support.new")</a>
         }
     </div>
 
     @if (filtersOpen || ActiveFilters > 0)
     {
         <div class="filters">
-            <label class="visually-hidden" for="status-filter">Durum</label>
+            <label class="visually-hidden" for="status-filter">@Texts.Get("common.field.status")</label>
             <select id="status-filter" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm durumlar</option>
+                <option value="">@Texts.Get("common.allStatuses")</option>
                 @foreach (var s in SupportLabels.Statuses)
                 {
                     <option value="@s.Key">@s.Label</option>
                 }
             </select>
-            <label class="visually-hidden" for="priority-filter">Öncelik</label>
+            <label class="visually-hidden" for="priority-filter">@Texts.Get("crm.leads.col.priority")</label>
             <select id="priority-filter" class="form-select form-select-sm filter-select" @bind="priority" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm öncelikler</option>
+                <option value="">@Texts.Get("crm.act.allPriorities")</option>
                 @foreach (var p in SupportLabels.Priorities)
                 {
                     <option value="@p.Key">@p.Label</option>
                 }
             </select>
-            <label class="visually-hidden" for="type-filter">Tür</label>
+            <label class="visually-hidden" for="type-filter">@Texts.Get("common.field.kind")</label>
             <select id="type-filter" class="form-select form-select-sm filter-select" @bind="typeKey" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm türler</option>
+                <option value="">@Texts.Get("crm.act.allTypes")</option>
                 @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList))
                 {
                     <option value="@t.Key">@t.Label</option>
@@ -83,47 +83,47 @@
     }
     else if (page is not null && page.Items.Count == 0)
     {
-        <p class="text-muted" role="status">Bu süzgece uyan talep yok.@(Session.Can(SupportAccess.TicketsCreate) ? " Yeni talep açabilirsiniz." : null)</p>
+        <p class="text-muted" role="status">@(Session.Can(SupportAccess.TicketsCreate) ? Texts.Get("support.tickets.emptyCanCreate") : Texts.Get("support.tickets.empty"))</p>
     }
     else if (page is not null)
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) talep listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("support.tickets.listed", page.TotalCount)</p>
         @if (CanBulk)
         {
-            <section class="bulk-bar" aria-label="Toplu işlem">
+            <section class="bulk-bar" aria-label="@Texts.Get("support.tickets.bulk")">
                 <p class="small text-muted mb-1">
-                    Seçilen taleplerin her biri kendi eyleminin izin, veri kapsamı ve kuralıyla işlenir; işlem atomik değildir, her talebin sonucu ayrı gösterilir. En çok 50 talep.
+                    @Texts.Get("support.tickets.bulkIntro")
                 </p>
                 <div class="filters">
-                    <span role="status" aria-live="polite">@selected.Count talep seçili</span>
-                    <label class="visually-hidden" for="bulk-action">Toplu işlem</label>
+                    <span role="status" aria-live="polite">@Texts.Get("support.tickets.selected", selected.Count)</span>
+                    <label class="visually-hidden" for="bulk-action">@Texts.Get("support.tickets.bulk")</label>
                     <select id="bulk-action" class="form-select form-select-sm filter-select" @bind="bulkAction">
-                        <option value="">İşlem seçin</option>
-                        @if (Session.Can(SupportAccess.TicketsAssign)) { <option value="assign">Sorumlu ata</option> }
-                        @if (Session.Can(SupportAccess.TicketsClose)) { <option value="close">Kapat (çözülmüş olmalı)</option> }
-                        @if (Session.Can(SupportAccess.TicketsCancel)) { <option value="cancel">İptal et</option> }
+                        <option value="">@Texts.Get("support.tickets.bulkChoose")</option>
+                        @if (Session.Can(SupportAccess.TicketsAssign)) { <option value="assign">@Texts.Get("support.tickets.bulkAssign")</option> }
+                        @if (Session.Can(SupportAccess.TicketsClose)) { <option value="close">@Texts.Get("support.tickets.bulkClose")</option> }
+                        @if (Session.Can(SupportAccess.TicketsCancel)) { <option value="cancel">@Texts.Get("support.action.cancel")</option> }
                     </select>
                     @if (bulkAction == "assign")
                     {
-                        <LookupPicker Id="bulk-owner" LookupKey="support.ticket.owner" @bind-Value="bulkOwner" Placeholder="Sorumlu seçin" />
+                        <LookupPicker Id="bulk-owner" LookupKey="support.ticket.owner" @bind-Value="bulkOwner" Placeholder="@Texts.Get("support.tickets.chooseOwner")" />
                     }
                     @if (bulkAction == "cancel")
                     {
-                        <label class="visually-hidden" for="bulk-reason">Gerekçe</label>
-                        <input id="bulk-reason" class="form-control form-control-sm" maxlength="500" placeholder="Gerekçe (zorunlu)" @bind="bulkReason" />
+                        <label class="visually-hidden" for="bulk-reason">@Texts.Get("crm.quoteApprovals.reasonLabel")</label>
+                        <input id="bulk-reason" class="form-control form-control-sm" maxlength="500" placeholder="@Texts.Get("orders.change.reason")" @bind="bulkReason" />
                     }
-                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(bulkBusy || selected.Count == 0 || string.IsNullOrEmpty(bulkAction))" @onclick="RunBulkAsync">Uygula</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(bulkBusy || selected.Count == 0 || string.IsNullOrEmpty(bulkAction))" @onclick="RunBulkAsync">@Texts.Get("crm.act.apply")</button>
                 </div>
                 @if (bulkResults is not null)
                 {
                     <div class="alert @(bulkResults.All(r => r.Succeeded) ? "alert-success" : "alert-warning")" role="status">
-                        @bulkResults.Count(r => r.Succeeded) / @bulkResults.Count talep işlendi.
+                        @Texts.Get("support.tickets.bulkDone", bulkResults.Count(r => r.Succeeded), bulkResults.Count)
                         @if (bulkResults.Any(r => !r.Succeeded))
                         {
                             <ul class="mb-0">
                                 @foreach (var r in bulkResults.Where(r => !r.Succeeded))
                                 {
-                                    <li>@(r.Number ?? "Talep bulunamadı"): @r.Message</li>
+                                    <li>@(r.Number ?? Texts.Get("support.tickets.bulkNotFound")): @r.Message</li>
                                 }
                             </ul>
                         }
@@ -132,18 +132,18 @@
             </section>
         }
         <table class="table record-table">
-            <caption class="visually-hidden">Destek talebi listesi</caption>
+            <caption class="visually-hidden">@Texts.Get("support.tickets.caption")</caption>
             <thead>
                 <tr>
                     @if (CanBulk)
                     {
-                        <th scope="col"><span class="visually-hidden">Seç</span></th>
+                        <th scope="col"><span class="visually-hidden">@Texts.Get("crm.act.select")</span></th>
                     }
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -152,8 +152,8 @@
                     <tr>
                         @if (CanBulk)
                         {
-                            <td data-label="Seç">
-                                <input type="checkbox" class="form-check-input" aria-label="@(t.Number + " numaralı talebi seç")" checked="@selected.Contains(t.Id)" @onchange="e => Toggle(t.Id, (bool)e.Value!)" />
+                            <td data-label="@Texts.Get("crm.act.select")">
+                                <input type="checkbox" class="form-check-input" aria-label="@Texts.Get("support.tickets.selectRow", t.Number)" checked="@selected.Contains(t.Id)" @onchange="e => Toggle(t.Id, (bool)e.Value!)" />
                             </td>
                         }
                         @foreach (var column in grid.VisibleColumns)
@@ -161,8 +161,8 @@
                             @Cell(column, t)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{t.Number} eylemleri")">
-                                <a class="view-menu-item" role="menuitem" href="destek/talepler/@t.Id"><AppIcon Name="eye" Size="16" /> <span>Aç</span></a>
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", t.Number)">
+                                <a class="view-menu-item" role="menuitem" href="destek/talepler/@t.Id"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></a>
                             </RowMenu>
                         </td>
                     </tr>
@@ -183,26 +183,29 @@
     private const string AllViews = "all";
 
     /// <summary>Hızlı görünümler; her biri sunucudaki süzgeçlerden birine karşılık gelir.</summary>
-    private static readonly (string Key, string Label, string Icon)[] Presets =
+    private static (string Key, string Label, string Icon)[] Presets =>
     [
-        ("mine", "Benim taleplerim", "star"), ("unassigned", "Atanmamış", "user"), ("awaiting", "Yanıt bekleyen", "clock"), ("waiting", "Müşteri bekleyen", "hourglass"),
-        ("reopened", "Yeniden açılan", "repeat"), ("resolved", "Çözüldü (teyit bekliyor)", "check-circle"), ("slarisk", "SLA riski", "alert-circle"), ("slabreach", "SLA ihlali", "alert-circle"), ("open", "Tüm açık talepler", "inbox"),
+        ("mine", Texts.Get("support.tickets.view.mine"), "star"), ("unassigned", Texts.Get("support.tickets.view.unassigned"), "user"),
+        ("awaiting", Texts.Get("support.tickets.view.awaiting"), "clock"), ("waiting", Texts.Get("support.tickets.view.waiting"), "hourglass"),
+        ("reopened", Texts.Get("support.tickets.view.reopened"), "repeat"), ("resolved", Texts.Get("support.tickets.view.resolved"), "check-circle"),
+        ("slarisk", Texts.Get("support.tickets.view.slarisk"), "alert-circle"), ("slabreach", Texts.Get("support.tickets.view.slabreach"), "alert-circle"),
+        ("open", Texts.Get("support.tickets.view.open"), "inbox"),
     ];
 
     // Sıralama sunucudaki sort anahtarlarıdır (TicketSort). Bazı anahtarlar tek yönlüdür: öncelik (yüksek önce), son hareket (yeni önce), SLA (yakın önce),
     // yaş (eski önce); ikinci tıklama varsayılan sıraya (en yeni önce) döner.
-    private static readonly GridColumnDef[] Columns =
+    private static GridColumnDef[] Columns =>
     [
-        new("ticket", "Talep", "message-square", "number", "-number", Locked: true),
-        new("customer", "Müşteri", "building"),
-        new("type", "Tür", "tag"),
-        new("priority", "Öncelik", "alert-circle", "priority"),
-        new("status", "Durum", "activity"),
-        new("owner", "Sorumlu", "user"),
-        new("age", "Yaş", "clock", "createdAt"),
-        new("sla", "SLA hedefleri", "hourglass", "resolutionDue"),
-        new("activity", "Son hareket", "history", "-lastActivity"),
-        new("reporter", "Başvuran", "user", DefaultVisible: false),
+        new("ticket", Texts.Get("support.tickets.col.ticket"), "message-square", "number", "-number", Locked: true),
+        new("customer", Texts.Get("support.tickets.col.customer"), "building"),
+        new("type", Texts.Get("common.field.kind"), "tag"),
+        new("priority", Texts.Get("crm.leads.col.priority"), "alert-circle", "priority"),
+        new("status", Texts.Get("common.field.status"), "activity"),
+        new("owner", Texts.Get("common.field.owner"), "user"),
+        new("age", Texts.Get("support.tickets.col.age"), "clock", "createdAt"),
+        new("sla", Texts.Get("support.tickets.col.sla"), "hourglass", "resolutionDue"),
+        new("activity", Texts.Get("support.tickets.col.activity"), "history", "-lastActivity"),
+        new("reporter", Texts.Get("support.tickets.col.reporter"), "user", DefaultVisible: false),
     ];
 
     /// <summary>Pano / başka ekranlardan gelen bağlantılar: <c>?gorunum=unassigned</c>, <c>?musteri={id}</c>.</summary>
@@ -296,7 +299,7 @@
     // Her hızlı görünümün yanında özet sayısı gösterilir (varsa); ardından kişisel görünümler.
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm talepler", Icon: "inbox"),
+        new(AllViews, Texts.Get("support.tickets.view.all"), Icon: "inbox"),
         .. Presets.Select(p => new ViewOption(p.Key, p.Label + (Count(p.Key) is { } n ? $" ({n})" : null), Icon: p.Icon)),
         .. views.Options,
     ];
@@ -403,11 +406,11 @@
             <a href="destek/talepler/@t.Id">@t.Subject</a>
             <small class="text-muted">@t.Number</small>
         </text>,
-        "customer" => @<text>@(t.CustomerName ?? t.ReporterName ?? "—")@(t.PartyId is null ? " (tanımsız)" : null)</text>,
+        "customer" => @<text>@(t.PartyId is null ? Texts.Get("support.tickets.undefinedCustomer", t.CustomerName ?? t.ReporterName ?? "—") : t.CustomerName ?? t.ReporterName ?? "—")</text>,
         "type" => @<text>@Lookups.Label(SupportLabels.TicketTypeList, t.TypeKey)</text>,
         "priority" => @<span class="badge stage-@SupportLabels.PriorityBadge(t.Priority)">@SupportLabels.Label(SupportLabels.Priorities, t.Priority)</span>,
         "status" => @<span class="badge stage-@SupportLabels.StatusBadge(t.Status)">@SupportLabels.Label(SupportLabels.Statuses, t.Status)</span>,
-        "owner" => @<text>@(t.OwnerId is null ? "Atanmamış" : Lookups.MemberName(t.OwnerId))</text>,
+        "owner" => @<text>@(t.OwnerId is null ? Texts.Get("support.unassigned") : Lookups.MemberName(t.OwnerId))</text>,
         "age" => @<text>@Age(t.CreatedAt)</text>,
         "sla" => @<text>@SlaText(t)</text>,
         "activity" => @<text>@CrmLabels.Time(t.LastActivityAt)</text>,
@@ -419,11 +422,7 @@
     private static string SlaText(TicketDto t) =>
         t.FirstResponseDueAt is null && t.ResolutionDueAt is null
             ? "—"
-            : string.Join(" · ", new[] { t.FirstResponseDueAt is { } f ? "İlk yanıt " + CrmLabels.Time(f) : null, t.ResolutionDueAt is { } r ? "Çözüm " + CrmLabels.Time(r) : null }.Where(x => x is not null));
+            : string.Join(" · ", new[] { t.FirstResponseDueAt is { } f ? Texts.Get("support.tickets.slaFirstResponse", CrmLabels.Time(f)) : null, t.ResolutionDueAt is { } r ? Texts.Get("support.tickets.slaResolution", CrmLabels.Time(r)) : null }.Where(x => x is not null));
 
-    private static string Age(DateTimeOffset createdAt)
-    {
-        var age = DateTimeOffset.UtcNow - createdAt;
-        return age.TotalDays >= 1 ? $"{(int)age.TotalDays} gün" : age.TotalHours >= 1 ? $"{(int)age.TotalHours} sa" : $"{Math.Max(0, (int)age.TotalMinutes)} dk";
-    }
+    private static string Age(DateTimeOffset createdAt) => SupportLabels.Age(createdAt, DateTimeOffset.UtcNow);
 }

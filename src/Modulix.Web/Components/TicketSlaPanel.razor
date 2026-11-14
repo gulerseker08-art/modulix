@@ -12,14 +12,14 @@
     }
     else if (instances.Count == 0)
     {
-        <p class="text-muted">Bu talebe uyan SLA politikası yok: <strong>hedefsiz</strong>. Hedef atanması için eşleşen bir politika (ya da varsayılan politika) tanımlanmalıdır.</p>
+        <p class="text-muted">@Texts.Strong("support.slaPanel.none", Texts.Get("support.slaPanel.noTarget"))</p>
     }
     else
     {
-        <p class="small text-muted">Süreler sunucuda iş takvimine göre hesaplanır; sayaç yazısı gösterim amaçlıdır ve @(Refresh) sn'de bir yenilenir. Saatler tarayıcınızın saat dilimindedir.</p>
+        <p class="small text-muted">@Texts.Get("support.slaPanel.help", Refresh)</p>
         @foreach (var cycle in instances.GroupBy(i => i.Cycle).OrderByDescending(g => g.Key))
         {
-            <h3 class="h6">Döngü @cycle.Key@(cycle.Key == instances.Max(i => i.Cycle) ? " (güncel)" : " (geçmiş)")</h3>
+            <h3 class="h6">@(cycle.Key == instances.Max(i => i.Cycle) ? Texts.Get("support.slaPanel.cycleCurrent", cycle.Key) : Texts.Get("support.slaPanel.cyclePast", cycle.Key))</h3>
             <div class="sla-cards">
                 @foreach (var i in cycle.OrderBy(i => i.Metric))
                 {
@@ -29,28 +29,28 @@
                             <span class="badge stage-@SlaLabels.StateBadge(i.State)">@SlaLabels.Label(SlaLabels.States, i.State)</span>
                         </header>
                         <dl class="detail-list">
-                            <dt>Politika</dt><dd>@i.PolicyName (sürüm @i.PolicyRevision)@(i.AlwaysOpen ? " · 7/24" : i.CalendarName is { } cal ? " · " + cal : null)</dd>
-                            <dt>Hedef</dt><dd>@SlaLabels.Duration(i.TargetMinutes) iş süresi</dd>
-                            <dt>Harcanan / kalan</dt><dd>@SlaLabels.Duration(i.WorkedMinutes) / @SlaLabels.Duration(i.RemainingMinutes)</dd>
+                            <dt>@Texts.Get("support.slaPanel.policy")</dt><dd>@Texts.Get("support.slaPanel.policyRevision", i.PolicyName, i.PolicyRevision)@(i.AlwaysOpen ? " · 7/24" : i.CalendarName is { } cal ? " · " + cal : null)</dd>
+                            <dt>@Texts.Get("crm.salesTarget.target")</dt><dd>@Texts.Get("support.slaPanel.workTime", SlaLabels.Duration(i.TargetMinutes))</dd>
+                            <dt>@Texts.Get("support.slaPanel.spentLeft")</dt><dd>@SlaLabels.Duration(i.WorkedMinutes) / @SlaLabels.Duration(i.RemainingMinutes)</dd>
                             @if (i.Status == "Running" && i.DueAt is { } due)
                             {
-                                <dt>Hedef anı</dt><dd>@CrmLabels.Time(due) · <span aria-live="off">@SlaLabels.Remaining(due, DateTimeOffset.UtcNow)</span></dd>
+                                <dt>@Texts.Get("support.slaPanel.dueAt")</dt><dd>@CrmLabels.Time(due) · <span aria-live="off">@SlaLabels.Remaining(due, DateTimeOffset.UtcNow)</span></dd>
                             }
                             else if (i.Status == "Paused")
                             {
-                                <dt>Hedef anı</dt><dd>Duraklatıldı; sayaç sürdürülünce yeniden hesaplanır.</dd>
+                                <dt>@Texts.Get("support.slaPanel.dueAt")</dt><dd>@Texts.Get("support.slaPanel.paused")</dd>
                             }
-                            @if (i.BreachedAt is { } breached) { <dt>İhlal anı</dt><dd>@CrmLabels.Time(breached) <small class="text-muted">(gerçek hedef anı)</small></dd> }
-                            @if (i.CompletedAt is { } completed) { <dt>Tamamlanma</dt><dd>@CrmLabels.Time(completed)</dd> }
+                            @if (i.BreachedAt is { } breached) { <dt>@Texts.Get("support.slaPanel.breachedAt")</dt><dd>@CrmLabels.Time(breached) <small class="text-muted">@Texts.Get("support.slaPanel.realDue")</small></dd> }
+                            @if (i.CompletedAt is { } completed) { <dt>@Texts.Get("support.slaPanel.completedAt")</dt><dd>@CrmLabels.Time(completed)</dd> }
                         </dl>
                         @if (i.Pauses.Count > 0)
                         {
                             <details>
-                                <summary>Duraklatma aralıkları (@i.Pauses.Count)</summary>
+                                <summary>@Texts.Get("support.slaPanel.pauses", i.Pauses.Count)</summary>
                                 <ul class="small">
                                     @foreach (var p in i.Pauses)
                                     {
-                                        <li>@CrmLabels.Time(p.StartedAt) → @(p.EndedAt is { } end ? CrmLabels.Time(end) : "devam ediyor") · @SupportLabels.Label(SupportLabels.Statuses, p.Reason)</li>
+                                        <li>@CrmLabels.Time(p.StartedAt) → @(p.EndedAt is { } end ? CrmLabels.Time(end) : Texts.Get("support.slaPanel.ongoing")) · @SupportLabels.Label(SupportLabels.Statuses, p.Reason)</li>
                                     }
                                 </ul>
                             </details>
@@ -58,11 +58,11 @@
                         @if (i.Escalations.Count > 0)
                         {
                             <details>
-                                <summary>Eskalasyon eylemleri (@i.Escalations.Count)</summary>
+                                <summary>@Texts.Get("support.slaPanel.escalations", i.Escalations.Count)</summary>
                                 <ul class="small">
                                     @foreach (var e in i.Escalations)
                                     {
-                                        <li>%@e.Percent · @SlaLabels.Label(SlaLabels.Actions, e.Action) · @CrmLabels.Time(e.ExecutedAt) · @e.Outcome</li>
+                                        <li>@Texts.Get("support.percent", e.Percent) · @SlaLabels.Label(SlaLabels.Actions, e.Action) · @CrmLabels.Time(e.ExecutedAt) · @e.Outcome</li>
                                     }
                                 </ul>
                             </details>
@@ -75,13 +75,13 @@
         @if (Session.Can(SupportAccess.SlaRecalculate) && instances.Any(i => i.Status is "Running" or "Paused"))
         {
             <details>
-                <summary>SLA'yı yeniden hesapla (yetkili işlem)</summary>
+                <summary>@Texts.Get("support.slaPanel.recalcTitle")</summary>
                 <form class="record-form" novalidate @onsubmit="RecalculateAsync" @onsubmit:preventDefault>
-                    <p class="small text-muted">Açık örnekler güncel politika ve takvimle yeniden anlık görüntülenir; harcanan süre korunur, ihlal edilmiş örnek değişmez. Önce/sonra özeti tarihçeye yazılır.</p>
-                    <label class="form-label" for="sla-reason">Gerekçe (zorunlu)</label>
+                    <p class="small text-muted">@Texts.Get("support.slaPanel.recalcHelp")</p>
+                    <label class="form-label" for="sla-reason">@Texts.Get("orders.change.reason")</label>
                     <textarea id="sla-reason" class="form-control" rows="2" maxlength="500" @bind="reason" aria-invalid="@(reasonError is not null ? "true" : null)"></textarea>
                     @if (reasonError is not null) { <div class="invalid-feedback d-block" role="alert">@reasonError</div> }
-                    <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Yeniden hesapla</button></div>
+                    <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">@Texts.Get("support.slaPanel.recalc")</button></div>
                 </form>
             </details>
         }
@@ -127,7 +127,7 @@
         if (busy) { return; }
         if (string.IsNullOrWhiteSpace(reason))
         {
-            reasonError = "Gerekçe zorunludur.";
+            reasonError = Texts.Get("crm.quoteDetail.reasonRequired");
             return;
         }
 
@@ -136,7 +136,7 @@
         var result = await Api.PostAsync<TicketDto>($"/api/support/tickets/{Ticket.Id}/sla/recalculate", new SlaRecalculateRequest(Ticket.Version, reason.Trim()));
         busy = false;
         failed = !result.IsSuccess;
-        message = result.IsSuccess ? "SLA yeniden hesaplandı." : result.Error;
+        message = result.IsSuccess ? Texts.Get("support.slaPanel.recalculated") : result.Error;
         if (result.IsSuccess)
         {
             reason = string.Empty;

@@ -4,21 +4,21 @@
 @if (surveys is { Count: > 0 })
 {
     <section aria-labelledby="survey-title">
-        <h2 id="survey-title">Memnuniyet anketi</h2>
+        <h2 id="survey-title">@Texts.Get("support.surveyPanel.title")</h2>
         <ul class="task-list">
             @foreach (var s in surveys)
             {
                 <li>
                     <span class="badge stage-@Badge(s)">@StateText(s)</span>
-                    <strong>Döngü @s.Cycle</strong>
+                    <strong>@Texts.Get("support.surveyPanel.cycle", s.Cycle)</strong>
                     @if (s.Rating is { } rating)
                     {
-                        <span> · Puan: @rating / 5</span>
-                        @if (rating <= 2) { <span class="badge stage-lost">Düşük puan — takip edin</span> }
+                        <span> · @Texts.Get("support.surveyPanel.rating", rating)</span>
+                        @if (rating <= 2) { <span class="badge stage-lost">@Texts.Get("support.surveyPanel.low")</span> }
                     }
                     @if (!string.IsNullOrWhiteSpace(s.Comment)) { <div class="small">“@s.Comment”</div> }
                     <small class="text-muted">
-                        @(s.AnsweredAt is { } at ? "Yanıt: " + CrmLabels.Time(at) : s.State == "NotSent" ? "E-posta kuyruğa yazılmadı (genel adres ayarlı değil)" : "Son geçerlilik: " + CrmLabels.Time(s.ExpiresAt))
+                        @(s.AnsweredAt is { } at ? Texts.Get("support.surveyPanel.answeredAt", CrmLabels.Time(at)) : s.State == "NotSent" ? Texts.Get("support.surveyPanel.notQueued") : Texts.Get("support.surveyPanel.expiresAt", CrmLabels.Time(s.ExpiresAt)))
                     </small>
                 </li>
             }
@@ -43,10 +43,10 @@
 
     private static string StateText(SurveyDto s) => s.State switch
     {
-        "Answered" => "Yanıtlandı",
-        "Expired" => "Süresi doldu",
-        "NotSent" => "Gönderilmedi",
-        _ => "E-posta kuyruğa alındı",
+        "Answered" => Texts.Get("support.surveyPanel.state.answered"),
+        "Expired" => Texts.Get("support.surveyPanel.state.expired"),
+        "NotSent" => Texts.Get("support.surveyPanel.state.notsent"),
+        _ => Texts.Get("support.surveyPanel.state.queued"),
     };
 
     private static string Badge(SurveyDto s) => s.State switch { "Answered" => "won", "Expired" or "NotSent" => "cancelled", _ => "open" };

@@ -5,38 +5,38 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>SLA yönetimi · Modulix</PageTitle>
+<PageTitle>@Texts.Get("support.sla.pageTitle") · Modulix</PageTitle>
 
 <AuthGate Module="@SupportAccess.ModuleKey" Permission="@SupportAccess.SlaManage">
     <div class="page-header">
         <div>
-            <h1>SLA ve eskalasyon</h1>
-            <p class="text-muted mb-0">Politika seçimi: yalnızca etkin ve kısıtlarının hepsi talebe uyan politikalar aday olur; önce daha çok kısıtı olan, sonra öncelik sayısı küçük olan, sonra ad sırası kazanır. Hiçbiri uymazsa varsayılan politika kullanılır; o da yoksa talep hedefsiz kalır. Politika değişikliği açık taleplerin hedeflerini <strong>değiştirmez</strong> (anlık görüntü); gerekirse talep sayfasından yetkili yeniden hesaplama yapılır.</p>
+            <h1>@Texts.Get("nav.app.support.sla")</h1>
+            <p class="text-muted mb-0">@Texts.Strong("support.sla.intro", Texts.Get("support.sla.introNotChange"))</p>
         </div>
-        <div class="header-actions"><a class="btn btn-outline-secondary" href="destek/ayarlar">Kuyruklar ve kategoriler</a></div>
+        <div class="header-actions"><a class="btn btn-outline-secondary" href="destek/ayarlar">@Texts.Get("nav.app.support.settings")</a></div>
     </div>
 
     <Notice Text="@message" Failed="@failed" />
 
     <section aria-labelledby="cal-title">
-        <h2 id="cal-title">İş takvimleri</h2>
+        <h2 id="cal-title">@Texts.Get("support.sla.calendars")</h2>
         @if (calendars is null) { <LoadingState Kind="LoadingKind.Table" /> }
-        else if (calendars.Count == 0) { <p class="text-muted">Takvim yok: politikalar takvimsiz 7/24 hesaplanır.</p> }
+        else if (calendars.Count == 0) { <p class="text-muted">@Texts.Get("support.sla.noCalendars")</p> }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">İş takvimleri</caption>
-                <thead><tr><th scope="col">Takvim</th><th scope="col">Saat dilimi</th><th scope="col">Çalışma saatleri</th><th scope="col">Tatil</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("support.sla.calendars")</caption>
+                <thead><tr><th scope="col">@Texts.Get("support.sla.calendar")</th><th scope="col">@Texts.Get("support.sla.timeZone")</th><th scope="col">@Texts.Get("support.sla.workingHours")</th><th scope="col">@Texts.Get("support.sla.holiday")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("crm.quoteApprovals.col.action")</th></tr></thead>
                 <tbody>
                     @foreach (var c in calendars)
                     {
                         <tr>
-                            <td data-label="Takvim" class="primary">@c.Name</td>
-                            <td data-label="Saat dilimi">@(c.IsAlwaysOpen ? "7/24" : c.TimeZoneId)</td>
-                            <td data-label="Çalışma saatleri">@WeeklySummary(c)</td>
-                            <td data-label="Tatil">@HolidayCount(c)</td>
-                            <td data-label="Durum"><span class="badge stage-@(c.IsActive ? "won" : "cancelled")">@(c.IsActive ? "Etkin" : "Pasif")</span></td>
-                            <td data-label="İşlem"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => EditCalendar(c)" disabled="@busy">Düzenle</button></td>
+                            <td data-label="@Texts.Get("support.sla.calendar")" class="primary">@c.Name</td>
+                            <td data-label="@Texts.Get("support.sla.timeZone")">@(c.IsAlwaysOpen ? "7/24" : c.TimeZoneId)</td>
+                            <td data-label="@Texts.Get("support.sla.workingHours")">@WeeklySummary(c)</td>
+                            <td data-label="@Texts.Get("support.sla.holiday")">@HolidayCount(c)</td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@(c.IsActive ? "won" : "cancelled")">@(c.IsActive ? Texts.Get("support.settings.enabled") : Texts.Get("common.inactive"))</span></td>
+                            <td data-label="@Texts.Get("crm.quoteApprovals.col.action")"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => EditCalendar(c)" disabled="@busy">@Texts.Get("common.edit")</button></td>
                         </tr>
                     }
                 </tbody>
@@ -45,28 +45,28 @@
 
         <form class="record-form" novalidate @onsubmit="SaveCalendarAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
-                <legend class="h6">@(cal.Id is null ? "Yeni takvim" : "Takvimi düzenle")</legend>
-                <FormTabs Title="Takvim bilgileri" Label="İş takvimi formu bölümleri">
+                <legend class="h6">@(cal.Id is null ? Texts.Get("support.sla.newCalendar") : Texts.Get("support.sla.editCalendar"))</legend>
+                <FormTabs Title="@Texts.Get("support.sla.calendarInfo")" Label="@Texts.Get("support.sla.calendarSections")">
                 <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label" for="cal-name">Ad</label>
+                        <label class="form-label" for="cal-name">@Texts.Get("common.field.name")</label>
                         <input id="cal-name" class="form-control" maxlength="100" @bind="cal.Name" />
                         <FieldError Field="name" Errors="calErrors" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="cal-zone">Saat dilimi</label>
+                        <label class="form-label" for="cal-zone">@Texts.Get("support.sla.timeZone")</label>
                         <input id="cal-zone" class="form-control" list="zones" maxlength="64" @bind="cal.TimeZoneId" />
                         <datalist id="zones"><option value="Europe/Istanbul"></option><option value="UTC"></option><option value="Europe/Berlin"></option><option value="Europe/London"></option></datalist>
                         <FieldError Field="timeZoneId" Errors="calErrors" />
                     </div>
                     <div class="span-12 form-check">
                         <input id="cal-always" class="form-check-input" type="checkbox" @bind="cal.AlwaysOpen" />
-                        <label class="form-check-label" for="cal-always">7/24 (çalışma saati ve tatil uygulanmaz)</label>
+                        <label class="form-check-label" for="cal-always">@Texts.Get("support.sla.alwaysOpen")</label>
                     </div>
                     @if (!cal.AlwaysOpen)
                     {
                         <div class="span-12">
-                            <span class="form-label d-block">Çalışma saatleri (yerel saat; gün başına tek pencere)</span>
+                            <span class="form-label d-block">@Texts.Get("support.sla.workingHoursHelp")</span>
                             @foreach (var (day, label) in SlaLabels.Days)
                             {
                                 var row = cal.Days[day];
@@ -75,56 +75,56 @@
                                         <input id="day-@day" class="form-check-input" type="checkbox" @bind="row.Enabled" />
                                         <label class="form-check-label" for="day-@day">@label</label>
                                     </div>
-                                    <label class="visually-hidden" for="day-start-@day">@label başlangıç</label>
+                                    <label class="visually-hidden" for="day-start-@day">@Texts.Get("support.sla.dayStart", label)</label>
                                     <input id="day-start-@day" type="time" class="form-control form-control-sm" style="max-width:8rem" @bind="row.Start" disabled="@(!row.Enabled)" />
                                     <span aria-hidden="true">–</span>
-                                    <label class="visually-hidden" for="day-end-@day">@label bitiş</label>
+                                    <label class="visually-hidden" for="day-end-@day">@Texts.Get("support.sla.dayEnd", label)</label>
                                     <input id="day-end-@day" type="time" class="form-control form-control-sm" style="max-width:8rem" @bind="row.End" disabled="@(!row.Enabled)" />
                                 </div>
                             }
                             <FieldError Field="weeklyHours" Errors="calErrors" />
                         </div>
                         <div class="span-12">
-                            <label class="form-label" for="cal-holidays">Tatiller (satır başına bir tane)</label>
+                            <label class="form-label" for="cal-holidays">@Texts.Get("support.sla.holidays")</label>
                             <textarea id="cal-holidays" class="form-control" rows="4" @bind="cal.HolidaysText" placeholder="2026-10-29; Cumhuriyet Bayramı&#10;2026-10-28; Arife; 09:00-13:00"></textarea>
-                            <small class="text-muted">Biçim: <code>yyyy-MM-dd; ad</code> (tam gün kapalı) ya da <code>yyyy-MM-dd; ad; SS:dd-SS:dd</code> (yalnızca o pencere açık, yarım gün).</small>
+                            <small class="text-muted">@((MarkupString)Texts.Get("support.sla.holidayFormat", $"<code>{System.Net.WebUtility.HtmlEncode(Texts.Get("support.sla.holidayFormatDay"))}</code>", $"<code>{System.Net.WebUtility.HtmlEncode(Texts.Get("support.sla.holidayFormatWindow"))}</code>"))</small>
                             <FieldError Field="holidays" Errors="calErrors" />
                         </div>
                     }
                     <div class="span-12 form-check">
                         <input id="cal-active" class="form-check-input" type="checkbox" @bind="cal.IsActive" />
-                        <label class="form-check-label" for="cal-active">Etkin</label>
+                        <label class="form-check-label" for="cal-active">@Texts.Get("support.settings.enabled")</label>
                     </div>
                 </div>
                 </FormTabs>
             </fieldset>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">@(cal.Id is null ? "Takvim ekle" : "Kaydet")</button>
-                @if (cal.Id is not null) { <button type="button" class="btn btn-outline-secondary" @onclick="NewCalendar">Vazgeç</button> }
+                <button type="submit" class="btn btn-primary" disabled="@busy">@(cal.Id is null ? Texts.Get("support.sla.addCalendar") : Texts.Get("common.save"))</button>
+                @if (cal.Id is not null) { <button type="button" class="btn btn-outline-secondary" @onclick="NewCalendar">@Texts.Get("common.dismiss")</button> }
             </div>
         </form>
     </section>
 
     <section aria-labelledby="pol-title">
-        <h2 id="pol-title">SLA politikaları</h2>
+        <h2 id="pol-title">@Texts.Get("support.sla.policies")</h2>
         @if (policies is null) { <LoadingState Kind="LoadingKind.Table" /> }
-        else if (policies.Count == 0) { <p class="text-muted">Politika yok: talepler hedefsiz açılır.</p> }
+        else if (policies.Count == 0) { <p class="text-muted">@Texts.Get("support.sla.noPolicies")</p> }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">SLA politikaları</caption>
-                <thead><tr><th scope="col">Politika</th><th scope="col">Kısıtlar</th><th scope="col">Hedefler</th><th scope="col">Takvim</th><th scope="col">Sıra</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("support.sla.policies")</caption>
+                <thead><tr><th scope="col">@Texts.Get("support.slaPanel.policy")</th><th scope="col">@Texts.Get("support.routing.col.constraints")</th><th scope="col">@Texts.Get("support.sla.targets")</th><th scope="col">@Texts.Get("support.sla.calendar")</th><th scope="col">@Texts.Get("contracts.signaturePanel.order")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("crm.quoteApprovals.col.action")</th></tr></thead>
                 <tbody>
                     @foreach (var p in policies)
                     {
                         <tr>
-                            <td data-label="Politika" class="primary">@p.Name <small class="text-muted">sürüm @p.Revision@(p.IsDefault ? " · varsayılan" : null)</small></td>
-                            <td data-label="Kısıtlar">@Constraints(p)</td>
-                            <td data-label="Hedefler">@Targets(p)</td>
-                            <td data-label="Takvim">@(p.CalendarId is { } id ? calendars?.FirstOrDefault(c => c.Id == id)?.Name ?? "—" : "7/24")</td>
-                            <td data-label="Sıra">@p.Precedence</td>
-                            <td data-label="Durum"><span class="badge stage-@(p.IsActive ? "won" : "cancelled")">@(p.IsActive ? "Etkin" : "Pasif")</span></td>
-                            <td data-label="İşlem"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => EditPolicy(p)" disabled="@busy">Düzenle</button></td>
+                            <td data-label="@Texts.Get("support.slaPanel.policy")" class="primary">@p.Name <small class="text-muted">@(p.IsDefault ? Texts.Get("support.sla.revisionDefault", p.Revision) : Texts.Get("support.sla.revision", p.Revision))</small></td>
+                            <td data-label="@Texts.Get("support.routing.col.constraints")">@Constraints(p)</td>
+                            <td data-label="@Texts.Get("support.sla.targets")">@Targets(p)</td>
+                            <td data-label="@Texts.Get("support.sla.calendar")">@(p.CalendarId is { } id ? calendars?.FirstOrDefault(c => c.Id == id)?.Name ?? "—" : "7/24")</td>
+                            <td data-label="@Texts.Get("contracts.signaturePanel.order")">@p.Precedence</td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@(p.IsActive ? "won" : "cancelled")">@(p.IsActive ? Texts.Get("support.settings.enabled") : Texts.Get("common.inactive"))</span></td>
+                            <td data-label="@Texts.Get("crm.quoteApprovals.col.action")"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => EditPolicy(p)" disabled="@busy">@Texts.Get("common.edit")</button></td>
                         </tr>
                     }
                 </tbody>
@@ -132,68 +132,68 @@
         }
 
         <form class="record-form" novalidate @onsubmit="SavePolicyAsync" @onsubmit:preventDefault>
-            <TabBar Tabs="PolicyTabs" State="polTabs" Label="SLA politikası formu bölümleri" />
+            <TabBar Tabs="PolicyTabs" State="polTabs" Label="@Texts.Get("support.sla.policySections")" />
             <fieldset disabled="@busy">
-                <legend class="h6">@(pol.Id is null ? "Yeni politika" : "Politikayı düzenle (kaydedilince sürüm artar; açık talepler etkilenmez)")</legend>
+                <legend class="h6">@(pol.Id is null ? Texts.Get("support.sla.newPolicy") : Texts.Get("support.sla.editPolicy"))</legend>
                 <TabPanel State="polTabs" Key="form-genel">
                 <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label" for="pol-name">Ad</label>
+                        <label class="form-label" for="pol-name">@Texts.Get("common.field.name")</label>
                         <input id="pol-name" class="form-control" maxlength="100" @bind="pol.Name" />
                         <FieldError Field="name" Errors="polErrors" />
                     </div>
                     <div class="span-3">
-                        <label class="form-label" for="pol-prec">Öncelik sırası (küçük kazanır)</label>
+                        <label class="form-label" for="pol-prec">@Texts.Get("support.sla.precedence")</label>
                         <input id="pol-prec" type="number" min="0" max="1000" class="form-control" @bind="pol.Precedence" />
                         <FieldError Field="precedence" Errors="polErrors" />
                     </div>
                     <div class="span-3 form-check align-self-end">
                         <input id="pol-active" class="form-check-input" type="checkbox" @bind="pol.IsActive" />
-                        <label class="form-check-label" for="pol-active">Etkin</label>
+                        <label class="form-check-label" for="pol-active">@Texts.Get("support.settings.enabled")</label>
                     </div>
-                    <div class="span-12"><label class="form-label" for="pol-desc">Açıklama</label><input id="pol-desc" class="form-control" maxlength="500" @bind="pol.Description" /></div>
+                    <div class="span-12"><label class="form-label" for="pol-desc">@Texts.Get("common.field.description")</label><input id="pol-desc" class="form-control" maxlength="500" @bind="pol.Description" /></div>
                 </div>
                 </TabPanel>
                 <TabPanel State="polTabs" Key="form-kapsam">
                 <div class="form-grid">
                     <div class="span-12 form-check">
                         <input id="pol-default" class="form-check-input" type="checkbox" @bind="pol.IsDefault" />
-                        <label class="form-check-label" for="pol-default">Varsayılan (yedek) politika: kısıtsız olmalı; hiçbir özel politika uymazsa kullanılır</label>
+                        <label class="form-check-label" for="pol-default">@Texts.Get("support.sla.defaultHelp")</label>
                         <FieldError Field="isDefault" Errors="polErrors" />
                     </div>
                     @if (!pol.IsDefault)
                     {
                         <div class="span-3">
-                            <label class="form-label" for="pol-type">Tür</label>
+                            <label class="form-label" for="pol-type">@Texts.Get("common.field.kind")</label>
                             <select id="pol-type" class="form-select" @bind="pol.TypeKey">
-                                <option value="">Tümü</option>
+                                <option value="">@Texts.Get("support.all")</option>
                                 @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList)) { <option value="@t.Key">@t.Label</option> }
                             </select>
                         </div>
                         <div class="span-3">
-                            <label class="form-label" for="pol-priority">Öncelik</label>
+                            <label class="form-label" for="pol-priority">@Texts.Get("crm.leads.col.priority")</label>
                             <select id="pol-priority" class="form-select" @bind="pol.Priority">
-                                <option value="">Tümü</option>
+                                <option value="">@Texts.Get("support.all")</option>
                                 @foreach (var (key, label) in SupportLabels.Priorities) { <option value="@key">@label</option> }
                             </select>
                         </div>
                         <div class="span-3">
-                            <label class="form-label" for="pol-category">Kategori</label>
-                            <LookupPicker Id="pol-category" LookupKey="support.sla-policy.category" @bind-Value="pol.CategoryId" Placeholder="Tümü" />
+                            <label class="form-label" for="pol-category">@Texts.Get("crm.products.field.category")</label>
+                            <LookupPicker Id="pol-category" LookupKey="support.sla-policy.category" @bind-Value="pol.CategoryId" Placeholder="@Texts.Get("support.all")" />
                         </div>
                         <div class="span-3">
-                            <label class="form-label" for="pol-party">Müşteri</label>
-                            <LookupPicker Id="pol-party" LookupKey="support.sla-policy.party" @bind-Value="pol.PartyId" Placeholder="Tümü" />
+                            <label class="form-label" for="pol-party">@Texts.Get("support.tickets.col.customer")</label>
+                            <LookupPicker Id="pol-party" LookupKey="support.sla-policy.party" @bind-Value="pol.PartyId" Placeholder="@Texts.Get("support.all")" />
                         </div>
                         @if (contracts is not null)
                         {
                             <div class="span-3">
-                                <label class="form-label" for="pol-contract">Sözleşme</label>
+                                <label class="form-label" for="pol-contract">@Texts.Get("support.linksPanel.kind.contract")</label>
                                 <select id="pol-contract" class="form-select" @bind="pol.ContractKey">
-                                    <option value="">Tümü</option>
+                                    <option value="">@Texts.Get("support.all")</option>
                                     @foreach (var c in contracts.Where(c => pol.PartyId is null || c.PartyId == pol.PartyId)) { <option value="@c.Id">@c.Number · @c.Title</option> }
                                 </select>
-                                <div class="form-text">Yalnızca bu sözleşmeye bağlı taleplere uygulanır (talebe sözleşme bağlanınca politika yeniden seçilir).</div>
+                                <div class="form-text">@Texts.Get("support.sla.contractHelp")</div>
                             </div>
                         }
                     }
@@ -202,31 +202,31 @@
                 <TabPanel State="polTabs" Key="form-hedef">
                 <div class="form-grid">
                     <div class="span-3">
-                        <label class="form-label" for="pol-fr">İlk yanıt hedefi (dk)</label>
+                        <label class="form-label" for="pol-fr">@Texts.Get("support.sla.firstResponseTarget")</label>
                         <input id="pol-fr" type="number" min="1" max="525600" class="form-control" @bind="pol.FirstResponseMinutes" />
                         <FieldError Field="firstResponseMinutes" Errors="polErrors" />
                     </div>
                     <div class="span-3">
-                        <label class="form-label" for="pol-res">Çözüm hedefi (dk)</label>
+                        <label class="form-label" for="pol-res">@Texts.Get("support.sla.resolutionTarget")</label>
                         <input id="pol-res" type="number" min="1" max="525600" class="form-control" @bind="pol.ResolutionMinutes" />
                         <FieldError Field="resolutionMinutes" Errors="polErrors" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="pol-cal">Takvim</label>
-                        <LookupPicker Id="pol-cal" LookupKey="support.sla-policy.calendar" @bind-Value="pol.CalendarId" Placeholder="Takvimsiz (7/24)" />
+                        <label class="form-label" for="pol-cal">@Texts.Get("support.sla.calendar")</label>
+                        <LookupPicker Id="pol-cal" LookupKey="support.sla-policy.calendar" @bind-Value="pol.CalendarId" Placeholder="@Texts.Get("support.sla.noCalendar")" />
                         <FieldError Field="calendarId" Errors="polErrors" />
                     </div>
                     <div class="span-6 form-check">
                         <input id="pol-pc" class="form-check-input" type="checkbox" @bind="pol.PauseOnWaitingCustomer" />
-                        <label class="form-check-label" for="pol-pc">Müşteriden bilgi beklenirken sayacı durdur</label>
+                        <label class="form-check-label" for="pol-pc">@Texts.Get("support.sla.pauseCustomer")</label>
                     </div>
                     <div class="span-6 form-check">
                         <input id="pol-pi" class="form-check-input" type="checkbox" @bind="pol.PauseOnWaitingInternal" />
-                        <label class="form-check-label" for="pol-pi">İç ekip beklenirken de sayacı durdur (varsayılan hayır)</label>
+                        <label class="form-check-label" for="pol-pi">@Texts.Get("support.sla.pauseInternal")</label>
                     </div>
 
                     <div class="span-12">
-                        <span class="form-label d-block">Eskalasyon kuralları <small class="text-muted">(hedefin yüzdesine ulaşılınca; 100 = hedef/ihlal, 100 üstü ihlal sonrası; her kural talep başına bir kez uygulanır)</small></span>
+                        <span class="form-label d-block">@Texts.Get("support.sla.escalationRules") <small class="text-muted">@Texts.Get("support.sla.escalationHelp")</small></span>
                         @for (var i = 0; i < pol.Rules.Count; i++)
                         {
                             var rule = pol.Rules[i];
@@ -234,21 +234,21 @@
                             <div class="border rounded p-2 mb-2">
                                 <div class="d-flex flex-wrap gap-2 align-items-end">
                                     <div>
-                                        <label class="form-label small" for="r-id-@index">Kimlik</label>
+                                        <label class="form-label small" for="r-id-@index">@Texts.Get("support.sla.ruleId")</label>
                                         <input id="r-id-@index" class="form-control form-control-sm" style="max-width:8rem" maxlength="20" @bind="rule.Id" />
                                     </div>
                                     <div>
-                                        <label class="form-label small" for="r-metric-@index">Ölçüt</label>
+                                        <label class="form-label small" for="r-metric-@index">@Texts.Get("support.reports.col.metric")</label>
                                         <select id="r-metric-@index" class="form-select form-select-sm" @bind="rule.Metric">
                                             @foreach (var (key, label) in SlaLabels.Metrics) { <option value="@key">@label</option> }
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="form-label small" for="r-pct-@index">Yüzde</label>
+                                        <label class="form-label small" for="r-pct-@index">@Texts.Get("support.sla.percent")</label>
                                         <input id="r-pct-@index" type="number" min="1" max="500" class="form-control form-control-sm" style="max-width:6rem" @bind="rule.Percent" />
                                     </div>
                                     <div>
-                                        <label class="form-label small" for="r-action-@index">Eylem</label>
+                                        <label class="form-label small" for="r-action-@index">@Texts.Get("support.routing.col.action")</label>
                                         <select id="r-action-@index" class="form-select form-select-sm" @bind="rule.Action">
                                             @foreach (var (key, label) in SlaLabels.Actions) { <option value="@key">@label</option> }
                                         </select>
@@ -256,86 +256,86 @@
                                     @if (rule.Action is "NotifyUser" or "Reassign")
                                     {
                                         <div>
-                                            <label class="form-label small" for="r-user-@index">Kullanıcı</label>
-                                            <LookupPicker Id="@($"r-user-{index}")" LookupKey="support.ticket.owner" @bind-Value="rule.UserId" Placeholder="Kullanıcı seçin…" />
+                                            <label class="form-label small" for="r-user-@index">@Texts.Get("support.sla.user")</label>
+                                            <LookupPicker Id="@($"r-user-{index}")" LookupKey="support.ticket.owner" @bind-Value="rule.UserId" Placeholder="@Texts.Get("support.sla.chooseUser")" />
                                         </div>
                                     }
                                     @if (rule.Action == "Reassign")
                                     {
                                         <div>
-                                            <label class="form-label small" for="r-queue-@index">Kuyruk</label>
-                                            <LookupPicker Id="@($"r-queue-{index}")" LookupKey="support.ticket.queue" @bind-Value="rule.QueueId" Placeholder="Kuyruk seçin…" />
+                                            <label class="form-label small" for="r-queue-@index">@Texts.Get("support.queue")</label>
+                                            <LookupPicker Id="@($"r-queue-{index}")" LookupKey="support.ticket.queue" @bind-Value="rule.QueueId" Placeholder="@Texts.Get("support.actionsPanel.chooseQueue")" />
                                         </div>
                                     }
-                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => pol.Rules.RemoveAt(index)">Kuralı kaldır</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => pol.Rules.RemoveAt(index)">@Texts.Get("support.sla.removeRule")</button>
                                 </div>
                             </div>
                         }
-                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AddRule">Kural ekle</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AddRule">@Texts.Get("support.routing.addRule")</button>
                         <FieldError Field="escalationRules" Errors="polErrors" />
                     </div>
                 </div>
                 </TabPanel>
             </fieldset>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">@(pol.Id is null ? "Politika ekle" : "Kaydet")</button>
-                @if (pol.Id is not null) { <button type="button" class="btn btn-outline-secondary" @onclick="NewPolicy">Vazgeç</button> }
+                <button type="submit" class="btn btn-primary" disabled="@busy">@(pol.Id is null ? Texts.Get("support.sla.addPolicy") : Texts.Get("common.save"))</button>
+                @if (pol.Id is not null) { <button type="button" class="btn btn-outline-secondary" @onclick="NewPolicy">@Texts.Get("common.dismiss")</button> }
             </div>
         </form>
     </section>
 
     <section aria-labelledby="prev-title">
-        <h2 id="prev-title">Örnek talep için önizleme</h2>
-        <p class="small text-muted">Hangi politika seçilir ve hedefler ne zaman olur? Hiçbir şey yazılmaz.</p>
+        <h2 id="prev-title">@Texts.Get("support.sla.preview")</h2>
+        <p class="small text-muted">@Texts.Get("support.sla.previewHelp")</p>
         <form class="record-form" novalidate @onsubmit="PreviewAsync" @onsubmit:preventDefault>
             <div class="form-grid">
                 <div class="span-3">
-                    <label class="form-label" for="pv-type">Tür</label>
+                    <label class="form-label" for="pv-type">@Texts.Get("common.field.kind")</label>
                     <select id="pv-type" class="form-select" @bind="pv.TypeKey">
                         @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList)) { <option value="@t.Key">@t.Label</option> }
                     </select>
                 </div>
                 <div class="span-3">
-                    <label class="form-label" for="pv-priority">Öncelik</label>
+                    <label class="form-label" for="pv-priority">@Texts.Get("crm.leads.col.priority")</label>
                     <select id="pv-priority" class="form-select" @bind="pv.Priority">
                         @foreach (var (key, label) in SupportLabels.Priorities) { <option value="@key">@label</option> }
                     </select>
                 </div>
                 <div class="span-3">
-                    <label class="form-label" for="pv-category">Kategori</label>
-                    <LookupPicker Id="pv-category" LookupKey="support.sla-policy.category" @bind-Value="pv.CategoryId" Placeholder="Kategorisiz" />
+                    <label class="form-label" for="pv-category">@Texts.Get("crm.products.field.category")</label>
+                    <LookupPicker Id="pv-category" LookupKey="support.sla-policy.category" @bind-Value="pv.CategoryId" Placeholder="@Texts.Get("support.routing.noCategory")" />
                 </div>
                 <div class="span-3">
-                    <label class="form-label" for="pv-party">Müşteri</label>
-                    <LookupPicker Id="pv-party" LookupKey="support.sla-policy.party" @bind-Value="pv.PartyId" Placeholder="Müşterisiz" />
+                    <label class="form-label" for="pv-party">@Texts.Get("support.tickets.col.customer")</label>
+                    <LookupPicker Id="pv-party" LookupKey="support.sla-policy.party" @bind-Value="pv.PartyId" Placeholder="@Texts.Get("support.routing.noCustomer")" />
                 </div>
                 <div class="span-4">
-                    <label class="form-label" for="pv-start">Açılış anı (boşsa şimdi)</label>
+                    <label class="form-label" for="pv-start">@Texts.Get("support.sla.startAt")</label>
                     <input id="pv-start" type="datetime-local" class="form-control" @bind="pv.StartAt" />
                 </div>
             </div>
-            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Önizle</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">@Texts.Get("support.sla.previewButton")</button></div>
             <FieldError Field="typeKey" Errors="pvErrors" />
         </form>
         @if (preview is not null)
         {
             @if (!preview.Matched)
             {
-                <div class="alert alert-warning" role="status">Hiçbir politika uymuyor: bu talep <strong>hedefsiz</strong> açılır.</div>
+                <div class="alert alert-warning" role="status">@Texts.Strong("support.sla.noMatch", Texts.Get("support.slaPanel.noTarget"))</div>
             }
             else
             {
                 <div class="alert alert-info" role="status">
-                    Seçilen politika: <strong>@preview.PolicyName</strong> (sürüm @preview.PolicyRevision) · @(preview.AlwaysOpen ? "7/24" : preview.CalendarName) ·
-                    müşteri beklemesi @(preview.PauseOnWaitingCustomer ? "durdurur" : "durdurmaz"), iç ekip beklemesi @(preview.PauseOnWaitingInternal ? "durdurur" : "durdurmaz")
+                    @Texts.Strong("support.sla.selectedPolicy", preview.PolicyName) @Texts.Get("support.sla.revisionParen", preview.PolicyRevision) · @(preview.AlwaysOpen ? "7/24" : preview.CalendarName) ·
+                    @Texts.Get("support.sla.pauseSummary", preview.PauseOnWaitingCustomer ? Texts.Get("support.sla.pauses") : Texts.Get("support.sla.noPause"), preview.PauseOnWaitingInternal ? Texts.Get("support.sla.pauses") : Texts.Get("support.sla.noPause"))
                     <ul class="mb-0">
                         @foreach (var m in preview.Metrics)
                         {
-                            <li>@SlaLabels.Label(SlaLabels.Metrics, m.Metric): hedef @SlaLabels.Duration(m.TargetMinutes) iş süresi → <strong>@CrmLabels.Time(m.DueAt)</strong>@(m.WarningAt is { } w ? $" (ilk uyarı {CrmLabels.Time(w)})" : null)</li>
+                            <li>@SlaLabels.Label(SlaLabels.Metrics, m.Metric): @Texts.Get("support.sla.targetWork", SlaLabels.Duration(m.TargetMinutes)) → <strong>@CrmLabels.Time(m.DueAt)</strong>@(m.WarningAt is { } w ? " " + Texts.Get("support.sla.firstWarning", CrmLabels.Time(w)) : null)</li>
                         }
                         @foreach (var r in preview.Rules)
                         {
-                            <li>Eskalasyon «@r.Id»: @SlaLabels.Label(SlaLabels.Metrics, r.Metric) %@r.Percent → @SlaLabels.Label(SlaLabels.Actions, r.Action)</li>
+                            <li>@Texts.Get("support.sla.escalationLine", r.Id, SlaLabels.Label(SlaLabels.Metrics, r.Metric), Texts.Get("support.percent", r.Percent), SlaLabels.Label(SlaLabels.Actions, r.Action))</li>
                         }
                     </ul>
                 </div>
@@ -367,9 +367,9 @@
 
     private IReadOnlyList<TabItem> PolicyTabs =>
     [
-        new("form-genel", "Genel", Errors: PolErrorCount("name", "precedence")),
-        new("form-kapsam", "Kapsam", Errors: PolErrorCount("isDefault", "typeKey", "priority", "categoryId", "partyId", "contractId")),
-        new("form-hedef", "Hedefler ve eskalasyon", Errors: PolErrorCount("firstResponseMinutes", "resolutionMinutes", "calendarId", "escalationRules")),
+        new("form-genel", Texts.Get("support.sla.tab.general"), Errors: PolErrorCount("name", "precedence")),
+        new("form-kapsam", Texts.Get("support.sla.tab.scope"), Errors: PolErrorCount("isDefault", "typeKey", "priority", "categoryId", "partyId", "contractId")),
+        new("form-hedef", Texts.Get("support.sla.tab.targets"), Errors: PolErrorCount("firstResponseMinutes", "resolutionMinutes", "calendarId", "escalationRules")),
     ];
     private IReadOnlyDictionary<string, string[]>? pvErrors;
 
@@ -427,7 +427,7 @@
             cal.Id is null ? 0 : cal.Version, cal.Name, cal.TimeZoneId, cal.AlwaysOpen, cal.AlwaysOpen ? null : JsonSerializer.Serialize(weekly, Json),
             cal.AlwaysOpen || holidays.Count == 0 ? null : JsonSerializer.Serialize(holidays, Json), cal.IsActive);
         if (await RunAsync(() => cal.Id is null ? Api.PostAsync<SlaCalendarDto>("/api/support/sla-calendars", request) : Api.PutAsync<SlaCalendarDto>($"/api/support/sla-calendars/{cal.Id}", request),
-                "Takvim kaydedildi.", e => calErrors = e))
+                Texts.Get("support.sla.calendarSaved"), e => calErrors = e))
         {
             NewCalendar();
         }
@@ -462,7 +462,7 @@
         return string.Join("; ", groups);
     }
 
-    private static string HolidayCount(SlaCalendarDto c) => c.IsAlwaysOpen ? "—" : $"{ParseHolidays(c.Holidays).Count()} gün";
+    private static string HolidayCount(SlaCalendarDto c) => c.IsAlwaysOpen ? "—" : Texts.Get("support.reports.days", ParseHolidays(c.Holidays).Count());
 
     // ---- Politika
 
@@ -497,7 +497,7 @@
             pol.FirstResponseMinutes, pol.ResolutionMinutes, pol.CalendarId, pol.PauseOnWaitingCustomer, pol.PauseOnWaitingInternal, rules,
             pol.IsDefault || !Guid.TryParse(pol.ContractKey, out var contractId) ? null : contractId);
         if (await RunAsync(() => pol.Id is null ? Api.PostAsync<SlaPolicyDto>("/api/support/sla-policies", request) : Api.PutAsync<SlaPolicyDto>($"/api/support/sla-policies/{pol.Id}", request),
-                "Politika kaydedildi.", e => polErrors = e))
+                Texts.Get("support.sla.policySaved"), e => polErrors = e))
         {
             NewPolicy();
             return;
@@ -509,16 +509,16 @@
     private static string Constraints(SlaPolicyDto p)
     {
         var parts = new List<string>();
-        if (p.TypeKey is not null) { parts.Add("tür: " + p.TypeKey); }
-        if (p.Priority is not null) { parts.Add("öncelik: " + SupportLabels.Label(SupportLabels.Priorities, p.Priority)); }
-        if (p.CategoryId is not null) { parts.Add("kategori"); }
-        if (p.PartyId is not null) { parts.Add("müşteri"); }
-        if (p.ContractId is not null) { parts.Add("sözleşme"); }
-        return parts.Count == 0 ? (p.IsDefault ? "yedek (kısıtsız)" : "kısıtsız") : string.Join(", ", parts);
+        if (p.TypeKey is not null) { parts.Add(Texts.Get("support.routing.cond.type", p.TypeKey)); }
+        if (p.Priority is not null) { parts.Add(Texts.Get("support.routing.cond.priority", SupportLabels.Label(SupportLabels.Priorities, p.Priority))); }
+        if (p.CategoryId is not null) { parts.Add(Texts.Get("support.routing.cond.category")); }
+        if (p.PartyId is not null) { parts.Add(Texts.Get("support.routing.cond.customer")); }
+        if (p.ContractId is not null) { parts.Add(Texts.Get("support.sla.cond.contract")); }
+        return parts.Count == 0 ? (p.IsDefault ? Texts.Get("support.sla.cond.fallback") : Texts.Get("support.sla.cond.none")) : string.Join(", ", parts);
     }
 
     private static string Targets(SlaPolicyDto p) =>
-        string.Join(" · ", new[] { p.FirstResponseMinutes is { } f ? "ilk yanıt " + SlaLabels.Duration(f) : null, p.ResolutionMinutes is { } r ? "çözüm " + SlaLabels.Duration(r) : null }.Where(x => x is not null));
+        string.Join(" · ", new[] { p.FirstResponseMinutes is { } f ? Texts.Get("support.sla.targetFirst", SlaLabels.Duration(f)) : null, p.ResolutionMinutes is { } r ? Texts.Get("support.sla.targetResolution", SlaLabels.Duration(r)) : null }.Where(x => x is not null));
 
     // ---- Önizleme
 

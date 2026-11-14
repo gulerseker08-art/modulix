@@ -4,16 +4,16 @@
 @inject CrmLookups Lookups
 @inject NavigationManager Navigation
 
-<PageTitle>Yeni talep · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.support.new") · Modulix</PageTitle>
 
 <AuthGate Module="@SupportAccess.ModuleKey" Permission="@SupportAccess.TicketsCreate">
     <div class="page-header">
         <div>
-            <h1>Yeni talep</h1>
-            <p class="text-muted mb-0">Destek talebi, şikâyet, bilgi talebi ya da hizmet isteği. Müşteri henüz tanımlı değilse başvuranın adını girin; müşteri kaydı açılmaz, talep sonradan mevcut firmaya bağlanır.</p>
+            <h1>@Texts.Get("nav.app.support.new")</h1>
+            <p class="text-muted mb-0">@Texts.Get("support.new.intro")</p>
         </div>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="destek/talepler">Taleplere dön</a>
+            <a class="btn btn-outline-secondary" href="destek/talepler">@Texts.Get("support.backToTickets")</a>
         </div>
     </div>
 
@@ -21,29 +21,29 @@
     @if (duplicates is { Count: > 0 })
     {
         <div class="alert alert-warning" role="status">
-            <strong>Olası mükerrer talep:</strong> aynı başvuranın benzer açık talepleri var. Yine de kaydedebilirsiniz; mükerrerse mevcut talepte devam etmeniz önerilir.
+            <strong>@Texts.Get("support.new.duplicateTitle")</strong> @Texts.Get("support.new.duplicateText")
             <ul class="mb-0">
                 @foreach (var d in duplicates)
                 {
-                    <li><a href="destek/talepler/@d.Id">@d.Number</a> · @d.Subject <small class="text-muted">(@SupportLabels.Label(SupportLabels.Statuses, d.Status) · @d.Reason · benzerlik %@((int)Math.Round(d.Score * 100)))</small></li>
+                    <li><a href="destek/talepler/@d.Id">@d.Number</a> · @d.Subject <small class="text-muted">(@SupportLabels.Label(SupportLabels.Statuses, d.Status) · @d.Reason · @Texts.Get("support.new.similarity", (int)Math.Round(d.Score * 100)))</small></li>
                 }
             </ul>
         </div>
     }
 
     <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-        <TabBar Tabs="FormTabs" State="tabs" Label="Talep formu bölümleri" />
+        <TabBar Tabs="FormTabs" State="tabs" Label="@Texts.Get("support.new.formSections")" />
         <fieldset disabled="@busy">
-            <legend class="visually-hidden">Talep bilgileri</legend>
+            <legend class="visually-hidden">@Texts.Get("support.detail.info")</legend>
             <TabPanel State="tabs" Key="form-talep">
                 <div class="form-grid">
                     <div class="span-12">
-                        <label class="form-label" for="f-subject">Konu (zorunlu)</label>
+                        <label class="form-label" for="f-subject">@Texts.Get("support.new.subject")</label>
                         <input id="f-subject" class="form-control" maxlength="200" @bind="form.Subject" @bind:after="CheckDuplicatesAsync" aria-invalid="@(Has("subject") ? "true" : null)" aria-describedby="@(Has("subject") ? "e-subject" : null)" />
                         <FieldError Field="subject" Errors="errors" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="f-type">Tür</label>
+                        <label class="form-label" for="f-type">@Texts.Get("common.field.kind")</label>
                         <select id="f-type" class="form-select" @bind="form.TypeKey">
                             @foreach (var t in Lookups.Choices(SupportLabels.TicketTypeList))
                             {
@@ -53,7 +53,7 @@
                         <FieldError Field="typeKey" Errors="errors" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="f-channel">Kanal</label>
+                        <label class="form-label" for="f-channel">@Texts.Get("crm.contactPoint.channel")</label>
                         <select id="f-channel" class="form-select" @bind="form.Channel">
                             @foreach (var (key, label) in SupportLabels.Channels)
                             {
@@ -62,24 +62,24 @@
                         </select>
                     </div>
                     <div class="span-12">
-                        <label class="form-label" for="f-category">Kategori</label>
-                        <LookupPicker Id="f-category" LookupKey="support.ticket.category" @bind-Value="form.CategoryId" Placeholder="Kategori ara…" Invalid="@Has("categoryId")" />
+                        <label class="form-label" for="f-category">@Texts.Get("crm.products.field.category")</label>
+                        <LookupPicker Id="f-category" LookupKey="support.ticket.category" @bind-Value="form.CategoryId" Placeholder="@Texts.Get("support.new.searchCategory")" Invalid="@Has("categoryId")" />
                         <FieldError Field="categoryId" Errors="errors" />
                     </div>
                     <div class="span-12">
-                        <label class="form-label" for="f-desc">Açıklama</label>
+                        <label class="form-label" for="f-desc">@Texts.Get("common.field.description")</label>
                         <textarea id="f-desc" class="form-control" rows="4" maxlength="4000" @bind="form.Description"></textarea>
                         <FieldError Field="description" Errors="errors" />
                     </div>
                     @if (IsComplaint)
                     {
                         <div class="span-4">
-                            <label class="form-label" for="f-event">Olay tarihi</label>
+                            <label class="form-label" for="f-event">@Texts.Get("support.eventDate")</label>
                             <input id="f-event" type="date" class="form-control" @bind="form.EventDate" />
                             <FieldError Field="eventDate" Errors="errors" />
                         </div>
                         <div class="span-8">
-                            <label class="form-label" for="f-outcome">Beklenen sonuç</label>
+                            <label class="form-label" for="f-outcome">@Texts.Get("support.expectedOutcome")</label>
                             <input id="f-outcome" class="form-control" maxlength="4000" @bind="form.ExpectedOutcome" />
                         </div>
                     }
@@ -88,30 +88,30 @@
             <TabPanel State="tabs" Key="form-musteri">
                 <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label" for="f-party">Müşteri</label>
-                        <LookupPicker Id="f-party" LookupKey="support.ticket.party" @bind-Value="form.PartyId" Placeholder="Müşteri ara…" Invalid="@Has("partyId")" />
+                        <label class="form-label" for="f-party">@Texts.Get("support.tickets.col.customer")</label>
+                        <LookupPicker Id="f-party" LookupKey="support.ticket.party" @bind-Value="form.PartyId" Placeholder="@Texts.Get("support.searchCustomer")" Invalid="@Has("partyId")" />
                         <FieldError Field="partyId" Errors="errors" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="f-person">İlgili kişi</label>
-                        <LookupPicker Id="f-person" LookupKey="support.ticket.person" @bind-Value="form.PersonId" ParentId="form.PartyId" Placeholder="Kişi ara…" Invalid="@Has("personId")" />
+                        <label class="form-label" for="f-person">@Texts.Get("contracts.field.personid")</label>
+                        <LookupPicker Id="f-person" LookupKey="support.ticket.person" @bind-Value="form.PersonId" ParentId="form.PartyId" Placeholder="@Texts.Get("support.new.searchPerson")" Invalid="@Has("personId")" />
                         <FieldError Field="personId" Errors="errors" />
                     </div>
                     @if (form.PartyId is null)
                     {
-                        <div class="span-12"><p class="small text-muted mb-0">Müşteri seçilmediği için başvuran bilgisi gerekir.</p></div>
+                        <div class="span-12"><p class="small text-muted mb-0">@Texts.Get("support.new.reporterNeeded")</p></div>
                         <div class="span-4">
-                            <label class="form-label" for="f-rname">Başvuran adı</label>
+                            <label class="form-label" for="f-rname">@Texts.Get("support.new.reporterName")</label>
                             <input id="f-rname" class="form-control" maxlength="200" @bind="form.ReporterName" />
                             <FieldError Field="reporterName" Errors="errors" />
                         </div>
                         <div class="span-4">
-                            <label class="form-label" for="f-remail">Başvuran e-postası</label>
+                            <label class="form-label" for="f-remail">@Texts.Get("support.reporterEmail")</label>
                             <input id="f-remail" type="email" class="form-control" maxlength="254" @bind="form.ReporterEmail" />
                             <FieldError Field="reporterEmail" Errors="errors" />
                         </div>
                         <div class="span-4">
-                            <label class="form-label" for="f-rphone">Başvuran telefonu</label>
+                            <label class="form-label" for="f-rphone">@Texts.Get("support.reporterPhone")</label>
                             <input id="f-rphone" class="form-control" maxlength="30" @bind="form.ReporterPhone" />
                         </div>
                     }
@@ -120,32 +120,32 @@
             <TabPanel State="tabs" Key="form-oncelik">
                 <div class="form-grid">
                     <div class="span-4">
-                        <label class="form-label" for="f-impact">Etki</label>
+                        <label class="form-label" for="f-impact">@Texts.Get("support.new.impact")</label>
                         <select id="f-impact" class="form-select" @bind="form.Impact">
                             @foreach (var (key, label) in SupportLabels.Levels) { <option value="@key">@label</option> }
                         </select>
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="f-urgency">Aciliyet</label>
+                        <label class="form-label" for="f-urgency">@Texts.Get("support.new.urgency")</label>
                         <select id="f-urgency" class="form-select" @bind="form.Urgency">
                             @foreach (var (key, label) in SupportLabels.Levels) { <option value="@key">@label</option> }
                         </select>
                     </div>
                     <div class="span-4">
-                        <span class="form-label d-block">Hesaplanan öncelik</span>
+                        <span class="form-label d-block">@Texts.Get("support.new.computedPriority")</span>
                         <span class="badge stage-@SupportLabels.PriorityBadge(Priority())">@SupportLabels.Label(SupportLabels.Priorities, Priority())</span>
-                        <small class="text-muted d-block">Etki ve aciliyetten hesaplanır; sonradan yalnızca yetkili ve gerekçeli değiştirilebilir.</small>
+                        <small class="text-muted d-block">@Texts.Get("support.new.priorityHelp")</small>
                     </div>
                     @if (Session.Can(SupportAccess.TicketsAssign))
                     {
                         <div class="span-6">
-                            <label class="form-label" for="f-queue">Kuyruk</label>
-                            <LookupPicker Id="f-queue" LookupKey="support.ticket.queue" @bind-Value="form.QueueId" Placeholder="Kategori / varsayılan kuyruk" />
+                            <label class="form-label" for="f-queue">@Texts.Get("support.queue")</label>
+                            <LookupPicker Id="f-queue" LookupKey="support.ticket.queue" @bind-Value="form.QueueId" Placeholder="@Texts.Get("support.new.queuePlaceholder")" />
                             <FieldError Field="queueId" Errors="errors" />
                         </div>
                         <div class="span-6">
-                            <label class="form-label" for="f-owner">Sorumlu</label>
-                            <LookupPicker Id="f-owner" LookupKey="support.ticket.owner" @bind-Value="form.OwnerId" Placeholder="Atanmamış kalsın" />
+                            <label class="form-label" for="f-owner">@Texts.Get("common.field.owner")</label>
+                            <LookupPicker Id="f-owner" LookupKey="support.ticket.owner" @bind-Value="form.OwnerId" Placeholder="@Texts.Get("support.new.ownerPlaceholder")" />
                             <FieldError Field="ownerId" Errors="errors" />
                         </div>
                     }
@@ -153,7 +153,7 @@
             </TabPanel>
         </fieldset>
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary" disabled="@busy">Talebi oluştur</button>
+            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("support.new.create")</button>
         </div>
     </form>
 </AuthGate>
@@ -181,9 +181,9 @@
 
     private IReadOnlyList<TabItem> FormTabs =>
     [
-        new("form-talep", "Talep", Errors: ErrorCount("subject", "typeKey", "categoryId", "description", "eventDate")),
-        new("form-musteri", "Müşteri ve başvuran", Errors: ErrorCount("partyId", "personId", "reporterName", "reporterEmail")),
-        new("form-oncelik", "Öncelik ve atama", Errors: ErrorCount("queueId", "ownerId")),
+        new("form-talep", Texts.Get("support.tickets.col.ticket"), Errors: ErrorCount("subject", "typeKey", "categoryId", "description", "eventDate")),
+        new("form-musteri", Texts.Get("support.new.tab.customer"), Errors: ErrorCount("partyId", "personId", "reporterName", "reporterEmail")),
+        new("form-oncelik", Texts.Get("support.new.tab.priority"), Errors: ErrorCount("queueId", "ownerId")),
     ];
 
     protected override async Task OnInitializedAsync()

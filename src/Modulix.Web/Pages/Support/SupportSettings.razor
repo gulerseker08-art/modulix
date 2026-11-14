@@ -2,49 +2,49 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Destek ayarları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("support.settings.pageTitle") · Modulix</PageTitle>
 
 <AuthGate Module="@SupportAccess.ModuleKey" Permission="@SupportAccess.SettingsManage">
     <div class="page-header">
         <div>
-            <h1>Kuyruklar ve kategoriler</h1>
-            <p class="text-muted mb-0">Talepler kategorinin varsayılan kuyruğuna, yoksa üst kategorinin kuyruğuna, o da yoksa varsayılan kuyruğa düşer. Kuyruk yoksa talep atanmamış kalır. Kullanılan kuyruk ve kategori silinmez, pasife alınır.</p>
+            <h1>@Texts.Get("nav.app.support.settings")</h1>
+            <p class="text-muted mb-0">@Texts.Get("support.settings.intro")</p>
         </div>
         <div class="header-actions">
-            <a class="btn btn-outline-secondary" href="modul-ayarlari/support">Politika ayarları</a>
+            <a class="btn btn-outline-secondary" href="modul-ayarlari/support">@Texts.Get("nav.app.support.policy-settings")</a>
         </div>
     </div>
 
     <Notice Text="@message" Failed="@failed" />
 
     <section aria-labelledby="queues-title">
-        <h2 id="queues-title">Kuyruklar</h2>
+        <h2 id="queues-title">@Texts.Get("support.settings.queues")</h2>
         @if (queues is null)
         {
             <LoadingState Kind="LoadingKind.Table" />
         }
         else if (queues.Count == 0)
         {
-            <EmptyState Title="Henüz kuyruk yok. Talepler kuyruksuz (atanmamış) açılır. Bir kuyruğu varsayılan yapmanız önerilir." />
+            <EmptyState Title="@Texts.Get("support.settings.noQueues")" />
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">Destek kuyrukları</caption>
-                <thead><tr><th scope="col">Kuyruk</th><th scope="col">Açıklama</th><th scope="col">Varsayılan</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("support.settings.queuesCaption")</caption>
+                <thead><tr><th scope="col">@Texts.Get("support.queue")</th><th scope="col">@Texts.Get("common.field.description")</th><th scope="col">@Texts.Get("support.settings.default")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("crm.quoteApprovals.col.action")</th></tr></thead>
                 <tbody>
                     @foreach (var q in queues)
                     {
                         <tr>
-                            <td data-label="Kuyruk" class="primary">@q.Name</td>
-                            <td data-label="Açıklama">@(q.Description ?? "—")</td>
-                            <td data-label="Varsayılan">@(q.IsDefault ? "Evet" : "—")</td>
-                            <td data-label="Durum"><span class="badge stage-@(q.IsActive ? "won" : "cancelled")">@(q.IsActive ? "Etkin" : "Pasif")</span></td>
-                            <td data-label="İşlem">
-                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleQueueAsync(q)" disabled="@(busy || q.IsDefault)">@(q.IsActive ? "Pasife al" : "Etkinleştir")</button>
+                            <td data-label="@Texts.Get("support.queue")" class="primary">@q.Name</td>
+                            <td data-label="@Texts.Get("common.field.description")">@(q.Description ?? "—")</td>
+                            <td data-label="@Texts.Get("support.settings.default")">@(q.IsDefault ? Texts.Get("common.yes") : "—")</td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@(q.IsActive ? "won" : "cancelled")">@(q.IsActive ? Texts.Get("support.settings.enabled") : Texts.Get("common.inactive"))</span></td>
+                            <td data-label="@Texts.Get("crm.quoteApprovals.col.action")">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleQueueAsync(q)" disabled="@(busy || q.IsDefault)">@(q.IsActive ? Texts.Get("support.settings.deactivate") : Texts.Get("support.settings.activate"))</button>
                                 @if (!q.IsDefault && q.IsActive)
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => MakeDefaultAsync(q)" disabled="@busy">Varsayılan yap</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => MakeDefaultAsync(q)" disabled="@busy">@Texts.Get("support.settings.makeDefault")</button>
                                 }
                             </td>
                         </tr>
@@ -55,55 +55,55 @@
 
         <form class="record-form" novalidate @onsubmit="AddQueueAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
-                <legend class="h6">Yeni kuyruk</legend>
-                <FormTabs Title="Kuyruk bilgileri" Label="Kuyruk formu bölümleri">
+                <legend class="h6">@Texts.Get("support.settings.newQueue")</legend>
+                <FormTabs Title="@Texts.Get("support.settings.queueInfo")" Label="@Texts.Get("support.settings.queueSections")">
                 <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label" for="q-name">Ad</label>
+                        <label class="form-label" for="q-name">@Texts.Get("common.field.name")</label>
                         <input id="q-name" class="form-control" maxlength="100" @bind="queueName" />
                         <FieldError Field="name" Errors="queueErrors" />
                     </div>
                     <div class="span-6">
-                        <label class="form-label" for="q-desc">Açıklama</label>
+                        <label class="form-label" for="q-desc">@Texts.Get("common.field.description")</label>
                         <input id="q-desc" class="form-control" maxlength="500" @bind="queueDescription" />
                     </div>
                     <div class="span-12 form-check">
                         <input id="q-default" class="form-check-input" type="checkbox" @bind="queueDefault" />
-                        <label class="form-check-label" for="q-default">Varsayılan kuyruk (eşleşme olmayan talepler buraya düşer)</label>
+                        <label class="form-check-label" for="q-default">@Texts.Get("support.settings.defaultQueueHelp")</label>
                         <FieldError Field="isDefault" Errors="queueErrors" />
                     </div>
                 </div>
                 </FormTabs>
             </fieldset>
-            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Kuyruk ekle</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("support.settings.addQueue")</button></div>
         </form>
     </section>
 
     <section aria-labelledby="categories-title">
-        <h2 id="categories-title">Kategoriler</h2>
+        <h2 id="categories-title">@Texts.Get("support.complaints.col.categories")</h2>
         @if (categories is null)
         {
             <LoadingState Kind="LoadingKind.Table" />
         }
         else if (categories.Count == 0)
         {
-            <EmptyState Title="Henüz kategori yok." />
+            <EmptyState Title="@Texts.Get("support.settings.noCategories")" />
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">Talep kategorileri</caption>
-                <thead><tr><th scope="col">Kategori</th><th scope="col">Üst kategori</th><th scope="col">Varsayılan kuyruk</th><th scope="col">Zorunlu alanlar</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+                <caption class="visually-hidden">@Texts.Get("support.settings.categoriesCaption")</caption>
+                <thead><tr><th scope="col">@Texts.Get("crm.products.field.category")</th><th scope="col">@Texts.Get("support.settings.parent")</th><th scope="col">@Texts.Get("support.settings.defaultQueue")</th><th scope="col">@Texts.Get("support.settings.requiredFields")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("crm.quoteApprovals.col.action")</th></tr></thead>
                 <tbody>
                     @foreach (var c in categories.Where(c => c.ParentId is null).SelectMany(root => new[] { root }.Concat(categories.Where(c => c.ParentId == root.Id))).Concat(categories.Where(c => c.ParentId is { } p && categories.All(r => r.Id != p))))
                     {
                         <tr>
-                            <td data-label="Kategori" class="primary">@(c.ParentId is null ? null : "↳ ")@c.Name</td>
-                            <td data-label="Üst kategori">@(c.ParentId is { } parentId ? categories.FirstOrDefault(p => p.Id == parentId)?.Name ?? "—" : "—")</td>
-                            <td data-label="Varsayılan kuyruk">@(c.DefaultQueueId is { } queueId ? queues?.FirstOrDefault(q => q.Id == queueId)?.Name ?? "—" : "—")</td>
-                            <td data-label="Zorunlu alanlar">@RequiredText(c.RequiredFields)</td>
-                            <td data-label="Durum"><span class="badge stage-@(c.IsActive ? "won" : "cancelled")">@(c.IsActive ? "Etkin" : "Pasif")</span></td>
-                            <td data-label="İşlem"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleCategoryAsync(c)" disabled="@busy">@(c.IsActive ? "Pasife al" : "Etkinleştir")</button></td>
+                            <td data-label="@Texts.Get("crm.products.field.category")" class="primary">@(c.ParentId is null ? null : "↳ ")@c.Name</td>
+                            <td data-label="@Texts.Get("support.settings.parent")">@(c.ParentId is { } parentId ? categories.FirstOrDefault(p => p.Id == parentId)?.Name ?? "—" : "—")</td>
+                            <td data-label="@Texts.Get("support.settings.defaultQueue")">@(c.DefaultQueueId is { } queueId ? queues?.FirstOrDefault(q => q.Id == queueId)?.Name ?? "—" : "—")</td>
+                            <td data-label="@Texts.Get("support.settings.requiredFields")">@RequiredText(c.RequiredFields)</td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@(c.IsActive ? "won" : "cancelled")">@(c.IsActive ? Texts.Get("support.settings.enabled") : Texts.Get("common.inactive"))</span></td>
+                            <td data-label="@Texts.Get("crm.quoteApprovals.col.action")"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleCategoryAsync(c)" disabled="@busy">@(c.IsActive ? Texts.Get("support.settings.deactivate") : Texts.Get("support.settings.activate"))</button></td>
                         </tr>
                     }
                 </tbody>
@@ -112,26 +112,26 @@
 
         <form class="record-form" novalidate @onsubmit="AddCategoryAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
-                <legend class="h6">Yeni kategori</legend>
-                <FormTabs Title="Kategori bilgileri" Label="Kategori formu bölümleri">
+                <legend class="h6">@Texts.Get("support.settings.newCategory")</legend>
+                <FormTabs Title="@Texts.Get("support.settings.categoryInfo")" Label="@Texts.Get("support.settings.categorySections")">
                 <div class="form-grid">
                     <div class="span-4">
-                        <label class="form-label" for="c-name">Ad</label>
+                        <label class="form-label" for="c-name">@Texts.Get("common.field.name")</label>
                         <input id="c-name" class="form-control" maxlength="100" @bind="categoryName" />
                         <FieldError Field="name" Errors="categoryErrors" />
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="c-parent">Üst kategori (alt kategori için)</label>
-                        <LookupPicker Id="c-parent" LookupKey="support.category.parent" @bind-Value="categoryParent" Placeholder="Ana kategori" />
+                        <label class="form-label" for="c-parent">@Texts.Get("support.settings.parentHelp")</label>
+                        <LookupPicker Id="c-parent" LookupKey="support.category.parent" @bind-Value="categoryParent" Placeholder="@Texts.Get("support.settings.rootCategory")" />
                         <FieldError Field="parentId" Errors="categoryErrors" />
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="c-queue">Varsayılan kuyruk</label>
-                        <LookupPicker Id="c-queue" LookupKey="support.category.queue" @bind-Value="categoryQueue" Placeholder="Üst kategori / varsayılan kuyruk" />
+                        <label class="form-label" for="c-queue">@Texts.Get("support.settings.defaultQueue")</label>
+                        <LookupPicker Id="c-queue" LookupKey="support.category.queue" @bind-Value="categoryQueue" Placeholder="@Texts.Get("support.settings.queuePlaceholder")" />
                         <FieldError Field="defaultQueueId" Errors="categoryErrors" />
                     </div>
                     <div class="span-12">
-                        <span class="form-label d-block">Bu kategoride zorunlu alanlar (üst kategorinin alanları da geçerlidir)</span>
+                        <span class="form-label d-block">@Texts.Get("support.settings.requiredHelp")</span>
                         @foreach (var (key, label) in RequiredOptions)
                         {
                             <div class="form-check form-check-inline">
@@ -144,7 +144,7 @@
                 </div>
                 </FormTabs>
             </fieldset>
-            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Kategori ekle</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("support.settings.addCategory")</button></div>
         </form>
     </section>
 </AuthGate>
@@ -165,8 +165,11 @@
     private IReadOnlyDictionary<string, string[]>? categoryErrors;
     private readonly HashSet<string> categoryRequired = [];
 
-    private static readonly (string Key, string Label)[] RequiredOptions =
-        [("description", "Açıklama"), ("personId", "İlgili kişi"), ("reporterEmail", "Başvuran e-postası"), ("reporterPhone", "Başvuran telefonu"), ("eventDate", "Olay tarihi"), ("expectedOutcome", "Beklenen sonuç")];
+    private static (string Key, string Label)[] RequiredOptions =>
+    [
+        ("description", Texts.Get("common.field.description")), ("personId", Texts.Get("contracts.field.personid")), ("reporterEmail", Texts.Get("support.reporterEmail")),
+        ("reporterPhone", Texts.Get("support.reporterPhone")), ("eventDate", Texts.Get("support.eventDate")), ("expectedOutcome", Texts.Get("support.expectedOutcome")),
+    ];
 
     private void ToggleRequired(string key, bool on) { if (on) { categoryRequired.Add(key); } else { categoryRequired.Remove(key); } }
 
@@ -202,7 +205,7 @@
     {
         queueErrors = null;
         if (await RunAsync(() => Api.PostAsync<QueueDto>("/api/support/queues", new SaveQueueRequest(Name: queueName, Description: string.IsNullOrWhiteSpace(queueDescription) ? null : queueDescription.Trim(), IsDefault: queueDefault, IsActive: true)),
-                "Kuyruk eklendi.", e => queueErrors = e))
+                Texts.Get("support.settings.queueAdded"), e => queueErrors = e))
         {
             queueName = string.Empty;
             queueDescription = null;
@@ -211,7 +214,7 @@
     }
 
     private Task ToggleQueueAsync(QueueDto q) =>
-        RunAsync(() => Api.PutAsync<QueueDto>($"/api/support/queues/{q.Id}", new SaveQueueRequest(q.Version, q.Name, q.Description, q.IsDefault, !q.IsActive)), q.IsActive ? "Kuyruk pasife alındı." : "Kuyruk etkinleştirildi.");
+        RunAsync(() => Api.PutAsync<QueueDto>($"/api/support/queues/{q.Id}", new SaveQueueRequest(q.Version, q.Name, q.Description, q.IsDefault, !q.IsActive)), q.IsActive ? Texts.Get("support.settings.queueDeactivated") : Texts.Get("support.settings.queueActivated"));
 
     private async Task MakeDefaultAsync(QueueDto q)
     {
@@ -222,14 +225,14 @@
             if (!cleared.IsSuccess) { failed = true; message = cleared.Error; return; }
         }
 
-        await RunAsync(() => Api.PutAsync<QueueDto>($"/api/support/queues/{q.Id}", new SaveQueueRequest(q.Version, q.Name, q.Description, true, q.IsActive)), "Varsayılan kuyruk güncellendi.");
+        await RunAsync(() => Api.PutAsync<QueueDto>($"/api/support/queues/{q.Id}", new SaveQueueRequest(q.Version, q.Name, q.Description, true, q.IsActive)), Texts.Get("support.settings.defaultUpdated"));
     }
 
     private async Task AddCategoryAsync()
     {
         categoryErrors = null;
         if (await RunAsync(() => Api.PostAsync<CategoryDto>("/api/support/categories", new SaveCategoryRequest(Name: categoryName, ParentId: categoryParent, DefaultQueueId: categoryQueue, IsActive: true, RequiredFields: categoryRequired.Count == 0 ? null : string.Join(',', categoryRequired))),
-                "Kategori eklendi.", e => categoryErrors = e))
+                Texts.Get("support.settings.categoryAdded"), e => categoryErrors = e))
         {
             categoryName = string.Empty;
             categoryParent = null;
@@ -240,5 +243,5 @@
 
     private Task ToggleCategoryAsync(CategoryDto c) =>
         RunAsync(() => Api.PutAsync<CategoryDto>($"/api/support/categories/{c.Id}", new SaveCategoryRequest(c.Version, c.Name, c.ParentId, c.DefaultQueueId, !c.IsActive, c.Position, c.RequiredFields)),
-            c.IsActive ? "Kategori pasife alındı." : "Kategori etkinleştirildi.");
+            c.IsActive ? Texts.Get("support.settings.categoryDeactivated") : Texts.Get("support.settings.categoryActivated"));
 }

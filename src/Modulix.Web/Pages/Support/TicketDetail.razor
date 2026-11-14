@@ -3,12 +3,12 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>@(ticket is null ? "Talep" : ticket.Number) · Modulix</PageTitle>
+<PageTitle>@(ticket is null ? Texts.Get("support.tickets.col.ticket") : ticket.Number) · Modulix</PageTitle>
 
 <AuthGate Module="@SupportAccess.ModuleKey" Permission="@SupportAccess.TicketsRead">
     @if (notFound)
     {
-        <div class="alert alert-warning" role="alert">Talep bulunamadı ya da erişim yetkiniz yok. <a href="destek/talepler">Taleplere dön</a></div>
+        <div class="alert alert-warning" role="alert">@Texts.Get("support.detail.notFound") <a href="destek/talepler">@Texts.Get("support.backToTickets")</a></div>
     }
     else if (ticket is null)
     {
@@ -22,16 +22,16 @@
                 <p class="mb-0">
                     <span class="text-muted">@ticket.Number</span>
                     <span class="badge stage-@SupportLabels.StatusBadge(ticket.Status)">@SupportLabels.Label(SupportLabels.Statuses, ticket.Status)</span>
-                    <span class="badge stage-@SupportLabels.PriorityBadge(ticket.Priority)">Öncelik: @SupportLabels.Label(SupportLabels.Priorities, ticket.Priority)@(ticket.PriorityOverridden ? " (elle)" : null)</span>
+                    <span class="badge stage-@SupportLabels.PriorityBadge(ticket.Priority)">@(ticket.PriorityOverridden ? Texts.Get("support.detail.priorityManual", SupportLabels.Label(SupportLabels.Priorities, ticket.Priority)) : Texts.Get("support.detail.priority", SupportLabels.Label(SupportLabels.Priorities, ticket.Priority)))</span>
                     <span class="text-muted">· @Lookups.Label(SupportLabels.TicketTypeList, ticket.TypeKey)</span>
                 </p>
-                <p class="small text-muted mb-0">Sorumlu: <strong>@(ticket.OwnerId is null ? "Atanmamış" : Lookups.MemberName(ticket.OwnerId))</strong> · Açılış: @CrmLabels.Time(ticket.CreatedAt) · İlk yanıt: @(ticket.FirstResponseAt is { } first ? CrmLabels.Time(first) : "henüz yok")</p>
+                <p class="small text-muted mb-0">@Texts.Strong("support.detail.owner", ticket.OwnerId is null ? Texts.Get("support.unassigned") : Lookups.MemberName(ticket.OwnerId)) · @Texts.Get("support.detail.opened", CrmLabels.Time(ticket.CreatedAt), ticket.FirstResponseAt is { } first ? CrmLabels.Time(first) : Texts.Get("support.detail.notYet"))</p>
             </div>
             <div class="header-actions">
-                <a class="btn btn-outline-secondary" href="destek/talepler">Taleplere dön</a>
+                <a class="btn btn-outline-secondary" href="destek/talepler">@Texts.Get("support.backToTickets")</a>
                 @if (Session.Can(SupportAccess.TicketsCreate))
                 {
-                    <a class="btn btn-outline-secondary" href="@RelatedHref">İlişkili talep aç</a>
+                    <a class="btn btn-outline-secondary" href="@RelatedHref">@Texts.Get("support.detail.openRelated")</a>
                 }
             </div>
         </div>
@@ -55,14 +55,14 @@
         <div class="detail-columns">
             <div>
                 <section aria-labelledby="messages-title">
-                    <h2 id="messages-title">Yazışma</h2>
+                    <h2 id="messages-title">@Texts.Get("support.detail.messages")</h2>
                     @if (messages is null)
                     {
                         <LoadingState />
                     }
                     else if (messages.Count == 0)
                     {
-                        <p class="text-muted">Henüz mesaj yok.</p>
+                        <p class="text-muted">@Texts.Get("support.detail.noMessages")</p>
                     }
                     else
                     {
@@ -71,9 +71,9 @@
                             {
                                 <li class="@(m.Visibility == "Internal" ? "timeline-internal" : null)">
                                     <strong>@Describe(m)</strong>
-                                    <span class="text-muted small"> · @CrmLabels.Time(m.CreatedAt) · @(m.AuthorId is null ? "Sistem" : Lookups.MemberName(m.AuthorId))</span>
+                                    <span class="text-muted small"> · @CrmLabels.Time(m.CreatedAt) · @(m.AuthorId is null ? Texts.Get("support.system") : Lookups.MemberName(m.AuthorId))</span>
                                     @if (m.Channel is { } channel) { <span class="badge stage-open">@SupportLabels.Label(SupportLabels.Channels, channel)</span> }
-                                    @if (m.SourceTicketId is { } source) { <span class="badge stage-open">Birleştirilen talepten</span> <a class="small" href="destek/talepler/@source">kaynak talep</a> }
+                                    @if (m.SourceTicketId is { } source) { <span class="badge stage-open">@Texts.Get("support.detail.fromMerged")</span> <a class="small" href="destek/talepler/@source">@Texts.Get("support.detail.sourceTicket")</a> }
                                     <div class="message-body">@m.Body</div>
                                     @if (SupportLabels.Delivery(m.DeliveryStatus) is { Length: > 0 } delivery) { <small class="text-muted">@delivery</small> }
                                 </li>
@@ -85,8 +85,8 @@
                     {
                         <form class="record-form" novalidate @onsubmit="SendAsync" @onsubmit:preventDefault>
                             <fieldset disabled="@sending">
-                                <legend class="h6">Yeni mesaj</legend>
-                                <div role="radiogroup" aria-label="Mesaj türü" class="filters">
+                                <legend class="h6">@Texts.Get("support.detail.newMessage")</legend>
+                                <div role="radiogroup" aria-label="@Texts.Get("support.detail.messageKind")" class="filters">
                                     @foreach (var (key, label) in KindsAllowed)
                                     {
                                         <label class="chip @(kind == key ? "active" : null)">
@@ -96,26 +96,26 @@
                                 </div>
                                 @if (kind == "note")
                                 {
-                                    <p class="small text-muted mb-1">İç not müşteriye hiçbir yoldan gönderilmez ve müşteri çıktılarına girmez.</p>
+                                    <p class="small text-muted mb-1">@Texts.Get("support.detail.noteHelp")</p>
                                 }
                                 else if (kind == "reply")
                                 {
-                                    <p class="small text-muted mb-1">Yanıt müşteriye görünür; müşterinin e-postası varsa e-posta kuyruğuna alınır (müşteriye ulaştığı doğrulanmaz).</p>
+                                    <p class="small text-muted mb-1">@Texts.Get("support.detail.replyHelp")</p>
                                 }
-                                <label class="form-label visually-hidden" for="msg-body">Mesaj metni</label>
+                                <label class="form-label visually-hidden" for="msg-body">@Texts.Get("support.detail.messageBody")</label>
                                 <textarea id="msg-body" class="form-control" rows="3" maxlength="8000" @bind="body" aria-invalid="@(Has("body") ? "true" : null)"></textarea>
                                 <FieldError Field="body" Errors="sendErrors" />
                             </fieldset>
                             <Notice Text="@sendMessage" Failed="true" />
                             <div class="form-actions">
-                                <button type="submit" class="btn btn-primary" disabled="@sending">Gönder</button>
+                                <button type="submit" class="btn btn-primary" disabled="@sending">@Texts.Get("support.detail.send")</button>
                             </div>
                         </form>
                     }
                 </section>
 
                 <section aria-labelledby="history-title">
-                    <h2 id="history-title">Tarihçe</h2>
+                    <h2 id="history-title">@Texts.Get("contracts.detail.tab.history")</h2>
                     @if (history is null)
                     {
                         <LoadingState />
@@ -127,10 +127,10 @@
                             {
                                 <li>
                                     <strong>@HistoryText(h.Kind)</strong>
-                                    <span class="text-muted small"> · @CrmLabels.Time(h.At) · @(h.ActorId is null ? "Sistem" : Lookups.MemberName(h.ActorId))</span>
+                                    <span class="text-muted small"> · @CrmLabels.Time(h.At) · @(h.ActorId is null ? Texts.Get("support.system") : Lookups.MemberName(h.ActorId))</span>
                                     @if (h.FromStatus != h.ToStatus && h.ToStatus is not null) { <div class="small">@SupportLabels.Label(SupportLabels.Statuses, h.FromStatus) → @SupportLabels.Label(SupportLabels.Statuses, h.ToStatus)</div> }
-                                    @if (h.FromOwnerId != h.ToOwnerId) { <div class="small">Sorumlu: @(h.FromOwnerId is null ? "—" : Lookups.MemberName(h.FromOwnerId)) → @(h.ToOwnerId is null ? "Atanmamış" : Lookups.MemberName(h.ToOwnerId))</div> }
-                                    @if (!string.IsNullOrEmpty(h.Reason)) { <div class="small">Gerekçe: @h.Reason</div> }
+                                    @if (h.FromOwnerId != h.ToOwnerId) { <div class="small">@Texts.Get("support.detail.ownerChange", h.FromOwnerId is null ? "—" : Lookups.MemberName(h.FromOwnerId), h.ToOwnerId is null ? Texts.Get("support.unassigned") : Lookups.MemberName(h.ToOwnerId))</div> }
+                                    @if (!string.IsNullOrEmpty(h.Reason)) { <div class="small">@Texts.Get("support.detail.reason", h.Reason)</div> }
                                 </li>
                             }
                         </ol>
@@ -139,9 +139,9 @@
             </div>
 
             <aside aria-labelledby="info-title">
-                <h2 id="info-title">Talep bilgileri</h2>
+                <h2 id="info-title">@Texts.Get("support.detail.info")</h2>
                 <dl class="detail-list">
-                    <dt>Müşteri</dt>
+                    <dt>@Texts.Get("support.tickets.col.customer")</dt>
                     <dd>
                         @if (ticket.PartyId is { } party)
                         {
@@ -149,44 +149,44 @@
                         }
                         else
                         {
-                            <span>@(ticket.ReporterName ?? "—") <span class="badge stage-open">Müşteri tanımsız</span></span>
+                            <span>@(ticket.ReporterName ?? "—") <span class="badge stage-open">@Texts.Get("support.detail.customerUndefined")</span></span>
                         }
                     </dd>
-                    @if (ticket.ReporterEmail is { Length: > 0 }) { <dt>Başvuran e-postası</dt><dd>@ticket.ReporterEmail</dd> }
-                    @if (ticket.ReporterPhone is { Length: > 0 }) { <dt>Başvuran telefonu</dt><dd>@ticket.ReporterPhone</dd> }
-                    <dt>Kanal</dt><dd>@SupportLabels.Label(SupportLabels.Channels, ticket.Channel)</dd>
-                    <dt>Etki / aciliyet</dt><dd>@SupportLabels.Label(SupportLabels.Levels, ticket.Impact) / @SupportLabels.Label(SupportLabels.Levels, ticket.Urgency)</dd>
-                    @if (ticket.PriorityReason is { Length: > 0 }) { <dt>Öncelik gerekçesi</dt><dd>@ticket.PriorityReason</dd> }
-                    @if (ticket.StatusReason is { Length: > 0 }) { <dt>Durum gerekçesi</dt><dd>@ticket.StatusReason</dd> }
-                    @if (ticket.ParentTicketId is { } parent) { <dt>İlişkili talep</dt><dd><a href="destek/talepler/@parent">Önceki talep</a></dd> }
-                    @if (ticket.MergedIntoId is { } mergedInto) { <dt>Birleştirildi</dt><dd><a href="destek/talepler/@mergedInto">Hedef talep</a></dd> }
-                    @if (ticket.EventDate is { } eventDate) { <dt>Olay tarihi</dt><dd>@SupportLabels.Date(eventDate)</dd> }
-                    @if (ticket.ExpectedOutcome is { Length: > 0 }) { <dt>Beklenen sonuç</dt><dd>@ticket.ExpectedOutcome</dd> }
-                    @if (ticket.Description is { Length: > 0 }) { <dt>Açıklama</dt><dd class="message-body">@ticket.Description</dd> }
+                    @if (ticket.ReporterEmail is { Length: > 0 }) { <dt>@Texts.Get("support.reporterEmail")</dt><dd>@ticket.ReporterEmail</dd> }
+                    @if (ticket.ReporterPhone is { Length: > 0 }) { <dt>@Texts.Get("support.reporterPhone")</dt><dd>@ticket.ReporterPhone</dd> }
+                    <dt>@Texts.Get("crm.contactPoint.channel")</dt><dd>@SupportLabels.Label(SupportLabels.Channels, ticket.Channel)</dd>
+                    <dt>@Texts.Get("support.detail.impactUrgency")</dt><dd>@SupportLabels.Label(SupportLabels.Levels, ticket.Impact) / @SupportLabels.Label(SupportLabels.Levels, ticket.Urgency)</dd>
+                    @if (ticket.PriorityReason is { Length: > 0 }) { <dt>@Texts.Get("support.detail.priorityReason")</dt><dd>@ticket.PriorityReason</dd> }
+                    @if (ticket.StatusReason is { Length: > 0 }) { <dt>@Texts.Get("support.detail.statusReason")</dt><dd>@ticket.StatusReason</dd> }
+                    @if (ticket.ParentTicketId is { } parent) { <dt>@Texts.Get("support.detail.related")</dt><dd><a href="destek/talepler/@parent">@Texts.Get("support.detail.previous")</a></dd> }
+                    @if (ticket.MergedIntoId is { } mergedInto) { <dt>@Texts.Get("support.status.merged")</dt><dd><a href="destek/talepler/@mergedInto">@Texts.Get("support.detail.target")</a></dd> }
+                    @if (ticket.EventDate is { } eventDate) { <dt>@Texts.Get("support.eventDate")</dt><dd>@SupportLabels.Date(eventDate)</dd> }
+                    @if (ticket.ExpectedOutcome is { Length: > 0 }) { <dt>@Texts.Get("support.expectedOutcome")</dt><dd>@ticket.ExpectedOutcome</dd> }
+                    @if (ticket.Description is { Length: > 0 }) { <dt>@Texts.Get("common.field.description")</dt><dd class="message-body">@ticket.Description</dd> }
                 </dl>
 
                 @if (ticket.ResolutionCode is not null)
                 {
-                    <h3 class="h6">Çözüm</h3>
+                    <h3 class="h6">@Texts.Get("support.sla-metric.resolution")</h3>
                     <dl class="detail-list">
-                        <dt>Kod</dt><dd>@Lookups.Label(SupportLabels.ResolutionCodeList, ticket.ResolutionCode)</dd>
-                        <dt>Açıklama</dt><dd class="message-body">@ticket.ResolutionNote</dd>
-                        @if (ticket.RootCause is { Length: > 0 }) { <dt>Kök neden</dt><dd>@ticket.RootCause</dd> }
-                        @if (ticket.CorrectiveAction is { Length: > 0 }) { <dt>Düzeltici aksiyon</dt><dd>@ticket.CorrectiveAction</dd> }
-                        <dt>Çözen / zaman</dt><dd>@Lookups.MemberName(ticket.ResolvedBy) · @(ticket.ResolvedAt is { } at ? CrmLabels.Time(at) : "—")</dd>
-                        @if (ticket.ReopenCount > 0) { <dt>Yeniden açılma</dt><dd>@ticket.ReopenCount kez; önceki çözüm kayıtları denetim kaydında</dd> }
+                        <dt>@Texts.Get("support.detail.code")</dt><dd>@Lookups.Label(SupportLabels.ResolutionCodeList, ticket.ResolutionCode)</dd>
+                        <dt>@Texts.Get("common.field.description")</dt><dd class="message-body">@ticket.ResolutionNote</dd>
+                        @if (ticket.RootCause is { Length: > 0 }) { <dt>@Texts.Get("support.rootCause")</dt><dd>@ticket.RootCause</dd> }
+                        @if (ticket.CorrectiveAction is { Length: > 0 }) { <dt>@Texts.Get("support.correctiveAction")</dt><dd>@ticket.CorrectiveAction</dd> }
+                        <dt>@Texts.Get("support.detail.resolvedBy")</dt><dd>@Lookups.MemberName(ticket.ResolvedBy) · @(ticket.ResolvedAt is { } at ? CrmLabels.Time(at) : "—")</dd>
+                        @if (ticket.ReopenCount > 0) { <dt>@Texts.Get("support.detail.reopens")</dt><dd>@Texts.Get("support.detail.reopenCount", ticket.ReopenCount)</dd> }
                     </dl>
                 }
 
                 @if (Session.Can(SupportAccess.TicketsWrite) && ticket.PartyId is null && !TicketStatusFinal)
                 {
-                    <h3 class="h6">Müşteriye bağla</h3>
-                    <p class="small text-muted">Başvuran mevcut bir müşteriyse seçerek talebi o kayda bağlayın; yeni müşteri kaydı açılmaz.</p>
-                    <label class="form-label" for="link-party">Müşteri</label>
-                    <LookupPicker Id="link-party" LookupKey="support.ticket.party" @bind-Value="linkPartyId" Placeholder="Müşteri ara…" />
+                    <h3 class="h6">@Texts.Get("support.detail.linkCustomer")</h3>
+                    <p class="small text-muted">@Texts.Get("support.detail.linkHelp")</p>
+                    <label class="form-label" for="link-party">@Texts.Get("support.tickets.col.customer")</label>
+                    <LookupPicker Id="link-party" LookupKey="support.ticket.party" @bind-Value="linkPartyId" Placeholder="@Texts.Get("support.searchCustomer")" />
                     <FieldError Field="partyId" Errors="linkErrors" />
                     <Notice Text="@linkMessage" Failed="true" />
-                    <div class="form-actions"><button type="button" class="btn btn-outline-secondary" disabled="@(linkPartyId is null || sending)" @onclick="LinkAsync">Bağla</button></div>
+                    <div class="form-actions"><button type="button" class="btn btn-outline-secondary" disabled="@(linkPartyId is null || sending)" @onclick="LinkAsync">@Texts.Get("crm.opp.link")</button></div>
                 }
             </aside>
         </div>
@@ -252,9 +252,9 @@
 
     private static string Describe(TicketMessageDto m) => m.Direction switch
     {
-        "Outbound" => "Müşteriye yanıt",
-        "Inbound" => "Müşteriden gelen mesaj",
-        _ => "İç not (müşteriye gitmez)",
+        "Outbound" => Texts.Get("support.message-kind.reply"),
+        "Inbound" => Texts.Get("support.detail.inbound"),
+        _ => Texts.Get("support.message-kind.note"),
     };
 
     private async Task SendAsync()
