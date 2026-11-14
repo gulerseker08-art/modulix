@@ -11,11 +11,23 @@ namespace Modulix.Web.Services;
 /// Oturumdaki kullanıcı, aktif tenant ve erişimi. Menü ve ekranlar buna göre gösterilir; asıl denetim
 /// her istekte sunucudadır. Giriş, çıkış ve tenant değişiminde yeniden yüklenir.
 /// </summary>
-public sealed class SessionState(ApiClient api, IJSRuntime? js = null)
+public sealed class SessionState
 {
+    private readonly ApiClient api;
+    private readonly IJSRuntime? js;
     private Task? loading;
     private bool languageDetected;
     private string? detectedLanguage;
+
+    public SessionState(ApiClient api, IJSRuntime? js = null, SessionExpiry? expiry = null)
+    {
+        this.api = api;
+        this.js = js;
+        if (expiry is not null)
+        {
+            expiry.Expired += OnExpired;
+        }
+    }
 
     public event Action? Changed;
 
@@ -167,6 +179,25 @@ public sealed class SessionState(ApiClient api, IJSRuntime? js = null)
         Regional.Apply(null);
         UiLanguage.Apply(null, null, await DetectLanguageAsync());
         await LoadTextsAsync();
+        loading = Task.CompletedTask;
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Sunucu 401 döndü: oturum süresi dolmuş ya da kapatılmış. Oturum bilgisi temizlenir; <c>AuthGate</c> dönüş adresiyle
+    /// girişe yönlendirir. Zaten oturumsuzken (ör. hatalı şifre) hiçbir şey yapmaz.
+    /// </summary>
+    private void OnExpired()
+    {
+        if (User is null)
+        {
+            return;
+        }
+
+        User = null;
+        Access = null;
+        Logo = null;
+        TwoFactorPending = false;
         loading = Task.CompletedTask;
         Changed?.Invoke();
     }
