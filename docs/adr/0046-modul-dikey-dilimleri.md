@@ -1,6 +1,6 @@
 # ADR-0046: Modül dikey dilimleri (uç noktalar ve arka plan işleri modüle taşınır)
 
-- **Durum:** Kabul edildi, 14 Kasım 2026 (açık sorular aynı gün karara bağlandı; aşağıda "Açık soruların kararı"). Henüz uygulanmadı; uygulama Dilim 0'dan başlar.
+- **Durum:** Kabul edildi, 14 Kasım 2026 (açık sorular aynı gün karara bağlandı; aşağıda "Açık soruların kararı"). Dilim 0 (envanter ve mimari kural) yapıldı; kod taşıması Dilim 1'den başlar.
 - **Karar:** Bir modülün HTTP uç noktaları ve arka plan işleri `Modulix.Api` yerine modülün kendi projesinde durur. Host (`Modulix.Api`) modülleri tanımaz; uç noktaları ve işleri modül kaydından (`IModule` ve yanındaki arayüzler) keşfeder. Arka plan işleri modül başına ayrı `BackgroundService` yerine tek bir zamanlayıcıdan çalışır. DTO'lar ve Blazor ekranları bu ADR'de yerinde kalır; onlar için yalnızca yön belirlenir.
 
 > Numara notu: 14 Kasım 2026'da `main`'de en yüksek numara 0045'ti ve 0046 adını taşıyan açık PR yoktu. Birleştirmeden önce numara yeniden kontrol edilmeli (0043 iki ADR'de kullanılmış durumda).
@@ -20,7 +20,7 @@ ADR-0044 modüller arası sözleşmeleri `Core.Contracts`'tan çıkardı; modül
 Sonuçları:
 
 - **Host bütün modülleri tanıyor.** `Program.cs` içinde 62 uç nokta eşleme ve iş kaydı satırı var. Yeni modül eklemek host'u değiştirmek demek; "modül tek `IModule` uygulamasıyla kaydolur" kuralı yalnızca metadata için geçerli.
-- **Modül sınırı Api'de delinebiliyor.** `Modulix.Api` her projeye başvurabildiği için uç nokta dosyaları başka modülün koduna ve altyapıya doğrudan uzanabiliyor. Bugün: `Api/Contracts` `Modulix.Modules.Crm`'e, `Api/Support` ve `Api/Contracts` `Modulix.Api.Crm`'e başvuruyor; 22 Api dosyası `ModulixDbContext`'i doğrudan kullanıyor. Mimari testler bunu görmüyor, çünkü test proje başvurularına bakıyor ve Api'nin her şeye başvurması serbest.
+- **Modül sınırı Api'de delinebiliyor.** `Modulix.Api` her projeye başvurabildiği için uç nokta dosyaları başka modülün koduna ve altyapıya doğrudan uzanabiliyor. Bugün: `Api/Support` ve `Api/Contracts` `Modulix.Api.Crm`'e başvuruyor; 22 Api dosyası `ModulixDbContext`'i doğrudan kullanıyor (10'u modül klasörlerinde). Dilim 0'a kadar mimari testler bunu görmüyordu, çünkü proje başvurularına bakıyorlardı ve Api'nin her şeye başvurması serbest. (Taslak yazılırken görülen `Api/Contracts` → `Modulix.Modules.Crm` başvurusu ADR-0044 Dilim 2 ile sözleşme projesine döndü; aşağıda "Dilim 0 envanteri".)
 - **Arka plan işleri kopyalanarak çoğalıyor.** Modüle özel beş iş (`QuoteExpiry`, `ContractJobs`, `OrderJobs`, `SupportJobs`, `MarketingSend`) aynı kalıbı tekrarlıyor: `WorkerEnabled` ve `PollIntervalSeconds` seçenekleri, tenant'ları gezen döngü, kapsam (scope) açma, lisans kontrolü, hata yakalama. Her yeni modül bir kopya daha ekliyor; lisans ve tenant durumu kuralları (ADR-0028) her kopyada ayrı ayrı doğru yazılmak zorunda.
 - **Customs taşınamıyor.** ADR-0044 karar 3: GTİP ve rejim profili sözleşmeleri `Core.Contracts`'ta, uygulaması `Core` ve `Infrastructure`'da, uç noktaları `Api/Customs`'ta. Modüller yalnızca tenant tablolarına erişebildiği için (`IModuleData`) bu kod Warehouse modülüne taşınamıyor.
 
@@ -88,7 +88,7 @@ public interface IModuleJob
 Bir uç nokta dosyası modüle taşınabilmek için `Core` iç koduna, `Infrastructure`'a ve başka modülün ana projesine başvurmamalıdır. Bugün başvuranlar taşınmadan önce düzeltilir:
 
 - `ModulixDbContext` kullanan uç nokta kodu modülün kayıt depolarına ya da `IModuleData`'ya alınır.
-- Başka modülün koduna uzanan uç nokta (ör. `Api/Contracts` → `Modulix.Modules.Crm`) o modülün sözleşme projesindeki bir arayüze çevrilir (ADR-0044).
+- Başka modülün koduna uzanan uç nokta (bugün yok; `ApiModuleFolderRulesTests` yenisini engeller) o modülün sözleşme projesindeki bir arayüze çevrilir (ADR-0044).
 - `Core` iç tiplerine ihtiyaç gerçekse (`Core.Events`, `Core.Platform`, `Core.Settings`) karşılığı `Core.Contracts`'a arayüz olarak çıkarılır; çıkarılamıyorsa o uç nokta host'ta kalır ve gerekçesiyle listelenir.
 
 Bu, taşımanın asıl işidir ve modül başına ayrı ayrı yapılır. Küçük modüller (Antrepo, Lojistik, İK: uç noktaları bugün yalnızca kendi modülüne ve `Shared`'a başvuruyor) neredeyse hazırdır; Crm, Sözleşme, Marketing, Sipariş ve Destek için önce temizlik gerekir.
@@ -116,13 +116,41 @@ Customs sözleşmeleri `Modulix.Modules.Warehouse.Contracts`'a, uygulaması ve u
 3. **Platform başvuru tabloları: kabul, Customs Warehouse'a.** Bölüm 6'daki model geçerlidir. Ayrı Gümrük modülü açılmaz; GTİP ya da rejim profiline ihtiyaç duyan başka modül `Modulix.Modules.Warehouse.Contracts` üzerinden kullanır. Antrepo lisansı olmayan bir müşterinin GTİP'e ihtiyacı doğarsa ayrı modül o gün yeniden ele alınır.
 4. **Platform ve çekirdek uç noktaları: host'ta kalır.** `Api/Platform`, `Auth`, `Users`, `Customization`, `Imports` gibi modüle ait olmayan klasörler bu ADR'de taşınmaz. Kabul ölçütündeki "host modül adı içermez" kuralı bunları kapsamaz.
 5. **Çok örnekli çalışma: tek örnek varsayılır.** İş kilidi (veritabanında kira/lease) bu ADR'ye girmez; birden çok API örneği planlandığında ayrı kararla eklenir. `ModuleJobsWorker` buna engel olmayacak biçimde yazılır: işin tenant başına çalıştırılması tek bir noktadan geçer, kilit oraya eklenebilir.
-6. **Api'nin Crm'e özel yardımcıları: karar değil, Dilim 0 çıktısı.** `Api/Support` ve `Api/Contracts` `Modulix.Api.Crm`'e başvuruyor. Neyin kullanıldığı Dilim 0'da çıkarılır; ortak yardımcıysa `Core.Hosting`'e, Crm davranışıysa Crm sözleşmesine gider.
+6. **Api'nin Crm'e özel yardımcıları: karar değil, Dilim 0 çıktısı.** `Api/Support` ve `Api/Contracts` `Modulix.Api.Crm`'den yalnızca `LeadEndpoints.Csv` (CSV hücre kaçışı) kullanıyor; ortak yardımcı olduğu için `Core.Hosting`'e gider (aşağıda "Dilim 0 envanteri").
+
+## Dilim 0 envanteri (14 Kasım 2026)
+
+Api'deki modül klasörlerinin kendi modülü, `Core.Contracts`, `Shared`, modül sözleşme projeleri ve `Api/Access` ile `Api/Records` dışında başvurduğu host içi kod. Kaynak metinden çıkarıldı (`using` satırları ve tam adla yazılmış başvurular); `ApiModuleFolderRulesTests.PendingCleanup` listesiyle aynıdır ve test listeyi iki yönde denetler (yeni başvuru da, temizlenmiş ama listede kalmış satır da testi kırar).
+
+| Klasör | Dosya | Host içi başvuru | Başvuran dosya |
+|---|---|---|---|
+| `Hr` | 3 | yok | hazır |
+| `Warehouse` | 1 | yok | hazır |
+| `Logistics` | 1 | `Core.Settings` | 1 (`ITenantSettings`, tam adla iki yerde) |
+| `Orders` | 2 | `Core.Events`, `Core.Modules`, `Core.Platform`, `Core.Settings`, `Infrastructure` | 2 (biri iş) |
+| `Marketing` | 7 | `Core.Events`, `Core.Modules`, `Core.Platform`, `Core.Settings`, `Infrastructure` | 2 (biri iş) |
+| `Support` | 3 | `Api.Crm`, `Core.Events`, `Core.Modules`, `Core.Platform`, `Core.Records`, `Core.Settings`, `Infrastructure` | 3 (biri iş) |
+| `Contracts` | 8 | `Api.Crm`, `Core.Events`, `Core.Lookups`, `Core.Modules`, `Core.Platform`, `Core.Records`, `Core.Settings`, `Infrastructure` | 5 (biri iş) |
+| `Crm` | 17 | `Api.Users`, `Core.Events`, `Core.Modules`, `Core.Platform`, `Core.Records`, `Core.Reporting`, `Core.Settings`, `Infrastructure` | 10 (biri iş) |
+| `Customs` | 3 | `Api.Imports`, `Api.Platform`, `Api.Users`, `Core.Customs` | 2 |
+
+Okuması:
+
+- **Başka modülün ana projesine başvuran modül klasörü yok.** Taslaktaki `Api/Contracts` → `Modulix.Modules.Crm` başvurusu ADR-0044 Dilim 2 ile sözleşme projesine (`Modulix.Modules.Crm.Contracts.Activities`) dönmüş. Kural istisnasız yazıldı.
+- **Beş iş dosyası aynı dört başvuruyu taşıyor** (`Core.Events`, `Core.Modules`, `Core.Platform`, `Infrastructure`): `ContractJobsWorker`, `QuoteExpiryWorker`, `MarketingSendWorker`, `OrderJobsWorker`, `SupportJobsWorker`. Tek zamanlayıcı (Dilim 3-4) bunları kendiliğinden kaldırır; Sipariş ve Marketing'de geriye yalnızca `Core.Settings` kalır.
+- **`Core.Settings` altı klasörde.** En yaygın engel `ITenantSettings`; `Core.Contracts`'a arayüz olarak açılması Dilim 1'in ön koşuludur (Lojistik pilotu dahil dört küçük/orta modülü açar).
+- **Uç nokta dosyalarında `ModulixDbContext` kullanan dört dosya var:** `ContractSignatureEndpoints`, `LeadIntakeEndpoints`, `QuoteSharingEndpoints`, `SupportChannelEndpoints` (hepsi oturumsuz/dış kanal uçları) ve yardımcı `QuoteDelivery`. Bölüm 4'teki temizliğin asıl işi bunlardır.
+- **`Api.Crm` başvurusu tek yardımcıdan ibaret (açık soru 6):** `Api/Support` ve `Api/Contracts` yalnızca `LeadEndpoints.Csv(...)` (CSV hücre kaçışı) kullanıyor. Crm davranışı değil; `Core.Hosting`'e ortak yardımcı olarak taşınır.
+- **`Api.Users` başvuruları da ortak yardımcı:** Crm `PublicUrl.Resolve`, Customs `UserEndpoints.ToProblem` kullanıyor; ikisi `Core.Hosting`'e gider. Customs'ın `Api.Platform` (`PlatformEndpoints.UserId`) ve `Api.Imports` başvuruları Dilim 7'de ele alınır.
+- Antrepo ve İK bugün taşınabilir. Bölüm 4'teki "Lojistik neredeyse hazır" değerlendirmesi `ITenantSettings` kaydıyla geçerlidir.
+
+Sınır: denetim metin üzerindedir; üst ad alanı üzerinden kısaltılmış başvuru (`Modulix.Api.Crm` içinden `Users.Tip`) yakalanmaz. Yorum içinde geçen ad da başvuru sayılır (yanlış alarm yönünde güvenli).
 
 ## Dilimler
 
 Her dilim ayrı PR'dır; taşıma dilimleri davranış ve URL değiştirmez.
 
-0. **Envanter ve kural.** Api'deki her modül klasörü için başvuru envanteri (kendi modülü dışında neye uzanıyor). Mimari teste "`Api/<Ad>/` klasörü başka modülün ana projesine başvuramaz" kuralı, bugünkü ihlaller geçici istisna listesiyle. Kod taşınmaz.
+0. **Envanter ve kural (yapıldı).** Api'deki her modül klasörü için başvuru envanteri (yukarıda). `ApiModuleFolderRulesTests`: modül klasörü başka modülün ana projesine başvuramaz (istisnasız); host içi başvurular `PendingCleanup` listesiyle sabit ve yalnızca küçülür. Kod taşınmadı.
 1. **`Core.Hosting` + `IModuleEndpoints` + pilot.** Yardımcılar `Api/Access` ve `Api/Records`'tan taşınır; pilot olarak Antrepo (tek dosya, yalnızca kendi modülüne ve `Shared`'a başvuruyor). `AllowedReferences` ve mimari testler güncellenir.
 2. **Küçük modüller.** Lojistik, İK. (Filo'nun modüle özel uç noktası yok; taşınacak bir şey çıkmaz.)
 3. **İş zamanlayıcısı + pilot.** `ModuleJobDefinition`, `IModuleJob`, `ModuleJobsWorker`; pilot `OrderJobs`. Eski yapılandırma adları okunmaya devam eder.
