@@ -9,12 +9,12 @@
     <div class="report-export">
         <button type="button" class="btn btn-outline-secondary" disabled="@(Disabled || busy)" aria-describedby="rx-help" @onclick='() => RunExportAsync("csv")'>
             @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
-            CSV olarak dışa aktar
+            @Texts.Get("reports.exportButton.csv")
         </button>
         <button type="button" class="btn btn-outline-secondary ms-2" disabled="@(Disabled || busy)" aria-describedby="rx-help" @onclick='() => RunExportAsync("xlsx")'>
-            Excel olarak dışa aktar
+            @Texts.Get("reports.exportButton.excel")
         </button>
-        <span id="rx-help" class="form-text ms-2">Ekrandaki sonuçla aynı hesaptan, yalnızca sizin yetkinizle üretilir; yetkiniz olmayan hassas alanlar dosyada yer almaz.</span>
+        <span id="rx-help" class="form-text ms-2">@Texts.Get("reports.exportButton.help")</span>
 
         <div aria-live="polite">
             @if (error is not null)
@@ -28,16 +28,15 @@
             @if (export is not null)
             {
                 <div class="alert alert-success mt-2" role="status">
-                    <strong>Dosya hazır:</strong> @export.FileName
-                    (@export.RowCount.ToString("N0", Regional.Numbers) satır, @ReportCenterLabels.Size(export.SizeBytes)).
-                    Dosya @CrmLabels.Time(export.ExpiresAt) tarihine kadar saklanır.
-                    <button type="button" class="btn btn-primary btn-sm ms-2" disabled="@busy" @onclick="DownloadAsync">İndir</button>
-                    <a class="ms-2" href="raporlar/disa-aktarimlar">Dışa aktarımlarım</a>
+                    <strong>@Texts.Get("reports.exportButton.ready")</strong> @export.FileName
+                    @Texts.Get("reports.exportButton.readyDetails", export.RowCount.ToString("N0", Regional.Numbers), ReportCenterLabels.Size(export.SizeBytes), CrmLabels.Time(export.ExpiresAt))
+                    <button type="button" class="btn btn-primary btn-sm ms-2" disabled="@busy" @onclick="DownloadAsync">@Texts.Get("crm.sales.export.download")</button>
+                    <a class="ms-2" href="raporlar/disa-aktarimlar">@Texts.Get("reports.exportButton.myExports")</a>
                 </div>
                 @if (export.Truncated)
                 {
                     <div class="alert alert-warning" role="status">
-                        <strong>Dosya eksik olabilir.</strong> Okuma sınırı aşıldığı için tüm kayıtlar dosyaya girmemiş olabilir; süzgeçlerle daraltıp yeniden dışa aktarın.
+                        <strong>@Texts.Get("reports.exportButton.truncatedTitle")</strong> @Texts.Get("reports.exportButton.truncated")
                     </div>
                 }
             }
@@ -86,7 +85,7 @@
         }
 
         error = result.Status == System.Net.HttpStatusCode.Forbidden
-            ? $"Dışa aktarma yetkiniz yok ya da raporun modülü kapalı. {result.Error}"
+            ? Texts.Get("reports.exportButton.forbidden", result.Error)
             : result.Error;
         issues = result.Issues;
     }
