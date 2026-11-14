@@ -63,6 +63,19 @@ public sealed record SubProfileDto(
     DateTimeOffset? ActivatedAt,
     IReadOnlyList<SubProfileOptionDto> Options);
 
+/// <summary>
+/// Hazır alt profil (öneri): tek tıkla firmanın taslak alt profili olarak eklenir. <see cref="MissingModules"/> kapalı olduğu için
+/// eklenemeyen modül adlarıdır; <see cref="Added"/> firmada bu hazır alt profil zaten varsa true.
+/// </summary>
+public sealed record SubProfileStarterDto(
+    string Key,
+    string Name,
+    string Description,
+    string? ActivityName,
+    IReadOnlyList<string> Options,
+    IReadOnlyList<string> MissingModules,
+    bool Added);
+
 /// <summary>Ekleme ya da düzenleme; <see cref="Revision"/> yalnızca düzenlemede gönderilir (açık ekranın eski olup olmadığını denetler).</summary>
 public sealed record SaveSubProfileRequest(string Name, string? Description, string? ActivityCode, long Revision = 0);
 
