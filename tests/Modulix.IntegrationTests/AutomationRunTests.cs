@@ -355,6 +355,40 @@ public class AutomationRunTests(AutomationFixture fixture) : IClassFixture<Autom
     }
 
     [Fact]
+    public async Task A_trial_company_is_served_like_an_active_one_and_a_suspended_company_is_skipped()
+    {
+        // ADR-0028: erişim kararı TenantStatusRules.Operational'dadır (Active ve Trial); deneme süresindeki firmanın kuralları da çalışır.
+        var setup = await SetUpAsync();
+        await PublishRuleAsync(setup, ClosedDefinition());
+        var record = AutomationRecords.Add(setup.Tenant.Id, Item, status: "closed", title: "Anka");
+        var runner = fixture.Extended.Services.GetRequiredService<AutomationRunner>();
+
+        await SetTenantStatusAsync(setup.Tenant.Id, Modulix.Core.Platform.TenantStatus.Trial);
+        var run = await DeliverAsync(setup.Tenant.Id, record, "closed");
+        Assert.Contains(setup.Tenant.Id, await runner.TenantIdsAsync(CancellationToken.None));
+        var round = await RunRoundAsync(setup.Tenant.Id);
+        Assert.Equal(1, round.StepsRun);
+        Assert.Equal(AutomationRunStatus.Succeeded, (await RunAsync(setup.Tenant.Id, run.Id)).Status);
+        Assert.Single(AutomationProbe.CallsOf(setup.Tenant.Id));
+
+        // Askıdaki firma listede yoktur; doğrudan çağrılan tur da çalışmaz, kuyruktaki çalışma olduğu gibi bekler.
+        var queued = await DeliverAsync(setup.Tenant.Id, record, "closed");
+        await SetTenantStatusAsync(setup.Tenant.Id, Modulix.Core.Platform.TenantStatus.Suspended);
+        Assert.DoesNotContain(setup.Tenant.Id, await runner.TenantIdsAsync(CancellationToken.None));
+        var (skippedRound, _) = await runner.RunTenantAsync(setup.Tenant.Id, CancellationToken.None);
+        Assert.Null(skippedRound);
+        Assert.Equal(AutomationRunStatus.Pending, (await RunAsync(setup.Tenant.Id, queued.Id)).Status);
+        Assert.Single(AutomationProbe.CallsOf(setup.Tenant.Id));
+    }
+
+    private async Task SetTenantStatusAsync(Guid tenantId, Modulix.Core.Platform.TenantStatus status)
+    {
+        using var scope = fixture.Factory.OpenScope(tenantId);
+        await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Tenants
+            .Where(t => t.Id == tenantId).ExecuteUpdateAsync(s => s.SetProperty(t => t.Status, status));
+    }
+
+    [Fact]
     public async Task The_platform_switch_pauses_everything_without_cancelling_and_work_resumes_when_it_is_back()
     {
         var setup = await SetUpAsync();

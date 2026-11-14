@@ -99,7 +99,7 @@ public sealed class AutomationRunner(
     public static string LockResource(Guid tenantId) => $"{LockName}:{tenantId:N}";
 
     /// <summary>
-    /// Kural yeteneği beyan eden bir modülü açık olan aktif tenant'lar (tek platform sorgusu). Kural yazılabilen kayıt türü yoksa boş.
+    /// Kural yeteneği beyan eden bir modülü açık olan, erişime açık (etkin ya da deneme süresindeki) tenant'lar (tek platform sorgusu). Kural yazılabilen kayıt türü yoksa boş.
     /// </summary>
     public async Task<IReadOnlyList<Guid>> TenantIdsAsync(CancellationToken cancellationToken)
     {
@@ -114,7 +114,7 @@ public sealed class AutomationRunner(
         return await (
             from tenant in db.Tenants.AsNoTracking()
             join entitlement in db.ModuleEntitlements.AsNoTracking() on tenant.Id equals entitlement.TenantId
-            where tenant.Status == TenantStatus.Active && entitlement.IsEnabled && moduleKeys.Contains(entitlement.ModuleKey)
+            where TenantStatusRules.Operational.Contains(tenant.Status) && entitlement.IsEnabled && moduleKeys.Contains(entitlement.ModuleKey)
             select tenant.Id)
             .Distinct()
             .ToListAsync(cancellationToken);
@@ -133,7 +133,7 @@ public sealed class AutomationRunner(
         await using var control = tenantScopes.Create(new TenantContext(tenantId, Guid.Empty, Guid.Empty));
         var services = control.ServiceProvider;
         var db = services.GetRequiredService<ModulixDbContext>();
-        if (!await db.Tenants.AsNoTracking().AnyAsync(t => t.Id == tenantId && t.Status == TenantStatus.Active, cancellationToken))
+        if (!await db.Tenants.AsNoTracking().AnyAsync(t => t.Id == tenantId && TenantStatusRules.Operational.Contains(t.Status), cancellationToken))
         {
             return (null, false);
         }
@@ -196,7 +196,7 @@ public sealed class AutomationRunner(
     /// Bir tenant için saklama temizliği (<see cref="AutomationRetention"/>). Tur ile aynı oturum kilidini kullanır; kilidi alamayan örnek atlar.
     /// Platform acil durdurma anahtarından ve firma ayarından bağımsızdır: kapalı otomasyonun eski kayıtları da süresi dolunca silinir.
     /// </summary>
-    /// <returns>Temizlik sonucu; kilit başka örnekteyse ya da tenant etkin değilse null.</returns>
+    /// <returns>Temizlik sonucu; kilit başka örnekteyse ya da tenant erişime açık değilse null.</returns>
     public async Task<AutomationRetentionResult?> CleanTenantAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
@@ -204,7 +204,7 @@ public sealed class AutomationRunner(
         await using var control = tenantScopes.Create(new TenantContext(tenantId, Guid.Empty, Guid.Empty));
         var services = control.ServiceProvider;
         if (!await services.GetRequiredService<ModulixDbContext>().Tenants.AsNoTracking()
-                .AnyAsync(t => t.Id == tenantId && t.Status == TenantStatus.Active, cancellationToken))
+                .AnyAsync(t => t.Id == tenantId && TenantStatusRules.Operational.Contains(t.Status), cancellationToken))
         {
             return null;
         }
