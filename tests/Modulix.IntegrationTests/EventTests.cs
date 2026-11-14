@@ -654,6 +654,42 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
 
     private const string OwnerField = "ownerId";
 
+    /// <summary>
+    /// Teslim listesi başlığa göre sıralanır: iki yön, firma süzgeciyle birlikte (başka firmanın teslimi görünmez), geçersiz
+    /// anahtar reddi ve platform yöneticisi olmayana kapalılık.
+    /// </summary>
+    [Fact]
+    public async Task Delivery_list_sorts_by_a_column_within_the_tenant_filter_and_rejects_an_unknown_key()
+    {
+        var actor = await ActorAsync();
+        var other = await ActorAsync();
+        var company = await CreateCompanyAsync(actor, "Sıralı Firma");
+        await UpdateCompanyAsync(actor, company.Id, "Sıralı Firma 2");
+        await CreateCompanyAsync(other, "Başka Firmanın Kaydı");
+        await DrainAsync();
+
+        var admin = await factory.CreateUserAsync();
+        await SetPlatformAdministratorAsync(admin.Id);
+        using var client = await LoginAsync(admin.Email!);
+        string url = $"/api/platform/events/deliveries?tenantId={actor.TenantId}&subscription={EventTestModule.Recorder}";
+
+        var ascending = (await client.GetFromJsonAsync<EventDeliveryPageResponse>($"{url}&sort=createdAt"))!;
+        var descending = (await client.GetFromJsonAsync<EventDeliveryPageResponse>($"{url}&sort=-createdAt"))!;
+        var byDefault = (await client.GetFromJsonAsync<EventDeliveryPageResponse>(url))!;
+        var byAttempts = (await client.GetFromJsonAsync<EventDeliveryPageResponse>($"{url}&sort=-attemptCount"))!;
+
+        Assert.Equal(2, ascending.TotalCount);
+        Assert.Equal(ascending.Items.Select(d => d.Id).Reverse(), descending.Items.Select(d => d.Id));
+        Assert.Equal(descending.Items.Select(d => d.Id), byDefault.Items.Select(d => d.Id));
+        Assert.True(ascending.Items[0].CreatedAt <= ascending.Items[1].CreatedAt);
+        Assert.All(byAttempts.Items, d => Assert.Equal(actor.TenantId, d.TenantId));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await client.GetAsync($"{url}&sort=password")).StatusCode);
+
+        var member = await MemberAsync(actor, CoreModule.Permissions.ManageUsers);
+        using var memberClient = await LoginAsync(member.Email);
+        Assert.Equal(HttpStatusCode.Forbidden, (await memberClient.GetAsync("/api/platform/events/deliveries?sort=createdAt")).StatusCode);
+    }
+
     private async Task SetPlatformAdministratorAsync(Guid userId)
     {
         using var scope = host.Services.CreateScope();

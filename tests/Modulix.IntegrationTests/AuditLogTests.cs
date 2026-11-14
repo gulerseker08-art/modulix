@@ -166,6 +166,62 @@ public class AuditLogTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         Assert.Equal(("Kapalı", "Açık"), (status.Old, status.New));
     }
 
+    [Fact]
+    public async Task Sorting_by_a_column_orders_the_log_in_both_directions()
+    {
+        var (_, editor, _) = await TenantWithCompanyChangeAsync();
+        using var client = await LoginAsync(editor);
+
+        Assert.Equal([AuditOperation.Created, AuditOperation.Updated], await ActionsAsync(client, "occurredAt"));
+        Assert.Equal([AuditOperation.Updated, AuditOperation.Created], await ActionsAsync(client, "-occurredAt"));
+        Assert.Equal([AuditOperation.Updated, AuditOperation.Created], await ActionsAsync(client, null));
+        Assert.Equal((await ActionsAsync(client, "action")).AsEnumerable().Reverse(), await ActionsAsync(client, "-action"));
+    }
+
+    [Fact]
+    public async Task An_unknown_sort_key_is_rejected_and_filters_still_work_together_with_sorting()
+    {
+        var (_, editor, _) = await TenantWithCompanyChangeAsync();
+        using var client = await LoginAsync(editor);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await client.GetAsync("/api/audit?sort=password")).StatusCode);
+        Assert.Equal([AuditOperation.Created], await ActionsAsync(client, "occurredAt", "&action=Created"));
+    }
+
+    [Fact]
+    public async Task A_sorted_log_never_shows_another_tenants_entries()
+    {
+        var (_, editorA, companyA) = await TenantWithCompanyChangeAsync();
+        var (_, editorB, companyB) = await TenantWithCompanyChangeAsync();
+        using var clientA = await LoginAsync(editorA);
+        using var clientB = await LoginAsync(editorB);
+
+        var pageA = await clientA.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company&sort=occurredAt");
+        var pageB = await clientB.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company&sort=-entityKey");
+
+        Assert.All(pageA!.Items, e => Assert.Equal(companyA, e.RecordId));
+        Assert.All(pageB!.Items, e => Assert.Equal(companyB, e.RecordId));
+        Assert.Equal((2, 2), (pageA.TotalCount, pageB.TotalCount));
+    }
+
+    [Fact]
+    public async Task Without_audit_permission_a_sorted_log_is_forbidden()
+    {
+        var (tenant, _, _) = await TenantWithCompanyChangeAsync();
+        var outsider = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [CompaniesRead], outsider);
+        using var client = await LoginAsync(outsider);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/audit?sort=occurredAt")).StatusCode);
+    }
+
+    private static async Task<List<AuditOperation>> ActionsAsync(HttpClient client, string? sort, string extra = "")
+    {
+        var page = await client.GetFromJsonAsync<AuditPageResponse>(
+            $"/api/audit?entityKey=crm.company{(sort is null ? "" : "&sort=" + Uri.EscapeDataString(sort))}{extra}");
+        return [.. page!.Items.Select(e => e.Action)];
+    }
+
     /// <summary>CRM açık firma; yönetici bir firma oluşturur ve durumunu değiştirir (iki denetim kaydı).</summary>
     private async Task<(Core.Platform.Tenant Tenant, ModulixUser Editor, Guid Company)> TenantWithCompanyChangeAsync()
     {

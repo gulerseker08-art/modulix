@@ -41,8 +41,7 @@ internal sealed class AuditLog(
 
         var filtered = Filter(query);
         var total = await filtered.CountAsync(cancellationToken);
-        var entries = await filtered
-            .OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id)
+        var entries = await Order(filtered, query.Sort)
             .Skip((page - 1) * pageSize).Take(pageSize)
             .ToListAsync(cancellationToken);
 
@@ -104,6 +103,19 @@ internal sealed class AuditLog(
     }
 
     // Kayıtlar tenant verisidir: sorgu filtresi ve RLS yalnızca aktif tenant'ınkileri döndürür.
+    // Anahtarlar AuditQuery.SortKeys'tedir; bilinmeyen anahtar uç noktada reddedilir, burada varsayılan sıraya düşer.
+    private static IOrderedQueryable<AuditLogEntry> Order(IQueryable<AuditLogEntry> entries, string? sort) => sort switch
+    {
+        "occurredAt" => entries.OrderBy(a => a.OccurredAt).ThenBy(a => a.Id),
+        "entityKey" => entries.OrderBy(a => a.EntityKey).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+        "-entityKey" => entries.OrderByDescending(a => a.EntityKey).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+        "action" => entries.OrderBy(a => a.Action).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+        "-action" => entries.OrderByDescending(a => a.Action).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+        "source" => entries.OrderBy(a => a.Source).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+        "-source" => entries.OrderByDescending(a => a.Source).ThenByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+        _ => entries.OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id),
+    };
+
     private IQueryable<AuditLogEntry> Filter(AuditQuery query)
     {
         var entries = db.AuditLog.AsNoTracking();

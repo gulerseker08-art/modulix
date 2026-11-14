@@ -1,9 +1,12 @@
 namespace Modulix.Core.Automation;
 
 public sealed record AutomationRunQuery(
-    Guid? RuleId = null, AutomationRunStatus? Status = null, Guid? RecordId = null, int Page = 1, int PageSize = 50)
+    Guid? RuleId = null, AutomationRunStatus? Status = null, Guid? RecordId = null, int Page = 1, int PageSize = 50, string? Sort = null)
 {
     public const int MaxPageSize = 200;
+
+    /// <summary>Başlığa göre sıralama anahtarları (ADR-0036); boşsa en yeni önce.</summary>
+    public static readonly IReadOnlyCollection<string> SortKeys = ["createdAt", "-createdAt", "status", "-status", "entityKey", "-entityKey"];
 }
 
 public sealed record AutomationRunSummary(

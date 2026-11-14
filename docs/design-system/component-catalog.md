@@ -128,7 +128,8 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 
 - **Sayfalanan liste** sunucuda sıralanır: kayıt deposu `SortKeys` + `Order(source, sort)` tanımlar, başlık `SortHeader`/`GridHeader` ile bu anahtarları gönderir; bilinmeyen anahtar reddedilir. Her yeni `sort` anahtarı dört testle gelir (yön, geçersiz anahtar, tenant izolasyonu, yetki). Örnek: `MeasureUnitSortTests`, `SalesTargetSortTests`.
 - **Tamamı yüklü küçük liste** (sayfalanmayan: platform planları, sektörler, onay bekleyenler) istemcide `ClientSort.Apply(liste, sort, sütunlar)` ile sıralanır; Türkçe sıra, boş değerler sonda, eşit satırlar yerinde kalır. Sayfalanan listede `ClientSort` kullanılmaz (yalnızca görünen sayfayı sıralar, yanıltır).
-- **Sıralanmayan listeler (bilinçli istisna):** zaman sıralı günlükler (denetim kaydı, otomasyon çalışma geçmişi, olay teslimleri) her zaman en yeni önce gelir ve süzgeçle daraltılır; durum raporu tabloları (platform sağlığı) ve kod sırasıyla gezilen kataloglar (GTİP) başlığa göre sıralanmaz.
+- **Günlükler** (denetim kaydı, otomasyon çalışma geçmişi, olay teslimleri) varsayılan olarak en yeni önce gelir ve sunucuda sıralanır: sorgu kaydı `SortKeys` taşır (`AuditQuery`, `AutomationRunQuery`, `EventDeliveryQuery`), uç nokta bilinmeyen anahtarı 422 ile reddeder. `SortHeader`'ın `Default` değeri varsayılan azalan anahtardır (ör. `-occurredAt`); kullanıcı adı, kural adı gibi başka tablodan çözülen sütunlar sıralanmaz.
+- **Sıralanmayan listeler (bilinçli istisna):** durum raporu tabloları (platform sağlığı) ve kod sırasıyla gezilen kataloglar (GTİP) başlığa göre sıralanmaz.
 
 ## Silme onayı (14.11.2026)
 

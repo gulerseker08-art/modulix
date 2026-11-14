@@ -54,8 +54,17 @@ internal sealed class EventAdministration(
 
         var rows = Filter(Rows(), query);
         var total = await rows.CountAsync(cancellationToken);
-        var items = await rows
-            .OrderByDescending(r => r.Delivery.CreatedAt).ThenByDescending(r => r.Delivery.Id)
+        // Anahtarlar EventDeliveryQuery.SortKeys'tedir; eşit kayıtlar en yeni önce sıralanır.
+        var ordered = query.Sort switch
+        {
+            "createdAt" => rows.OrderBy(r => r.Delivery.CreatedAt).ThenBy(r => r.Delivery.Id),
+            "subscription" => rows.OrderBy(r => r.Delivery.Subscription).ThenByDescending(r => r.Delivery.CreatedAt).ThenByDescending(r => r.Delivery.Id),
+            "-subscription" => rows.OrderByDescending(r => r.Delivery.Subscription).ThenByDescending(r => r.Delivery.CreatedAt).ThenByDescending(r => r.Delivery.Id),
+            "attemptCount" => rows.OrderBy(r => r.Delivery.AttemptCount).ThenByDescending(r => r.Delivery.CreatedAt).ThenByDescending(r => r.Delivery.Id),
+            "-attemptCount" => rows.OrderByDescending(r => r.Delivery.AttemptCount).ThenByDescending(r => r.Delivery.CreatedAt).ThenByDescending(r => r.Delivery.Id),
+            _ => rows.OrderByDescending(r => r.Delivery.CreatedAt).ThenByDescending(r => r.Delivery.Id),
+        };
+        var items = await ordered
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(r => new EventDeliveryItem(
                 r.Delivery.Id,

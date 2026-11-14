@@ -99,7 +99,17 @@
     {
         <table class="table record-table">
             <thead>
-                <tr><th>Açılış</th><th>Firma</th><th>Abonelik</th><th>Olay</th><th>Kayıt</th><th>Durum</th><th>Deneme</th><th>Son hata</th><th></th></tr>
+                <tr>
+                    <th scope="col"><SortHeader Label="Açılış" ColumnIcon="calendar" Asc="createdAt" Desc="-createdAt" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col">Firma</th>
+                    <th scope="col"><SortHeader Label="Abonelik" ColumnIcon="repeat" Asc="subscription" Desc="-subscription" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col">Olay</th>
+                    <th scope="col">Kayıt</th>
+                    <th scope="col">Durum</th>
+                    <th scope="col"><SortHeader Label="Deneme" ColumnIcon="hash" Asc="attemptCount" Desc="-attemptCount" Value="@sort" Default="-createdAt" ValueChanged="SortAsync" /></th>
+                    <th scope="col">Son hata</th>
+                    <th scope="col"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var delivery in page.Items)
@@ -182,6 +192,17 @@
         await LoadAsync(1);
     }
 
+    // Günlük varsayılan olarak en yeni önce gelir; sıralama sunucudadır (EventDeliveryQuery.SortKeys).
+    private const string DefaultSort = "-createdAt";
+
+    private string sort = DefaultSort;
+
+    private async Task SortAsync(string value)
+    {
+        sort = value;
+        await LoadAsync(1);
+    }
+
     private async Task LoadAsync(int pageNumber)
     {
         if (!string.IsNullOrWhiteSpace(tenantId) && !Guid.TryParse(tenantId, out _))
@@ -191,7 +212,7 @@
         }
 
         var filter = Filter();
-        var query = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}" };
+        var query = new List<string> { $"page={pageNumber}&pageSize={ListPaging.Size}&sort={Uri.EscapeDataString(sort)}" };
         Add(query, "tenantId", filter.TenantId?.ToString());
         Add(query, "subscription", filter.Subscription);
         Add(query, "eventType", filter.EventType);

@@ -47,7 +47,17 @@ internal sealed class AutomationRunService(
         }
 
         var total = await runs.CountAsync(cancellationToken);
-        var items = await runs.OrderByDescending(r => r.CreatedAt).ThenBy(r => r.Id)
+        // Anahtarlar AutomationRunQuery.SortKeys'tedir; eşit kayıtlar en yeni önce sıralanır.
+        var ordered = query.Sort switch
+        {
+            "createdAt" => runs.OrderBy(r => r.CreatedAt).ThenBy(r => r.Id),
+            "status" => runs.OrderBy(r => r.Status).ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
+            "-status" => runs.OrderByDescending(r => r.Status).ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
+            "entityKey" => runs.OrderBy(r => r.EntityKey).ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
+            "-entityKey" => runs.OrderByDescending(r => r.EntityKey).ThenByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
+            _ => runs.OrderByDescending(r => r.CreatedAt).ThenBy(r => r.Id),
+        };
+        var items = await ordered
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
         return new AutomationRunPage(await SummariesAsync(items, cancellationToken), page, pageSize, total);
     }

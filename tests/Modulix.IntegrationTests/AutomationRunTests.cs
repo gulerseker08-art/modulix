@@ -707,6 +707,51 @@ public class AutomationRunTests(AutomationFixture fixture) : IClassFixture<Autom
         Assert.Contains("eventKey", await publish.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task Run_history_sorts_by_a_column_in_both_directions_and_rejects_an_unknown_key()
+    {
+        var setup = await SetUpAsync();
+        await PublishRuleAsync(setup, ClosedDefinition());
+        var first = await DeliverAsync(setup.Tenant.Id, AutomationRecords.Add(setup.Tenant.Id, Item, status: "closed", title: "İlk"), "closed");
+        fixture.Time.Advance(TimeSpan.FromMinutes(1));
+        var second = await DeliverAsync(setup.Tenant.Id, AutomationRecords.Add(setup.Tenant.Id, Item, status: "closed", title: "İkinci"), "closed");
+
+        // Oluşturulma anı test saatinden gelir; iki çalışma arasında saat ilerletilir.
+        List<Guid> oldestFirst = [first.Id, second.Id];
+        List<Guid> newestFirst = [second.Id, first.Id];
+        Assert.True(first.CreatedAt < second.CreatedAt);
+
+        Assert.Equal(oldestFirst, await RunIdsAsync(setup.Client, "createdAt"));
+        Assert.Equal(newestFirst, await RunIdsAsync(setup.Client, "-createdAt"));
+        Assert.Equal(newestFirst, await RunIdsAsync(setup.Client, null));
+        Assert.Equal(2, (await RunIdsAsync(setup.Client, "-status")).Count);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await setup.Client.GetAsync("/api/automation/runs?sort=password")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_sorted_run_history_is_tenant_isolated_and_needs_the_log_permission()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        await PublishRuleAsync(a, ClosedDefinition());
+        var runA = await DeliverAsync(a.Tenant.Id, AutomationRecords.Add(a.Tenant.Id, Item, status: "closed", title: "Anka"), "closed");
+
+        Assert.Equal([runA.Id], await RunIdsAsync(a.Client, "createdAt"));
+        Assert.Empty(await RunIdsAsync(b.Client, "createdAt"));
+
+        var outsider = await fixture.Factory.CreateUserAsync(a.Tenant);
+        await fixture.CreateRoleAsync(a.Tenant.Id, [AutomationTestModule.ItemsRead], outsider);
+        using var outsiderClient = await LoginAsync(outsider);
+        Assert.Equal(HttpStatusCode.Forbidden, (await outsiderClient.GetAsync("/api/automation/runs?sort=createdAt")).StatusCode);
+    }
+
+    private static async Task<List<Guid>> RunIdsAsync(HttpClient client, string? sort)
+    {
+        var page = await client.GetFromJsonAsync<AutomationRunPageDto>(
+            "/api/automation/runs" + (sort is null ? "" : "?sort=" + Uri.EscapeDataString(sort)));
+        return [.. page!.Items.Select(r => r.Id)];
+    }
+
     private EventEnvelope Envelope(Guid tenantId, Guid recordId, string eventType, JsonObject payload) =>
         new(Guid.NewGuid(), tenantId, eventType, 1, Item, recordId, null, Guid.NewGuid(), ExecutionSource.Api, null, null, 0, payload, fixture.Time.GetUtcNow());
 

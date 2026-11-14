@@ -15,7 +15,13 @@ public sealed record AuditQuery(
     DateTimeOffset? To = null,
     Guid? RecordId = null,
     int Page = 1,
-    int PageSize = 50);
+    int PageSize = 50,
+    string? Sort = null)
+{
+    /// <summary>Başlığa göre sıralama anahtarları (ADR-0036); boşsa en yeni önce. Eşit kayıtlar en yeni önce sıralanır.</summary>
+    public static readonly IReadOnlyCollection<string> SortKeys =
+        ["occurredAt", "-occurredAt", "entityKey", "-entityKey", "action", "-action", "source", "-source"];
+}
 
 /// <summary>
 /// Değişen bir alan, gösterime hazır: <see cref="Label"/> alanın görünen adı; değerler seçenek adı, kişi adı veya bağlı
