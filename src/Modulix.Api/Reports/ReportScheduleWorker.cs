@@ -441,7 +441,7 @@ public sealed class ReportScheduleWorker(IServiceScopeFactory scopes, ReportSche
             {
                 await using var scope = scopes.CreateAsyncScope();
                 var tenantIds = await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Tenants.AsNoTracking()
-                    .Where(t => t.Status == TenantStatus.Active).Select(t => t.Id).ToListAsync(stoppingToken);
+                    .Where(t => TenantStatusRules.Operational.Contains(t.Status)).Select(t => t.Id).ToListAsync(stoppingToken);
                 foreach (var tenantId in tenantIds)
                 {
                     try

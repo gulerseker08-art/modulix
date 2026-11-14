@@ -197,14 +197,14 @@ public sealed class MarketingSendWorker(
         }
     }
 
-    /// <summary>Pazarlama modülü açık, etkin tenant'lar; tek platform sorgusudur.</summary>
+    /// <summary>Pazarlama modülü açık, erişime açık (etkin ya da deneme süresindeki) tenant'lar; tek platform sorgusudur.</summary>
     internal static async Task<IReadOnlyList<Guid>> MarketingTenantIdsAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
         var db = services.GetRequiredService<ModulixDbContext>();
         return await (
             from tenant in db.Tenants.AsNoTracking()
             join entitlement in db.ModuleEntitlements.AsNoTracking() on tenant.Id equals entitlement.TenantId
-            where tenant.Status == TenantStatus.Active && entitlement.ModuleKey == MarketingModule.ModuleKey && entitlement.IsEnabled
+            where TenantStatusRules.Operational.Contains(tenant.Status) && entitlement.ModuleKey == MarketingModule.ModuleKey && entitlement.IsEnabled
             select tenant.Id)
             .ToListAsync(cancellationToken);
     }
