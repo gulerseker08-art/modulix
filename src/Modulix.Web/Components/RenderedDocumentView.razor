@@ -5,27 +5,27 @@
 {
     @if (Preview.IsExample)
     {
-        <div class="alert alert-danger" role="status"><strong>ÖRNEK METİN</strong> — hukuki inceleme yapılmamıştır; kurumunuzun onaylı metniyle değiştirin.</div>
+        <div class="alert alert-danger" role="status">@Texts.Strong("contracts.document.example", Texts.Get("contracts.document.exampleMark"))</div>
     }
     @if (Preview.IsDraftTemplate)
     {
-        <div class="alert alert-warning" role="status">Bu önizleme şablonun <strong>yayımlanmamış çalışma kopyasıdır</strong>; belge yalnızca yayımlanmış sürümden üretilir.</div>
+        <div class="alert alert-warning" role="status">@Texts.Strong("contracts.document.draftTemplate", Texts.Get("contracts.document.draftTemplateMark"))</div>
     }
     else if (!Preview.IsFinal)
     {
-        <div class="alert alert-info" role="status">Sözleşme sürümü henüz dondurulmadı: üretilecek belge <strong>taslak kopya</strong> olarak işaretlenir.</div>
+        <div class="alert alert-info" role="status">@Texts.Strong("contracts.document.notFinal", Texts.Get("contracts.document.notFinalMark"))</div>
     }
     @if (Preview.Missing.Count > 0)
     {
         <div class="alert alert-danger" role="alert">
-            <strong>Belge üretilemez; eksik bilgiler:</strong>
+            <strong>@Texts.Get("contracts.document.missing")</strong>
             <ul class="mb-0">
                 @foreach (var item in Preview.Missing) { <li>@item</li> }
             </ul>
         </div>
     }
 
-    <article class="doc-preview" aria-label="Belge önizlemesi: @Preview.TemplateName (şablon V@(Preview.TemplateVersionNo))">
+    <article class="doc-preview" aria-label="@Texts.Get("contracts.document.previewLabel", Preview.TemplateName, Preview.TemplateVersionNo)">
         @foreach (var block in Preview.Blocks)
         {
             switch (block.Kind)
@@ -42,7 +42,7 @@
                 case "Table":
                     <div class="table-scroll">
                         <table class="table record-table doc-table">
-                            <caption class="visually-hidden">Kalem tablosu</caption>
+                            <caption class="visually-hidden">@Texts.Get("contracts.document.linesCaption")</caption>
                             <thead><tr>@foreach (var h in block.Header ?? []) { <th scope="col">@h</th> }</tr></thead>
                             <tbody>
                                 @foreach (var row in block.Rows ?? [])
@@ -69,7 +69,7 @@
                     </div>
                     break;
                 case "PageBreak":
-                    <hr class="doc-page-break" aria-label="Sayfa sonu" />
+                    <hr class="doc-page-break" aria-label="@Texts.Get("contracts.document.pageBreak")" />
                     break;
             }
         }
