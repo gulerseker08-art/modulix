@@ -196,3 +196,7 @@ Mutlu yol (yükle, uygula, sonuç); hata/doğrulama (her hata kodu, biçim, dosy
 - Uygulama bütün satırları tek kapsamda ve tek `RunAtomicAsync` işleminde yazar; ilk hatalı satırda işlem geri alınır, hiçbir kayıt kalmaz, koşu `Failed` biter ve hata raporu o satırı taşır.
 - **Sapma (bölüm 5 kural b):** 10.000 satır sınırı ayrıca uygulanmadı; genel dosya sınırı (`ImportLimits.MaxRows` = 2.000) zaten daha dar. Sınır yükseltilirse "hepsi ya da hiç" için ayrı sınır eklenmeli.
 - **Sonra değerlendirilecek:** ilk hatada durulduğu için uygulamada yalnızca ilk hatalı satır raporlanır (kuru çalışma hepsini gösterir); tek işlem boyunca ilerleme sayacı güncellenmez; 4b aynı dosya uyarısının bu modda engele çevrilmesi.
+
+### Not: Core kişi içe aktarması (14 Kasım 2026, ADR-0042 bölüm 21)
+
+Core artık `core.person` için içe aktarma tanımı beyan eder (izin `core.people.import`). Kişinin yazma izni kişiyi kullanan modüllerden geldiğinden içe aktarıcı ayrıca bunlardan birine sahip olmalıdır; kayıt boru hattı her satırda denetler. Modüller kişiye bağlı kayıtlarını (ör. İK çalışan kartı) kişi e-postasıyla bağlayarak içe aktarır.

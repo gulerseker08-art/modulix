@@ -368,3 +368,21 @@ Yol haritası M4.2 (tarihli görev geçmişi). Çalışanın unvan, departman, y
 | `dotnet test tests/Modulix.ArchitectureTests` | 83/83 geçti |
 | `HrEmployeePositionTests` (entegrasyon, 3 test: dönem açma/kapama, ayrılış ve yeniden başlama; geçerlilik günü kuralları ve geçmişe doğrudan yazma 409; tenant izolasyonu, izinsiz kullanıcı ve salt okur) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
 | `Modulix.Web` derlemesi | Yeni bileşen ve editör değişikliği hatasız derleniyor; ekran görüntüsü alınamadı (yerelde uygulama çalışmıyor) |
+
+## 21. Çalışan kartı içe aktarma: seçenek (a) (14 Kasım 2026)
+
+Bölüm 19'daki karar (a) olarak verildi (kullanıcı kararı, 14 Kasım 2026): Core'a kişi içe aktarması için ayrı bir izin ve tanım; çalışan kartı kişiye e-postayla bağlanır.
+
+- **Core:** yeni izin `core.people.import` ("İçe aktarma" grubu; Yönetici rolü bütün izinleri taşıdığından onda vardır) ve `core.person` içe aktarma tanımı (ad, soyad zorunlu; e-posta, telefon, unvan). Aynı e-postalı kişi **olası mükerrerdir** (uyarı; kişiler otomatik birleştirilmez, ADR-0013). Kişinin yazma izni kişiyi kullanan modüllerden geldiği için (`SharedRecordAccess`) içe aktarıcı ayrıca bunlardan birine (ör. `hr.employees.write`) sahip olmalıdır; kayıt boru hattı bunu her satırda denetler. Katalog kuralı (tanım modülün kendi kayıt türü, izin modülün kendi izni) değişmedi: tanım Core'da, izin Core'un.
+- **İK:** `hr.employee` içe aktarma tanımı (`hr.employees.write`): kişi e-postası (zorunlu, `core.person` e-posta süzgeciyle), sicil no, işe giriş (zorunlu), unvan, departman, yönetici sicil no (`hr.employee` sicil no süzgeciyle), çalışma şekli, çalışma yeri, kullanıcı hesabı (e-posta), durum, ayrılış, özlük alanları (izni olmayan içe aktarıcıda dolu hücre satır hatasıdır), notlar. Sicil no ve kişi kesin eşleşmedir (dosyada tekrar eden satır hatası; kayıtlı kişinin ikinci kartı depo kuralıyla reddedilir). Görev geçmişinin ilk dönemi içe aktarmada da açılır (bölüm 20).
+- **Yönetici bağlantısı:** satırlar sırayla yazılır ve bağlantı yazma anında çözülür; yönetici dosyada astından önce gelirse bulunur. Kuru çalışmada satırlar yazılmadığından aynı dosyadaki yöneticiye bağlantı çözülmez; "hepsi ya da hiç" kipi hatasız kuru çalışma istediği için bu kipte yöneticiler ayrı (önceki) bir dosyayla yüklenmelidir.
+- Sıra: kişiler → çalışan kartları → izin hakları.
+
+### Test sonuçları (bölüm 21)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 43/43 geçti (gerçek katalogla çalışan ve kişi tanımları) |
+| `dotnet test tests/Modulix.Core.Tests` | 996/996 geçti |
+| `dotnet test tests/Modulix.ArchitectureTests` | 91/91 geçti |
+| `HrImportTests` (entegrasyon, +2 test: kişiler sonra kartlar, e-posta ve yönetici bağlantısı, görev geçmişi; bilinmeyen e-posta, aynı kişiye ikinci kart, olası mükerrer kişi uyarısı, kişi içe aktarma izni, başka firmanın kişisi) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
