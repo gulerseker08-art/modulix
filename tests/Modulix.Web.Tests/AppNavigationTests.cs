@@ -335,6 +335,18 @@ public class AppNavigationTests
     }
 
     [Fact]
+    public void Logistics_expenses_screen_needs_its_own_read_permission_and_the_module()
+    {
+        // Masraflar kendi okuma iznine bağlıdır: sefer ya da sürücü izni yetmez; modül kapalıysa hiç görünmez.
+        Assert.Equal(["Masraflar"], Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.ExpensesRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
+        var nav = Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.ExpensesRead]);
+        Assert.Equal("lojistik/masraflar", nav.Find("logistics.expenses")!.Route);
+        Assert.Equal(AppCatalog.Logistics, nav.Context("lojistik/masraflar")!.Root.Id);
+        Assert.DoesNotContain("Masraflar", Nav([LogisticsAccess.ModuleKey], [LogisticsAccess.TripsRead, LogisticsAccess.DriversRead]).MenuEntries(AppCatalog.Logistics).Select(e => e.Name));
+        Assert.Empty(Nav([], [LogisticsAccess.ExpensesRead]).Roots());
+    }
+
+    [Fact]
     public void Fleet_app_shows_the_vehicles_screen_only_with_the_module_and_the_permission()
     {
         var nav = Nav([FleetAccess.ModuleKey], [FleetAccess.VehiclesRead]);
@@ -405,6 +417,30 @@ public class AppNavigationTests
         Assert.Equal(["Masraflarım"], Nav([HrAccess.ModuleKey], [HrAccess.ExpensesRead, HrAccess.ExpensesRequest]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
         Assert.Equal(["Masraf beyanları"], Nav([HrAccess.ModuleKey], [HrAccess.ExpensesRead, HrAccess.ExpensesPay]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
         Assert.Equal("ik/masraf-beyanlari", Nav([HrAccess.ModuleKey], [HrAccess.ExpensesManage]).Find("hr.expense-claims")!.Route);
+
+        // Zimmet: okuma izni "Zimmetlerim"i, yönetim izni "Demirbaşlar"ı açar.
+        Assert.Equal(["Zimmetlerim"], Nav([HrAccess.ModuleKey], [HrAccess.AssetsRead]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["Zimmetlerim", "Demirbaşlar"], Nav([HrAccess.ModuleKey], [HrAccess.AssetsRead, HrAccess.AssetsManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
+        // İşe giriş/çıkış: okuma "Görevlerim"i, yönetim süreç ve şablon ekranlarını açar.
+        Assert.Equal(["Görevlerim"], Nav([HrAccess.ModuleKey], [HrAccess.ChecklistsRead]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["Görevlerim", "İşe giriş ve çıkış", "Süreç şablonları"],
+            Nav([HrAccess.ModuleKey], [HrAccess.ChecklistsRead, HrAccess.ChecklistsManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
+        // Duyurular: okuma akışı en üstte; yönetim ayrı ekran.
+        Assert.Equal(["Duyurular"], Nav([HrAccess.ModuleKey], [HrAccess.AnnouncementsRead]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["Duyurular", "Duyuru yönetimi"],
+            Nav([HrAccess.ModuleKey], [HrAccess.AnnouncementsRead, HrAccess.AnnouncementsManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
+        // Anketler: yanıtlama ekranı duyuruların ardından; yönetim ayrı ekran.
+        Assert.Equal(["Duyurular", "Anketler"], Nav([HrAccess.ModuleKey], [HrAccess.AnnouncementsRead, HrAccess.SurveysRespond]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["Anketler", "Anket yönetimi"],
+            Nav([HrAccess.ModuleKey], [HrAccess.SurveysRespond, HrAccess.SurveysManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
+        // Blog ve galeri: okuma ekranları iletişim ekranlarının ardından; yönetim ekranları en sonda.
+        Assert.Equal(["Blog", "Galeri"], Nav([HrAccess.ModuleKey], [HrAccess.BlogRead, HrAccess.GalleryRead]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["Blog", "Galeri", "Blog yönetimi", "Galeri yönetimi"],
+            Nav([HrAccess.ModuleKey], [HrAccess.BlogRead, HrAccess.GalleryRead, HrAccess.BlogManage, HrAccess.GalleryManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
 
         Assert.Empty(Nav([], [HrAccess.EmployeesRead]).Roots());
         Assert.Empty(Nav([HrAccess.ModuleKey], []).Roots());

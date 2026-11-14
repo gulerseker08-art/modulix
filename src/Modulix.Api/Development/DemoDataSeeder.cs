@@ -98,11 +98,11 @@ public static class DemoDataSeeder
         var anka = await CreateAsync(CrmModule.Entities.Company, new JsonObject
         {
             ["name"] = "Anka Gıda A.Ş.", ["city"] = "İstanbul", ["phone"] = "0212 555 01 01", ["email"] = "info@anka.demo",
-            ["status"] = "Customer", ["industry"] = "Gıda", ["source"] = "Referral", ["tags"] = "öncelikli, soğuk zincir",
+            ["status"] = "Customer", ["industry"] = "gida-icecek", ["source"] = "Referral", ["tags"] = "öncelikli, soğuk zincir",
         });
         var delta = await CreateAsync(CrmModule.Entities.Company, new JsonObject
         {
-            ["name"] = "Delta Yapı Ltd.", ["city"] = "Ankara", ["taxNumber"] = "1234567890", ["industry"] = "İnşaat", ["source"] = "Event",
+            ["name"] = "Delta Yapı Ltd.", ["city"] = "Ankara", ["taxNumber"] = "1234567890", ["industry"] = "insaat", ["source"] = "Event",
         });
         var selin = await CreateAsync(CrmModule.Entities.Contact, new JsonObject
         {

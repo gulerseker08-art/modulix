@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Approvals;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Logistics.Domain;
@@ -11,7 +12,7 @@ namespace Modulix.Modules.Logistics.Lifecycle;
 public sealed record LogisticsActionState(string Action, string Label, bool Allowed, string? Message, bool RequiresReason, bool Destructive);
 
 /// <summary>
-/// Taşıma talebi, sevkiyat ve sefer iş akışı (ADR-0038 K7, dilim 4–5). Durum yalnızca bu komutlarla değişir; her geçiş kayıt boru hattından geçer
+/// Taşıma talebi, sevkiyat, sefer ve sefer masrafı iş akışı (ADR-0038 K7, K10, dilim 4–5, 8). Durum yalnızca bu komutlarla değişir; her geçiş kayıt boru hattından geçer
 /// (izin, sürüm denetimi 409, audit, outbox olayı). Talep onayı aynı işlemde sevkiyatı açar ve talebe bağlar. Sevkiyatın "Planlandı" durumu sefer
 /// atamasıdır (<see cref="ITripPlanner"/>). Seferin planı uygunluk denetimi geçince onaylanır (uyarılar seferde saklanır), sefere çıkışta denetim
 /// yinelenir; sefer bütün duraklara varış girilince tamamlanır; iptal seferdeki yüklenmemiş sevkiyatları planlamaya döndürür. Teslim eylemleri
@@ -31,6 +32,7 @@ public static class LogisticsActions
 {
     public const string Approve = "approve";
     public const string Reject = "reject";
+    public const string Resubmit = "resubmit";
     public const string Cancel = "cancel";
     public const string Confirm = "confirm";
     public const string Reopen = "reopen";
@@ -74,6 +76,13 @@ public static class LogisticsTransitions
             [Trip.Statuses.InProgress], Trip.Statuses.Completed, false, "Yalnızca yoldaki sefer tamamlanır."),
         new(LogisticsModule.Entities.Trip, LogisticsActions.Cancel, "İptal et", LogisticsModule.Permissions.TripsWrite,
             [Trip.Statuses.Planning, Trip.Statuses.Ready], Trip.Statuses.Cancelled, true, "Yola çıkmış ya da kapanmış sefer iptal edilemez.", Destructive: true),
+
+        new(LogisticsModule.Entities.TripExpense, LogisticsActions.Approve, "Onayla", LogisticsModule.Permissions.ExpensesApprove,
+            [TripExpense.Statuses.Pending], TripExpense.Statuses.Approved, false, "Yalnızca beklemedeki masraf onaylanabilir."),
+        new(LogisticsModule.Entities.TripExpense, LogisticsActions.Reject, "Reddet", LogisticsModule.Permissions.ExpensesApprove,
+            [TripExpense.Statuses.Pending], TripExpense.Statuses.Rejected, true, "Yalnızca beklemedeki masraf reddedilebilir.", Destructive: true),
+        new(LogisticsModule.Entities.TripExpense, LogisticsActions.Resubmit, "Yeniden onaya gönder", LogisticsModule.Permissions.ExpensesWrite,
+            [TripExpense.Statuses.Rejected], TripExpense.Statuses.Pending, false, "Yalnızca reddedilen masraf yeniden onaya gönderilir."),
     ];
 
     public static Transition? Find(string entityKey, string action) =>
@@ -81,12 +90,13 @@ public static class LogisticsTransitions
 }
 
 internal sealed class LogisticsWorkflow(
-    IRecordPipeline pipeline, LogisticsWorkflowGate gate, ICurrentAccess access, ITripPlanner planner, LogisticsStoreContext context) : ILogisticsWorkflow
+    IRecordPipeline pipeline, LogisticsWorkflowGate gate, ICurrentAccess access, ITripPlanner planner, LogisticsStoreContext context,
+    IApprovalGate approvalGate) : ILogisticsWorkflow
 {
     /// <summary>Talepten sevkiyata kopyalanan alanlar (yük, güzergâh, taraflar).</summary>
     private static readonly string[] CargoKeys =
     [
-        "customerPartyId", "senderPartyId", "receiverPartyId", "transportModeKey", "pickupCity", "pickupAddress", "deliveryCity", "deliveryAddress",
+        "customerPartyId", "senderPartyId", "receiverPartyId", "transportModeKey", "pickupCity", "pickupCountry", "pickupAddress", "deliveryCity", "deliveryCountry", "deliveryAddress",
         "pickupDate", "deliveryBy", "cargoDescription", "weightKg", "volumeM3", "palletCount", "loadingMeters", "hazardous", "notes",
     ];
 
@@ -203,6 +213,14 @@ internal sealed class LogisticsWorkflow(
     /// </summary>
     private async Task<string?> PreconditionAsync(string entityKey, Guid id, string action, CancellationToken cancellationToken)
     {
+        if (entityKey == LogisticsModule.Entities.TripExpense)
+        {
+            // Firma masrafın onaylanmasını bir onay sürecine bağlamışsa kayıt onaylanmış olmalıdır (ADR-0027 Ç6a.3); ret her zaman serbesttir.
+            return action == LogisticsActions.Approve
+                ? await approvalGate.BlockReasonAsync(new RecordRef(entityKey, id), LogisticsModule.ApprovalCommands.ApproveExpense, cancellationToken)
+                : null;
+        }
+
         if (entityKey != LogisticsModule.Entities.Trip)
         {
             return null;

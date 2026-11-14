@@ -48,12 +48,12 @@
     {
         @if (message is null)
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
     }
     else if (teams.Count == 0)
     {
-        <p class="text-muted">Henüz ekip yok.</p>
+        <EmptyState Title="Henüz ekip yok." />
     }
     else
     {

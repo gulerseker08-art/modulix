@@ -25,6 +25,7 @@ public static class LogisticsEndpoints
         ["requests"] = LogisticsModule.Entities.TransportRequest,
         ["shipments"] = LogisticsModule.Entities.Shipment,
         ["trips"] = LogisticsModule.Entities.Trip,
+        ["expenses"] = LogisticsModule.Entities.TripExpense,
     };
 
     public static IEndpointRouteBuilder MapLogisticsEndpoints(this IEndpointRouteBuilder app)
@@ -121,5 +122,12 @@ internal sealed class LogisticsPolicyProvider(IServiceProvider services) : ILogi
         var value = await services.GetRequiredService<Modulix.Core.Settings.ITenantSettings>()
             .GetValueAsync(LogisticsModule.SettingKeys.CredentialCheck, cancellationToken);
         return value == LogisticsModule.CredentialCheckModes.Block ? LogisticsModule.CredentialCheckModes.Block : LogisticsModule.CredentialCheckModes.Warn;
+    }
+
+    public async Task<string?> DefaultCountryAsync(CancellationToken cancellationToken)
+    {
+        var value = await services.GetRequiredService<Modulix.Core.Settings.ITenantSettings>()
+            .GetValueAsync(LogisticsModule.SettingKeys.DefaultCountry, cancellationToken);
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
     }
 }

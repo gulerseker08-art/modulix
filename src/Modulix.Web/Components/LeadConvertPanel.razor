@@ -27,7 +27,7 @@
 
     @if (preview is null)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState />
     }
     else if (preview.Blockers.Count > 0)
     {

@@ -76,7 +76,7 @@ Her dilim dört testle teslim edilir (mutlu yol, doğrulama, tenant izolasyonu, 
 | 5 | Sefer, durak zinciri, atama, uygunluk denetimi (belge, kapasite), durum makinesi, sefer numarası | 4, Ç8.1 |
 | 6 | Teslim kanıtı + `ShipmentDelivered.v1` | 5, Ç0.4 |
 | 7 | Navlun ve hakediş (7a, yapıldı: hassas alanlar) → faturalanabilir kalem (7b) | 6, ADR-0037 dilim 1 |
-| 8 | Masraf + onay + yakıt alanları | 5, Ç6a asgari |
+| 8 | Masraf + onay + yakıt alanları (yapıldı) | 5, Ç6a asgari |
 | 9 | Kârlılık görünümü, eşik kuralları, pano | 7, 8 |
 | 10 | Belgeler: taşıma irsaliyesi çıktısı (Ç8.2), e-İrsaliye adaptörü (Ç11b.3), U-ETDS bildirimi | Ç8, Ç11, bölüm 8 doğrulaması |
 | 11 | Sipariş → talep ve sefer → depo kabul köprüleri | 4, ADR-0023, ADR-0032 dilim 5 |
@@ -476,6 +476,31 @@ Dilim 7 ikiye bölündü: bu dilim yalnızca tutar alanlarını ve yetkisini get
 | `... --filter "LogisticsFreightTests"` (temiz veritabanı) | 4/4. **Mutlu yol:** navlun girilir, para birimi büyük harfe çevrilir, silinir; talep onayı navlunsuz sevkiyat açar; taşeron seferde hakediş. **Doğrulama:** tutarsız para birimi, tutarsız tutar, geçersiz kod, eksi ve üç ondalıklı tutar, taşıyıcısız hakediş, para birimsiz hakediş, yüklemesi başlayan sevkiyatın navlunu kilitli; hatalı denemeler hiçbir şey yazmaz. **Tenant izolasyonu:** başka tenant'ın sevkiyat ve seferi 404, listede yok, değiştirilemez. **Yetki:** navlun izni olmayan alanları görmez, yazamaz, diğer alanları düzenlemeye devam eder ve navlun korunur, denetim kaydında tutarı görmez, izinsiz kişi 403 |
 | `... --filter "LogisticsDelivery\|LogisticsTrip\|LogisticsShipment\|LogisticsDriver\|LogisticsCarrierTerms\|FieldRulePackage\|AutomationRule\|ModulesAndRoles\|TableInventory\|TenantDataTransfer\|BusinessEvent\|SharedRecord\|TenantIsolation"` (temiz veritabanı) | 85/85 |
 
+## 20. Dilim 8: Sefer masrafı, onay ve yakıt alanları (13 Kasım 2026)
+
+K10 uygulandı. Masraf operasyon kaydıdır; ödeme, kasa, banka ve sürücü hesabı finans/İK işidir ve burada yoktur.
+
+- **Masraf (`logistics.TripExpenses`, `ICompanyShared`):** sefer (yalnızca oluştururken; `(TenantId, TripId)` bileşik yabancı anahtar), tür (Y9b listesi `logistics.expense-kind`), açıklama (zorunlu, 200; onay isteğinde kaydın adı), masraf tarihi (ileri gün olamaz), tutar (KDV dahil toplam, sıfırdan büyük), para birimi (üç harf), KDV tutarı (tutarı aşamaz), tedarikçi (`core.Party`, rol süzgeci yok), durum, durum gerekçesi. İptal edilmiş sefere masraf açılmaz (409).
+- **Tür ve kategori:** hazır değerler yakıt, köprü/otoyol geçişi, harcırah, trafik cezası, otopark, yolda onarım/lastik, diğer; kategoriler `fuel`, `toll`, `allowance`, `fine`, `other`. Kod türün adına değil **kategorisine** bakar; firma kendi türlerini ekler. Varsayılan "Diğer": yakıt ek alan ister, bilinçli seçilmelidir.
+- **Yakıt (ayrı defter yok):** `fuel` kategorisinde litre zorunlu (0-999.999,999), kilometre sayacı isteğe bağlı; başka kategoride ikisi de girilemez (422). Litre fiyatı (`unitPrice`, KDV dahil) tutardan ve litreden türetilir, kaydedilmez. Araç yakıt raporu bu kayıtlardan türetilecek (rapor dilim 9).
+- **Ceza:** `chargeToDriver` yalnızca `fine` kategorisinde işaretlenir; sürücüye rücu **yalnızca bilgidir**, borç kaydı üretmez.
+- **Durum ve karar:** Beklemede → Onaylandı / Reddedildi; yalnızca iş akışı komutuyla (`/api/logistics/expenses/{id}/actions`: `approve`, `reject`, `resubmit`). Ret gerekçe ister (422). Reddedilen masraf düzeltilip `resubmit` (yazma izni, gerekçesiz) ile yeniden Beklemede olur; onaylanmış masraf değişmez (onay tutara bağlıdır) ve masraf silinmez (K12): onaylanmış hatalı masrafın düzeltmesi yeni masrafladır. Fiş/fatura numarası `documentNo` alanındadır (en çok 50 karakter, isteğe bağlı). Makbuz ve fiş masrafa Core dosya deposuyla eklenir (okuma = masraf okuma izni, ekleme = masraf yazma izni).
+- **İzinler:** `logistics.expenses.read/write/approve`. "Operasyon" okur ve girer; yalnızca "Operasyon müdürü" onaylar. Giren, eylem listesinde onay ve ret düğmesini görmez; kendi masrafını onaylama yasağı bu dilimde yoktur (aynı kişiye hem yazma hem onay izni verilebilir; ayrım rol kararıdır).
+- **Genel onay (ADR-0027 Ç6a):** masraf `IModule.ApprovalTargets` ile onaya gönderilebilir (tutar ve para birimi kayıttan); "Masrafı onaylama" işlemi onaya bağlanabilir. Firma bir onay sürecini bu işleme bağlarsa `approve` komutu önce onay kapısına sorar (409, neden iletide); ret her zaman serbesttir. Onay sürecini bağlamayan firmada müdür doğrudan onaylar.
+- **Kural altyapısı:** masraf için kayıt olayları (`logistics.trip-expense.created/updated`), durum, tür, tutar, para birimi, tarih, sefer alanları ve tarama kaynağı (zamanlanmış ve masraf tarihine bağlı; yalnızca beklemedeki masraflar) beyan edildi: "tutarı eşiği aşan masraf onaya gitsin" ya da "3 gündür onay bekleyen masraf için hatırlat" gibi kurallar firmanın otomasyonudur, koda eşik yazılmadı.
+- **Migration:** `LogisticsTripExpenses` (yeni tablo, RLS politikası `TenantIsolationSql.AddTable` ile).
+- **Arayüz:** sefer kartında "Masraflar" paneli (`TripExpensesPanel`): ekleme/düzenleme formu (yakıtta litre ve kilometre, cezada rücu işareti), tablo, onaylı/bekleyen toplam (para birimine göre), onay-ret eylem çubuğu, makbuz ekleme. Sayfa içi küçük eylem formu olduğu için sekmesizdir; yeni CSS sınıfı ya da token yok. **Açık ve koyu tema ekran görüntüsü alınmadı.**
+
+**Bilerek yapılmadı:** masraf listesi ekranı ("Bekleyen masraflar" onay kuyruğu; onay merkezi bağlantı adresi bu yüzden seferler sayfasına gider), ödeme ve kasa/banka, sürücü avansı ve hesabı (İK M4), yakıt tüketimi/sapma raporu ve eşikleri (dilim 9), makbuz zorunluluğu, masraf için özel alan ve form tasarımı, kendi masrafını onaylama yasağı, kur dönüşümü (para birimleri ayrı toplanır).
+
+### Test sonuçları (Dilim 8)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 27 (6 yeni): masraf türü listesi ve kategorileri (varsayılan yakıt değil), yalnızca müdür şablonu onaylar, geçiş tablosu (karar yalnızca beklemeden, ret gerekçeli, iptal/yeniden açma yok), onay hedefi ve onaya bağlanabilir komut, kural altyapısı ve denetim etiketleri, Shared sabitleri sunucuyla aynı. Mevcut üç testin beklentisi masraf varlığını kapsayacak şekilde genişletildi |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Web.Tests` | 69/69 / 122/122 |
+| `... --filter "LogisticsExpenseTests"` (temiz veritabanı) | 4/4. **Mutlu yol:** operasyon yakıt ve geçiş masrafı girer, litre fiyatı türer, beklemedeki masraf düzenlenir, müdür onaylar ve gerekçeyle reddeder, karar verilmiş masraf değişmez ve silinmez, bekleyen listesi, denetim kaydı. **Doğrulama:** tutar, para birimi, KDV, tarih, açıklama, bilinmeyen tür ve sefer, kategoriye bağlı litre/kilometre/rücu kuralları, iptal edilmiş sefer (409), gerekçesiz ret (422), çifte karar (409). **Tenant izolasyonu:** başka tenant'ın masrafı görünmez, güncellenmez, onaylanmaz, başka tenant'ın seferine masraf açılmaz. **Yetki:** yalnızca okuyan giremez, giren onaylayamaz ve eylem listesinde onay/ret görmez, okuma izni olmayan göremez |
+| Etkilenen diğer entegrasyon testleri | **Yerelde tamamlanamadı.** İlk çalıştırmada 36 test geçti; "Approval" kalıbıyla toplanan ve bu dilimle ilgisiz bir Sözleşmeler testi bellek tükenmesiyle (`OutOfMemoryException`) düşüp çalıştırmayı durdurdu. Sonraki çalıştırmalarda makinenin belleği (≈750 MB boş) ve Docker'ın SQL Server kapı iletişimi yüzünden bağlantılar zaman aşımına uğradı (sunucu kapsayıcı içinden yanıt veriyordu). Kalanlar CI'da (temiz veritabanı, 4 parça) çalışır |
 
 ## 21. Dilim 9a: Operasyon panosu (13 Kasım 2026)
 
@@ -513,3 +538,22 @@ Dilim 9 ikiye bölündü. Bu dilim yalnızca operasyon panosunu getirir. Kârlı
 | `dotnet test tests/Modulix.ArchitectureTests` | 69/69 |
 | `dotnet test tests/Modulix.Web.Tests` | 122/122 (menüde pano ilk sırada, sürücü ya da sefer izniyle görünür) |
 | `... --filter "LogisticsDashboardTests"` | 4 test yazıldı. **Mutlu yol:** talep, sevkiyat, geciken, sefer ilerlemesi, teslim oranı ve günlük dağılım, belge. **Boş firma:** sıfırlar, oran yok. **Tenant izolasyonu:** başka firmanın kayıtları sayılmaz. **Yetki:** yalnızca sefer izni olan yalnızca sefer bölümünü alır, izinsiz 403, modül kapalıyken 403. **Yerelde çalıştırılamadı** (SQL Server 14333 bağlantısı zaman aşımında); CI doğrular. |
+
+## 22. Dilim 8b: Masraflar ekranı ve masraf paneli düzeltmesi (13 Kasım 2026)
+
+Dilim 8'in "bilerek yapılmadı" listesindeki bekleyen masraf kuyruğu eklendi; görsel doğrulamada bulunan bir arayüz hatası düzeltildi.
+
+- **Masraflar ekranı** (`/lojistik/masraflar`, menüde "Masraflar", izin `logistics.expenses.read`): grid şablonu; görünümler Bekleyenler (varsayılan), Onaylananlar, Reddedilenler, Tüm masraflar; kişisel görünüm kaydı; arama (açıklama); sıralanan başlıklar (`expenseDate`, `amount`, `status`); sütun seçici; satır menüsü "Aç". Sefer numarası `logistics.trip-expense.trip` çözümleme lookup'ıyla gelir (seçici değil; okuma sefer okuma iznine bağlı, izni olmayan "—" görür). Satır açılınca ayrıntı kartı: bütün alanlar, onay/ret eylem çubuğu (`LogisticsActionsBar`, ret gerekçe ister), makbuz paneli. Karar sonrası liste yenilenir, karar verilmiş masraf kartta güncel haliyle kalır. Sayfa toplamı onaylı ve bekleyen olarak para birimine göre ayrı yazılır.
+- **Onay merkezi bağlantısı** (`ApprovalTargets.LinkTemplate`) artık `lojistik/masraflar`: masraf başına sayfa olmadığı için eskiden seferler listesine gidiyordu.
+- **Menü çevirisi** (ADR-0034): `nav.app.logistics.expenses` TR/EN/AZ.
+- **Hata düzeltmesi (dilim 8 paneli):** `TripExpensesPanel` `CrmLookups`'ı kendisi enjekte ediyordu; `CrmLookups` geçici (transient) kayıtlı olduğundan panel yüklenmemiş boş bir örnek alıyor, "Tür" seçimi boş kalıyor (masraf eklenemiyor) ve tür sütunu etiket yerine ham anahtar ("Fuel") gösteriyordu. Panel artık sayfanın yüklediği örneği parametre olarak alır (CargoEditor ve TripEditor ile aynı kalıp). Bu hata birim ve entegrasyon testleriyle yakalanamaz (yalnızca arayüz); tarayıcıda görüldü.
+- **Görsel doğrulama:** Masraflar ekranı ve ayrıntı kartı açık ve koyu temada, sefer kartındaki Masraflar paneli koyu temada tarayıcıda incelendi; yeni CSS sınıfı ya da token yok. **Düzeltmeden sonraki panelin tarayıcıda yeniden doğrulaması ve dilim 6 (Teslim paneli), 7a (Navlun/Hakediş) bölümlerinin tema kontrolü yapılamadı** (Docker Desktop açılmadı); derleme, birim, Web ve mimari testleri geçti.
+
+### Test sonuçları (Dilim 8b)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.Modules.Logistics.Tests` | 30 (1 yeni): çözümleme lookup'ları ve onay bağlantısı |
+| `dotnet test tests/Modulix.Web.Tests` | 138 (1 yeni): Masraflar menüsü kendi okuma iznine ve modüle bağlı |
+| `dotnet test tests/Modulix.ArchitectureTests` | 73/73 |
+| `... --filter "LogisticsExpenseTests"` (SQL Server; CI koşar) | 5 (1 yeni): sefer numarası çözümlemesi yalnızca sefer okuma izni olan ve aynı tenant'taki kullanıcıya açık. **Yerelde çalıştırılamadı** (Docker Desktop kapalı) |

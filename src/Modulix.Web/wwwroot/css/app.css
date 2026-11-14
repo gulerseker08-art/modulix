@@ -1709,6 +1709,19 @@ tr.done td.primary {
         font-weight: 700;
     }
 
+    /* Yıkıcı menü öğesi (Sil): renk + çöp ikonu; menünün son öğesidir. */
+    .view-menu-item.is-danger {
+        color: var(--mx-danger-text);
+    }
+
+        .view-menu-item.is-danger:hover {
+            background: var(--mx-tone-danger-bg);
+        }
+
+    .view-menu-item:disabled {
+        opacity: 0.55;
+    }
+
     .view-menu-item.view-menu-new {
         justify-content: flex-start;
         font-weight: 600;
@@ -3145,6 +3158,10 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
     margin-top: 1rem;
 }
 
+.chart-grid > .today-panel {
+    margin: 0;
+}
+
 .chart-card {
     padding: 1.25rem;
     border: 1px solid var(--mx-border);
@@ -3263,6 +3280,23 @@ li.overdue .item-main span, tr.overdue td[data-label="Tarih"] {
     box-shadow: var(--mx-shadow);
     overflow: hidden;
 }
+
+    /* Bölüm kartının içindeki alt bölüm ikinci bir kart çizmez (kart içinde kart yok): çerçeve ve gölge kalkar,
+       kardeş alt bölümler ince çizgiyle ayrılır. Satır menüsü taşabilsin diye kırpılmaz. */
+    .section-card-body > .sub-section {
+        margin-bottom: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible;
+    }
+
+        .section-card-body > .sub-section + .sub-section {
+            margin-top: var(--mx-space-2);
+            padding-top: var(--mx-space-2);
+            border-top: 1px solid var(--mx-border);
+        }
 
     .sub-section > .section-header {
         margin: 0;
@@ -4788,6 +4822,9 @@ button.pipeline-label {
 /* Liste görünümleri (ViewTabs, 12.11.2026 görsel kararı): etkin sekme açık marka zeminli, üstü yuvarlak, altında turkuaz→mavi çizgi. */
 .view-tabs {
     gap: var(--mx-space-2);
+    /* İçerik paneli içeriğine göre genişler (fit-content); sekme çubuğu paneli genişletmez, sığmayınca kendi içinde kayar
+       (telefonda sayfa yatay taşmaz). */
+    contain: inline-size;
 }
 
     .view-tabs .record-tab {
@@ -4938,6 +4975,34 @@ button.pipeline-label {
         border-color: var(--mx-brand-primary);
         box-shadow: var(--mx-focus-ring);
     }
+
+/* Kısayol ipucu (Ctrl K): kutu boşken sağda durur; odaklanınca ve telefonda gizlenir. */
+.global-search-kbd {
+    position: absolute;
+    right: var(--mx-space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0 var(--mx-space-2);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-surface-muted);
+    color: var(--mx-text-secondary);
+    font-family: var(--mx-font);
+    font-size: var(--mx-fs-helper);
+    font-weight: 600;
+    line-height: 1.5rem;
+    pointer-events: none;
+}
+
+.global-search:focus-within .global-search-kbd {
+    display: none;
+}
+
+@media (max-width: 767.98px) {
+    .global-search-kbd {
+        display: none;
+    }
+}
 
 /* Panelin dışına tıklanınca kapanır. */
 .global-search-backdrop {
@@ -6878,5 +6943,290 @@ button.hero-stat {
 @media (max-width: 640px) {
     .dash-meter {
         flex-basis: 28%;
+    }
+}
+
+/* Güzergâh haritasında ülkenin yaklaşık merkezine düşen nokta (şehir katalogda yok): içi boş halka */
+.map-dot.is-approx {
+    fill: none;
+    stroke: var(--mx-map-dot);
+    stroke-width: 1.5;
+    stroke-dasharray: 2 2;
+}
+
+/* ---- Yükleme iskeleti (docs/design-system/component-catalog.md → LoadingState) ---- */
+/* Kısa süren yüklemede titremesin diye gecikmeyle belirir; çubuklar yalnızca tokenlardan renk alır. */
+.loading-state {
+    animation: loading-reveal 0.2s ease-out 0.15s both;
+}
+
+@keyframes loading-reveal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.skeleton {
+    display: block;
+    border-radius: var(--mx-radius-input);
+    background: linear-gradient(90deg, var(--mx-surface-muted) 25%, var(--mx-surface-hover) 50%, var(--mx-surface-muted) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+}
+
+.skeleton-bar {
+    height: 0.75rem;
+}
+
+.skeleton-tall {
+    height: 1.5rem;
+}
+
+.skeleton-lines {
+    display: grid;
+    gap: var(--mx-space-3);
+    max-width: 32rem;
+    padding: var(--mx-space-2) 0;
+}
+
+    .skeleton-lines .skeleton-bar:nth-child(2n) {
+        width: 72%;
+    }
+
+    .skeleton-lines .skeleton-bar:last-child {
+        width: 48%;
+    }
+
+/* Liste iskeleti: record-table ile aynı kart çerçevesi, başlık bandı ve 44 px satır. */
+.skeleton-table {
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface);
+    overflow: hidden;
+}
+
+.skeleton-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: var(--mx-space-6);
+    align-items: center;
+    min-height: 44px;
+    padding: 0 var(--mx-space-4);
+    border-top: 1px solid var(--mx-border);
+}
+
+    .skeleton-row .skeleton-bar {
+        width: 70%;
+    }
+
+    .skeleton-row:nth-child(2n) .skeleton-bar {
+        width: 50%;
+    }
+
+.skeleton-head {
+    min-height: 36px;
+    border-top: 0;
+    background: var(--mx-surface-muted);
+}
+
+    .skeleton-head .skeleton-bar {
+        width: 40%;
+        height: 0.5rem;
+        background: var(--mx-border);
+        animation: none;
+    }
+
+.skeleton-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: var(--mx-space-4);
+}
+
+.skeleton-card {
+    display: grid;
+    gap: var(--mx-space-3);
+    padding: var(--mx-space-4);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface);
+}
+
+    .skeleton-card .skeleton-bar:first-child {
+        width: 55%;
+    }
+
+    .skeleton-card .skeleton-tall {
+        width: 35%;
+    }
+
+@media (max-width: 640.98px) {
+    .skeleton-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+        .skeleton-row .skeleton-bar:nth-child(n+3) {
+            display: none;
+        }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .loading-state, .skeleton {
+        animation: none;
+    }
+}
+
+/* ---- Boş durum (docs/design-system/component-catalog.md → EmptyState) ---- */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--mx-space-3);
+    padding: var(--mx-space-8) var(--mx-space-4);
+    border: 1px dashed var(--mx-border-strong);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface);
+    text-align: center;
+}
+
+.empty-state-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-tone-brand-bg);
+    color: var(--mx-tone-brand-fg);
+}
+
+.empty-state-title {
+    margin: 0;
+    font-size: var(--mx-fs-body);
+    font-weight: 700;
+    color: var(--mx-text-primary);
+}
+
+.empty-state-text {
+    margin: var(--mx-space-1) 0 0;
+    max-width: 28rem;
+    font-size: var(--mx-fs-label);
+    color: var(--mx-text-secondary);
+}
+
+.empty-state-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--mx-space-2);
+}
+
+/* Kart ya da panel içinde: çerçevesiz, tek satır. */
+.empty-state-compact {
+    flex-direction: row;
+    padding: var(--mx-space-3) 0;
+    border: 0;
+    background: transparent;
+    text-align: start;
+}
+
+    .empty-state-compact .empty-state-icon {
+        flex: none;
+        width: 2rem;
+        height: 2rem;
+        border-radius: var(--mx-radius-button);
+        background: var(--mx-tone-neutral-bg);
+        color: var(--mx-tone-neutral-fg);
+    }
+
+    .empty-state-compact .empty-state-title {
+        font-weight: 600;
+        color: var(--mx-text-secondary);
+    }
+
+    .empty-state-compact .empty-state-actions {
+        margin-inline-start: auto;
+    }
+
+/* ---- Kısa süreli bildirim (docs/design-system/component-catalog.md → Toast) ---- */
+/* Sağ altta, çekmece ve açılır listelerin üstünde; telefonda tam genişlik. Tıklamalar yığının boş yerinden geçer. */
+.toast-stack {
+    position: fixed;
+    right: var(--mx-space-6);
+    bottom: var(--mx-space-6);
+    z-index: 1080;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mx-space-2);
+    width: min(24rem, calc(100vw - 2 * var(--mx-space-4)));
+    pointer-events: none;
+}
+
+.app-toast {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-3);
+    padding: var(--mx-space-2) var(--mx-space-2) var(--mx-space-2) var(--mx-space-3);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface);
+    color: var(--mx-text-primary);
+    box-shadow: var(--mx-shadow-popover);
+    font-size: var(--mx-fs-body);
+    font-weight: 600;
+    pointer-events: auto;
+    animation: toast-in 0.18s ease-out both;
+}
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateY(0.5rem); }
+    to { opacity: 1; transform: none; }
+}
+
+.app-toast-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: var(--mx-radius-badge);
+    background: var(--mx-tone-success-bg);
+    color: var(--mx-tone-success-fg);
+}
+
+.app-toast-info .app-toast-icon {
+    background: var(--mx-tone-info-bg);
+    color: var(--mx-tone-info-fg);
+}
+
+.app-toast-error .app-toast-icon {
+    background: var(--mx-tone-danger-bg);
+    color: var(--mx-tone-danger-fg);
+}
+
+.app-toast-text {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.app-toast-close {
+    flex: none;
+}
+
+@media (max-width: 640.98px) {
+    .toast-stack {
+        right: var(--mx-space-4);
+        bottom: var(--mx-space-4);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-toast {
+        animation: none;
     }
 }

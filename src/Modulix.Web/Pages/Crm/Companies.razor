@@ -63,11 +63,11 @@
 
     @if (page is null)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("common.noRecords")</p>
+        <EmptyState />
     }
     else
     {
@@ -293,7 +293,7 @@
         "city" => @<text>@company.City</text>,
         "owner" => @<OwnerCell Name="@Lookups.MemberName(company.OwnerId)" />,
         "phone" => @<text>@company.Phone</text>,
-        "industry" => @<text>@company.Industry</text>,
+        "industry" => @<text>@(company.IndustryName ?? company.LegacyIndustry)</text>,
         "taxNumber" => @<text>@company.TaxNumber</text>,
         "email" => @<text>@company.Email</text>,
         "tags" => @<text>@company.Tags</text>,

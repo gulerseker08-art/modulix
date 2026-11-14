@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Modulix.Core.Contracts\Modulix.Core.Contracts.csproj" />
+    <!-- Araç okuma sözleşmesi (ADR-0044): yalnızca Filo'nun sözleşme projesi, Filo modülünün kendisi değil. -->
+    <ProjectReference Include="..\Modulix.Modules.Fleet.Contracts\Modulix.Modules.Fleet.Contracts.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

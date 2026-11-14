@@ -47,27 +47,27 @@ public class SegmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
     public async Task Conditions_combine_with_and_or_null_semantics_and_relations_without_duplicates()
     {
         var (client, _) = await ManagerAsync();
-        var a = await CompanyAsync(client, "Anka Tekstil", "Bursa", "Tekstil");
-        await CompanyAsync(client, "Bora Tekstil", "İzmir", "Tekstil");
-        await CompanyAsync(client, "Cem Gıda", "Bursa", "Gıda");
-        await CompanyAsync(client, "Deniz Tekstil", null, "Tekstil");
+        var a = await CompanyAsync(client, "Anka Tekstil", "Bursa", "Tekstil ve hazır giyim");
+        await CompanyAsync(client, "Bora Tekstil", "İzmir", "Tekstil ve hazır giyim");
+        await CompanyAsync(client, "Cem Gıda", "Bursa", "Gıda ve içecek");
+        await CompanyAsync(client, "Deniz Tekstil", null, "Tekstil ve hazır giyim");
         // Aynı firmanın iki kişisi: "kişisi var" firmayı iki kez saymaz (sonuç kimlik kümesidir).
         await ContactAsync(client, a.Id, "Ayşe", "Demir");
         await ContactAsync(client, a.Id, "Can", "Kaya");
 
-        Assert.Equal(1, (await CountAsync(client, And(Leaf("crm.company.industry", "eq", "Tekstil"), Leaf("crm.company.city", "eq", "Bursa")))));
+        Assert.Equal(1, (await CountAsync(client, And(Leaf("crm.company.industry", "eq", "Tekstil ve hazır giyim"), Leaf("crm.company.city", "eq", "Bursa")))));
         Assert.Equal(3, await CountAsync(client, Or(Leaf("crm.company.city", "eq", "Bursa"), Leaf("crm.company.city", "eq", "İzmir"))));
         Assert.Equal(2, await CountAsync(client, Leaf("crm.company.city", "ne", "Bursa")));
         Assert.Equal(1, await CountAsync(client, Leaf("crm.company.city", "empty")));
         Assert.Equal(3, await CountAsync(client, Leaf("crm.company.city", "notempty")));
-        Assert.Equal(2, await CountAsync(client, And(Leaf("crm.company.industry", "eq", "Tekstil"), Or(Leaf("crm.company.city", "eq", "Bursa"), Leaf("crm.company.city", "empty")))));
+        Assert.Equal(2, await CountAsync(client, And(Leaf("crm.company.industry", "eq", "Tekstil ve hazır giyim"), Or(Leaf("crm.company.city", "eq", "Bursa"), Leaf("crm.company.city", "empty")))));
         Assert.Equal(3, await CountAsync(client, Leaf("crm.company.name", "contains", "Tekstil")));
         Assert.Equal(1, await CountAsync(client, Leaf("crm.company.contacts", "exists")));
         Assert.Equal(3, await CountAsync(client, Leaf("crm.company.contacts", "notexists")));
         Assert.Equal(4, await CountAsync(client, Leaf("crm.company.createdAt", "lastdays", "1")));
         Assert.Equal(0, await CountAsync(client, Leaf("crm.company.createdAt", "before", "2020-01-01")));
 
-        var preview = await PreviewAsync(client, "Company", Leaf("crm.company.industry", "eq", "Gıda"));
+        var preview = await PreviewAsync(client, "Company", Leaf("crm.company.industry", "eq", "Gıda ve içecek"));
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
         var body = (await preview.Content.ReadFromJsonAsync<SegmentEvaluationDto>())!;
         Assert.Equal("Cem Gıda", Assert.Single(body.Rows).Label);
@@ -78,8 +78,8 @@ public class SegmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
     public async Task Publishing_freezes_a_version_and_later_edits_never_rewrite_history()
     {
         var (client, _) = await ManagerAsync();
-        await CompanyAsync(client, "Anka", "Bursa", "Tekstil");
-        await CompanyAsync(client, "Bora", "İzmir", "Tekstil");
+        await CompanyAsync(client, "Anka", "Bursa", "Tekstil ve hazır giyim");
+        await CompanyAsync(client, "Bora", "İzmir", "Tekstil ve hazır giyim");
         var segment = await CreateSegmentAsync(client, "tekstil-bursa", Leaf("crm.company.city", "eq", "Bursa"));
         Assert.Equal(("Draft", 0), (segment.Status, segment.PublishedVersion));
 
@@ -113,7 +113,7 @@ public class SegmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await client.PostAsJsonAsync("/api/marketing/segment-versions", new SaveSegmentVersionRequest())).StatusCode);
 
         // Yenileme: yeni uygun firma gelince son hesaplama özeti güncellenir; segment kaydı değişmez ama sayı artar.
-        await CompanyAsync(client, "Ece", "İzmir", "Gıda");
+        await CompanyAsync(client, "Ece", "İzmir", "Gıda ve içecek");
         var refreshed = (await (await client.PostAsync($"/api/marketing/segments/{segment.Id}/refresh", null)).Content.ReadFromJsonAsync<SegmentDto>())!;
         Assert.Equal(2, refreshed.LastMemberCount);
         Assert.Equal(2, refreshed.PublishedVersion);
@@ -123,9 +123,9 @@ public class SegmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
     public async Task Static_members_and_dynamic_exceptions_follow_include_minus_exclude()
     {
         var (client, _) = await ManagerAsync();
-        var anka = await CompanyAsync(client, "Anka", "Bursa", "Tekstil");
-        var bora = await CompanyAsync(client, "Bora", "İzmir", "Tekstil");
-        var cem = await CompanyAsync(client, "Cem", "Bursa", "Gıda");
+        var anka = await CompanyAsync(client, "Anka", "Bursa", "Tekstil ve hazır giyim");
+        var bora = await CompanyAsync(client, "Bora", "İzmir", "Tekstil ve hazır giyim");
+        var cem = await CompanyAsync(client, "Cem", "Bursa", "Gıda ve içecek");
 
         // Statik: üyeler elle seçilir; mükerrer ve hariç tutma reddedilir.
         var stat = await CreateSegmentAsync(client, "fuar-listesi", null, kind: "Static");
@@ -197,7 +197,7 @@ public class SegmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
     public async Task Lifecycle_archive_restore_copy_and_delete_rules()
     {
         var (client, _) = await ManagerAsync();
-        await CompanyAsync(client, "Anka", "Bursa", "Tekstil");
+        await CompanyAsync(client, "Anka", "Bursa", "Tekstil ve hazır giyim");
         var segment = await CreateSegmentAsync(client, "yasam", Leaf("crm.company.city", "eq", "Bursa"));
         var active = (await (await PublishAsync(client, segment.Id)).Content.ReadFromJsonAsync<SegmentDto>())!;
 
@@ -236,7 +236,7 @@ public class SegmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
     {
         var (clientA, _) = await ManagerAsync();
         var (clientB, _) = await ManagerAsync();
-        var companyA = await CompanyAsync(clientA, "Anka", "Bursa", "Tekstil");
+        var companyA = await CompanyAsync(clientA, "Anka", "Bursa", "Tekstil ve hazır giyim");
         var segmentA = await CreateSegmentAsync(clientA, "ortak-kod", Leaf("crm.company.city", "eq", "Bursa"));
         await PublishAsync(clientA, segmentA.Id);
         Assert.Equal(HttpStatusCode.Created, (await AddMemberAsync(clientA, segmentA.Id, companyA.PartyId!.Value, "Include")).StatusCode);
@@ -265,7 +265,7 @@ public class SegmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
         var tenant = await TenantAsync();
         var admin = await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions]);
         var noCrm = await UserClientAsync(tenant, AllMarketing);
-        await CompanyAsync(admin, "Anka", "Bursa", "Tekstil");
+        await CompanyAsync(admin, "Anka", "Bursa", "Tekstil ve hazır giyim");
 
         var available = (await admin.GetFromJsonAsync<SegmentFieldsResponse>("/api/marketing/segment-fields?target=Company"))!;
         Assert.Contains(available.Fields, f => f.Key == "crm.company.city");
@@ -296,8 +296,8 @@ public class SegmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
         var tenant = await TenantAsync();
         var manager = await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions]);
         var own = await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions], RecordScope.Own);
-        await CompanyAsync(manager, "Yönetici firması", "Bursa", "Tekstil");
-        await CompanyAsync(own, "Kendi firması", "Bursa", "Tekstil");
+        await CompanyAsync(manager, "Yönetici firması", "Bursa", "Tekstil ve hazır giyim");
+        await CompanyAsync(own, "Kendi firması", "Bursa", "Tekstil ve hazır giyim");
 
         Assert.Equal(2, await CountAsync(manager, Leaf("crm.company.city", "eq", "Bursa")));
         var scoped = await PreviewAsync(own, "Company", Leaf("crm.company.city", "eq", "Bursa"));
@@ -319,7 +319,7 @@ public class SegmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
         var viewer = await UserClientAsync(tenant, [SegmentsRead, CrmModule.Permissions.CompaniesRead]);
         var writer = await UserClientAsync(tenant, [SegmentsRead, SegmentsWrite, CrmModule.Permissions.CompaniesRead]);
         var nobody = await UserClientAsync(tenant, [CrmModule.Permissions.CompaniesRead]);
-        await CompanyAsync(manager, "Anka", "Bursa", "Tekstil");
+        await CompanyAsync(manager, "Anka", "Bursa", "Tekstil ve hazır giyim");
         var segment = await CreateSegmentAsync(manager, "izinler", Leaf("crm.company.city", "eq", "Bursa"));
         await PublishAsync(manager, segment.Id);
 
@@ -374,18 +374,18 @@ public class SegmentTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
         var tenant = await TenantAsync();
         var manager = await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions]);
         var rep = await UserClientAsync(tenant, CrmPermissions, RecordScope.Own);
-        await CompanyAsync(manager, "Anka Tekstil", "Bursa", "Tekstil");
-        await CompanyAsync(rep, "Bora Tekstil", "İzmir", "Tekstil");
-        Assert.Equal(2, await CountAsync(manager, Leaf("crm.company.industry", "eq", "Tekstil")));
+        await CompanyAsync(manager, "Anka Tekstil", "Bursa", "Tekstil ve hazır giyim");
+        await CompanyAsync(rep, "Bora Tekstil", "İzmir", "Tekstil ve hazır giyim");
+        Assert.Equal(2, await CountAsync(manager, Leaf("crm.company.industry", "eq", "Tekstil ve hazır giyim")));
 
         // Fırsat türüne konan tavan firma segmentini etkilemez: her koşul kendi türünün kapsamıyla değerlendirilir.
         using var platform = await LoginAsync(await PlatformAdministratorAsync());
         await SetLimitAsync(platform, tenant.Id, "crm.opportunity");
-        Assert.Equal(2, await CountAsync(manager, Leaf("crm.company.industry", "eq", "Tekstil")));
+        Assert.Equal(2, await CountAsync(manager, Leaf("crm.company.industry", "eq", "Tekstil ve hazır giyim")));
 
         // Firma türüne konan tavan: geniş roldeki yönetici olmayan kullanıcı yalnızca kendi firmasını segmentte görür.
         await SetLimitAsync(platform, tenant.Id, "crm.company");
-        Assert.Equal(1, await CountAsync(manager, Leaf("crm.company.industry", "eq", "Tekstil")));
+        Assert.Equal(1, await CountAsync(manager, Leaf("crm.company.industry", "eq", "Tekstil ve hazır giyim")));
     }
 
     private static async Task SetLimitAsync(HttpClient platform, Guid tenantId, string entityKey) =>

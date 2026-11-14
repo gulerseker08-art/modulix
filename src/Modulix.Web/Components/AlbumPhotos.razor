@@ -1,0 +1,77 @@
+@* Albüm fotoğrafları (ADR-0042 dilim 8). Fotoğraflar albüme bağlı ADR-0040 dosyalarıdır; erişim albümün erişimidir (yayında olmayan albümün
+   fotoğrafı okura 404). Sunucu dosyayı yalnızca "attachment" olarak verir; görüntü baytları oturumla alınıp sayfada data: adresiyle gösterilir
+   (tarayıcıda dosya adresi açılmaz). Yalnızca PNG/JPEG/GIF gösterilir; diğer dosyalar indirme bağlantısıyla listelenir. *@
+@inject ApiClient Api
+
+@if (message is not null)
+{
+    <div class="alert alert-danger" role="alert">@message</div>
+}
+@if (files is null)
+{
+    <p class="text-muted" role="status">Fotoğraflar yükleniyor…</p>
+}
+else if (files.Count == 0)
+{
+    <p class="text-muted" role="status">Bu albümde henüz fotoğraf yok.</p>
+}
+else
+{
+    <ul class="profile-cards list-unstyled" aria-label="@($"{Title} fotoğrafları")">
+        @foreach (var file in files)
+        {
+            <li class="profile-card">
+                @if (images.TryGetValue(file.Id, out var source))
+                {
+                    <img class="img-fluid" src="@source" alt="@file.FileName" loading="lazy" />
+                }
+                else if (IsImage(file))
+                {
+                    <span role="status">Yükleniyor…</span>
+                }
+                <a href="@($"/api/files/{file.Id}/content")" download="@file.FileName"><AppIcon Name="@(IsImage(file) ? "image" : "file-text")" Size="16" /> @file.FileName</a>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private static readonly HashSet<string> ImageTypes = ["image/png", "image/jpeg", "image/gif"];
+
+    private List<StoredFileDto>? files;
+    private readonly Dictionary<Guid, string> images = [];
+    private string? message;
+    private (Guid, int) loadedFor;
+
+    [Parameter, EditorRequired] public Guid AlbumId { get; set; }
+
+    [Parameter] public string Title { get; set; } = "Albüm";
+
+    /// <summary>Değişince liste yeniden yüklenir (ör. yönetim ekranında fotoğraf eklenip silindikçe).</summary>
+    [Parameter] public int Revision { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (AlbumId, Revision))
+        {
+            return;
+        }
+
+        loadedFor = (AlbumId, Revision);
+        images.Clear();
+        var result = await Api.GetAsync<List<StoredFileDto>>($"/api/files?entityKey={Uri.EscapeDataString(HrAccess.PhotoAlbumEntityKey)}&recordId={AlbumId}");
+        files = result.Value ?? [];
+        message = result.Error;
+        foreach (var file in files.Where(IsImage))
+        {
+            var content = await Api.GetAsync<byte[]>($"/api/files/{file.Id}/content");
+            if (content.Value is { } bytes)
+            {
+                images[file.Id] = $"data:{file.ContentType};base64,{Convert.ToBase64String(bytes)}";
+                StateHasChanged();
+            }
+        }
+    }
+
+    private static bool IsImage(StoredFileDto file) => ImageTypes.Contains(file.ContentType);
+}

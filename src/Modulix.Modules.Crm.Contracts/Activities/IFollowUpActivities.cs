@@ -1,4 +1,4 @@
-namespace Modulix.Core.Contracts.Activities;
+namespace Modulix.Modules.Crm.Contracts.Activities;
 
 /// <summary>
 /// Takip aktivitesi isteği: konu, açıklama, son tarih, atanan kullanıcı ve aktivitenin bağlanacağı kayıt. <paramref name="IdempotencyKey"/> verilirse

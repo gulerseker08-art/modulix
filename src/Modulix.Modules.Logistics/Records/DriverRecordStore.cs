@@ -8,7 +8,7 @@ namespace Modulix.Modules.Logistics.Records;
 
 /// <summary>
 /// Sürücü kartları (ADR-0038 K2, dilim 3). Kişi yalnızca oluştururken seçilir ve bir kişinin tek sürücü kartı olur. Taşeron sürücüde
-/// "Taşıyıcı" rollü firma zorunludur, kadrolu sürücüde taşıyıcı seçilmez. Varsayılan araç Filo'dan okunur (<see cref="Core.Contracts.Fleet.IVehicleDirectory"/>):
+/// "Taşıyıcı" rollü firma zorunludur, kadrolu sürücüde taşıyıcı seçilmez. Varsayılan araç Filo'dan okunur (<see cref="Modulix.Modules.Fleet.Contracts.IVehicleDirectory"/>):
 /// araç bu tenant'ta olmalı, motorlu (dorse/römork değil) ve pasif olmamalıdır; Filo kapalıysa araç seçilemez. Sürücü silinmez (K12).
 /// Liste kişinin adına göre sıralanır ve kişinin adı, soyadı, telefonu ve e-postasıyla aranır.
 /// </summary>

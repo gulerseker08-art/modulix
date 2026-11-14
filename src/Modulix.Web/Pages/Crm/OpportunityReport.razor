@@ -3,24 +3,24 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Fırsat raporu · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.opportunityReport.title") · Modulix</PageTitle>
 
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.OpportunitiesRead">
-    <a class="back-link" href="crm/firsatlar">← Fırsatlar</a>
+    <a class="back-link" href="crm/firsatlar">@Texts.Get("crm.opportunityReport.back")</a>
     <div class="page-header">
-        <h1>Fırsat raporu</h1>
+        <h1>@Texts.Get("crm.opportunityReport.title")</h1>
         @if (Session.Can(CrmAccess.OpportunitiesExport))
         {
-            <a class="btn btn-outline-secondary" href="api/crm/opportunities/export" download="firsatlar.csv">CSV dışa aktar</a>
+            <a class="btn btn-outline-secondary" href="api/crm/opportunities/export" download="firsatlar.csv">@Texts.Get("crm.opportunityReport.csv")</a>
         }
     </div>
 
     <form class="filters" @onsubmit="LoadAsync" @onsubmit:preventDefault>
-        <label class="form-label" for="rp-from">Kapanış başlangıç</label>
+        <label class="form-label" for="rp-from">@Texts.Get("crm.opportunityReport.from")</label>
         <input id="rp-from" class="form-control" type="date" @bind="from" />
-        <label class="form-label" for="rp-to">Kapanış bitiş</label>
+        <label class="form-label" for="rp-to">@Texts.Get("crm.opportunityReport.to")</label>
         <input id="rp-to" class="form-control" type="date" @bind="to" />
-        <button type="submit" class="btn btn-primary" disabled="@busy">Raporu getir</button>
+        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.sales.runReport")</button>
     </form>
 
     @if (message is not null)
@@ -32,38 +32,38 @@
     {
         @if (message is null)
         {
-            <p class="text-muted">Yükleniyor…</p>
+            <LoadingState />
         }
     }
     else
     {
         @if (report.Truncated)
         {
-            <div class="alert alert-warning" role="status">Kayıt sayısı sınırı (5000) aşıldı; rapor ilk kayıtlara göredir. Dönemi daraltın.</div>
+            <div class="alert alert-warning" role="status">@Texts.Get("crm.sales.reportTruncated")</div>
         }
         @if (!report.AmountsVisible)
         {
-            <div class="alert alert-info" role="status">Tutar izniniz olmadığı için tutarlar gösterilmiyor; yalnızca adetler vardır.</div>
+            <div class="alert alert-info" role="status">@Texts.Get("crm.opportunityReport.noAmounts")</div>
         }
 
         <section class="detail-section">
-            <div class="section-header"><h2>Açık fırsatlar</h2></div>
-            <p>@report.OpenCount açık · @report.OnHoldCount beklemede</p>
+            <div class="section-header"><h2>@Texts.Get("crm.opportunityReport.open")</h2></div>
+            <p>@Texts.Get("crm.opportunityReport.openSummary", report.OpenCount, report.OnHoldCount)</p>
             @TotalsTable(report.OpenTotals)
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Aşama dağılımı (açık)</h2></div>
+            <div class="section-header"><h2>@Texts.Get("crm.opportunityReport.byStage")</h2></div>
             <table class="table record-table">
-                <thead><tr><th>Aşama</th><th>Adet</th><th>Tutar</th><th>Ort. kalma (gün)</th></tr></thead>
+                <thead><tr><th>@Texts.Get("crm.opportunities.col.stage")</th><th>@Texts.Get("crm.sales.col.count")</th><th>@Texts.Get("crm.sales.col.amount")</th><th>@Texts.Get("crm.opportunityReport.col.avgDays")</th></tr></thead>
                 <tbody>
                     @foreach (var s in report.ByStage)
                     {
                         <tr>
-                            <td data-label="Aşama">@Lookups.Label(CrmLists.OpportunityStage, s.Stage)</td>
-                            <td data-label="Adet">@s.Count</td>
-                            <td data-label="Tutar">@Amounts(s.Totals)</td>
-                            <td data-label="Ort. kalma">@(s.AverageDaysInStage?.ToString("0.#") ?? "—")</td>
+                            <td data-label="@Texts.Get("crm.opportunities.col.stage")">@Lookups.Label(CrmLists.OpportunityStage, s.Stage)</td>
+                            <td data-label="@Texts.Get("crm.sales.col.count")">@s.Count</td>
+                            <td data-label="@Texts.Get("crm.sales.col.amount")">@Amounts(s.Totals)</td>
+                            <td data-label="@Texts.Get("crm.opportunityReport.col.avgDaysShort")">@(s.AverageDaysInStage?.ToString("0.#") ?? "—")</td>
                         </tr>
                     }
                 </tbody>
@@ -71,18 +71,18 @@
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Sorumlu bazında</h2></div>
+            <div class="section-header"><h2>@Texts.Get("crm.sales.byOwner")</h2></div>
             <table class="table record-table">
-                <thead><tr><th>Sorumlu</th><th>Açık</th><th>Açık tutar</th><th>Kazanılan</th><th>Kaybedilen</th></tr></thead>
+                <thead><tr><th>@Texts.Get("common.field.owner")</th><th>@Texts.Get("crm.opportunityReport.col.open")</th><th>@Texts.Get("crm.opportunityReport.col.openAmount")</th><th>@Texts.Get("crm.opportunityReport.won")</th><th>@Texts.Get("crm.opportunityReport.lost")</th></tr></thead>
                 <tbody>
                     @foreach (var o in report.ByOwner)
                     {
                         <tr>
-                            <td data-label="Sorumlu">@(o.OwnerId is null ? "Atanmadı" : Lookups.MemberName(o.OwnerId))</td>
-                            <td data-label="Açık">@o.OpenCount</td>
-                            <td data-label="Açık tutar">@Amounts(o.OpenTotals)</td>
-                            <td data-label="Kazanılan">@o.WonCount</td>
-                            <td data-label="Kaybedilen">@o.LostCount</td>
+                            <td data-label="@Texts.Get("common.field.owner")">@(o.OwnerId is null ? Texts.Get("crm.leads.unassigned") : Lookups.MemberName(o.OwnerId))</td>
+                            <td data-label="@Texts.Get("crm.opportunityReport.col.open")">@o.OpenCount</td>
+                            <td data-label="@Texts.Get("crm.opportunityReport.col.openAmount")">@Amounts(o.OpenTotals)</td>
+                            <td data-label="@Texts.Get("crm.opportunityReport.won")">@o.WonCount</td>
+                            <td data-label="@Texts.Get("crm.opportunityReport.lost")">@o.LostCount</td>
                         </tr>
                     }
                 </tbody>
@@ -90,32 +90,32 @@
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Tahmini kapanış dönemine göre tahmin (açık fırsatlar)</h2></div>
+            <div class="section-header"><h2>@Texts.Get("crm.opportunityReport.forecast")</h2></div>
             <table class="table record-table">
-                <thead><tr><th>Ay</th><th>Tutar / ağırlıklı</th></tr></thead>
+                <thead><tr><th>@Texts.Get("crm.opportunityReport.col.month")</th><th>@Texts.Get("crm.opportunityReport.col.amountWeighted")</th></tr></thead>
                 <tbody>
                     @foreach (var m in report.Forecast)
                     {
-                        <tr><td data-label="Ay">@m.Month</td><td data-label="Tutar">@Amounts(m.Totals, weighted: true)</td></tr>
+                        <tr><td data-label="@Texts.Get("crm.opportunityReport.col.month")">@m.Month</td><td data-label="@Texts.Get("crm.sales.col.amount")">@Amounts(m.Totals, weighted: true)</td></tr>
                     }
                 </tbody>
             </table>
-            <p class="text-muted small">Bugünkü kayıt değerlerinden hesaplanır; geçmiş dönem tahmini değildir.</p>
+            <p class="text-muted small">@Texts.Get("crm.opportunityReport.forecastNote")</p>
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Kapanışlar (@CrmLabels.Date(report.From) – @CrmLabels.Date(report.To))</h2></div>
+            <div class="section-header"><h2>@Texts.Get("crm.opportunityReport.closings", CrmLabels.Date(report.From), CrmLabels.Date(report.To))</h2></div>
             <dl class="detail-grid">
-                <div><dt>Kazanılan</dt><dd>@report.WonCount</dd></div>
-                <div><dt>Kaybedilen</dt><dd>@report.LostCount</dd></div>
-                <div><dt>İptal edilen</dt><dd>@report.CancelledCount (kazanma oranına girmez)</dd></div>
-                <div><dt>Kazanma oranı</dt><dd>@(report.WinRate is { } rate ? $"%{rate * 100:0.#}" : "Tanımsız (karar verilen fırsat yok)")</dd></div>
-                <div><dt>Ort. satış döngüsü</dt><dd>@(report.AverageCycleDays is { } cycle ? $"{cycle:0.#} gün" : "—")</dd></div>
-                <div><dt>Kazanılan tutar</dt><dd>@Amounts(report.WonTotals)</dd></div>
+                <div><dt>@Texts.Get("crm.opportunityReport.won")</dt><dd>@report.WonCount</dd></div>
+                <div><dt>@Texts.Get("crm.opportunityReport.lost")</dt><dd>@report.LostCount</dd></div>
+                <div><dt>@Texts.Get("crm.opportunityReport.cancelled")</dt><dd>@Texts.Get("crm.opportunityReport.cancelledValue", report.CancelledCount)</dd></div>
+                <div><dt>@Texts.Get("crm.opportunityReport.winRate")</dt><dd>@(report.WinRate is { } rate ? $"%{rate * 100:0.#}" : Texts.Get("crm.opportunityReport.winRateUndefined"))</dd></div>
+                <div><dt>@Texts.Get("crm.opportunityReport.avgCycle")</dt><dd>@(report.AverageCycleDays is { } cycle ? Texts.Get("crm.sales.days", $"{cycle:0.#}") : "—")</dd></div>
+                <div><dt>@Texts.Get("crm.opportunityReport.wonAmount")</dt><dd>@Amounts(report.WonTotals)</dd></div>
             </dl>
             @if (report.LossReasons.Count > 0)
             {
-                <h3>Kaybetme nedenleri</h3>
+                <h3>@Texts.Get("crm.opportunityReport.lossReasons")</h3>
                 <ul class="item-list">
                     @foreach (var r in report.LossReasons)
                     {
@@ -125,39 +125,39 @@
             }
             @if (report.CompetitorLosses.Count > 0)
             {
-                <h3>Rakibe kayıplar</h3>
+                <h3>@Texts.Get("crm.opportunityReport.competitorLosses")</h3>
                 <ul class="item-list">
                     @foreach (var c in report.CompetitorLosses)
                     {
-                        <li><div class="item-main">@(c.Name ?? "Bilinmeyen rakip") <span class="text-muted">@c.Count</span></div></li>
+                        <li><div class="item-main">@(c.Name ?? Texts.Get("crm.opportunityReport.unknownCompetitor")) <span class="text-muted">@c.Count</span></div></li>
                     }
                 </ul>
             }
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Dikkat gerektirenler</h2></div>
-            @AttentionList("Kapanış tarihi geçmiş", report.Overdue)
-            @AttentionList("Sonraki aksiyonu olmayan", report.NoNextAction)
-            @AttentionList("Hareketsiz (son etkileşim eşiği aşıldı)", report.Inactive)
-            <h3>Kapanış tarihi ertelenenler</h3>
+            <div class="section-header"><h2>@Texts.Get("crm.opportunityReport.attention")</h2></div>
+            @AttentionList(Texts.Get("crm.opportunityReport.overdue"), report.Overdue)
+            @AttentionList(Texts.Get("crm.opportunityReport.noNextAction"), report.NoNextAction)
+            @AttentionList(Texts.Get("crm.opportunityReport.inactive"), report.Inactive)
+            <h3>@Texts.Get("crm.opportunityReport.postponed")</h3>
             @if (report.Postponed.Count == 0)
             {
-                <p class="text-muted">Yok.</p>
+                <p class="text-muted">@Texts.Get("crm.opportunityReport.none")</p>
             }
             else
             {
                 <ul class="item-list">
                     @foreach (var p in report.Postponed)
                     {
-                        <li><div class="item-main"><a href="crm/firsatlar/@p.Id">@p.Title</a> <span class="text-muted">@p.ChangeCount kez değişti@(p.ExpectedCloseDate is { } d ? $" · şimdi {CrmLabels.Date(d)}" : null)</span></div></li>
+                        <li><div class="item-main"><a href="crm/firsatlar/@p.Id">@p.Title</a> <span class="text-muted">@(p.ExpectedCloseDate is { } d ? Texts.Get("crm.opportunityReport.changedNow", p.ChangeCount, CrmLabels.Date(d)) : Texts.Get("crm.opportunityReport.changed", p.ChangeCount))</span></div></li>
                     }
                 </ul>
             }
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>Tanımlar</h2></div>
+            <div class="section-header"><h2>@Texts.Get("crm.sales.definitionsTitle")</h2></div>
             <ul>
                 @foreach (var definition in report.Definitions)
                 {
@@ -203,24 +203,29 @@
         }
 
         return string.Join(" + ", totals.Select(t => t.Amount is null
-            ? $"{t.Count} adet"
-            : $"{CrmLabels.Amount(t.Amount.Value, t.Currency)}{(weighted && t.Weighted is { } w ? $" (ağırlıklı {CrmLabels.Amount(w, t.Currency)})" : null)}"));
+            ? Texts.Get("crm.sales.countUnit", t.Count)
+            : weighted && t.Weighted is { } w
+                ? Texts.Get("crm.opportunityReport.withWeighted", CrmLabels.Amount(t.Amount.Value, t.Currency), CrmLabels.Amount(w, t.Currency))
+                : CrmLabels.Amount(t.Amount.Value, t.Currency)));
     }
+
+    // Ham HTML tablosuna giren sözlük metni kodlanır.
+    private static string Html(string key) => System.Net.WebUtility.HtmlEncode(Texts.Get(key));
 
     private RenderFragment TotalsTable(IReadOnlyList<OpportunityCurrencyTotal> totals) => builder =>
     {
         if (totals.Count == 0)
         {
-            builder.AddMarkupContent(0, "<p class=\"text-muted\">Açık fırsat yok.</p>");
+            builder.AddMarkupContent(0, $"<p class=\"text-muted\">{Html("crm.sales.noOpen")}</p>");
             return;
         }
 
-        var html = "<table class=\"table record-table\"><thead><tr><th>Para birimi</th><th>Adet</th><th>Tutar</th><th>Ağırlıklı</th><th>Tutarı bilinmeyen</th><th>Olasılığı bilinmeyen</th></tr></thead><tbody>"
+        var html = $"<table class=\"table record-table\"><thead><tr><th>{Html("crm.sales.currency")}</th><th>{Html("crm.sales.col.count")}</th><th>{Html("crm.sales.col.amount")}</th><th>{Html("crm.opportunityReport.col.weighted")}</th><th>{Html("crm.opportunityReport.col.unknownAmount")}</th><th>{Html("crm.opportunityReport.col.unknownProbability")}</th></tr></thead><tbody>"
             + string.Concat(totals.Select(t =>
-                $"<tr><td data-label=\"Para birimi\">{System.Net.WebUtility.HtmlEncode(t.Currency)}</td><td data-label=\"Adet\">{t.Count}</td>"
-                + $"<td data-label=\"Tutar\">{(t.Amount is { } a ? CrmLabels.Amount(a, t.Currency) : "—")}</td>"
-                + $"<td data-label=\"Ağırlıklı\">{(t.Weighted is { } w ? CrmLabels.Amount(w, t.Currency) : "—")}</td>"
-                + $"<td data-label=\"Tutarı bilinmeyen\">{t.UnknownAmountCount}</td><td data-label=\"Olasılığı bilinmeyen\">{t.NoProbabilityCount}</td></tr>"))
+                $"<tr><td data-label=\"{Html("crm.sales.currency")}\">{System.Net.WebUtility.HtmlEncode(t.Currency)}</td><td data-label=\"{Html("crm.sales.col.count")}\">{t.Count}</td>"
+                + $"<td data-label=\"{Html("crm.sales.col.amount")}\">{(t.Amount is { } a ? CrmLabels.Amount(a, t.Currency) : "—")}</td>"
+                + $"<td data-label=\"{Html("crm.opportunityReport.col.weighted")}\">{(t.Weighted is { } w ? CrmLabels.Amount(w, t.Currency) : "—")}</td>"
+                + $"<td data-label=\"{Html("crm.opportunityReport.col.unknownAmount")}\">{t.UnknownAmountCount}</td><td data-label=\"{Html("crm.opportunityReport.col.unknownProbability")}\">{t.NoProbabilityCount}</td></tr>"))
             + "</tbody></table>";
         builder.AddMarkupContent(0, html);
     };
@@ -235,7 +240,7 @@
         {
             builder.OpenElement(seq++, "p");
             builder.AddAttribute(seq++, "class", "text-muted");
-            builder.AddContent(seq++, "Yok.");
+            builder.AddContent(seq++, Texts.Get("crm.opportunityReport.none"));
             builder.CloseElement();
             return;
         }

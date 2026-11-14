@@ -222,7 +222,7 @@ public class ReportCenterTests(ModulixApiFactory factory) : IClassFixture<Moduli
             await PostAsync<QuoteLineDto>(s.Admin, "/api/crm/quote-lines", new SaveQuoteLineRequest(quote.Id, "Kalem", "Free", null, 1m, price, null, "None", 0m, 20m, null, "Standard"));
         }
 
-        foreach (var (name, industry) in new[] { ("Yazılım A", "Yazılım"), ("Yazılım B", "Yazılım"), ("Lojistik C", "Lojistik") })
+        foreach (var (name, industry) in new[] { ("Yazılım A", "Bilişim ve yazılım"), ("Yazılım B", "Bilişim ve yazılım"), ("Lojistik C", "Lojistik ve taşımacılık") })
         {
             await PostAsync<CompanyDto>(s.Admin, "/api/crm/companies", new SaveCompanyRequest(name, Industry: industry));
         }
@@ -244,12 +244,12 @@ public class ReportCenterTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var companies = await RunAsync(s.Admin, new ReportSpecDto
         {
             Dataset = "crm.companies",
-            Groups = [new() { Field = "industry" }],
+            Groups = [new() { Field = "industryName" }],
             Measures = [new() { Aggregation = "count" }],
             Sort = new() { Field = "count", Direction = "descending" },
         });
-        Assert.Equal(("Yazılım", 2m), (companies.Rows[0].Keys[0], Cell(companies.Rows[0], 1)));   // azalan sayıda ilk satır
-        Assert.Equal(1m, Cell(companies.Rows.Single(r => r.Keys[0] == "Lojistik"), 1));
+        Assert.Equal(("Bilişim ve yazılım", 2m), (companies.Rows[0].Keys[0], Cell(companies.Rows[0], 1)));   // azalan sayıda ilk satır
+        Assert.Equal(1m, Cell(companies.Rows.Single(r => r.Keys[0] == "Lojistik ve taşımacılık"), 1));
         // "Anka Ltd." sektörsüz: boş grup olarak ayrı satırdır.
         Assert.Contains(companies.Rows, r => r.Keys[0] is null && Cell(r, 1) == 1m);
 

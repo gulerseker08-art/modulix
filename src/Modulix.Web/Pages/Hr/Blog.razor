@@ -1,0 +1,87 @@
+@page "/ik/blog"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Blog · Modulix</PageTitle>
+
+@* Kurum içi blog (ADR-0042 dilim 8): yayındaki yazılar, en yeni üstte. Yazı açılınca metni (düz metin) ve ekleri görünür. Hangi yazının görüneceğine
+   sunucu karar verir. *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.BlogRead">
+    <PageHeader Title="Blog" Icon="file-text" Subtitle="@(page is null ? "Kurum içi yazılar." : $"{page.TotalCount} yazı")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Yazılarda ara" placeholder="Başlık ya da metinde ara" @bind="search" />
+        </form>
+    </div>
+
+    @if (page is null)
+    {
+        <LoadingState />
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Henüz yayında yazı yok.</p>
+    }
+    else
+    {
+        <ul class="list-unstyled" aria-label="Blog yazıları">
+            @foreach (var post in page.Items)
+            {
+                var open = opened == post.Id;
+                <li class="summary-card mb-3">
+                    <h2 class="h6 mb-1">@WarehouseLabels.Text(post, "title")</h2>
+                    <p class="text-muted mb-2">@Published(post)@(WarehouseLabels.Id(post, "authorUserId") is { } author ? $" · {Lookups.MemberName(author)}" : "")</p>
+                    @if (WarehouseLabels.Text(post, "summary") is { Length: > 0 } summary)
+                    {
+                        <p class="mb-2">@summary</p>
+                    }
+                    @if (open)
+                    {
+                        <p class="preline mb-2">@WarehouseLabels.Text(post, "body")</p>
+                        <AttachmentPanel EntityKey="@HrAccess.BlogPostEntityKey" RecordId="post.Id" Title="Ekler" EmptyText="Bu yazının eki yok." />
+                    }
+                    <button type="button" class="btn btn-ghost" aria-expanded="@(open ? "true" : "false")" @onclick="() => opened = open ? null : post.Id">
+                        <AppIcon Name="@(open ? "chevron-down" : "chevron-right")" Size="16" /> @(open ? "Kapat" : "Devamını oku")
+                    </button>
+                </li>
+            }
+        </ul>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private RecordPageResponse? page;
+    private Guid? opened;
+    private string? message;
+    private string? search;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.BlogRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        // Yönetici de akışta yalnızca yayındaki yazıları görür.
+        var result = await Api.GetAsync<RecordPageResponse>(
+            $"/api/records/{HrAccess.BlogPostEntityKey}?isPublished=true&page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}");
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private static string Published(RecordResponse post) =>
+        DateTimeOffset.TryParse(WarehouseLabels.Text(post, "publishedAt"), out var at) ? at.LocalDateTime.ToString("dd.MM.yyyy") : "";
+}

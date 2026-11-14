@@ -9,11 +9,11 @@
         <div class="section-header"><h2 id="related-campaigns">Pazarlama geçmişi</h2></div>
         @if (history is null)
         {
-            <p class="text-muted" role="status">Yükleniyor…</p>
+            <LoadingState Kind="LoadingKind.Table" />
         }
         else if (history.Items.Count == 0)
         {
-            <p class="text-muted">Bu müşteriye giden kampanya iletisi ya da gelen yanıt yok.</p>
+            <EmptyState Title="Bu müşteriye giden kampanya iletisi ya da gelen yanıt yok." />
         }
         else
         {

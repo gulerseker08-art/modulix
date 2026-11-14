@@ -14,7 +14,7 @@
 
     @if (Items is null)
     {
-        <p class="today-panel-state" role="status">@Texts.Get("common.loading")</p>
+        <div class="today-panel-state"><LoadingState Rows="3" /></div>
     }
     else if (Error is not null)
     {

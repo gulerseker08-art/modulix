@@ -1,5 +1,5 @@
 using System.Text.Json.Nodes;
-using Modulix.Core.Contracts.Activities;
+using Modulix.Modules.Crm.Contracts.Activities;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;

@@ -6,6 +6,7 @@
 @inject ApiClient Api
 @inject FormLayouts Layouts
 @inject SessionState Session
+@inject ToastService Toasts
 
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
@@ -126,6 +127,10 @@
 {
     <TripCheckPanel TripId="Record.Id" Refresh="refresh" />
     <TripStopsPanel Trip="Record" CanWrite="@Session.Can(LogisticsAccess.TripsWrite)" Changed="StopsChanged" />
+    @if (Session.Can(LogisticsAccess.ExpensesRead))
+    {
+        <TripExpensesPanel Trip="Record" Lookups="Lookups" CanWrite="@Session.Can(LogisticsAccess.ExpensesWrite)" />
+    }
 }
 
 @code {
@@ -248,6 +253,7 @@
         if (result.IsSuccess)
         {
             dirty = false;
+            Toasts.Success(Texts.Get("common.saved"));
             await Saved.InvokeAsync(result.Value!);
             return;
         }

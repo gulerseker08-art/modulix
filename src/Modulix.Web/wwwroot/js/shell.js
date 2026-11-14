@@ -39,6 +39,18 @@
     applyTheme(read(themeKey));
     applySidebar(read(sidebarKey) === 'true');
 
+    // Komut paleti kısayolu: Ctrl+K (macOS'ta ⌘K) genel aramaya odaklanır. Arama kutusu yoksa (giriş ekranı) tarayıcının kısayolu çalışır.
+    document.addEventListener('keydown', event => {
+        if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
+            const input = document.getElementById('global-search-input');
+            if (input) {
+                event.preventDefault();
+                input.focus();
+                input.select();
+            }
+        }
+    });
+
     window.modulixShell = {
         getTheme: () => root.getAttribute('data-theme') || 'light',
         setTheme: theme => {

@@ -15,7 +15,7 @@ public partial class ModuleRegistrationTests
         var data = new TheoryData<string>();
         foreach (var name in RepositoryLayout.SourceProjects()
                      .Select(RepositoryLayout.ProjectName)
-                     .Where(n => n.StartsWith(ModulePrefix, StringComparison.Ordinal))
+                     .Where(n => n.StartsWith(ModulePrefix, StringComparison.Ordinal) && !RepositoryLayout.IsModuleContracts(n))
                      .Order())
         {
             data.Add(name);

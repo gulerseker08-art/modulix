@@ -109,7 +109,7 @@
     <h2 class="mt-4">Sürümler</h2>
     @if (versions is null)
     {
-        <p class="text-muted" role="status">Yükleniyor…</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (versions.Count == 0)
     {
@@ -173,7 +173,7 @@
             </div>
             @if (entries is null)
             {
-                <p class="text-muted" role="status">Yükleniyor…</p>
+                <LoadingState Kind="LoadingKind.Table" />
             }
             else if (entries.Items.Count == 0)
             {

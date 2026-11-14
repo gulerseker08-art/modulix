@@ -3,8 +3,11 @@ using System.Text;
 
 namespace Modulix.Web.Services;
 
-/// <summary>Yer kataloğundaki bir nokta: boylam, enlem ve ISO ülke kodu (TR: Türkiye).</summary>
-public sealed record GeoPlace(string Name, double Lon, double Lat, string Country);
+/// <summary>
+/// Yer kataloğundaki bir nokta: boylam, enlem ve ISO ülke kodu (TR: Türkiye). <paramref name="Approximate"/> doluysa şehir katalogda yoktur,
+/// nokta ülkenin yaklaşık merkezidir (ADR-0043 K5); harita bunu "yaklaşık" işaretler.
+/// </summary>
+public sealed record GeoPlace(string Name, double Lon, double Lat, string Country, bool Approximate = false);
 
 /// <summary>
 /// Lojistik panosunun yer kataloğu: sevkiyattaki şehir metnini (serbest metin) harita noktasına çevirir. Kayıtta ülke ve koordinat alanı yoktur
@@ -57,16 +60,55 @@ public static class LogisticsGazetteer
         "72.88,19.08,IN,Mumbai", "-74.01,40.71,US,New York", "-118.24,34.05,US,Los Angeles", "-95.37,29.76,US,Houston",
     ];
 
+    /// <summary>Ülkelerin yaklaşık merkezi (boylam, enlem): şehir katalogda yokken nokta bu olur ve "yaklaşık" işaretlenir.</summary>
+    private static readonly Dictionary<string, (double Lon, double Lat)> CountryCenters = new(StringComparer.Ordinal)
+    {
+        ["TR"] = (35.0, 39.0), ["DE"] = (10.4, 51.2), ["FR"] = (2.2, 46.6), ["IT"] = (12.6, 42.8), ["ES"] = (-3.7, 40.2), ["PT"] = (-8.0, 39.6),
+        ["GB"] = (-2.0, 54.0), ["IE"] = (-8.0, 53.2), ["NL"] = (5.3, 52.2), ["BE"] = (4.6, 50.6), ["LU"] = (6.1, 49.8), ["CH"] = (8.2, 46.8),
+        ["AT"] = (14.5, 47.6), ["CZ"] = (15.5, 49.8), ["SK"] = (19.5, 48.7), ["PL"] = (19.4, 52.1), ["HU"] = (19.5, 47.2), ["RO"] = (25.0, 45.9),
+        ["BG"] = (25.5, 42.7), ["GR"] = (22.0, 39.1), ["RS"] = (20.9, 44.0), ["HR"] = (15.5, 45.1), ["SI"] = (14.8, 46.1), ["BA"] = (17.8, 44.2),
+        ["ME"] = (19.3, 42.7), ["MK"] = (21.7, 41.6), ["AL"] = (20.0, 41.1), ["MD"] = (28.4, 47.4), ["UA"] = (31.2, 48.4), ["BY"] = (28.0, 53.7),
+        ["LT"] = (23.9, 55.2), ["LV"] = (24.9, 56.9), ["EE"] = (25.5, 58.7), ["FI"] = (26.0, 64.5), ["SE"] = (15.0, 62.0), ["NO"] = (9.0, 61.0),
+        ["DK"] = (9.5, 56.0), ["IS"] = (-19.0, 64.9), ["RU"] = (60.0, 60.0), ["CY"] = (33.0, 35.0), ["GE"] = (43.4, 42.2), ["AM"] = (45.0, 40.2),
+        ["AZ"] = (47.6, 40.3), ["KZ"] = (67.0, 48.0), ["UZ"] = (64.5, 41.4), ["TM"] = (59.5, 39.0), ["KG"] = (74.6, 41.2), ["TJ"] = (71.0, 38.9),
+        ["IR"] = (53.7, 32.4), ["IQ"] = (43.7, 33.2), ["SY"] = (38.5, 35.0), ["LB"] = (35.9, 33.9), ["JO"] = (36.5, 31.2), ["IL"] = (34.9, 31.4),
+        ["SA"] = (45.0, 24.0), ["AE"] = (54.0, 24.0), ["KW"] = (47.6, 29.3), ["QA"] = (51.2, 25.3), ["OM"] = (56.0, 21.5), ["YE"] = (47.5, 15.5),
+        ["EG"] = (30.0, 26.8), ["LY"] = (17.2, 27.0), ["TN"] = (9.5, 34.0), ["DZ"] = (2.6, 28.0), ["MA"] = (-6.0, 31.8), ["NG"] = (8.0, 9.6),
+        ["ZA"] = (24.0, -29.0), ["KE"] = (37.9, 0.2), ["ET"] = (39.5, 9.0), ["CN"] = (104.0, 35.0), ["IN"] = (79.0, 22.0), ["PK"] = (69.4, 30.0),
+        ["JP"] = (138.0, 36.5), ["KR"] = (127.8, 36.5), ["US"] = (-98.0, 39.5), ["CA"] = (-96.0, 57.0), ["MX"] = (-102.0, 23.5), ["BR"] = (-52.0, -10.0),
+        ["AR"] = (-64.0, -34.0),
+    };
+
     private static readonly Dictionary<string, GeoPlace> Index = Build();
 
-    /// <summary>Şehir metnini katalogda arar; yer bulunamazsa null.</summary>
-    public static GeoPlace? Find(string? text)
+    /// <summary>Ülkeyi bilmeden arar (eski çağrılar): şehir metni katalogda yoksa null.</summary>
+    public static GeoPlace? Find(string? text) => Find(text, null);
+
+    /// <summary>
+    /// Şehir metnini ülkeyle birlikte arar (ADR-0043 K5). Sıra: (1) ad katalogda ve ülke aynıysa o yer; (2) ad katalogda ama başka ülkedeyse yine o yer
+    /// (eski kayıtlar ülkesiz açıldığı için "TR" varsayılanıyla gelir ve "Hamburg" gibi yurt dışı şehirleri yanlış ülkeyle taşır; katalogdaki adlar
+    /// tekil olduğundan karışıklık yoktur); (3) ad yoksa ülkenin yaklaşık merkezi, <see cref="GeoPlace.Approximate"/> işaretli; (4) hiçbiri yoksa null.
+    /// </summary>
+    public static GeoPlace? Find(string? text, string? country)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
             return null;
         }
 
+        var found = Lookup(text);
+        if (found is not null)
+        {
+            return found;
+        }
+
+        return country is { Length: 2 } code && CountryCenters.TryGetValue(code.ToUpperInvariant(), out var center)
+            ? new GeoPlace(text.Trim(), center.Lon, center.Lat, code.ToUpperInvariant(), Approximate: true)
+            : null;
+    }
+
+    private static GeoPlace? Lookup(string text)
+    {
         if (Index.TryGetValue(Normalize(text), out var place))
         {
             return place;

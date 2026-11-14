@@ -21,7 +21,7 @@
             </div>
             @if (day is null)
             {
-                <p class="text-muted mb-0" role="status">Yükleniyor…</p>
+                <LoadingState />
             }
             else if (day.Suggestions.Count == 0)
             {

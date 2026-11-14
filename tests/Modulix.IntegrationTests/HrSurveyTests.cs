@@ -1,0 +1,314 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Authorization;
+using Modulix.Infrastructure.Identity;
+using Modulix.Shared.Auth;
+using Modulix.Shared.Hr;
+using Modulix.Shared.Records;
+using static Modulix.Modules.Hr.HrModule.Permissions;
+using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
+
+namespace Modulix.IntegrationTests;
+
+/// <summary>
+/// ADR-0042 dilim 7: anketler. Mutlu yol (hazırlama, soru türleri, yanıta açma, yanıt, sonuç özeti, kapatma), doğrulama (sorusuz anket açılmaz,
+/// seçenek kuralları, açılmış anketin sorusu değişmez, zorunlu soru, puan ve seçenek, tekrar yanıt, doğrudan yazma, yanıtlı anket silinmez), kimliği
+/// gizli anket (yanıtlayan görünmez, az yanıtta sonuç gizli, cevaplar tek tek listelenmez), tenant izolasyonu ve yetki (hedef kitle, izinsiz kullanıcı).
+/// </summary>
+public class HrSurveyTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
+{
+    private const string Employees = "/api/records/hr.employee";
+    private const string People = "/api/records/core.person";
+    private const string Surveys = "/api/records/hr.survey";
+    private const string Questions = "/api/records/hr.survey-question";
+    private const string Responses = "/api/records/hr.survey-response";
+    private const string Answers = "/api/records/hr.survey-answer";
+
+    [Fact]
+    public async Task Survey_is_prepared_opened_answered_summarised_and_closed()
+    {
+        var s = await SetUpAsync();
+        using var hr = await LoginAsync(s.Hr);
+        using var staff = await LoginAsync(s.Staff);
+
+        var survey = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "Memnuniyet", ["description"] = "Kısa anket." });
+        Assert.Equal(("draft", s.Hr.Id.ToString(), 0), (Text(survey, "status"), Text(survey, "authorUserId"), Number(survey, "questionCount")));
+        var rating = await QuestionAsync(hr, survey.Id, "İş yükü nasıl?", "rating", null, required: true);
+        var choice = await QuestionAsync(hr, survey.Id, "Ofise kaç gün?", "choice", "Hiç\nİki gün\nHer gün", required: true);
+        var text = await QuestionAsync(hr, survey.Id, "Önerin?", "text", "yok sayılır", required: false);
+        Assert.Equal([10, 20, 30], new[] { rating, choice, text }.Select(q => Number(q, "sequence")));
+        Assert.Null(Text(text, "options"));
+
+        // Taslak çalışana görünmez; açılınca görünür.
+        Assert.Empty(await ListAsync(staff, Surveys, "available=true"));
+        Assert.Equal("open", Text(await ActAsync(hr, survey.Id, "open"), "status"));
+        var visible = Assert.Single(await ListAsync(staff, Surveys, "available=true"));
+        Assert.Equal((3, false), (Number(visible, "questionCount"), Flag(visible, "respondedByMe")));
+        Assert.Equal(3, (await ListAsync(staff, Questions, $"surveyId={survey.Id}")).Count);
+
+        var answered = await SubmitAsync(staff, survey.Id, new SurveyAnswerItem(rating.Id, 4, null, null), new SurveyAnswerItem(choice.Id, null, "İki gün", null),
+            new SurveyAnswerItem(text.Id, null, null, "  Daha çok eğitim  "));
+        Assert.Equal((true, 1), (Flag(answered, "respondedByMe"), Number(answered, "responseCount")));
+        await SubmitAsync(hr, survey.Id, new SurveyAnswerItem(rating.Id, 2, null, null), new SurveyAnswerItem(choice.Id, null, "İki gün", null));
+
+        // Sonuç özeti; kimliği açık ankette yanıtlayanlar listelenir.
+        var results = (await hr.GetFromJsonAsync<SurveyResultsDto>($"/api/hr/surveys/{survey.Id}/results"))!;
+        Assert.Equal((2, (string?)null), (results.ResponseCount, results.HiddenReason));
+        var ratingResult = results.Questions[0];
+        Assert.Equal((2, 3m), (ratingResult.AnswerCount, ratingResult.Average));
+        Assert.Equal([0, 1, 0, 1, 0], ratingResult.Counts.Select(c => c.Count));
+        Assert.Equal([("Hiç", 0), ("İki gün", 2), ("Her gün", 0)], results.Questions[1].Counts.Select(c => (c.Option, c.Count)));
+        Assert.Equal(["Daha çok eğitim"], results.Questions[2].Texts);
+        Assert.Equal(new[] { s.Hr.Id.ToString(), s.Staff.Id.ToString() }.Order(),
+            (await ListAsync(hr, Responses, $"surveyId={survey.Id}")).Select(r => Text(r, "respondentUserId")).Order());
+
+        // Kapanınca çalışana görünmez ve yanıt alınmaz; yeniden açılabilir.
+        Assert.Equal("closed", Text(await ActAsync(hr, survey.Id, "close"), "status"));
+        Assert.Empty(await ListAsync(staff, Surveys, null));
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.GetAsync($"{Surveys}/{survey.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostResponseAsync(staff, survey.Id, new SurveyAnswerItem(rating.Id, 5, null, null))).StatusCode);
+        Assert.Equal("open", Text(await ActAsync(hr, survey.Id, "open"), "status"));
+    }
+
+    [Fact]
+    public async Task Invalid_surveys_questions_and_answers_are_rejected()
+    {
+        var s = await SetUpAsync();
+        using var hr = await LoginAsync(s.Hr);
+        using var staff = await LoginAsync(s.Staff);
+
+        var survey = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "Kurallar" });
+        Assert.Equal(HttpStatusCode.Conflict, (await PostActionAsync(hr, survey.Id, "open")).StatusCode); // sorusuz
+        Assert.Equal(HttpStatusCode.Conflict, (await PostActionAsync(hr, survey.Id, "close")).StatusCode); // açık değil
+        Assert.True((await ValidationProblemAsync(await hr.PostAsJsonAsync($"/api/hr/surveys/{survey.Id}/actions", new RunHrActionRequest("sil", survey.Version, null))))
+            .Errors.ContainsKey("action"));
+
+        var oneOption = await ValidationProblemAsync(await hr.PostAsJsonAsync(Questions, new RecordWriteRequest(Question(survey.Id, "Tek", "choice", "Evet", true))));
+        Assert.True(oneOption.Errors.ContainsKey("options"));
+        var duplicate = await ValidationProblemAsync(await hr.PostAsJsonAsync(Questions, new RecordWriteRequest(Question(survey.Id, "Çift", "choice", "Evet\nevet", true))));
+        Assert.True(duplicate.Errors.ContainsKey("options"));
+        Assert.True((await ValidationProblemAsync(await hr.PostAsJsonAsync(Questions, new RecordWriteRequest(new JsonObject { ["surveyId"] = survey.Id.ToString() }))))
+            .Errors.ContainsKey("text"));
+
+        var rating = await QuestionAsync(hr, survey.Id, "Puan", "rating", null, required: true);
+        var choice = await QuestionAsync(hr, survey.Id, "Seçim", "choice", "A\nB", required: false);
+        await ActAsync(hr, survey.Id, "open");
+
+        // Açılmış anketin sorusu eklenmez, değişmez, silinmez.
+        Assert.Equal(HttpStatusCode.Conflict, (await hr.PostAsJsonAsync(Questions, new RecordWriteRequest(Question(survey.Id, "Geç", "text", null, false)))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await hr.PutAsJsonAsync($"{Questions}/{rating.Id}",
+            new RecordWriteRequest(new JsonObject { ["text"] = "Değişti" }, rating.Version))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await hr.DeleteAsync($"{Questions}/{rating.Id}?version={rating.Version}")).StatusCode);
+
+        // Cevap kuralları.
+        var missing = await ValidationProblemAsync(await PostResponseAsync(staff, survey.Id, new SurveyAnswerItem(choice.Id, null, "A", null)));
+        Assert.True(missing.Errors.ContainsKey($"answers.{rating.Id}"));
+        var wrong = await ValidationProblemAsync(await PostResponseAsync(staff, survey.Id,
+            new SurveyAnswerItem(rating.Id, 6, null, null), new SurveyAnswerItem(choice.Id, null, "C", null), new SurveyAnswerItem(Guid.NewGuid(), 1, null, null)));
+        Assert.True(wrong.Errors.ContainsKey($"answers.{rating.Id}"));
+        Assert.True(wrong.Errors.ContainsKey($"answers.{choice.Id}"));
+        Assert.Equal(3, wrong.Errors.Count);
+
+        await SubmitAsync(staff, survey.Id, new SurveyAnswerItem(rating.Id, 5, null, null));
+        Assert.Equal(HttpStatusCode.Conflict, (await PostResponseAsync(staff, survey.Id, new SurveyAnswerItem(rating.Id, 1, null, null))).StatusCode);
+
+        // Katılım ve cevap yalnızca komutla yazılır; yanıtı olan anket silinmez.
+        Assert.Equal(HttpStatusCode.Conflict, (await hr.PostAsJsonAsync(Responses,
+            new RecordWriteRequest(new JsonObject { ["surveyId"] = survey.Id.ToString() }))).StatusCode);
+        var current = await GetAsync(hr, $"{Surveys}/{survey.Id}");
+        Assert.Equal(HttpStatusCode.Conflict, (await hr.DeleteAsync($"{Surveys}/{survey.Id}?version={current.Version}")).StatusCode);
+
+        // Taslak anket sorularıyla birlikte silinir.
+        var draft = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "Silinecek" });
+        await QuestionAsync(hr, draft.Id, "Soru", "rating", null, required: true);
+        Assert.Equal(HttpStatusCode.NoContent, (await hr.DeleteAsync($"{Surveys}/{draft.Id}?version={draft.Version}")).StatusCode);
+        Assert.Empty(await ListAsync(hr, Questions, $"surveyId={draft.Id}"));
+    }
+
+    [Fact]
+    public async Task Anonymous_survey_hides_respondents_and_shows_results_only_after_enough_responses()
+    {
+        var s = await SetUpAsync();
+        using var hr = await LoginAsync(s.Hr);
+        using var staff = await LoginAsync(s.Staff);
+        using var colleague = await LoginAsync(s.Colleague);
+
+        var survey = await PostAsync(hr, Surveys, new JsonObject { ["title"] = "Nabız", ["isAnonymous"] = true });
+        var rating = await QuestionAsync(hr, survey.Id, "Bu hafta nasılsın?", "rating", null, required: true);
+        await ActAsync(hr, survey.Id, "open");
+
+        // Kimliği gizli seçimi sonradan değişmez.
+        var current = await GetAsync(hr, $"{Surveys}/{survey.Id}");
+        var change = await hr.PutAsJsonAsync($"{Surveys}/{survey.Id}", new RecordWriteRequest(new JsonObject { ["isAnonymous"] = false }, current.Version));
+        Assert.NotEqual(HttpStatusCode.OK, change.StatusCode);
+        Assert.True(Flag(await GetAsync(hr, $"{Surveys}/{survey.Id}"), "isAnonymous"));
+
+        await SubmitAsync(staff, survey.Id, new SurveyAnswerItem(rating.Id, 2, null, null));
+        await SubmitAsync(colleague, survey.Id, new SurveyAnswerItem(rating.Id, 4, null, null));
+        var hidden = (await hr.GetFromJsonAsync<SurveyResultsDto>($"/api/hr/surveys/{survey.Id}/results"))!;
+        Assert.Equal((2, true), (hidden.ResponseCount, hidden.HiddenReason is not null));
+        Assert.Empty(hidden.Questions);
+
+        await SubmitAsync(hr, survey.Id, new SurveyAnswerItem(rating.Id, 3, null, null));
+        var shown = (await hr.GetFromJsonAsync<SurveyResultsDto>($"/api/hr/surveys/{survey.Id}/results"))!;
+        Assert.Equal((3, (string?)null, 3m), (shown.ResponseCount, shown.HiddenReason, Assert.Single(shown.Questions).Average));
+
+        // Yanıtlayan hiçbir uçta görünmez; cevaplar tek tek listelenmez (yönetici rolünde bile).
+        var responses = await ListAsync(hr, Responses, $"surveyId={survey.Id}");
+        Assert.Equal(3, responses.Count);
+        Assert.All(responses, r => Assert.Null(Text(r, "respondentUserId")));
+        Assert.Empty(await ListAsync(hr, Answers, $"questionId={rating.Id}"));
+    }
+
+    [Fact]
+    public async Task Audience_permissions_and_tenants_are_enforced()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var hrA = await LoginAsync(a.Hr);
+        using var hrB = await LoginAsync(b.Hr);
+        using var staff = await LoginAsync(a.Staff);
+        using var outsider = await LoginAsync(a.Outsider);
+
+        var finance = await PostAsync(hrA, Surveys, new JsonObject { ["title"] = "Finans", ["audienceDepartmentKey"] = "Finance" });
+        var financeQuestion = await QuestionAsync(hrA, finance.Id, "Soru", "rating", null, required: true);
+        await ActAsync(hrA, finance.Id, "open");
+        var management = await PostAsync(hrA, Surveys, new JsonObject { ["title"] = "Yönetim", ["audienceDepartmentKey"] = "Management" });
+        var managementQuestion = await QuestionAsync(hrA, management.Id, "Soru", "rating", null, required: true);
+        await ActAsync(hrA, management.Id, "open");
+
+        // Hedef kitle: çalışan yalnızca kendi departmanının anketini görür ve yanıtlar; başka departmanın anketi ve sorusu yoktur.
+        Assert.Equal([finance.Id], (await ListAsync(staff, Surveys, null)).Select(x => x.Id));
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.GetAsync($"{Surveys}/{management.Id}")).StatusCode);
+        Assert.Empty(await ListAsync(staff, Questions, $"surveyId={management.Id}"));
+        Assert.Equal(HttpStatusCode.NotFound, (await PostResponseAsync(staff, management.Id, new SurveyAnswerItem(managementQuestion.Id, 3, null, null))).StatusCode);
+        await SubmitAsync(staff, finance.Id, new SurveyAnswerItem(financeQuestion.Id, 3, null, null));
+
+        // Yönetici bütün anketleri görür ama hedef kitlede değilse yanıtlayamaz.
+        Assert.Equal(HttpStatusCode.Conflict, (await PostResponseAsync(hrA, finance.Id, new SurveyAnswerItem(financeQuestion.Id, 3, null, null))).StatusCode);
+
+        // Çalışan anket hazırlayamaz, durum değiştiremez, sonuç ve katılım göremez.
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsJsonAsync(Surveys, new RecordWriteRequest(new JsonObject { ["title"] = "Benim" }))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostActionAsync(staff, finance.Id, "close")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync($"/api/hr/surveys/{finance.Id}/results")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(Responses)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(Answers)).StatusCode);
+
+        // İzinsiz kullanıcı.
+        Assert.Equal(HttpStatusCode.Forbidden, (await outsider.GetAsync(Surveys)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostResponseAsync(outsider, finance.Id, new SurveyAnswerItem(financeQuestion.Id, 3, null, null))).StatusCode);
+
+        // B tenant'ı A'nın anketini, sorularını, katılımlarını ve sonucunu görmez, yanıtlayamaz.
+        Assert.Empty(await ListAsync(hrB, Surveys, null));
+        Assert.Empty(await ListAsync(hrB, Questions, null));
+        Assert.Empty(await ListAsync(hrB, Responses, null));
+        Assert.Equal(HttpStatusCode.NotFound, (await hrB.GetAsync($"{Surveys}/{finance.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await hrB.GetAsync($"/api/hr/surveys/{finance.Id}/results")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostResponseAsync(hrB, finance.Id, new SurveyAnswerItem(financeQuestion.Id, 3, null, null))).StatusCode);
+        Assert.Equal(1, Number(await GetAsync(hrA, $"{Surveys}/{finance.Id}"), "responseCount"));
+    }
+
+    // --- yardımcılar ---
+
+    private sealed record Setup(Guid TenantId, ModulixUser Hr, ModulixUser Staff, ModulixUser Colleague, ModulixUser Outsider);
+
+    /// <summary>İK (yönetici rolü, çalışan kartı yok), Finans departmanındaki iki çalışan (yalnızca yanıtlama izni) ve izinsiz kullanıcı.</summary>
+    private async Task<Setup> SetUpAsync()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "hr", enabled: true);
+        var hrUser = await factory.CreateUserAsync(tenant);
+        var staffUser = await factory.CreateUserAsync(tenant);
+        var colleagueUser = await factory.CreateUserAsync(tenant);
+        var outsider = await factory.CreateUserAsync(tenant);
+        await MakeAdministratorAsync(tenant.Id, hrUser);
+        await factory.CreateRoleAsync(tenant.Id, [SurveysRespond], Scope.Own, staffUser, colleagueUser);
+
+        using var hr = await LoginAsync(hrUser);
+        foreach (var (user, name) in new[] { (staffUser, "Sinan"), (colleagueUser, "Selin") })
+        {
+            var person = await PostAsync(hr, People, new JsonObject { ["firstName"] = name, ["lastName"] = "Yanıtlar" });
+            await PostAsync(hr, Employees, new JsonObject
+            {
+                ["personId"] = person.Id.ToString(), ["hireDate"] = "2020-01-01", ["userId"] = user.Id.ToString(), ["departmentKey"] = "Finance",
+            });
+        }
+
+        return new Setup(tenant.Id, hrUser, staffUser, colleagueUser, outsider);
+    }
+
+    private static JsonObject Question(Guid surveyId, string text, string type, string? options, bool required) => new()
+    {
+        ["surveyId"] = surveyId.ToString(), ["text"] = text, ["questionType"] = type, ["options"] = options, ["isRequired"] = required,
+    };
+
+    private static Task<RecordResponse> QuestionAsync(HttpClient client, Guid surveyId, string text, string type, string? options, bool required) =>
+        PostAsync(client, Questions, Question(surveyId, text, type, options, required));
+
+    private static async Task<HttpResponseMessage> PostActionAsync(HttpClient client, Guid surveyId, string action)
+    {
+        var current = await client.GetAsync($"{Surveys}/{surveyId}");
+        var version = current.IsSuccessStatusCode ? (await current.Content.ReadFromJsonAsync<RecordResponse>())!.Version : 1;
+        return await client.PostAsJsonAsync($"/api/hr/surveys/{surveyId}/actions", new RunHrActionRequest(action, version, null));
+    }
+
+    private static async Task<RecordResponse> ActAsync(HttpClient client, Guid surveyId, string action)
+    {
+        var response = await PostActionAsync(client, surveyId, action);
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        return (await response.Content.ReadFromJsonAsync<RecordResponse>())!;
+    }
+
+    private static Task<HttpResponseMessage> PostResponseAsync(HttpClient client, Guid surveyId, params SurveyAnswerItem[] answers) =>
+        client.PostAsJsonAsync($"/api/hr/surveys/{surveyId}/responses", new SubmitSurveyRequest(answers));
+
+    private static async Task<RecordResponse> SubmitAsync(HttpClient client, Guid surveyId, params SurveyAnswerItem[] answers)
+    {
+        var response = await PostResponseAsync(client, surveyId, answers);
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        return (await response.Content.ReadFromJsonAsync<RecordResponse>())!;
+    }
+
+    private static string? Text(RecordResponse record, string field) => record.Values[field]?.GetValue<string>();
+
+    private static int Number(RecordResponse record, string field) => record.Values[field]!.GetValue<int>();
+
+    private static bool Flag(RecordResponse record, string field) => record.Values[field]!.GetValue<bool>();
+
+    private async Task MakeAdministratorAsync(Guid tenantId, ModulixUser user)
+    {
+        using var scope = factory.OpenScope(tenantId);
+        var roles = scope.ServiceProvider.GetRequiredService<IRoleService>();
+        var system = await roles.EnsureSystemRoleAsync(CancellationToken.None);
+        Assert.True(await roles.SetMembershipRolesAsync(await factory.GetMembershipIdAsync(user.Id, tenantId), [system.Id], CancellationToken.None));
+    }
+
+    private async Task<HttpClient> LoginAsync(ModulixUser user)
+    {
+        var client = factory.CreateBrowserClient();
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(user.Email!, ModulixApiFactory.Password));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return client;
+    }
+
+    private static async Task<RecordResponse> GetAsync(HttpClient client, string url) => (await client.GetFromJsonAsync<RecordResponse>(url))!;
+
+    private static async Task<IReadOnlyList<RecordResponse>> ListAsync(HttpClient client, string url, string? query) =>
+        (await client.GetFromJsonAsync<RecordPageResponse>(query is null ? url : $"{url}?{query}"))!.Items;
+
+    private static async Task<RecordResponse> PostAsync(HttpClient client, string url, JsonObject values)
+    {
+        var response = await client.PostAsJsonAsync(url, new RecordWriteRequest(values));
+        Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        return (await response.Content.ReadFromJsonAsync<RecordResponse>())!;
+    }
+
+    private static async Task<ValidationProblemDetails> ValidationProblemAsync(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<ValidationProblemDetails>())!;
+    }
+}

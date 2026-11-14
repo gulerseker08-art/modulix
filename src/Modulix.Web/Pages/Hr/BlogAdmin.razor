@@ -1,0 +1,263 @@
+@page "/ik/blog-yonetimi"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Blog yönetimi · Modulix</PageTitle>
+
+@* Blog yönetimi (ADR-0042 dilim 8): taslak ve yayındaki bütün yazılar; yazma, yayınlama, ek ekleme ve silme. Okurlar yazıları "Blog" ekranında
+   görür. *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.BlogManage">
+    <PageHeader Title="Blog yönetimi" Icon="file-text" Subtitle="@(page is null ? "Kurum içi yazıları hazırlayın ve yayınlayın." : $"{page.TotalCount} yazı")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        <BlogPostEditor @key="selected?.Id" Post="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
+        @if (selected is not null)
+        {
+            <AttachmentPanel EntityKey="@HrAccess.BlogPostEntityKey" RecordId="selected.Id" CanWrite="true" Title="Ekler" EmptyText="Bu yazının eki yok." />
+        }
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Blog görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Yazı ara" placeholder="Başlık ya da metinde ara" @bind="search" />
+        </form>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (!editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni yazı</button>
+        }
+    </div>
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan yazı yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) yazı listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Blog yazıları</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var post in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, post)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(post, "title")} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(post)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DeleteAsync(post)"><AppIcon Name="x" Size="16" /> <span>Sil</span></button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + HrAccess.BlogPostEntityKey;
+
+    private const string AllViews = "all";
+
+    // Sıralama anahtarları kayıt deposunun beyanıdır (BlogPostRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("title", "Başlık", "file-text", "title", "-title", Locked: true),
+        new("author", "Yazan", "user"),
+        new("publishedAt", "Yayın", "calendar", "publishedAt", "-publishedAt"),
+        new("status", "Durum", "tag"),
+    ];
+
+    private readonly GridViewState grid = new("hr.blog-admin", "-publishedAt");
+    private PersonalGridViews views = default!;
+    private string view = "all";
+    private (string Key, string Value)? filter = null;
+
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private string? message;
+    private string? search;
+
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new("all", "Tüm yazılar", Icon: "list"),
+        new("isPublished=true", "Yayında", Icon: "file-text"),
+        new("isPublished=false", "Taslak", Icon: "pencil"),
+        .. views.Options,
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, "hr.blog-admin");
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.BlogManage))
+        {
+            await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(HrAccess.BlogPostEntityKey)
+                .Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            filter = GridFilters.Parse(saved.Filters).Select(p => ((string, string)?)(p.Key, p.Value)).FirstOrDefault();
+        }
+        else
+        {
+            grid.Reset();
+            filter = key == AllViews ? null : (key.Split('=')[0], key.Split('=')[1]);
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(filter);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (filter is { } f)
+        {
+            url += $"&{f.Key}={Uri.EscapeDataString(f.Value)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse record) =>
+        @<td data-label="@column.Label" class="@(column.Key == "title" ? "primary" : null)">@CellContent(column.Key, record)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse record) => key switch
+    {
+        "title" => @<text>@WarehouseLabels.Text(record, "title")</text>,
+        "author" => @<text>@(WarehouseLabels.Id(record, "authorUserId") is { } author ? Lookups.MemberName(author) : "—")</text>,
+        "publishedAt" => @<text>@(DateTimeOffset.TryParse(WarehouseLabels.Text(record, "publishedAt"), out var at) ? at.LocalDateTime.ToString("dd.MM.yyyy") : "—")</text>,
+        "status" => @<span class="badge @(WarehouseLabels.Flag(record, "isPublished") ? "status-customer" : "status-inactive")">@(WarehouseLabels.Flag(record, "isPublished") ? "Yayında" : "Taslak")</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.BlogPostEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, record.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private void Open(RecordResponse? post)
+    {
+        selected = post;
+        editing = true;
+    }
+
+    private void Close()
+    {
+        editing = false;
+        selected = null;
+    }
+
+    private async Task SavedAsync(RecordResponse saved)
+    {
+        // Yeni yazı kaydedilince açık kalır: ek eklenebilsin.
+        if (selected is null)
+        {
+            selected = saved;
+        }
+        else
+        {
+            Close();
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private async Task DeleteAsync(RecordResponse post)
+    {
+        var result = await Api.DeleteAsync($"{Url}/{post.Id}?version={post.Version}");
+        message = result.IsSuccess ? null : result.Error;
+        if (result.IsSuccess && selected?.Id == post.Id)
+        {
+            Close();
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

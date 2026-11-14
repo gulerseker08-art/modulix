@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Api.Access;
 using Modulix.Api.Records;
 using Modulix.Core.Contracts.Records;
-using Modulix.Core.Contracts.Sales;
+using Modulix.Modules.Crm.Contracts.Sales;
 using Modulix.Core.Settings;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Quotes;

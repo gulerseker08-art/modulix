@@ -103,11 +103,11 @@
 
     @if (page is null)
     {
-        <p class="text-muted">@Texts.Get("common.loading")</p>
+        <LoadingState Kind="LoadingKind.Table" />
     }
     else if (page.Items.Count == 0)
     {
-        <p class="text-muted">@Texts.Get("crm.leads.none")</p>
+        <EmptyState Title="@Texts.Get("crm.leads.none")" />
     }
     else
     {
@@ -402,7 +402,7 @@
         "email" => @<text>@lead.Email</text>,
         "phone" => @<text>@lead.Phone</text>,
         "city" => @<text>@lead.City</text>,
-        "industry" => @<text>@lead.Industry</text>,
+        "industry" => @<text>@(lead.IndustryName ?? lead.LegacyIndustry)</text>,
         "productInterest" => @<text>@lead.ProductInterest</text>,
         _ => @<text></text>,
     };

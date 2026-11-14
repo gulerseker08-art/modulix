@@ -1,0 +1,111 @@
+@page "/ik/duyurular"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>Duyurular · Modulix</PageTitle>
+
+@* Duyuru akışı (ADR-0042 dilim 6): kullanıcıya hedeflenen, yayında ve süresi dolmamış duyurular; sabitlenmiş olanlar üstte, okunmamışlar "Yeni"
+   işaretli. Duyuru açılınca okundu yazılır. Hangi duyurunun görüneceğine sunucu karar verir. Metin düz metindir (HTML yorumlanmaz). *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.AnnouncementsRead">
+    <PageHeader Title="Duyurular" Icon="bell" Subtitle="@(page is null ? "Kurum içi duyurular." : $"{page.TotalCount} duyuru · {Unread} okunmamış")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Duyurularda ara" placeholder="Başlık ya da metinde ara" @bind="search" />
+        </form>
+    </div>
+
+    @if (page is null)
+    {
+        <LoadingState />
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Şu an size yönelik duyuru yok.</p>
+    }
+    else
+    {
+        <ul class="list-unstyled" aria-label="Duyurular">
+            @foreach (var announcement in page.Items)
+            {
+                var open = expanded.Contains(announcement.Id);
+                <li class="summary-card mb-3">
+                    <div class="list-toolbar mb-1">
+                        <h2 class="h6 mb-0 me-auto">@WarehouseLabels.Text(announcement, "title")</h2>
+                        @if (WarehouseLabels.Flag(announcement, "isPinned"))
+                        {
+                            <span class="badge stage-qualified">Sabitlenmiş</span>
+                        }
+                        @if (!WarehouseLabels.Flag(announcement, "readByMe"))
+                        {
+                            <span class="badge stage-negotiation">Yeni</span>
+                        }
+                    </div>
+                    <p class="text-muted mb-2">
+                        @HrLabels.Date(WarehouseLabels.Text(announcement, "publishOn"))@(WarehouseLabels.Text(announcement, "audienceDepartmentKey") is { Length: > 0 } dep ? $" · {Lookups.Label(HrAccess.DepartmentList, dep)}" : "")
+                    </p>
+                    @if (open)
+                    {
+                        <p class="preline mb-2">@WarehouseLabels.Text(announcement, "body")</p>
+                    }
+                    <button type="button" class="btn btn-ghost" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleAsync(announcement)">
+                        <AppIcon Name="@(open ? "chevron-down" : "chevron-right")" Size="16" /> @(open ? "Kapat" : "Oku")
+                    </button>
+                </li>
+            }
+        </ul>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private RecordPageResponse? page;
+    private readonly HashSet<Guid> expanded = [];
+    private string? message;
+    private string? search;
+
+    private int Unread => page?.Items.Count(a => !WarehouseLabels.Flag(a, "readByMe")) ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.AnnouncementsRead))
+        {
+            await Lookups.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        // Yöneticiler de akışta yalnızca yayındaki ve tarih aralığındaki duyuruları görür.
+        var result = await Api.GetAsync<RecordPageResponse>(
+            $"/api/records/{HrAccess.AnnouncementEntityKey}?active=true&page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}");
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private async Task ToggleAsync(RecordResponse announcement)
+    {
+        if (!expanded.Add(announcement.Id))
+        {
+            expanded.Remove(announcement.Id);
+            return;
+        }
+
+        if (!WarehouseLabels.Flag(announcement, "readByMe"))
+        {
+            var result = await Api.PostAsync<RecordResponse>($"/api/hr/announcements/{announcement.Id}/read", new { });
+            if (result.Value is { } fresh && page is not null)
+            {
+                page = page with { Items = [.. page.Items.Select(a => a.Id == fresh.Id ? fresh : a)] };
+            }
+        }
+    }
+}

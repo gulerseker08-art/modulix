@@ -1,0 +1,362 @@
+@page "/ik/giris-cikis"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+
+<PageTitle>İşe giriş ve çıkış · Modulix</PageTitle>
+
+@* İşe giriş/çıkış süreçleri (ADR-0042 dilim 5): başlatılan süreçler, ilerleme, görevler ve iptal. Süreç şablondan başlatılır (görevler tek işlemde
+   açılır). Çıkış sürecindeki "zimmet iadesi" görevi açık zimmet varken tamamlanamaz. Görünürlük sunucudadır (kapsam + kendisine görev atanan). *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.ChecklistsRead">
+    <PageHeader Title="İşe giriş ve çıkış" Icon="user-check" Subtitle="@(page is null ? "Çalışanların işe giriş ve işten çıkış süreçlerini izleyin." : $"{page.TotalCount} süreç")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (starting)
+    {
+        <form class="record-form" novalidate @onsubmit="StartAsync" @onsubmit:preventDefault aria-label="Süreç başlat">
+            <div class="form-toolbar">
+                <div><h2>Süreç başlat</h2><p>Şablonun adımları çalışana görev olarak açılır.</p></div>
+                <div class="form-toolbar-actions">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => starting = false">İptal</button>
+                    <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : null)">Başlat</button>
+                </div>
+            </div>
+            <div class="form-grid">
+                <div class="span-6">
+                    <label class="form-label required" for="start-employee">Çalışan</label>
+                    <LookupPicker Id="start-employee" LookupKey="@HrAccess.ChecklistEmployeeLookup" @bind-Value="startEmployee" Required="true" Placeholder="Çalışanı seçin…" Invalid="@(errors?.ContainsKey("employeeId") == true)" />
+                    <FieldError Field="employeeId" Errors="errors" />
+                </div>
+                <div class="span-6">
+                    <label class="form-label required" for="start-template">Şablon</label>
+                    <LookupPicker Id="start-template" LookupKey="@HrAccess.ChecklistTemplateLookup" @bind-Value="startTemplate" Required="true" Placeholder="Etkin şablonu seçin…" Invalid="@(errors?.ContainsKey("templateId") == true)" />
+                    <FieldError Field="templateId" Errors="errors" />
+                </div>
+                <div class="span-6">
+                    <label class="form-label required" for="start-date">Başlangıç günü</label>
+                    <input id="start-date" class="form-control" type="date" required aria-required="true" @bind="startDate" />
+                    <FieldError Field="startDate" Errors="errors" />
+                    <small class="text-muted">İşe girişte giriş tarihi, çıkışta ayrılış tarihi; görev son tarihleri buna göre hesaplanır.</small>
+                </div>
+            </div>
+        </form>
+    }
+
+    @if (selected is not null)
+    {
+        <section class="record-form sectioned" aria-label="Süreç">
+            <div class="form-toolbar">
+                <div>
+                    <h2>@WarehouseLabels.Text(selected, "name")</h2>
+                    <p>@WarehouseLabels.Text(selected, "employeeName") · @HrLabels.ChecklistKind(WarehouseLabels.Text(selected, "kind")) · başlangıç @HrLabels.Date(WarehouseLabels.Text(selected, "startDate"))</p>
+                </div>
+                <div class="form-toolbar-actions">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => selected = null">Kapat</button>
+                </div>
+            </div>
+            <LeaveActionsBar Record="selected" BaseUrl="/api/hr/employee-checklists" Changed="ChecklistChangedAsync" />
+            <div class="stat-grid">
+                <div class="stat-card"><span>İlerleme</span><strong>@WarehouseLabels.Number(selected, "closedCount") / @WarehouseLabels.Number(selected, "taskCount")</strong></div>
+                <div class="stat-card"><span>Durum</span><strong><span class="badge @HrLabels.ChecklistStatusBadge(WarehouseLabels.Text(selected, "status"))">@HrLabels.ChecklistStatus(WarehouseLabels.Text(selected, "status"))</span></strong></div>
+            </div>
+            <ChecklistTaskList Title="Görevler" EmptyText="Bu süreçte görev yok." Query="@($"checklistId={selected.Id}")" Changed="RefreshSelectedAsync" />
+        </section>
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Süreç görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Süreç ara" placeholder="Çalışan adı ya da şablon ara" @bind="search" />
+        </form>
+        <FilterToggle @bind-Open="filtersOpen" Count="@(kind is null ? 0 : 1)" />
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(HrAccess.ChecklistsManage) && !starting)
+        {
+            <button type="button" class="btn btn-primary" @onclick="OpenStart"><AppIcon Name="plus" Size="16" /> Süreç başlat</button>
+        }
+    </div>
+
+    @if (filtersOpen || kind is not null)
+    {
+        <div class="filters">
+            <select class="form-select" aria-label="Süreç türü" @bind="KindFilter" @bind:after="() => LoadAsync(1)">
+                <option value="">Tüm türler</option>
+                @foreach (var (key, label) in HrAccess.ChecklistKinds)
+                {
+                    <option value="@key">@label</option>
+                }
+            </select>
+        </div>
+    }
+
+    <PersonalViewBar Active="Active" Dirty="grid.Differs(Active)" Naming="views.Naming" NamingChanged="views.StartNaming" Error="@views.Error"
+                     SaveAs="SaveAsAsync" UpdateView="UpdateViewAsync" DiscardChanges="DiscardAsync" DeleteView="DeleteViewAsync" />
+
+    @if (page is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (page.Items.Count == 0)
+    {
+        <p class="text-muted" role="status">Bu görünüme uyan süreç yok.</p>
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) süreç listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">İşe giriş ve çıkış süreçleri</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var checklist in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            @Cell(column, checklist)
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(checklist, "employeeName")} süreci eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(checklist)"><AppIcon Name="eye" Size="16" /> <span>Aç</span></button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + HrAccess.EmployeeChecklistEntityKey;
+
+    private const string AllViews = "all";
+
+    // Sıralama anahtarları kayıt deposunun beyanıdır (EmployeeChecklistRecordStore.SortKeys).
+    private static readonly GridColumnDef[] BaseColumns =
+    [
+        new("employee", "Çalışan", "user", Locked: true),
+        new("process", "Süreç", "clipboard-list", "kind", "-kind"),
+        new("startDate", "Başlangıç", "calendar", "startDate", "-startDate"),
+        new("progress", "İlerleme", "check-circle"),
+        new("status", "Durum", "tag", "status", "-status"),
+    ];
+
+    private readonly GridViewState grid = new("hr.checklists", "-startDate");
+    private PersonalGridViews views = default!;
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private string? search;
+    private string view = "open";
+    private string? status = "open";
+    private string? kind;
+    private bool filtersOpen;
+    private bool starting;
+    private bool busy;
+    private Guid? startEmployee;
+    private Guid? startTemplate;
+    private DateOnly? startDate;
+
+    private string KindFilter
+    {
+        get => kind ?? string.Empty;
+        set => kind = string.IsNullOrEmpty(value) ? null : value;
+    }
+
+    private GridViewDto? Active => views.Find(view);
+
+    private IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new("open", "Süren süreçler", Icon: "hourglass"),
+        new("open:onboarding", "İşe giriş", Icon: "user-check"),
+        new("open:offboarding", "İşten çıkış", Icon: "log-out"),
+        new("completed", "Tamamlanan", Icon: "check-circle"),
+        new(AllViews, "Tüm süreçler", Icon: "list"),
+        .. views.Options,
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        views = new PersonalGridViews(Api, "hr.checklists");
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.ChecklistsRead))
+        {
+            await Lookups.LoadAsync();
+            grid.Define([.. BaseColumns, .. Lookups.FieldsOf(HrAccess.EmployeeChecklistEntityKey)
+                .Select(f => new GridColumnDef("custom." + f.Key, f.Label, "type", DefaultVisible: f.ShowInList))]);
+            await views.LoadAsync();
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        views.StartNaming(false);
+        if (Active is { } saved)
+        {
+            grid.Apply(saved);
+            var filters = GridFilters.Parse(saved.Filters);
+            status = filters.GetValueOrDefault("status");
+            kind = filters.GetValueOrDefault("kind");
+        }
+        else
+        {
+            grid.Reset();
+            var parts = key.Split(':');
+            status = parts[0] == AllViews ? null : parts[0];
+            kind = parts.Length > 1 ? parts[1] : null;
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private string? CurrentFilters => GridFilters.Build(status is { } s ? ("status", s) : null, kind is { } k ? ("kind", k) : null);
+
+    private void StartNaming() => views.StartNaming(true);
+
+    private async Task SaveAsAsync(string name)
+    {
+        if (await views.SaveAsAsync(grid.ToRequest(name, CurrentFilters)) is { } key)
+        {
+            view = key;
+        }
+    }
+
+    private async Task UpdateViewAsync()
+    {
+        if (Active is { } current)
+        {
+            await views.UpdateAsync(current, grid.ToRequest(current.Name, CurrentFilters));
+        }
+    }
+
+    private async Task DiscardAsync() => await ChooseViewAsync(view);
+
+    private async Task DeleteViewAsync()
+    {
+        if (Active is { } current && await views.DeleteAsync(current))
+        {
+            await ChooseViewAsync(AllViews);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (status is { } s)
+        {
+            url += $"&status={Uri.EscapeDataString(s)}";
+        }
+
+        if (kind is { } k)
+        {
+            url += $"&kind={Uri.EscapeDataString(k)}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private RenderFragment Cell(GridColumnDef column, RecordResponse checklist) =>
+        @<td data-label="@column.Label" class="@(column.Key == "employee" ? "primary" : null)">@CellContent(column.Key, checklist)</td>;
+
+    private RenderFragment CellContent(string key, RecordResponse checklist) => key switch
+    {
+        "employee" => @<text>@WarehouseLabels.Text(checklist, "employeeName")</text>,
+        "process" => @<text>@HrLabels.ChecklistKind(WarehouseLabels.Text(checklist, "kind")) · @WarehouseLabels.Text(checklist, "name")</text>,
+        "startDate" => @<text>@HrLabels.Date(WarehouseLabels.Text(checklist, "startDate"))</text>,
+        "progress" => @<text>@WarehouseLabels.Number(checklist, "closedCount") / @WarehouseLabels.Number(checklist, "taskCount")</text>,
+        "status" => @<span class="badge @HrLabels.ChecklistStatusBadge(WarehouseLabels.Text(checklist, "status"))">@HrLabels.ChecklistStatus(WarehouseLabels.Text(checklist, "status"))</span>,
+        _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.EmployeeChecklistEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
+            @<text>@CustomFieldText.Format(field, checklist.Values["custom"] as JsonObject)</text>,
+        _ => @<text></text>,
+    };
+
+    private void OpenStart()
+    {
+        selected = null;
+        starting = true;
+        errors = null;
+        startEmployee = startTemplate = null;
+        startDate = DateOnly.FromDateTime(DateTime.Today);
+    }
+
+    private async Task StartAsync()
+    {
+        if (startEmployee is not { } employee || startTemplate is not { } template || startDate is not { } day)
+        {
+            errors = new Dictionary<string, string[]> { ["employeeId"] = ["Çalışan, şablon ve başlangıç günü zorunludur."] };
+            return;
+        }
+
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await Api.PostAsync<RecordResponse>("/api/hr/employee-checklists/start", new StartChecklistRequest(employee, template, day));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            message = result.FieldErrors is { Count: > 0 } ? null : result.Error;
+            return;
+        }
+
+        starting = false;
+        selected = result.Value;
+        await LoadAsync(1);
+    }
+
+    private void Open(RecordResponse checklist)
+    {
+        starting = false;
+        selected = checklist;
+    }
+
+    private async Task ChecklistChangedAsync(RecordResponse changed)
+    {
+        selected = changed;
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    /// <summary>Görev değişince sürecin ilerlemesi ve durumu sunucudan yeniden okunur.</summary>
+    private async Task RefreshSelectedAsync()
+    {
+        if (selected is not null && (await Api.GetAsync<RecordResponse>($"{Url}/{selected.Id}")).Value is { } fresh)
+        {
+            selected = fresh;
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+}
