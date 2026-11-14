@@ -857,7 +857,7 @@ dotnet run --project src/Modulix.Api
 
 | Proje | Görev | Referans verebileceği projeler |
 | --- | --- | --- |
-| `Modulix.Core.Contracts` | Modüllerin görebildiği tek Core projesi | — |
+| `Modulix.Core.Contracts` | Modüllerin görebildiği tek Core projesi; yalnızca bütün modüllerin ortak kullandığı çekirdek sözleşmeler. Ad alanları mimari testteki izin listesiyle sabittir, modüle özel sözleşme modülün kendi sözleşme projesine konur ([ADR-0044](docs/adr/0044-modul-sozlesme-projeleri.md)) | — |
 | `Modulix.Core` | Tenant, yetki, entitlement, kayıt boru hattı, audit, outbox, metadata | Core.Contracts |
 | `Modulix.Infrastructure` | EF Core, SQL Server, RLS, dosya, e-posta | Core, Core.Contracts |
 | `Modulix.Modules.Crm` | Firma, kişi, fırsat, aktivite | Core.Contracts, Modules.Crm.Contracts, Modules.Marketing.Contracts |
