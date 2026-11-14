@@ -327,3 +327,23 @@ Dilimlerin "bilerek yapılmadı" listelerinden kalanlar öncelik sırasına konu
 | `dotnet test tests/Modulix.Modules.Hr.Tests` | 37/37 geçti (gerçek katalogla beyan, tarih alanı ↔ tarama kaynağı uyumu, bildirim alanları, aksiyon izni, şablon bağlamaları) |
 | `dotnet test tests/Modulix.ArchitectureTests` | 78/78 geçti |
 | `HrAutomationTests` (entegrasyon, 4 test: bütün şablonlar gerçek yayın doğrulamasından geçer; görev bildirimi + son gün hatırlatması + tenant izolasyonu; ayrılınca tek işten çıkış süreci; izinsiz kural yöneticisi şablonu kullanamaz) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |
+
+## 19. Sonraya kalanlar, öncelik 2a: içe aktarma (14 Kasım 2026)
+
+Öncelik 2'nin (çalışan kartı genişletmeleri) ilk parçası: ADR-0033 içe aktarma tanımları. Yeni tablo ve migration yoktur; motor, ekran ("Yeni içe aktarma"), işlem günlüğü ve firmanın içe aktarma tasarımı mevcut Core altyapısıdır.
+
+- **Demirbaş** (`hr.asset`, izin `hr.assets.manage`): envanter no ve ad zorunlu; kategori, seri no, marka, model, alış tarihi ve bedeli, para birimi, notlar. Envanter no kesin eşleşmedir (kayıtlı ya da dosyada tekrar eden satır hatası). Durum içe aktarılmaz: yeni demirbaş depoda başlar, zimmet iş akışıyla verilir.
+- **İzin hakkı** (`hr.leave-balance`, izin `hr.leaves.manage`): geçiş için açılış bakiyeleri. Çalışan sicil numarasıyla bağlanır (`hr.employee` kayıt deposuna `employeeNumber` süzgeci eklendi); hak ve devreden gün; aynı çalışan ve yıl için ikinci hak depo kuralıyla reddedilir.
+- **Resmî tatil** (`hr.holiday`, izin `hr.leaves.manage`): tarih, ad, yarım gün; tarih kesin eşleşmedir.
+- **Tam sayı alanı:** içe aktarma sayıları ondalık verdiğinden İK'nın tam sayı alanı küsuratsız ondalık sayıyı da kabul eder (ör. yıl 2026); küsuratlı değer hâlâ hatadır.
+
+**Çalışan kartı içe aktarılmadı (karar gerekiyor):** çalışan kartı Core'un kişi kaydına (`core.person`) bağlıdır ve kişiler bugün toplu içe aktarılamaz. İçe aktarma tanımı modülün kendi kayıt türü olmak zorunda (katalog kuralı), kişi kaydının yazma izni ise kişiyi kullanan modüllerden gelir; bu yüzden ne İK kişi içe aktarabilir ne de Core tek bir izinle tanımlayabilir. Seçenekler: (a) Core'a kişi içe aktarma için ayrı bir izin (ör. `core.people.import`) ve tanım; önce kişiler, sonra çalışan kartları (kişi e-postayla bağlanır), (b) motora "bağlı kaydı yoksa oluştur" desteği. İkisi de Core değişikliğidir; öncelik 4 ile birlikte karara bağlanmalıdır.
+
+### Test sonuçları (bölüm 19)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 42/42 geçti (gerçek katalogla tanımlar, eşleşme kuralları, sicil no bağlantısı, ondalık → tam sayı) |
+| `dotnet test tests/Modulix.ArchitectureTests` | 78/78 geçti |
+| `dotnet test tests/Modulix.Core.Tests` | 971/971 geçti |
+| `HrImportTests` (entegrasyon, 3 test: demirbaş + izin hakkı + tatil; tekrar, küsuratlı yıl ve bilinmeyen sicil no satır hatası; başka firmanın sicil numarası çözülmez ve izinsiz kullanıcı demirbaş türünü görmez) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır) |

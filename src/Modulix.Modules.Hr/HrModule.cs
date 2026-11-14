@@ -468,6 +468,9 @@ public sealed class HrModule : IModule
     /// <summary>Kural altyapısı yetenekleri (ADR-0027): çalışan eklendi/güncellendi olayları; durum, çalışma şekli ve tarihler (ör. işe girişe N gün kala).</summary>
     AutomationCapabilities IModule.Automation => Automation.HrAutomation.Capabilities;
 
+    /// <summary>Toplu içe aktarma (ADR-0033): demirbaş, izin hakkı (açılış bakiyeleri) ve resmî tatil.</summary>
+    IReadOnlyList<ImportDefinition> IModule.Imports => HrImports.All;
+
     IReadOnlyList<RoleTemplate> IModule.RoleTemplates { get; } =
     [
         new(
