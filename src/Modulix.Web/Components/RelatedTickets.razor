@@ -7,10 +7,10 @@
 {
     <section class="detail-section" aria-labelledby="related-tickets-@IdSuffix">
         <div class="section-header">
-            <h2 id="related-tickets-@IdSuffix">@Title</h2>
+            <h2 id="related-tickets-@IdSuffix">@TitleText</h2>
             @if (PartyId is { } party && Session.Can(SupportAccess.TicketsCreate))
             {
-                <a class="btn btn-sm btn-outline-secondary" href="destek/talepler/yeni?musteri=@party">Talep aç</a>
+                <a class="btn btn-sm btn-outline-secondary" href="destek/talepler/yeni?musteri=@party">@Texts.Get("support.related.open")</a>
             }
         </div>
         @if (error is not null)
@@ -23,28 +23,28 @@
         }
         else if (listing.Items.Count == 0)
         {
-            <p class="text-muted">İlişkili destek talebi yok.</p>
+            <p class="text-muted">@Texts.Get("support.related.none")</p>
         }
         else
         {
-            <p class="small text-muted">@open açık talep · toplam @listing.TotalCount@(listing.TotalCount > listing.Items.Count ? " (son " + listing.Items.Count + " gösteriliyor)" : null)</p>
+            <p class="small text-muted">@(listing.TotalCount > listing.Items.Count ? Texts.Get("support.related.countsPartial", open, listing.TotalCount, listing.Items.Count) : Texts.Get("support.related.counts", open, listing.TotalCount))</p>
             <table class="table record-table">
-                <caption class="visually-hidden">@Title</caption>
-                <thead><tr><th scope="col">Talep</th><th scope="col">Öncelik</th><th scope="col">Durum</th><th scope="col">Sorumlu</th><th scope="col">Son hareket</th></tr></thead>
+                <caption class="visually-hidden">@TitleText</caption>
+                <thead><tr><th scope="col">@Texts.Get("support.tickets.col.ticket")</th><th scope="col">@Texts.Get("crm.leads.col.priority")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("common.field.owner")</th><th scope="col">@Texts.Get("support.tickets.col.activity")</th></tr></thead>
                 <tbody>
                     @foreach (var t in listing.Items)
                     {
                         <tr>
-                            <td data-label="Talep" class="primary"><a href="destek/talepler/@t.Id">@t.Subject</a> <small class="text-muted">@t.Number</small></td>
-                            <td data-label="Öncelik"><span class="badge stage-@SupportLabels.PriorityBadge(t.Priority)">@SupportLabels.Label(SupportLabels.Priorities, t.Priority)</span></td>
-                            <td data-label="Durum"><span class="badge stage-@SupportLabels.StatusBadge(t.Status)">@SupportLabels.Label(SupportLabels.Statuses, t.Status)</span></td>
-                            <td data-label="Sorumlu">@(t.OwnerId is null ? "Atanmamış" : Lookups.MemberName(t.OwnerId))</td>
-                            <td data-label="Son hareket">@CrmLabels.Time(t.LastActivityAt)</td>
+                            <td data-label="@Texts.Get("support.tickets.col.ticket")" class="primary"><a href="destek/talepler/@t.Id">@t.Subject</a> <small class="text-muted">@t.Number</small></td>
+                            <td data-label="@Texts.Get("crm.leads.col.priority")"><span class="badge stage-@SupportLabels.PriorityBadge(t.Priority)">@SupportLabels.Label(SupportLabels.Priorities, t.Priority)</span></td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@SupportLabels.StatusBadge(t.Status)">@SupportLabels.Label(SupportLabels.Statuses, t.Status)</span></td>
+                            <td data-label="@Texts.Get("common.field.owner")">@(t.OwnerId is null ? Texts.Get("support.unassigned") : Lookups.MemberName(t.OwnerId))</td>
+                            <td data-label="@Texts.Get("support.tickets.col.activity")">@CrmLabels.Time(t.LastActivityAt)</td>
                         </tr>
                     }
                 </tbody>
             </table>
-            <a class="small" href="@AllHref">Tüm destek talepleri</a>
+            <a class="small" href="@AllHref">@Texts.Get("support.related.all")</a>
         }
     </section>
 }
@@ -52,7 +52,10 @@
 @code {
     [Inject] private CrmLookups Lookups { get; set; } = default!;
 
-    [Parameter] public string Title { get; set; } = "Destek talepleri";
+    /// <summary>Başlık; verilmezse sözlükteki "Destek talepleri" (ADR-0034, dilim 12).</summary>
+    [Parameter] public string? Title { get; set; }
+
+    private string TitleText => Title ?? Texts.Get("support.tickets.pageTitle");
 
     /// <summary>Ortak müşteri (taraf) kaydı; firma kartında firmanın <c>PartyId</c> değeri.</summary>
     [Parameter] public Guid? PartyId { get; set; }

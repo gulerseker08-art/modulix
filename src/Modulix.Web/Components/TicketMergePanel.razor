@@ -6,35 +6,34 @@
 @if (CanMerge)
 {
     <section aria-labelledby="merge-title">
-        <h2 id="merge-title">Mükerrer talep</h2>
+        <h2 id="merge-title">@Texts.Get("support.mergePanel.title")</h2>
         <details>
-            <summary>Bu talebi başka bir talebe birleştir</summary>
+            <summary>@Texts.Get("support.mergePanel.summary")</summary>
             <p class="small text-muted">
-                Bu talep <strong>Birleştirildi</strong> durumuna geçer; geçmişi, mesajları ve dış anahtarı korunur, mesajları özgün zamanlarıyla hedef talebe kopyalanır. Farklı müşterilerin talepleri birleştirilemez.
-                Bu işlem geri alınamaz.
+                @Texts.Strong("support.mergePanel.help", Texts.Get("support.status.merged"))
             </p>
             <Notice Text="@message" Failed="true" />
             @if (candidates is { Count: > 0 })
             {
                 <fieldset>
-                    <legend class="h6">Olası mükerrerler</legend>
+                    <legend class="h6">@Texts.Get("support.mergePanel.candidates")</legend>
                     @foreach (var c in candidates)
                     {
                         <div class="form-check">
                             <input id="cand-@c.Id" class="form-check-input" type="radio" name="merge-target" checked="@(targetId == c.Id)" @onchange="() => targetId = c.Id" />
-                            <label class="form-check-label" for="cand-@c.Id"><a href="destek/talepler/@c.Id">@c.Number</a> · @c.Subject <small class="text-muted">(@SupportLabels.Label(SupportLabels.Statuses, c.Status) · benzerlik %@((int)Math.Round(c.Score * 100)) · @c.Reason)</small></label>
+                            <label class="form-check-label" for="cand-@c.Id"><a href="destek/talepler/@c.Id">@c.Number</a> · @c.Subject <small class="text-muted">(@SupportLabels.Label(SupportLabels.Statuses, c.Status) · @Texts.Get("support.new.similarity", (int)Math.Round(c.Score * 100)) · @c.Reason)</small></label>
                         </div>
                     }
                 </fieldset>
             }
-            <label class="form-label" for="merge-target">Ya da hedef talebi arayın</label>
-            <LookupPicker Id="merge-target" LookupKey="support.ticket.parent" @bind-Value="targetId" Placeholder="Talep ara…" />
+            <label class="form-label" for="merge-target">@Texts.Get("support.mergePanel.search")</label>
+            <LookupPicker Id="merge-target" LookupKey="support.ticket.parent" @bind-Value="targetId" Placeholder="@Texts.Get("support.searchTicket")" />
             <FieldError Field="targetId" Errors="errors" />
-            <label class="form-label mt-2" for="merge-reason">Gerekçe (zorunlu)</label>
+            <label class="form-label mt-2" for="merge-reason">@Texts.Get("orders.change.reason")</label>
             <textarea id="merge-reason" class="form-control" rows="2" maxlength="500" @bind="reason" aria-invalid="@(Has("reason") ? "true" : null)"></textarea>
             <FieldError Field="reason" Errors="errors" />
             <div class="form-actions">
-                <button type="button" class="btn btn-outline-danger" disabled="@(busy || targetId is null)" @onclick="MergeAsync">Birleştir</button>
+                <button type="button" class="btn btn-outline-danger" disabled="@(busy || targetId is null)" @onclick="MergeAsync">@Texts.Get("support.mergePanel.merge")</button>
             </div>
         </details>
     </section>

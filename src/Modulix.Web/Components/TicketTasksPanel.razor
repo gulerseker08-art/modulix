@@ -4,7 +4,7 @@
 @inject CrmLookups Lookups
 
 <section aria-labelledby="tasks-title">
-    <h2 id="tasks-title">Alt işler</h2>
+    <h2 id="tasks-title">@Texts.Get("support.tasksPanel.title")</h2>
     <Notice Text="@message" Failed="@failed" />
     @if (tasks is null)
     {
@@ -12,7 +12,7 @@
     }
     else if (tasks.Count == 0)
     {
-        <p class="text-muted">Alt iş yok.</p>
+        <p class="text-muted">@Texts.Get("support.tasksPanel.none")</p>
     }
     else
     {
@@ -20,12 +20,12 @@
             @foreach (var t in tasks)
             {
                 <li>
-                    <span class="badge stage-@(t.IsDone ? "won" : t.IsBlocking ? "lost" : "open")">@(t.IsDone ? "Tamamlandı" : t.IsBlocking ? "Engelleyici" : "Açık")</span>
+                    <span class="badge stage-@(t.IsDone ? "won" : t.IsBlocking ? "lost" : "open")">@(t.IsDone ? Texts.Get("support.tasksPanel.done") : t.IsBlocking ? Texts.Get("support.tasksPanel.blocking") : Texts.Get("support.tasksPanel.open"))</span>
                     <strong class="@(t.IsDone ? "text-decoration-line-through" : null)">@t.Title</strong>
-                    <small class="text-muted"> · @(t.AssigneeId is null ? "Atanmamış" : Lookups.MemberName(t.AssigneeId))@(t.DoneAt is { } at ? " · " + CrmLabels.Time(at) + " " + Lookups.MemberName(t.DoneBy) : null)</small>
+                    <small class="text-muted"> · @(t.AssigneeId is null ? Texts.Get("support.unassigned") : Lookups.MemberName(t.AssigneeId))@(t.DoneAt is { } at ? " · " + CrmLabels.Time(at) + " " + Lookups.MemberName(t.DoneBy) : null)</small>
                     @if (CanWrite)
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" disabled="@busy" @onclick="() => SetDoneAsync(t, !t.IsDone)">@(t.IsDone ? "Yeniden aç" : "Tamamla")</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" disabled="@busy" @onclick="() => SetDoneAsync(t, !t.IsDone)">@(t.IsDone ? Texts.Get("support.action.reopen") : Texts.Get("support.tasksPanel.complete"))</button>
                     }
                 </li>
             }
@@ -36,25 +36,25 @@
     {
         <form class="record-form" novalidate @onsubmit="AddAsync" @onsubmit:preventDefault>
             <fieldset disabled="@busy">
-                <legend class="h6">Alt iş ekle</legend>
+                <legend class="h6">@Texts.Get("support.tasksPanel.add")</legend>
                 <div class="form-grid">
                     <div class="span-6">
-                        <label class="form-label" for="task-title">Başlık</label>
+                        <label class="form-label" for="task-title">@Texts.Get("support.title")</label>
                         <input id="task-title" class="form-control" maxlength="200" @bind="title" aria-invalid="@(Has("title") ? "true" : null)" />
                         <FieldError Field="title" Errors="errors" />
                     </div>
                     <div class="span-4">
-                        <label class="form-label" for="task-assignee">Sorumlu</label>
-                        <LookupPicker Id="task-assignee" LookupKey="support.ticket.owner" @bind-Value="assignee" Placeholder="Atanmamış" />
+                        <label class="form-label" for="task-assignee">@Texts.Get("common.field.owner")</label>
+                        <LookupPicker Id="task-assignee" LookupKey="support.ticket.owner" @bind-Value="assignee" Placeholder="@Texts.Get("support.unassigned")" />
                         <FieldError Field="assigneeId" Errors="errors" />
                     </div>
                     <div class="span-2 form-check align-self-end">
                         <input id="task-blocking" class="form-check-input" type="checkbox" @bind="blocking" />
-                        <label class="form-check-label" for="task-blocking">Engelleyici</label>
+                        <label class="form-check-label" for="task-blocking">@Texts.Get("support.tasksPanel.blocking")</label>
                     </div>
                 </div>
             </fieldset>
-            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">Ekle</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-outline-secondary" disabled="@busy">@Texts.Get("common.add")</button></div>
         </form>
     }
 </section>
@@ -103,7 +103,7 @@
         var result = await Api.PostAsync<List<TicketTaskDto>>($"/api/support/tickets/{Ticket.Id}/tasks", new AddTicketTaskRequest(title, assignee, blocking));
         busy = false;
         failed = !result.IsSuccess;
-        message = result.IsSuccess ? "Alt iş eklendi." : result.Error;
+        message = result.IsSuccess ? Texts.Get("support.tasksPanel.added") : result.Error;
         errors = result.FieldErrors;
         if (!result.IsSuccess) { return; }
         tasks = result.Value;

@@ -3,28 +3,27 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Şikâyet inceleme · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.support.complaints") · Modulix</PageTitle>
 
 <AuthGate Module="@SupportAccess.ModuleKey" Permission="@SupportAccess.ReportsRead">
     <div class="page-header">
         <div>
-            <h1>Şikâyet inceleme</h1>
+            <h1>@Texts.Get("nav.app.support.complaints")</h1>
             <p class="text-muted mb-0">
-                Tekrarlayan kök nedenler ve düzeltici aksiyon takibi. Veriler yetkiniz ve veri kapsamınızla sınırlıdır. Kök nedenler yazıldığı metne göre gruplanır
-                (büyük/küçük harf ve boşluk farkı gözetilmez; anlamsal eşleştirme yoktur).
+                @Texts.Get("support.complaints.intro")
             </p>
         </div>
-        <div class="header-actions"><a class="btn btn-outline-secondary" href="destek/raporlar">Destek raporları</a></div>
+        <div class="header-actions"><a class="btn btn-outline-secondary" href="destek/raporlar">@Texts.Get("support.reports.title")</a></div>
     </div>
 
-    <form class="filters" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="Süzgeçler">
-        <label class="visually-hidden" for="cp-from">Başlangıç</label>
+    <form class="filters" @onsubmit="LoadAsync" @onsubmit:preventDefault aria-label="@Texts.Get("support.complaints.filters")">
+        <label class="visually-hidden" for="cp-from">@Texts.Get("support.reports.from")</label>
         <input id="cp-from" type="date" class="form-control form-control-sm filter-select" @bind="from" />
-        <label class="visually-hidden" for="cp-to">Bitiş</label>
+        <label class="visually-hidden" for="cp-to">@Texts.Get("support.reports.to")</label>
         <input id="cp-to" type="date" class="form-control form-control-sm filter-select" @bind="to" />
-        <label class="visually-hidden" for="cp-min">Tekrar eşiği</label>
+        <label class="visually-hidden" for="cp-min">@Texts.Get("support.complaints.threshold")</label>
         <input id="cp-min" type="number" min="2" max="100" class="form-control form-control-sm filter-select" @bind="minOccurrences" />
-        <button type="submit" class="btn btn-sm btn-outline-secondary" disabled="@busy">Getir</button>
+        <button type="submit" class="btn btn-sm btn-outline-secondary" disabled="@busy">@Texts.Get("support.complaints.load")</button>
     </form>
 
     <Notice Text="@error" Failed="true" />
@@ -36,65 +35,65 @@
     else if (review is not null)
     {
         <p class="small text-muted" role="status">
-            @review.Meta.From.ToString("dd.MM.yyyy") – @review.Meta.To.ToString("dd.MM.yyyy") · dönemde açılan <strong>@review.Complaints</strong> şikâyet, kök nedeni yazılmış <strong>@review.WithRootCause</strong>
+            @review.Meta.From.ToString("dd.MM.yyyy") – @review.Meta.To.ToString("dd.MM.yyyy") · @Texts.Strong("support.complaints.summary", review.Complaints.ToString(), review.WithRootCause.ToString())
         </p>
         @if (review.Meta.Truncated)
         {
-            <div class="alert alert-warning" role="alert">Talep sayısı rapor üst sınırını aştı; sayılar eksiktir. Dönemi daraltın.</div>
+            <div class="alert alert-warning" role="alert">@Texts.Get("support.complaints.truncated")</div>
         }
 
-        <section aria-labelledby="cp-recurring"><h2 id="cp-recurring">Tekrarlayan nedenler (en az @review.MinOccurrences kez)</h2>
+        <section aria-labelledby="cp-recurring"><h2 id="cp-recurring">@Texts.Get("support.complaints.recurring", review.MinOccurrences)</h2>
             @if (review.Recurring.Count == 0)
             {
-                <EmptyState Title="Bu dönemde eşiği aşan tekrarlayan neden yok." />
+                <EmptyState Title="@Texts.Get("support.complaints.noRecurring")" />
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Tekrarlayan kök nedenler</caption>
-                    <thead><tr><th scope="col">Kök neden</th><th scope="col">Tekrar</th><th scope="col">İlk / son</th><th scope="col">Kategoriler</th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("support.complaints.recurringCaption")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("support.rootCause")</th><th scope="col">@Texts.Get("support.complaints.col.count")</th><th scope="col">@Texts.Get("support.complaints.col.firstLast")</th><th scope="col">@Texts.Get("support.complaints.col.categories")</th></tr></thead>
                     <tbody>
                         @foreach (var r in review.Recurring)
                         {
                             <tr>
-                                <td data-label="Kök neden" class="primary">@r.Cause</td>
-                                <td data-label="Tekrar"><a href="@ReportLabels.Drill(r.DrillDown)">@r.Count şikâyet</a></td>
-                                <td data-label="İlk / son">@CrmLabels.Time(r.FirstAt) / @CrmLabels.Time(r.LastAt)</td>
-                                <td data-label="Kategoriler">@string.Join(", ", r.Categories.Select(c => $"{c.Key} ({c.Count})"))</td>
+                                <td data-label="@Texts.Get("support.rootCause")" class="primary">@r.Cause</td>
+                                <td data-label="@Texts.Get("support.complaints.col.count")"><a href="@ReportLabels.Drill(r.DrillDown)">@Texts.Get("support.complaints.count", r.Count)</a></td>
+                                <td data-label="@Texts.Get("support.complaints.col.firstLast")">@CrmLabels.Time(r.FirstAt) / @CrmLabels.Time(r.LastAt)</td>
+                                <td data-label="@Texts.Get("support.complaints.col.categories")">@string.Join(", ", r.Categories.Select(c => $"{c.Key} ({c.Count})"))</td>
                             </tr>
                         }
                     </tbody>
                 </table>
-                @if (review.Recurring.Any(r => r.Count > r.TicketIds.Count)) { <p class="small text-muted">Bağlantılar en çok 50 talebi açar.</p> }
+                @if (review.Recurring.Any(r => r.Count > r.TicketIds.Count)) { <p class="small text-muted">@Texts.Get("support.complaints.linkLimit")</p> }
             }
         </section>
 
-        <section aria-labelledby="cp-actions"><h2 id="cp-actions">Düzeltici aksiyonlar</h2>
+        <section aria-labelledby="cp-actions"><h2 id="cp-actions">@Texts.Get("support.correctivePanel.title")</h2>
             <p>
-                Açık: <strong>@review.Actions.Open</strong> · gecikmiş: <strong>@review.Actions.Overdue</strong> · tamamlanan: @review.Actions.Done · iptal: @review.Actions.Cancelled
+                @Texts.Strong("support.complaints.actionsOpen", review.Actions.Open.ToString(), review.Actions.Overdue.ToString()) · @Texts.Get("support.complaints.actionsClosed", review.Actions.Done, review.Actions.Cancelled)
             </p>
             <p class="small text-muted">
-                Zamanında tamamlanma (vadesi bu dönemde olanlar): <strong>@ReportLabels.Percent(review.Actions.OnTimePercent)</strong>
-                — pay: zamanında tamamlanan @review.Actions.DoneOnTime; payda: zamanında @review.Actions.DoneOnTime + geç @review.Actions.DoneLate + gecikmiş açık @review.Actions.OverdueInPeriod.
+                @Texts.Strong("support.complaints.onTime", ReportLabels.Percent(review.Actions.OnTimePercent))
+                — @Texts.Get("support.complaints.onTimeFormula", review.Actions.DoneOnTime, review.Actions.DoneLate, review.Actions.OverdueInPeriod)
             </p>
             @if (review.OverdueActions.Count == 0)
             {
-                <EmptyState Title="Gecikmiş aksiyon yok." />
+                <EmptyState Title="@Texts.Get("support.complaints.noOverdue")" />
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Gecikmiş düzeltici aksiyonlar</caption>
-                    <thead><tr><th scope="col">Aksiyon</th><th scope="col">Talep</th><th scope="col">Sorumlu</th><th scope="col">Son tarih</th><th scope="col">Gecikme</th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("support.complaints.overdueCaption")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("support.complaints.col.action")</th><th scope="col">@Texts.Get("support.tickets.col.ticket")</th><th scope="col">@Texts.Get("common.field.owner")</th><th scope="col">@Texts.Get("support.correctivePanel.dueDate")</th><th scope="col">@Texts.Get("support.complaints.col.delay")</th></tr></thead>
                     <tbody>
                         @foreach (var a in review.OverdueActions)
                         {
                             <tr>
-                                <td data-label="Aksiyon" class="primary">@a.Title</td>
-                                <td data-label="Talep"><a href="destek/talepler/@a.TicketId">@a.TicketNumber</a></td>
-                                <td data-label="Sorumlu">@Lookups.MemberName(a.OwnerId)</td>
-                                <td data-label="Son tarih">@a.DueDate.ToString("dd.MM.yyyy")</td>
-                                <td data-label="Gecikme">@a.DaysOverdue gün</td>
+                                <td data-label="@Texts.Get("support.complaints.col.action")" class="primary">@a.Title</td>
+                                <td data-label="@Texts.Get("support.tickets.col.ticket")"><a href="destek/talepler/@a.TicketId">@a.TicketNumber</a></td>
+                                <td data-label="@Texts.Get("common.field.owner")">@Lookups.MemberName(a.OwnerId)</td>
+                                <td data-label="@Texts.Get("support.correctivePanel.dueDate")">@a.DueDate.ToString("dd.MM.yyyy")</td>
+                                <td data-label="@Texts.Get("support.complaints.col.delay")">@Texts.Get("support.complaints.days", a.DaysOverdue)</td>
                             </tr>
                         }
                     </tbody>
