@@ -121,4 +121,8 @@ internal static class FilterValue
 
     public static DateOnly? Date(string value) =>
         DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : null;
+
+    /// <summary>ISO 8601 an; saat dilimi verilmemişse UTC sayılır.</summary>
+    public static DateTimeOffset? Time(string value) =>
+        DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var time) ? time.ToUniversalTime() : null;
 }

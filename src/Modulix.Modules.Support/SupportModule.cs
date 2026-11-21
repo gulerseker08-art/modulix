@@ -141,6 +141,12 @@ public sealed class SupportModule : IModule, IModuleEndpoints, IModulePublicEndp
 
     public string DisplayName => "Destek";
 
+    /// <summary>CRM olmadan talepler elle açılır; CRM'deki müşteri zaman çizelgesi talepleri de gösterir (ADR-0051, ADR-0053).</summary>
+    public IReadOnlyList<ModuleDependency> Dependencies { get; } =
+    [
+        new ModuleDependency("crm", ModuleDependencyKind.Optional, "Müşteri kartındaki zaman çizelgesinde destek talepleri"),
+    ];
+
     IReadOnlyList<PermissionDefinition> IModule.Permissions { get; } =
     [
         new(Permissions.TicketsRead, "Destek taleplerini, tarihçesini ve müşteriye görünen mesajlarını görüntüler", "Destek talepleri"),
@@ -449,6 +455,8 @@ public sealed class SupportModule : IModule, IModuleEndpoints, IModulePublicEndp
         services.AddScoped<IRecordStore, SupportTicketRecordStore>();
         services.AddScoped<IRecordStore, SupportQueueRecordStore>();
         services.AddScoped<IRecordStore, TicketCategoryRecordStore>();
+        // Müşteri zaman çizelgesinin talep kaynağı (ADR-0053); CRM kayıtlı kaynakları birleştirir.
+        services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, TicketTimelineSource>();
         services.AddScoped<ITicketWorkflow, TicketWorkflow>();
         services.AddScoped<ITicketMessages, TicketMessages>();
         services.AddScoped<ITicketQueries, TicketQueries>();

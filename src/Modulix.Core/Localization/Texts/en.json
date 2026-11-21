@@ -462,6 +462,7 @@
   "crm.timeline.kind.quote": "Quote",
   "crm.timeline.kind.order": "Order",
   "crm.timeline.kind.contract": "Contract",
+  "crm.timeline.kind.ticket": "Support ticket",
   "crm.timeline.kind.other": "Record",
   "crm.company.tabs.aria": "Company sections",
   "crm.company.tickets": "Support tickets",

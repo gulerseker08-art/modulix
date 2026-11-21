@@ -462,6 +462,7 @@
   "crm.timeline.kind.quote": "Teklif",
   "crm.timeline.kind.order": "Sipariş",
   "crm.timeline.kind.contract": "Sözleşme",
+  "crm.timeline.kind.ticket": "Destek talebi",
   "crm.timeline.kind.other": "Kayıt",
   "crm.company.tabs.aria": "Firma bölümleri",
   "crm.company.tickets": "Destek talepleri",

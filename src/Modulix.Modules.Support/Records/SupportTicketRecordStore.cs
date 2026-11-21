@@ -78,6 +78,8 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         ["queueId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.QueueId == id) : null,
         ["parentTicketId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(t => t.ParentTicketId == id) : null,
         // Rapor kırılımı (dilim 6): açılış tarihi aralığı (Türkiye günü, uçlar dahil), yaş (gün), yeniden açılma, düşük memnuniyet, kimlik listesi.
+        // Müşteri zaman çizelgesinin sayfalama imleci (ADR-0053): verilen andan önce açılan talepler (sınır hariç).
+        ["createdBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(t => t.CreatedAt < time) : null,
         ["createdFrom"] = (q, v, _) => FilterValue.Date(v) is { } d && ReportPeriod.StartOf(d) is var from ? q.Where(t => t.CreatedAt >= from) : null,
         ["createdTo"] = (q, v, _) => FilterValue.Date(v) is { } d && ReportPeriod.EndExclusive(d) is var until ? q.Where(t => t.CreatedAt < until) : null,
         ["minAgeDays"] = (q, v, _) => int.TryParse(v, out var days) && days >= 0 && DateTimeOffset.UtcNow.AddDays(-days) is var edge ? q.Where(t => t.CreatedAt <= edge) : null,
